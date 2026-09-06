@@ -39,10 +39,10 @@ const state = {
 
 /* ---------- Boot ---------- */
 async function boot() {
-  if (!state.member) {
-    renderLogin();
-    return;
-  }
+  const authed = await ensureValidAuthToken();
+  if (!authed) { renderPasswordGate(); return; }
+  if (!state.member) { renderNamePicker(); return; }
+
   await loadMembers();
   window.addEventListener('hashchange', () => {
     state.route = (location.hash || '#plan').replace('#', '');
@@ -62,86 +62,90 @@ function currentMemberBoard() {
 }
 
 /* ================================================================
-   LOGIN
+   LOGIN — zweistufig:
+   1) gemeinsamer Team-Code (echter Firebase-Auth-Account, sichert die
+      Datenbank ab — siehe firebase.js)
+   2) eigener Name (rein lokal pro Gerät gemerkt, keine echten Accounts)
    ================================================================= */
-let loginSelected = null;
-
-async function renderLogin() {
+function renderPasswordGate() {
   APP_ROOT.innerHTML = `
     <div class="login-shell">
       <h1 class="login-word">PIN<em>CHO</em></h1>
       <p class="login-tag">Kraft, die an der Wand ankommt.</p>
       <div class="field">
-        <label>Wer trainiert?</label>
-        <div class="chip-row" id="login-members"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
+        <label>Team-Code</label>
+        <input type="password" id="login-password" placeholder="••••" autofocus>
       </div>
-      <div class="field">
-        <label>Code</label>
-        <input type="password" id="login-code" inputmode="numeric" placeholder="••••">
-      </div>
-      <button class="btn" id="login-submit">REIN AN DIE WAND</button>
-      <p class="login-hint" id="login-hint"></p>
+      <button class="btn" id="login-password-submit">REIN AN DIE WAND</button>
+      <p class="login-hint" id="login-password-hint">Erste Anmeldung überhaupt? Der hier eingegebene Code wird zum neuen Team-Code.</p>
     </div>
   `;
-  document.getElementById('login-submit').onclick = submitLogin;
-
-  const [members, appCode] = await Promise.all([fbGet('members'), fbGet('config/appCode')]);
-  state.members = members || {};
-  window.__pinchoAppCodeExists = !!appCode;
-  window.__pinchoAppCode = appCode;
-
-  const row = document.getElementById('login-members');
-  const hint = document.getElementById('login-hint');
-  const ids = Object.keys(state.members);
-  row.innerHTML = ids.map((id) => `
-    <button type="button" class="chip" data-id="${esc(id)}">${esc(state.members[id].name)}</button>
-  `).join('') + `<button type="button" class="chip" id="login-add">+ Neu</button>`;
-
-  row.querySelectorAll('.chip[data-id]').forEach((btn) => {
-    btn.onclick = () => {
-      loginSelected = { id: btn.dataset.id, name: state.members[btn.dataset.id].name };
-      row.querySelectorAll('.chip[data-id]').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-    };
+  document.getElementById('login-password-submit').onclick = submitPasswordGate;
+  document.getElementById('login-password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitPasswordGate();
   });
-  document.getElementById('login-add').onclick = async () => {
-    const name = prompt('Wie heisst du?');
-    if (!name || !name.trim()) return;
-    const id = await fbPush('members', { name: name.trim(), board: 'bm2000' });
-    if (!id) { toast('Konnte nicht speichern — Firebase-URL korrekt gesetzt?', 'err'); return; }
-    state.members[id] = { name: name.trim(), board: 'bm2000' };
-    loginSelected = { id, name: name.trim() };
-    renderLogin();
-  };
-
-  hint.textContent = ids.length === 0
-    ? 'Noch niemand registriert — leg dich als Erste/r an.'
-    : (appCode ? '' : 'Noch kein Team-Code gesetzt — der hier eingegebene Code wird zum neuen Team-Code.');
 }
 
-async function submitLogin() {
-  if (!loginSelected) { toast('Bitte zuerst Namen wählen.', 'err'); return; }
-  const code = document.getElementById('login-code').value.trim();
-  if (!code) { toast('Bitte Code eingeben.', 'err'); return; }
+async function submitPasswordGate() {
+  const password = document.getElementById('login-password').value;
+  const hint = document.getElementById('login-password-hint');
+  if (!password) { toast('Bitte Team-Code eingeben.', 'err'); return; }
 
-  if (!window.__pinchoAppCodeExists) {
-    const ok = await fbPut('config/appCode', code);
-    if (!ok) { toast('Konnte Code nicht speichern.', 'err'); return; }
-    toast('Team-Code gesetzt.', 'ok');
-  } else if (code !== window.__pinchoAppCode) {
-    toast('Falscher Code.', 'err');
+  let result = await signInTeam(password);
+  if (!result.ok && result.code === 'EMAIL_NOT_FOUND') {
+    result = await signUpTeam(password);
+    if (result.ok) toast('Team-Code gesetzt.', 'ok');
+  }
+  if (!result.ok) {
+    hint.textContent = 'Falscher Team-Code — bitte nochmal versuchen.';
+    hint.style.color = 'var(--danger)';
     return;
   }
+  boot();
+}
 
-  state.member = loginSelected;
+function renderNamePicker() {
+  APP_ROOT.innerHTML = `
+    <div class="login-shell">
+      <h1 class="login-word">PIN<em>CHO</em></h1>
+      <p class="login-tag">Wer trainiert?</p>
+      <div class="chip-row" id="name-picker-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
+      <p class="login-hint">Einmal pro Gerät — danach merkt sich Pincho, wer du bist.</p>
+    </div>
+  `;
+  loadMembers().then(() => {
+    const row = document.getElementById('name-picker-list');
+    const ids = Object.keys(state.members);
+    row.innerHTML = ids.map((id) => `
+      <button type="button" class="chip" data-id="${esc(id)}">${esc(state.members[id].name)}</button>
+    `).join('') + `<button type="button" class="chip" id="name-picker-add">+ Neu</button>`;
+
+    row.querySelectorAll('.chip[data-id]').forEach((btn) => {
+      btn.onclick = () => selectMemberAndEnter(btn.dataset.id, state.members[btn.dataset.id].name);
+    });
+    document.getElementById('name-picker-add').onclick = async () => {
+      const name = prompt('Wie heisst du?');
+      if (!name || !name.trim()) return;
+      const id = await fbPush('members', { name: name.trim(), board: 'bm2000' });
+      if (!id) { toast('Konnte nicht speichern.', 'err'); return; }
+      state.members[id] = { name: name.trim(), board: 'bm2000' };
+      selectMemberAndEnter(id, name.trim());
+    };
+  });
+}
+
+function selectMemberAndEnter(id, name) {
+  state.member = { id, name };
   localStorage.setItem('pincho_member', JSON.stringify(state.member));
   boot();
 }
 
+/* "Raus" wechselt nur den lokal gewählten Namen (z. B. anderes Gerät,
+   Kollege trainiert am selben Handy) — der Team-Code bleibt angemeldet. */
 function logout() {
   localStorage.removeItem('pincho_member');
   state.member = null;
-  renderLogin();
+  renderNamePicker();
 }
 
 /* ================================================================
@@ -173,7 +177,7 @@ function renderShell(contentHtml) {
 }
 
 function render() {
-  if (!state.member) { renderLogin(); return; }
+  if (!state.member) { boot(); return; }
   switch (state.route) {
     case 'log': renderLog(); break;
     case 'fingerboard': renderFingerboard(); break;
