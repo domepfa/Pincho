@@ -56,6 +56,7 @@ const BOARDS = {
       { id: 'pocket2_offset', label: '2-Finger-Tasche versetzt (Mittel-/Zeigefinger)', note: '35 / 50mm' },
       { id: 'mono', label: 'Mono-Tasche', note: '55mm' },
       { id: 'mono_small', label: 'Mono-Tasche klein', note: '25mm' },
+      { id: 'sloper_easy', label: 'Sloper 20°', note: '' },
       { id: 'sloper_medium', label: 'Sloper 35°', note: '' },
       { id: 'sloper_hard', label: 'Sloper 45°', note: '' },
     ],
