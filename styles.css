@@ -158,8 +158,10 @@ button, input, select, textarea { font-family: inherit; }
    kühlen Granit-Theme — echte Fingerboards sind aus Holz. */
 .board-plank { fill: #8a6339; stroke: #5c4326; stroke-width: 2; }
 .grip-hold { cursor: pointer; }
-.grip-hold rect, .grip-hold circle, .grip-hold path { fill: #3c2a17; stroke: #241a0e; stroke-width: 1; transition: fill .15s, stroke .15s; }
-.grip-hold.active rect, .grip-hold.active circle, .grip-hold.active path { fill: var(--accent); stroke: var(--accent-ink); }
+.grip-hold rect, .grip-hold ellipse, .grip-hold path { fill: #3c2a17; stroke: #241a0e; stroke-width: 1; transition: fill .15s, stroke .15s; }
+.grip-hold.active rect, .grip-hold.active ellipse, .grip-hold.active path { fill: var(--accent); stroke: var(--accent-ink); }
+.grip-hold .hold-dot { fill: #8a6339; stroke: none; } /* wirkt wie kleine Bohrung, gleicher Ton wie das Brett */
+.grip-hold.active .hold-dot { fill: var(--accent-ink); }
 .grip-hold-label { fill: #f2e9d8; font-family: 'IBM Plex Mono', monospace; font-size: 7px; }
 .grip-hold.active .grip-hold-label { fill: var(--accent); font-weight: 600; }
 

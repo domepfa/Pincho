@@ -387,6 +387,18 @@ const fb = {
   wakeLock: null,
 };
 
+/* Eine ovale Tasche/Mono-Aussparung mit kleinem "Bohrloch"-Punkt (wie auf
+   echten Beastmaker-Boards sichtbar) — rxFrac bestimmt die Breite relativ
+   zur Zellbreite (mehr Finger = breiter). */
+function ovalHold(x, y, w, h, rxFrac) {
+  const cx = x + w / 2;
+  const cy = y + h * 0.55;
+  const rx = w * rxFrac;
+  const ry = h * 0.3;
+  const dotR = Math.max(2, Math.min(w, h) * 0.045);
+  return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/><circle class="hold-dot" cx="${cx}" cy="${cy - ry * 0.4}" r="${dotR}"/>`;
+}
+
 /* Zeichnet die Griff-Silhouette passend zur Kategorie (Kante/Tasche/Sloper/
    Jug) — grobe, aber klar unterscheidbare Formen statt generischer Buttons. */
 function holdShapeSvg(grip, x, y, w, h) {
@@ -398,18 +410,13 @@ function holdShapeSvg(grip, x, y, w, h) {
   if (id === 'jug') {
     return `<rect x="${x + w * 0.08}" y="${y + h * 0.12}" width="${w * 0.84}" height="${h * 0.76}" rx="10"/>`;
   }
-  if (id.startsWith('pocket4')) {
-    return [0, 1, 2, 3].map((i) => `<circle cx="${x + w * (0.15 + i * 0.235)}" cy="${y + h * 0.55}" r="${Math.min(w * 0.11, h * 0.16)}"/>`).join('');
-  }
-  if (id.startsWith('pocket3')) {
-    return [0, 1, 2].map((i) => `<circle cx="${x + w * (0.22 + i * 0.28)}" cy="${y + h * 0.55}" r="${Math.min(w * 0.13, h * 0.18)}"/>`).join('');
-  }
-  if (id.startsWith('pocket2')) {
-    return [0, 1].map((i) => `<circle cx="${x + w * (0.32 + i * 0.36)}" cy="${y + h * 0.55}" r="${Math.min(w * 0.15, h * 0.2)}"/>`).join('');
-  }
-  if (id.startsWith('mono')) {
-    return `<circle cx="${x + w / 2}" cy="${y + h * 0.55}" r="${Math.min(w * 0.13, h * 0.16)}"/>`;
-  }
+  // Taschen/Mono sind auf dem echten Board EINE durchgehende ovale Aussparung
+  // (breiter für mehr Finger), nicht mehrere einzelne Löcher — nur die Breite
+  // unterscheidet 4-/3-/2-Finger-Taschen und Mono.
+  if (id.startsWith('pocket4')) return ovalHold(x, y, w, h, 0.42);
+  if (id.startsWith('pocket3')) return ovalHold(x, y, w, h, 0.32);
+  if (id.startsWith('pocket2')) return ovalHold(x, y, w, h, 0.22);
+  if (id.startsWith('mono')) return ovalHold(x, y, w, h, 0.14);
   if (id.startsWith('sloper')) {
     const steep = id.endsWith('hard');
     const topY = y + h * (steep ? 0.08 : 0.26);
