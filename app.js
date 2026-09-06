@@ -43,12 +43,12 @@ async function boot() {
   if (!authed) { renderPasswordGate(); return; }
   if (!state.member) { renderNamePicker(); return; }
 
-  await loadMembers();
-  window.addEventListener('hashchange', () => {
-    state.route = (location.hash || '#plan').replace('#', '');
-    render();
-  });
+  // Sofort rendern statt auf eine (ggf. langsame/wacklige) Firebase-Antwort
+  // zu warten — die Mitgliederliste wird im Hintergrund nachgeladen und
+  // löst bei Bedarf ein Nachrendern aus (Fingerboard/Challenges nutzen sie).
   render();
+  await loadMembers();
+  if (state.route === 'fingerboard' || state.route === 'challenges') render();
 }
 
 async function loadMembers() {
@@ -115,6 +115,7 @@ function renderNamePicker() {
   `;
   loadMembers().then(() => {
     const row = document.getElementById('name-picker-list');
+    if (!row) return; // Nutzer hat inzwischen weiternavigiert
     const ids = Object.keys(state.members);
     row.innerHTML = ids.map((id) => `
       <button type="button" class="chip" data-id="${esc(id)}">${esc(state.members[id].name)}</button>
@@ -195,7 +196,13 @@ async function renderPlan() {
     <div class="list" id="plan-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>`);
 
   let plan = await fbGet(`plans/${state.member.id}`);
-  if (!plan) {
+  if (plan === undefined) {
+    // Anfrage fehlgeschlagen (z. B. kein Netz) — Default nur lokal anzeigen,
+    // NICHT zurückschreiben, sonst würde ein evtl. schon angepasster Plan
+    // beim nächsten erfolgreichen Laden überschrieben.
+    plan = DEFAULT_WEEK_PLAN;
+  } else if (plan === null) {
+    // Wirklich noch kein Plan für dieses Mitglied vorhanden — einmalig anlegen.
     plan = DEFAULT_WEEK_PLAN;
     await fbPut(`plans/${state.member.id}`, plan);
   }
@@ -205,6 +212,7 @@ async function renderPlan() {
   const todayIdx = jsToday === 0 ? 6 : jsToday - 1; // Mo=0 ... So=6
 
   const list = document.getElementById('plan-list');
+  if (!list) return; // Nutzer hat inzwischen weiternavigiert
   list.innerHTML = plan.map((d, i) => `
     <div class="day-row ${i === todayIdx ? 'today' : ''}">
       <span class="d mono">${d.day}</span>
@@ -231,6 +239,8 @@ async function renderPlan() {
 /* ================================================================
    LOG
    ================================================================= */
+let logBuilder = { exercises: [] };
+
 async function renderLog() {
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Neue Session</h2><div class="sec-rule"></div></div>
@@ -240,14 +250,39 @@ async function renderLog() {
         <div class="field"><label>Typ</label>
           <select id="log-type">
             <option value="klettern">Klettern</option>
-            <option value="gym">Gym</option>
+            <option value="gym" selected>Gym</option>
             <option value="fingerboard">Fingerboard</option>
             <option value="mobility">Mobility</option>
             <option value="sonstiges">Sonstiges</option>
           </select>
         </div>
       </div>
-      <div class="field"><label>Notiz</label><textarea id="log-note" placeholder="z. B. Klimmzug 4×5 @ +15kg, Pallof Press 3×12…"></textarea></div>
+
+      <div class="field">
+        <label>Vorlage laden</label>
+        <select id="log-template">
+          <option value="">— eigener Ablauf —</option>
+          ${ROUTINE_TEMPLATES.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
+        </select>
+      </div>
+
+      <div id="log-exercise-rows"></div>
+
+      <div class="field">
+        <label>Übung hinzufügen</label>
+        <div class="field-row">
+          <select id="log-exercise-picker" style="flex:2;">
+            ${Object.entries(EXERCISE_CATEGORY_LABEL).map(([cat, label]) => `
+              <optgroup label="${label}">
+                ${EXERCISE_LIBRARY.filter((e) => e.category === cat).map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join('')}
+              </optgroup>
+            `).join('')}
+          </select>
+          <button type="button" class="btn small" id="log-exercise-add" style="flex:0 0 auto;">+ Hinzufügen</button>
+        </div>
+      </div>
+
+      <div class="field"><label>Notiz (optional)</label><textarea id="log-note" placeholder="Befinden, Bedingungen, Sonstiges…"></textarea></div>
       <div class="field"><label>RPE (1–10, optional)</label><input type="number" id="log-rpe" min="1" max="10"></div>
       <button class="btn" id="log-save">SESSION SPEICHERN</button>
     </div>
@@ -256,28 +291,74 @@ async function renderLog() {
     <div class="list" id="log-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
   `);
 
+  renderLogExerciseRows();
+
+  document.getElementById('log-template').onchange = (e) => {
+    const t = ROUTINE_TEMPLATES.find((r) => r.id === e.target.value);
+    logBuilder.exercises = t ? t.exercises.map((ex) => ({ ...ex, weight: '' })) : [];
+    renderLogExerciseRows();
+  };
+  document.getElementById('log-exercise-add').onclick = () => {
+    const id = document.getElementById('log-exercise-picker').value;
+    logBuilder.exercises.push({ exerciseId: id, sets: 3, reps: '', weight: '' });
+    renderLogExerciseRows();
+  };
+
   document.getElementById('log-save').onclick = async () => {
     const entry = {
       date: document.getElementById('log-date').value || todayKey(),
       type: document.getElementById('log-type').value,
+      exercises: logBuilder.exercises,
       note: document.getElementById('log-note').value.trim(),
       rpe: document.getElementById('log-rpe').value || null,
       createdAt: Date.now(),
     };
     const id = await fbPush(`logs/${state.member.id}`, entry);
-    if (id) { toast('Session gespeichert.', 'ok'); renderLog(); }
+    if (id) { toast('Session gespeichert.', 'ok'); logBuilder = { exercises: [] }; renderLog(); }
     else toast('Konnte nicht speichern.', 'err');
   };
 
   const raw = await fbGet(`logs/${state.member.id}`);
   const entries = Object.entries(raw || {}).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
   const list = document.getElementById('log-list');
+  if (!list) return; // Nutzer hat inzwischen weiternavigiert
   list.innerHTML = entries.length ? entries.map(([id, e]) => `
     <div class="log-item">
       <div class="top"><span>${esc(e.date)}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
+      ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => `
+        <div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}</span><span class="mono">${esc(String(ex.sets))}×${esc(String(ex.reps))}${ex.weight ? ' @ ' + esc(String(ex.weight)) + 'kg' : ''}</span></div>
+      `).join('')}</div>` : ''}
       ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
     </div>
   `).join('') : '<div class="list-empty">Noch keine Einträge.</div>';
+}
+
+function renderLogExerciseRows() {
+  const holder = document.getElementById('log-exercise-rows');
+  if (!holder) return;
+  holder.innerHTML = logBuilder.exercises.length ? logBuilder.exercises.map((ex, i) => `
+    <div class="ex-row">
+      <span class="ex-row-name">${esc(exerciseName(ex.exerciseId))}</span>
+      <input type="number" data-i="${i}" data-f="sets" value="${ex.sets}" placeholder="Sätze" class="ex-row-input" title="Sätze">
+      <input type="text" data-i="${i}" data-f="reps" value="${esc(String(ex.reps))}" placeholder="Wdh" class="ex-row-input" title="Wiederholungen">
+      <input type="number" data-i="${i}" data-f="weight" value="${ex.weight}" placeholder="kg" step="0.5" class="ex-row-input" title="Gewicht">
+      <button type="button" class="ex-row-remove" data-remove="${i}">×</button>
+    </div>
+  `).join('') : '<div class="list-empty" style="margin-bottom:14px;">Noch keine Übungen — Vorlage laden oder unten hinzufügen.</div>';
+
+  holder.querySelectorAll('input').forEach((inp) => {
+    inp.oninput = () => {
+      const i = Number(inp.dataset.i);
+      const f = inp.dataset.f;
+      logBuilder.exercises[i][f] = f === 'reps' ? inp.value : (Number(inp.value) || 0);
+    };
+  });
+  holder.querySelectorAll('[data-remove]').forEach((btn) => {
+    btn.onclick = () => {
+      logBuilder.exercises.splice(Number(btn.dataset.remove), 1);
+      renderLogExerciseRows();
+    };
+  });
 }
 
 /* ================================================================
@@ -510,6 +591,7 @@ const HOUR_MS = 60 * 60 * 1000;
 const CHALLENGE_WINDOW_H = 48;
 
 function getSharedGripIds() {
+  if (Object.keys(state.members).length === 0) return []; // Mitgliederliste noch nicht geladen
   const boardIds = Object.values(state.members).map((m) => m.board || 'bm2000');
   const uniqueBoards = [...new Set(boardIds)];
   const gripSets = uniqueBoards.map((b) => new Set(BOARDS[b].grips.map((g) => g.id)));
@@ -557,6 +639,7 @@ async function renderChallenges() {
 
   const entries = Object.entries(state.challenges).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
   const list = document.getElementById('challenge-list');
+  if (!list) return; // Nutzer hat inzwischen weiternavigiert
   list.innerHTML = entries.length ? entries.map(([id, c]) => renderChallengeCard(id, c, now)).join('') : '<div class="list-empty">Noch keine Challenges — leg die erste an!</div>';
 
   list.querySelectorAll('[data-confirm]').forEach((btn) => {
@@ -603,7 +686,7 @@ function renderNewChallengeForm() {
       <div class="chip-row">
         ${Object.keys(PROTOCOLS).map((p) => `<button type="button" class="chip ${newChallengeState.protocolId === p ? 'active' : ''}" data-proto="${p}">${PROTOCOLS[p].label}</button>`).join('')}
       </div>
-      ${Object.entries(EXERCISE_CATEGORY_LABEL).map(([cat, label]) => `
+      ${Object.entries(EXERCISE_CATEGORY_LABEL).filter(([cat]) => ACCESSORY_EXERCISES.some((e) => e.category === cat)).map(([cat, label]) => `
         <div class="ex-cat-label">${label} — in den Pausen</div>
         <div class="ex-check-grid">
           ${ACCESSORY_EXERCISES.filter((e) => e.category === cat).map((e) => `
@@ -657,4 +740,8 @@ async function sendNewChallenge() {
 }
 
 /* ---------- Start ---------- */
+window.addEventListener('hashchange', () => {
+  state.route = (location.hash || '#plan').replace('#', '');
+  render();
+});
 boot();

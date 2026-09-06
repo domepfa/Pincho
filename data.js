@@ -95,30 +95,92 @@ function buildSequence(protocolId, opts) {
   return seq;
 }
 
-/* ---------- Zubehör-Übungen für Trainings-Pausen & Challenges ---------- */
-const ACCESSORY_EXERCISES = [
-  { id: 'face_pull', name: 'Face Pulls', category: 'antagonist' },
-  { id: 'ext_rotation', name: 'Aussenrotation Kabel', category: 'antagonist' },
-  { id: 'wrist_ext', name: 'Reverse Wrist Curls', category: 'antagonist' },
-  { id: 'y_t_w', name: 'Y-T-W-Raises', category: 'antagonist' },
-  { id: 'pallof', name: 'Pallof Press', category: 'rumpf' },
-  { id: 'hanging_leg_raise', name: 'Hanging Leg Raise', category: 'rumpf' },
-  { id: 'front_lever_prog', name: 'Front-Lever-Progression', category: 'rumpf' },
-  { id: 'toes_to_bar', name: 'Toes-to-Bar', category: 'rumpf' },
-  { id: 'push_up', name: 'Liegestütz / Bankdrücken', category: 'push' },
+/* ---------- Übungsdatenbank ----------
+   Eine Liste für alles: Log-Einträge, Trainingsplan-Vorlagen UND die
+   Zubehör-Auswahl bei Challenges. `pauseFriendly: true` markiert Übungen,
+   die sich in Fingerboard-Pausen machen lassen (kein Langhantel-Rack nötig)
+   — genau diese Teilmenge wird bei Challenges angeboten
+   (siehe ACCESSORY_EXERCISES unten). */
+const EXERCISE_LIBRARY = [
+  // Zug
+  { id: 'pullup', name: 'Klimmzug', category: 'zug' },
+  { id: 'pullup_weighted', name: 'Klimmzug mit Zusatzgewicht', category: 'zug' },
+  { id: 'lat_pulldown', name: 'Latzug', category: 'zug' },
+  { id: 'lat_pulldown_single', name: 'Latzug einarmig', category: 'zug' },
+  { id: 'row_cable', name: 'Rudern Kabel', category: 'zug' },
+  { id: 'row_barbell', name: 'Rudern Langhantel', category: 'zug' },
+  // Antagonisten
+  { id: 'face_pull', name: 'Face Pulls', category: 'antagonist', pauseFriendly: true },
+  { id: 'ext_rotation', name: 'Aussenrotation Kabel', category: 'antagonist', pauseFriendly: true },
+  { id: 'wrist_ext', name: 'Reverse Wrist Curls', category: 'antagonist', pauseFriendly: true },
+  { id: 'y_t_w', name: 'Y-T-W-Raises', category: 'antagonist', pauseFriendly: true },
+  // Rumpf
+  { id: 'pallof', name: 'Pallof Press', category: 'rumpf', pauseFriendly: true },
+  { id: 'hanging_leg_raise', name: 'Hanging Leg Raise', category: 'rumpf', pauseFriendly: true },
+  { id: 'front_lever_prog', name: 'Front-Lever-Progression', category: 'rumpf', pauseFriendly: true },
+  { id: 'toes_to_bar', name: 'Toes-to-Bar', category: 'rumpf', pauseFriendly: true },
+  // Push
+  { id: 'push_up', name: 'Liegestütz', category: 'push', pauseFriendly: true },
+  { id: 'bench_press', name: 'Bankdrücken', category: 'push' },
   { id: 'ohp', name: 'Overhead Press', category: 'push' },
-  { id: 'dips', name: 'Dips', category: 'push' },
-  { id: 'split_squat', name: 'Bulgarian Split Squat', category: 'beine' },
-  { id: 'deadlift', name: 'Kreuzheben', category: 'beine' },
+  { id: 'dips', name: 'Dips', category: 'push', pauseFriendly: true },
+  // Beine
   { id: 'squat', name: 'Kniebeuge', category: 'beine' },
+  { id: 'deadlift', name: 'Kreuzheben', category: 'beine' },
+  { id: 'split_squat', name: 'Bulgarian Split Squat', category: 'beine', pauseFriendly: true },
 ];
 
+const ACCESSORY_EXERCISES = EXERCISE_LIBRARY.filter((e) => e.pauseFriendly);
+
 const EXERCISE_CATEGORY_LABEL = {
+  zug: 'Zug',
   antagonist: 'Antagonisten',
-  rumpf: 'Rumpf',
   push: 'Push',
   beine: 'Beine',
+  rumpf: 'Rumpf',
 };
+
+function exerciseName(id) {
+  const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
+  return ex ? ex.name : id;
+}
+
+/* ---------- Trainingsplan-Vorlagen ----------
+   Vorgefertigte Abläufe (Übung + Sätze + Wiederholungen), die im Log als
+   Ausgangspunkt geladen und danach frei angepasst werden können. */
+const ROUTINE_TEMPLATES = [
+  {
+    id: 'gym_zug_rumpf',
+    name: 'Gym — Zug & Rumpf',
+    exercises: [
+      { exerciseId: 'pullup_weighted', sets: 4, reps: '5' },
+      { exerciseId: 'row_barbell', sets: 3, reps: '8' },
+      { exerciseId: 'pallof', sets: 3, reps: '12' },
+      { exerciseId: 'face_pull', sets: 3, reps: '15' },
+      { exerciseId: 'wrist_ext', sets: 2, reps: '15' },
+    ],
+  },
+  {
+    id: 'gym_beine_push',
+    name: 'Gym — Beine & Push',
+    exercises: [
+      { exerciseId: 'squat', sets: 4, reps: '6' },
+      { exerciseId: 'split_squat', sets: 3, reps: '10' },
+      { exerciseId: 'bench_press', sets: 3, reps: '8' },
+      { exerciseId: 'ohp', sets: 3, reps: '8' },
+    ],
+  },
+  {
+    id: 'gym_ganzkoerper',
+    name: 'Gym — Ganzkörper (Einsteiger)',
+    exercises: [
+      { exerciseId: 'deadlift', sets: 3, reps: '5' },
+      { exerciseId: 'lat_pulldown', sets: 3, reps: '10' },
+      { exerciseId: 'push_up', sets: 3, reps: '12' },
+      { exerciseId: 'pallof', sets: 3, reps: '12' },
+    ],
+  },
+];
 
 /* ---------- Standard-Wochenplan (Startvorlage) ----------
    Wird pro Mitglied einmalig nach Firebase kopiert und ist dort danach

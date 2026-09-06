@@ -119,18 +119,23 @@ function authQuery() {
   return authState.idToken ? `?auth=${authState.idToken}` : '';
 }
 
+/* Gibt bei Erfolg den Wert zurück (kann selbst `null` sein — Firebase liefert
+   das für einen leeren, aber existierenden Pfad). Bei einem echten Fehler
+   (Netzwerk, Server) wird stattdessen `undefined` zurückgegeben — Aufrufer
+   können so "wirklich leer" von "Anfrage fehlgeschlagen" unterscheiden und
+   müssen im Fehlerfall nicht fälschlich Default-Daten zurückschreiben. */
 async function fbGet(path) {
   try {
     await ensureValidAuthToken();
     const res = await fetch(`${FIREBASE_URL}/${path}.json${authQuery()}`);
     if (!res.ok) {
       console.error('Firebase GET fehlgeschlagen', path, res.status);
-      return null;
+      return undefined;
     }
     return await res.json();
   } catch (e) {
     console.error('Firebase GET Fehler', path, e);
-    return null;
+    return undefined;
   }
 }
 

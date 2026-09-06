@@ -1,6 +1,7 @@
 # Pincho
 
-Krafttraining-App fürs Klettern: Wochenplan, eigenes Logbuch, ein
+Krafttraining-App fürs Klettern: Wochenplan, eigenes Logbuch mit
+Übungsdatenbank und Trainingsplan-Vorlagen (Sätze/Wdh/Gewicht), ein
 Fingerboard-Timer-Tool (Beastmaker 1000/2000) und Motivations-Challenges für
 eine kleine Crew (bis ~5 Personen). Kein Wettkampf, keine Rangliste — nur
 "hast du's auch gemacht?".
