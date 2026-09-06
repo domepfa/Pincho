@@ -34,11 +34,31 @@ const BOARDS = {
       { id: 'sloper_medium', label: 'Sloper 35°', note: '' },
     ],
     // Antippbare Zonen (% von Bildbreite/-höhe) — per calibrate.html
-    // erzeugt (Bild antippen, Griff zuordnen, Code exportieren). Aktuell
-    // leer, seit das Bild ins Querformat gedreht wurde (macht alte
-    // Koordinaten ungültig). Bis zur Neu-Kalibrierung bleibt die
-    // Griff-Auswahl über die Chip-Liste unter dem Bild nutzbar.
+    // erzeugt (Bild antippen, Griff zuordnen, Code exportieren).
     hotspots: [
+      { grip: 'jug', x: 14.9, y: 23 },
+      { grip: 'jug', x: 84.9, y: 24.2 },
+      { grip: 'sloper_medium', x: 28.9, y: 31.4 },
+      { grip: 'sloper_medium', x: 69.2, y: 30.3 },
+      { grip: 'sloper_easy', x: 44.6, y: 28 },
+      { grip: 'sloper_easy', x: 57.5, y: 28.6 },
+      { grip: 'edge_xsmall', x: 13.9, y: 37.6 },
+      { grip: 'edge_xsmall', x: 85.9, y: 37.6 },
+      { grip: 'edge3', x: 46.1, y: 35.4 },
+      { grip: 'edge3', x: 57.5, y: 39.3 },
+      { grip: 'edge_medium', x: 12.4, y: 51.1 },
+      { grip: 'edge_medium', x: 90.7, y: 51.7 },
+      { grip: 'pocket2_deep', x: 76.5, y: 52 },
+      { grip: 'pocket2_deep', x: 25.3, y: 52 },
+      { grip: 'pocket3_deep', x: 36.2, y: 52.8 },
+      { grip: 'pocket3_deep', x: 68.2, y: 52.2 },
+      { grip: 'edge_large', x: 50.2, y: 50.7 },
+      { grip: 'edge_small', x: 82.1, y: 68.6 },
+      { grip: 'edge_small', x: 20.3, y: 66.3 },
+      { grip: 'pocket2', x: 68.9, y: 68 },
+      { grip: 'pocket2', x: 34.5, y: 68.5 },
+      { grip: 'pocket3', x: 57.5, y: 69.1 },
+      { grip: 'pocket3', x: 44.6, y: 68 },
     ],
   },
   bm2000: {
