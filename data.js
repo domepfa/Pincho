@@ -11,29 +11,35 @@
    angeboten, die auf ALLEN beteiligten Boards existieren (siehe app.js,
    getSharedGripIds()).
 
-   BM2000-Werte sind reale Herstellerangaben (bestätigt anhand einer
-   beschrifteten Referenzgrafik, September 2026). BM1000 noch mit
-   Platzhaltern — sobald eine ebenso eindeutige Quelle/Messung vorliegt,
-   hier analog eintragen. */
+   BM1000- und BM2000-Kanten/Taschen sind reale Herstellerangaben (bestätigt
+   anhand beschrifteter Referenzgrafiken, September 2026). Jug- und
+   Sloper-Winkel sind bekannt, aber ohne mm-Tiefe (Sloper werden über den
+   Winkel trainiert, nicht über eine Tiefe). */
 const BOARDS = {
   bm1000: {
     label: 'Beastmaker 1000',
     grips: [
       { id: 'jug', label: 'Jug', note: '2 Jugs oben' },
-      { id: 'edge_large', label: 'Grosse Kante', note: 'mm noch eintragen' },
-      { id: 'edge_medium', label: 'Mittlere Kante', note: 'mm noch eintragen' },
-      { id: 'pocket4_deep', label: '4-Finger-Tasche tief', note: '' },
-      { id: 'pocket4_medium', label: '4-Finger-Tasche mittel', note: '' },
-      { id: 'pocket3', label: '3-Finger-Tasche', note: '' },
-      { id: 'pocket2', label: '2-Finger-Tasche', note: '' },
+      { id: 'edge_large', label: 'Grosse Kante (4-Finger)', note: '50mm' },
+      { id: 'edge_medium', label: 'Mittlere Kante (4-Finger)', note: '45mm' },
+      { id: 'edge_small', label: 'Kleine Kante (4-Finger)', note: '20mm' },
+      { id: 'edge_xsmall', label: 'Kleinste Kante (4-Finger)', note: '15mm' },
+      { id: 'edge3', label: '3-Finger-Kante', note: '30mm' },
+      { id: 'pocket3', label: '3-Finger-Tasche', note: '20mm' },
+      { id: 'pocket3_deep', label: '3-Finger-Tasche tief', note: '45mm' },
+      { id: 'pocket2', label: '2-Finger-Tasche', note: '25mm' },
+      { id: 'pocket2_deep', label: '2-Finger-Tasche tief', note: '50mm' },
       { id: 'sloper_easy', label: 'Sloper 20°', note: '' },
       { id: 'sloper_medium', label: 'Sloper 35°', note: '' },
     ],
     // Schematische Anordnung fürs grafische Board (Zeile für Zeile, oben→unten).
     layoutRows: [
-      ['jug', 'edge_large', 'edge_medium'],
-      ['pocket4_deep', 'pocket4_medium'],
-      ['pocket3', 'pocket2'],
+      ['edge_large', 'edge_medium'],
+      ['edge_small', 'edge_xsmall'],
+      ['edge3'],
+      ['pocket3', 'pocket3_deep'],
+      ['pocket2', 'pocket2_deep'],
+      ['jug'],
       ['sloper_easy', 'sloper_medium'],
     ],
   },
