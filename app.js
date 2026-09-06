@@ -421,21 +421,31 @@ function holdShapeSvg(grip, x, y, w, h) {
 /* Grafisches Board: Holzbrett-Hintergrund + Löcher/Griffe gemäss layoutRows,
    Zeile für Zeile. mm-Angabe (grip.note) steht direkt unter jedem Griff,
    sobald sie in data.js eingetragen ist — bis dahin die Kategorie-Bezeichnung. */
+/* Quer-Layout, das die echte Zeilen-Anordnung des physischen Boards abbildet
+   (siehe layoutRows in data.js: links/rechts gespiegelt, oben→unten, wie auf
+   den Beastmaker-Referenzfotos) — feste Zellgrösse, kürzere Zeilen (Jug,
+   Sloper) werden zentriert statt in die Breite gezogen. Auf schmalen Handys
+   scrollt der umgebende Container (.board-visual) horizontal. */
 function renderBoardSvg() {
   const board = BOARDS[fb.board];
   const rows = board.layoutRows;
-  const rowH = 60;
-  const pad = 10;
-  const svgW = 300;
+  const cellW = 74;
+  const cellH = 60;
+  const rowGap = 18;
+  const pad = 12;
+  const maxCols = Math.max(...rows.map((r) => r.length));
+  const svgW = pad * 2 + maxCols * cellW;
+  const rowH = cellH + rowGap;
+  const svgH = pad * 2 + rows.length * rowH - rowGap + 4;
   const shapes = [];
   rows.forEach((row, ri) => {
-    const cellW = (svgW - pad * 2) / row.length;
+    const offsetX = pad + (maxCols * cellW - row.length * cellW) / 2;
     row.forEach((gripId, ci) => {
       const grip = board.grips.find((g) => g.id === gripId);
-      const x = pad + ci * cellW;
+      const x = offsetX + ci * cellW;
       const y = pad + ri * rowH;
       const w = cellW - 8;
-      const h = rowH - 16;
+      const h = cellH;
       const active = fb.selectedGrip === gripId;
       const noteText = (grip.note && !grip.note.includes('noch eintragen')) ? grip.note : grip.label;
       shapes.push(`
@@ -446,9 +456,8 @@ function renderBoardSvg() {
       `);
     });
   });
-  const svgH = pad * 2 + rows.length * rowH + 4;
-  return `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%">
-    <rect x="0" y="0" width="${svgW}" height="${svgH}" rx="10" class="board-plank"/>
+  return `<svg viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" height="${svgH}">
+    <rect x="0" y="0" width="${svgW}" height="${svgH}" rx="${svgH / 2.2}" class="board-plank"/>
     ${shapes.join('')}
   </svg>`;
 }

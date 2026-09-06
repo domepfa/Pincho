@@ -151,8 +151,8 @@ button, input, select, textarea { font-family: inherit; }
 .ex-row-step { flex-shrink: 0; background: none; border: 1px solid var(--accent); color: var(--accent); width: 22px; height: 22px; line-height: 1; cursor: pointer; font-size: 13px; }
 
 /* ---------- Fingerboard ---------- */
-.board-visual { border: 1px solid var(--line); background: var(--surface-2); padding: 10px; margin-bottom: 6px; }
-.board-visual svg { width: 100%; height: auto; display: block; }
+.board-visual { border: 1px solid var(--line); background: var(--surface-2); padding: 10px; margin-bottom: 6px; overflow-x: auto; }
+.board-visual svg { display: block; margin: 0 auto; max-width: none; }
 
 /* Holzbrett-Look fürs Fingerboard: warmer Holzton als Kontrast zum sonst
    kühlen Granit-Theme — echte Fingerboards sind aus Holz. */

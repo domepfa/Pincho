@@ -32,14 +32,14 @@ const BOARDS = {
       { id: 'sloper_easy', label: 'Sloper 20°', note: '' },
       { id: 'sloper_medium', label: 'Sloper 35°', note: '' },
     ],
-    // Schematische Anordnung fürs grafische Board (Zeile für Zeile, oben→unten).
+    // Echte Zeilen-Anordnung wie auf dem physischen Board (links/rechts
+    // gespiegelt, oben→unten), anhand der Referenzgrafik nachgebaut —
+    // dasselbe Bild pro Zeile, statt nur einmal pro Kategorie.
     layoutRows: [
-      ['edge_large', 'edge_medium'],
-      ['edge_small', 'edge_xsmall'],
-      ['edge3'],
-      ['pocket3', 'pocket3_deep'],
-      ['pocket2', 'pocket2_deep'],
-      ['jug'],
+      ['jug', 'jug'],
+      ['edge_xsmall', 'edge3', 'edge3', 'edge_xsmall'],
+      ['edge_medium', 'pocket2_deep', 'pocket3_deep', 'edge_large', 'pocket3_deep', 'pocket2_deep', 'edge_medium'],
+      ['edge_small', 'pocket2', 'pocket3', 'pocket3', 'pocket2', 'edge_small'],
       ['sloper_easy', 'sloper_medium'],
     ],
   },
@@ -60,13 +60,12 @@ const BOARDS = {
       { id: 'sloper_medium', label: 'Sloper 35°', note: '' },
       { id: 'sloper_hard', label: 'Sloper 45°', note: '' },
     ],
+    // Echte Zeilen-Anordnung wie auf dem physischen Board (links/rechts
+    // gespiegelt, oben→unten), anhand der Referenzgrafik nachgebaut.
     layoutRows: [
-      ['edge_large', 'edge_medium'],
-      ['edge_small', 'edge_xsmall'],
       ['pocket3', 'pocket3_small'],
-      ['pocket2', 'pocket2_small'],
-      ['pocket2_offset'],
-      ['mono', 'mono_small'],
+      ['edge_medium', 'mono', 'pocket2_offset', 'pocket2', 'edge_large', 'pocket2', 'pocket2_offset', 'mono', 'edge_medium'],
+      ['edge_xsmall', 'mono_small', 'pocket2_small', 'pocket2_small', 'edge_small', 'pocket2_small', 'pocket2_small', 'mono_small', 'edge_xsmall'],
       ['sloper_medium', 'sloper_hard'],
     ],
   },
