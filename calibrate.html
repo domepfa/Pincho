@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pincho – Board-Kalibrierung</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="./styles.css">
+<style>
+  body { padding: 16px; padding-bottom: 40px; max-width: 640px; margin: 0 auto; }
+  h1 { font-family: 'Bebas Neue', sans-serif; font-size: 26px; margin: 0 0 4px; }
+  .intro { color: var(--ink-dim); font-size: 13px; margin: 0 0 16px; }
+
+  .calib-wrap { position: relative; width: 100%; border: 1px solid var(--line); background: var(--surface-2); margin-bottom: 12px; }
+  .calib-wrap img { width: 100%; display: block; cursor: crosshair; }
+  .calib-pin {
+    position: absolute; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+    display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 700;
+    transform: translate(-50%, -50%); border: 2px solid var(--accent-ink); cursor: pointer;
+  }
+  .calib-pin.assigned { background: #7cff3f; }
+
+  .legend-row { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); padding: 8px; margin-bottom: 6px; }
+  .legend-row .num {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  }
+  .legend-row select { flex: 1; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); padding: 8px; font-size: 13px; }
+  .legend-row button { flex-shrink: 0; background: none; border: 1px solid var(--line); color: var(--ink-faint); width: 26px; height: 26px; cursor: pointer; }
+
+  textarea { width: 100%; min-height: 220px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; background: var(--surface-2);
+    border: 1px solid var(--line); color: var(--ink); padding: 10px; box-sizing: border-box; }
+</style>
+</head>
+<body>
+
+<h1>Pincho — Board-Kalibrierung</h1>
+<p class="intro">Aufs Bild tippen → nummerierter Punkt entsteht. Unten jedem Punkt einen Griff zuordnen. Am Schluss den Code exportieren und Claude schicken. Ein Punkt lässt sich durch Antippen wieder löschen.</p>
+
+<div class="chip-row" id="board-toggle">
+  <button class="chip active" data-board="bm1000">BM 1000</button>
+  <button class="chip" data-board="bm2000">BM 2000</button>
+</div>
+
+<div class="calib-wrap" id="calib-wrap">
+  <img id="calib-img" src="" alt="">
+</div>
+
+<button class="btn ghost" id="reset-btn" style="width:auto;padding:8px 16px;margin-bottom:20px;">Punkte zurücksetzen</button>
+
+<div class="sec-head"><h2 class="sec-title">Zuordnung</h2><div class="sec-rule"></div></div>
+<div id="legend-list"></div>
+
+<div class="sec-head"><h2 class="sec-title">Export</h2><div class="sec-rule"></div></div>
+<textarea id="export-text" readonly></textarea>
+<button class="btn" id="copy-btn" style="margin-top:10px;">In Zwischenablage kopieren</button>
+<p class="mono" id="copy-hint" style="font-size:11px;color:var(--ink-faint);min-height:14px;"></p>
+
+<script src="./data.js"></script>
+<script>
+  let board = 'bm1000';
+  const points = { bm1000: [], bm2000: [] };
+
+  function render() {
+    document.getElementById('calib-img').src = BOARDS[board].image;
+    document.querySelectorAll('#board-toggle .chip').forEach((b) => b.classList.toggle('active', b.dataset.board === board));
+    renderPins();
+    renderLegend();
+    renderExport();
+  }
+
+  function renderPins() {
+    const wrap = document.getElementById('calib-wrap');
+    wrap.querySelectorAll('.calib-pin').forEach((p) => p.remove());
+    points[board].forEach((p, i) => {
+      const el = document.createElement('div');
+      el.className = 'calib-pin' + (p.grip ? ' assigned' : '');
+      el.style.left = p.x + '%';
+      el.style.top = p.y + '%';
+      el.textContent = i + 1;
+      el.onclick = (e) => {
+        e.stopPropagation();
+        if (confirm('Punkt ' + (i + 1) + ' löschen?')) { points[board].splice(i, 1); render(); }
+      };
+      wrap.appendChild(el);
+    });
+  }
+
+  function renderLegend() {
+    const holder = document.getElementById('legend-list');
+    const grips = BOARDS[board].grips;
+    holder.innerHTML = points[board].length ? points[board].map((p, i) => `
+      <div class="legend-row">
+        <span class="num">${i + 1}</span>
+        <select data-i="${i}">
+          <option value="">— Griff wählen —</option>
+          ${grips.map((g) => `<option value="${g.id}" ${p.grip === g.id ? 'selected' : ''}>${g.label}${g.note ? ' · ' + g.note : ''}</option>`).join('')}
+        </select>
+        <button type="button" data-remove="${i}">×</button>
+      </div>
+    `).join('') : '<p style="color:var(--ink-faint);font-size:13px;">Noch keine Punkte gesetzt — oben aufs Bild tippen.</p>';
+
+    holder.querySelectorAll('select').forEach((sel) => {
+      sel.onchange = () => {
+        points[board][Number(sel.dataset.i)].grip = sel.value || null;
+        renderPins();
+        renderExport();
+      };
+    });
+    holder.querySelectorAll('[data-remove]').forEach((btn) => {
+      btn.onclick = () => { points[board].splice(Number(btn.dataset.remove), 1); render(); };
+    });
+  }
+
+  function renderExport() {
+    const assigned = points[board].filter((p) => p.grip);
+    const lines = assigned.map((p) => `      { grip: '${p.grip}', x: ${p.x}, y: ${p.y} },`).join('\n');
+    const missing = BOARDS[board].grips.filter((g) => !assigned.some((p) => p.grip === g.id));
+    let text = `// ${board} — ${assigned.length}/${BOARDS[board].grips.length} zugeordnet\nhotspots: [\n${lines}\n    ],`;
+    if (missing.length) text += `\n\n// Noch offen: ${missing.map((g) => g.label).join(', ')}`;
+    document.getElementById('export-text').value = text;
+  }
+
+  document.getElementById('calib-wrap').addEventListener('click', (e) => {
+    if (e.target.closest('.calib-pin')) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * 1000) / 10;
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * 1000) / 10;
+    points[board].push({ x, y, grip: null });
+    render();
+  });
+
+  document.getElementById('board-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-board]');
+    if (!btn) return;
+    board = btn.dataset.board;
+    render();
+  });
+
+  document.getElementById('reset-btn').onclick = () => {
+    if (confirm('Alle Punkte für ' + BOARDS[board].label + ' löschen?')) { points[board] = []; render(); }
+  };
+
+  document.getElementById('copy-btn').onclick = () => {
+    const ta = document.getElementById('export-text');
+    ta.select();
+    const hint = document.getElementById('copy-hint');
+    navigator.clipboard?.writeText(ta.value)
+      .then(() => { hint.textContent = 'Kopiert.'; })
+      .catch(() => { hint.textContent = 'Kopieren fehlgeschlagen — Text oben manuell markieren.'; });
+  };
+
+  render();
+</script>
+</body>
+</html>
