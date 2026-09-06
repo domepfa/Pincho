@@ -151,19 +151,16 @@ button, input, select, textarea { font-family: inherit; }
 .ex-row-step { flex-shrink: 0; background: none; border: 1px solid var(--accent); color: var(--accent); width: 22px; height: 22px; line-height: 1; cursor: pointer; font-size: 13px; }
 
 /* ---------- Fingerboard ---------- */
-.board-visual { border: 1px solid var(--line); background: var(--surface-2); padding: 10px; margin-bottom: 6px; overflow-x: auto; }
-.board-visual svg { display: block; margin: 0 auto; max-width: none; }
+.board-visual { border: 1px solid var(--line); background: var(--surface-2); padding: 10px; margin-bottom: 6px; }
 
-/* Holzbrett-Look fürs Fingerboard: warmer Holzton als Kontrast zum sonst
-   kühlen Granit-Theme — echte Fingerboards sind aus Holz. */
-.board-plank { fill: #8a6339; stroke: #5c4326; stroke-width: 2; }
-.grip-hold { cursor: pointer; }
-.grip-hold rect, .grip-hold ellipse, .grip-hold path { fill: #3c2a17; stroke: #241a0e; stroke-width: 1; transition: fill .15s, stroke .15s; }
-.grip-hold.active rect, .grip-hold.active ellipse, .grip-hold.active path { fill: var(--accent); stroke: var(--accent-ink); }
-.grip-hold .hold-dot { fill: #8a6339; stroke: none; } /* wirkt wie kleine Bohrung, gleicher Ton wie das Brett */
-.grip-hold.active .hold-dot { fill: var(--accent-ink); }
-.grip-hold-label { fill: #f2e9d8; font-family: 'IBM Plex Mono', monospace; font-size: 7px; }
-.grip-hold.active .grip-hold-label { fill: var(--accent); font-weight: 600; }
+.board-photo-wrap { position: relative; max-width: 320px; margin: 0 auto; }
+.board-photo-wrap img { width: 100%; display: block; }
+.board-hotspot {
+  position: absolute; width: 11%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  border-radius: 50%; border: 2px solid rgba(212, 255, 63, .55); background: rgba(212, 255, 63, .1);
+  cursor: pointer; padding: 0;
+}
+.board-hotspot.active { border-color: var(--accent); background: rgba(212, 255, 63, .38); box-shadow: 0 0 0 4px rgba(212, 255, 63, .2); }
 
 .timer-box { text-align: center; margin: 6px 0 18px; }
 .timer-box .big { font-family: 'Bebas Neue', sans-serif; font-size: 88px; line-height: 1; color: var(--accent); }

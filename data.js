@@ -18,6 +18,7 @@
 const BOARDS = {
   bm1000: {
     label: 'Beastmaker 1000',
+    image: './assets/board-bm1000.png',
     grips: [
       { id: 'jug', label: 'Jug', note: '2 Jugs oben' },
       { id: 'edge_large', label: 'Grosse Kante (4-Finger)', note: '50mm' },
@@ -32,19 +33,29 @@ const BOARDS = {
       { id: 'sloper_easy', label: 'Sloper 20°', note: '' },
       { id: 'sloper_medium', label: 'Sloper 35°', note: '' },
     ],
-    // Echte Zeilen-Anordnung wie auf dem physischen Board (links/rechts
-    // gespiegelt, oben→unten), anhand der Referenzgrafik nachgebaut —
-    // dasselbe Bild pro Zeile, statt nur einmal pro Kategorie.
-    layoutRows: [
-      ['jug', 'jug'],
-      ['edge_xsmall', 'edge3', 'edge3', 'edge_xsmall'],
-      ['edge_medium', 'pocket2_deep', 'pocket3_deep', 'edge_large', 'pocket3_deep', 'pocket2_deep', 'edge_medium'],
-      ['edge_small', 'pocket2', 'pocket3', 'pocket3', 'pocket2', 'edge_small'],
-      ['sloper_easy', 'sloper_medium'],
+    // Antippbare Zonen (% von Bildbreite/-höhe) auf dem eigenen Foto/Bild.
+    // Da es sich um eine Illustration und kein massstabsgetreues Photo
+    // handelt, ist die Zuordnung Loch↔Kategorie nach bestem Augenmass
+    // gewählt (grössere/tiefere Löcher → grössere Kategorien) statt exakt
+    // vermessen — bei Bedarf hier anpassen.
+    hotspots: [
+      { grip: 'jug', x: 30, y: 20 },
+      { grip: 'edge_small', x: 30, y: 35 },
+      { grip: 'edge_xsmall', x: 30, y: 49 },
+      { grip: 'edge3', x: 30, y: 64 },
+      { grip: 'sloper_easy', x: 30, y: 80 },
+      { grip: 'sloper_medium', x: 30, y: 93 },
+      { grip: 'edge_large', x: 48, y: 12 },
+      { grip: 'edge_medium', x: 62, y: 11 },
+      { grip: 'pocket3', x: 48, y: 23 },
+      { grip: 'pocket3_deep', x: 48, y: 34 },
+      { grip: 'pocket2', x: 62, y: 44 },
+      { grip: 'pocket2_deep', x: 62, y: 59 },
     ],
   },
   bm2000: {
     label: 'Beastmaker 2000',
+    image: './assets/board-bm2000.png',
     grips: [
       { id: 'edge_large', label: 'Grosse Kante (4-Finger)', note: '50mm' },
       { id: 'edge_medium', label: 'Mittlere Kante (4-Finger)', note: '33mm' },
@@ -60,13 +71,21 @@ const BOARDS = {
       { id: 'sloper_medium', label: 'Sloper 35°', note: '' },
       { id: 'sloper_hard', label: 'Sloper 45°', note: '' },
     ],
-    // Echte Zeilen-Anordnung wie auf dem physischen Board (links/rechts
-    // gespiegelt, oben→unten), anhand der Referenzgrafik nachgebaut.
-    layoutRows: [
-      ['pocket3', 'pocket3_small'],
-      ['edge_medium', 'mono', 'pocket2_offset', 'pocket2', 'edge_large', 'pocket2', 'pocket2_offset', 'mono', 'edge_medium'],
-      ['edge_xsmall', 'mono_small', 'pocket2_small', 'pocket2_small', 'edge_small', 'pocket2_small', 'pocket2_small', 'mono_small', 'edge_xsmall'],
-      ['sloper_medium', 'sloper_hard'],
+    // Siehe Kommentar bei bm1000 — gleiche Vorgehensweise.
+    hotspots: [
+      { grip: 'edge_medium', x: 33, y: 15 },
+      { grip: 'edge_small', x: 33, y: 25 },
+      { grip: 'edge_xsmall', x: 33, y: 32 },
+      { grip: 'pocket2_small', x: 33, y: 41 },
+      { grip: 'sloper_medium', x: 33, y: 50 },
+      { grip: 'sloper_hard', x: 33, y: 60 },
+      { grip: 'edge_large', x: 50, y: 15 },
+      { grip: 'mono', x: 50, y: 24 },
+      { grip: 'pocket3_small', x: 50, y: 41 },
+      { grip: 'pocket3', x: 50, y: 52 },
+      { grip: 'pocket2', x: 50, y: 62 },
+      { grip: 'mono_small', x: 50, y: 79 },
+      { grip: 'pocket2_offset', x: 62, y: 45 },
     ],
   },
 };

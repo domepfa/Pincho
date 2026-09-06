@@ -1,7 +1,7 @@
-const CACHE_NAME = 'pincho-shell-v1';
+const CACHE_NAME = 'pincho-shell-v2';
 const SHELL_ASSETS = [
   './', './index.html', './styles.css', './data.js', './firebase.js', './app.js',
-  './manifest.json', './icon.svg',
+  './manifest.json', './icon.svg', './assets/board-bm1000.png', './assets/board-bm2000.png',
 ];
 
 self.addEventListener('install', (e) => {

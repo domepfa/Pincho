@@ -387,86 +387,22 @@ const fb = {
   wakeLock: null,
 };
 
-/* Eine ovale Tasche/Mono-Aussparung mit kleinem "Bohrloch"-Punkt (wie auf
-   echten Beastmaker-Boards sichtbar) — rxFrac bestimmt die Breite relativ
-   zur Zellbreite (mehr Finger = breiter). */
-function ovalHold(x, y, w, h, rxFrac) {
-  const cx = x + w / 2;
-  const cy = y + h * 0.55;
-  const rx = w * rxFrac;
-  const ry = h * 0.3;
-  const dotR = Math.max(2, Math.min(w, h) * 0.045);
-  return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/><circle class="hold-dot" cx="${cx}" cy="${cy - ry * 0.4}" r="${dotR}"/>`;
-}
-
-/* Zeichnet die Griff-Silhouette passend zur Kategorie (Kante/Tasche/Sloper/
-   Jug) — grobe, aber klar unterscheidbare Formen statt generischer Buttons. */
-function holdShapeSvg(grip, x, y, w, h) {
-  const id = grip.id;
-  if (id.startsWith('edge')) {
-    const depth = id.endsWith('small') ? 0.5 : id.endsWith('medium') ? 0.4 : 0.3;
-    return `<rect x="${x + w * 0.05}" y="${y + h * (1 - depth)}" width="${w * 0.9}" height="${h * depth}" rx="3"/>`;
-  }
-  if (id === 'jug') {
-    return `<rect x="${x + w * 0.08}" y="${y + h * 0.12}" width="${w * 0.84}" height="${h * 0.76}" rx="10"/>`;
-  }
-  // Taschen/Mono sind auf dem echten Board EINE durchgehende ovale Aussparung
-  // (breiter für mehr Finger), nicht mehrere einzelne Löcher — nur die Breite
-  // unterscheidet 4-/3-/2-Finger-Taschen und Mono.
-  if (id.startsWith('pocket4')) return ovalHold(x, y, w, h, 0.42);
-  if (id.startsWith('pocket3')) return ovalHold(x, y, w, h, 0.32);
-  if (id.startsWith('pocket2')) return ovalHold(x, y, w, h, 0.22);
-  if (id.startsWith('mono')) return ovalHold(x, y, w, h, 0.14);
-  if (id.startsWith('sloper')) {
-    const steep = id.endsWith('hard');
-    const topY = y + h * (steep ? 0.08 : 0.26);
-    return `<path d="M ${x + w * 0.08} ${y + h * 0.84} Q ${x + w * 0.5} ${topY} ${x + w * 0.92} ${y + h * 0.6} L ${x + w * 0.92} ${y + h * 0.9} Q ${x + w * 0.5} ${y + h * 0.98} ${x + w * 0.08} ${y + h * 0.9} Z"/>`;
-  }
-  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4"/>`;
-}
-
-/* Grafisches Board: Holzbrett-Hintergrund + Löcher/Griffe gemäss layoutRows,
-   Zeile für Zeile. mm-Angabe (grip.note) steht direkt unter jedem Griff,
-   sobald sie in data.js eingetragen ist — bis dahin die Kategorie-Bezeichnung. */
-/* Quer-Layout, das die echte Zeilen-Anordnung des physischen Boards abbildet
-   (siehe layoutRows in data.js: links/rechts gespiegelt, oben→unten, wie auf
-   den Beastmaker-Referenzfotos) — feste Zellgrösse, kürzere Zeilen (Jug,
-   Sloper) werden zentriert statt in die Breite gezogen. Auf schmalen Handys
-   scrollt der umgebende Container (.board-visual) horizontal. */
-function renderBoardSvg() {
+/* Echtes Board-Bild (eigene Illustration/eigenes Foto, siehe assets/) mit
+   unsichtbaren, antippbaren Kreiszonen über den Griffen (Positionen aus
+   data.js, in % von Bildbreite/-höhe — funktioniert responsiv). Da es sich
+   bislang um eine Illustration handelt, ist die Zuordnung Zone↔Kategorie
+   nach bestem Augenmass gewählt, nicht pixelgenau vermessen. */
+function renderBoardImage() {
   const board = BOARDS[fb.board];
-  const rows = board.layoutRows;
-  const cellW = 74;
-  const cellH = 60;
-  const rowGap = 18;
-  const pad = 12;
-  const maxCols = Math.max(...rows.map((r) => r.length));
-  const svgW = pad * 2 + maxCols * cellW;
-  const rowH = cellH + rowGap;
-  const svgH = pad * 2 + rows.length * rowH - rowGap + 4;
-  const shapes = [];
-  rows.forEach((row, ri) => {
-    const offsetX = pad + (maxCols * cellW - row.length * cellW) / 2;
-    row.forEach((gripId, ci) => {
-      const grip = board.grips.find((g) => g.id === gripId);
-      const x = offsetX + ci * cellW;
-      const y = pad + ri * rowH;
-      const w = cellW - 8;
-      const h = cellH;
-      const active = fb.selectedGrip === gripId;
-      const noteText = (grip.note && !grip.note.includes('noch eintragen')) ? grip.note : grip.label;
-      shapes.push(`
-        <g class="grip-hold ${active ? 'active' : ''}" data-grip="${gripId}">
-          ${holdShapeSvg(grip, x, y, w, h)}
-          <text x="${x + w / 2}" y="${y + h + 12}" text-anchor="middle" class="grip-hold-label">${esc(noteText)}</text>
-        </g>
-      `);
-    });
-  });
-  return `<svg viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" height="${svgH}">
-    <rect x="0" y="0" width="${svgW}" height="${svgH}" rx="${svgH / 2.2}" class="board-plank"/>
-    ${shapes.join('')}
-  </svg>`;
+  const spots = board.hotspots.map((h) => {
+    const grip = board.grips.find((g) => g.id === h.grip);
+    const active = fb.selectedGrip === h.grip;
+    return `<button type="button" class="board-hotspot ${active ? 'active' : ''}" style="left:${h.x}%;top:${h.y}%;" data-grip="${h.grip}" title="${esc(grip.label)}${grip.note ? ' · ' + esc(grip.note) : ''}"></button>`;
+  }).join('');
+  return `<div class="board-photo-wrap">
+    <img src="${board.image}" alt="${esc(board.label)}">
+    ${spots}
+  </div>`;
 }
 
 async function renderFingerboard() {
@@ -480,8 +416,11 @@ async function renderFingerboard() {
       <button class="chip ${fb.board === 'bm2000' ? 'active' : ''}" data-board="bm2000">BM 2000</button>
     </div>
 
-    <div class="board-visual" id="fb-board-visual">${renderBoardSvg()}</div>
-    <p class="login-hint" style="margin:-6px 0 16px;">${fb.selectedGrip ? 'Gewählt: ' + esc(gripLabel(fb.board, fb.selectedGrip)) : 'Griff am Board antippen, um ihn für einen neuen Hang-Satz zu wählen.'}</p>
+    <div class="board-visual" id="fb-board-visual">${renderBoardImage()}</div>
+    <p class="login-hint" style="margin:-6px 0 10px;">${fb.selectedGrip ? 'Gewählt: ' + esc(gripLabel(fb.board, fb.selectedGrip)) : 'Griff am Board antippen, um ihn für einen neuen Hang-Satz zu wählen.'}</p>
+    <div class="chip-row" id="fb-grip-legend" style="margin-bottom:16px;">
+      ${BOARDS[fb.board].grips.map((g) => `<button type="button" class="chip ${fb.selectedGrip === g.id ? 'active' : ''}" data-grip="${g.id}">${esc(g.label)}${g.note ? ' · ' + esc(g.note) : ''}</button>`).join('')}
+    </div>
 
     <div class="field"><label>Zusatzgewicht für diese Session (kg, negativ = Assistenz)</label><input type="number" id="fb-weight" value="${fb.weight}" step="0.5"></div>
 
@@ -516,7 +455,10 @@ async function renderFingerboard() {
       renderFingerboard();
     };
   });
-  document.getElementById('fb-board-visual').querySelectorAll('.grip-hold').forEach((el) => {
+  document.getElementById('fb-board-visual').querySelectorAll('.board-hotspot').forEach((el) => {
+    el.onclick = () => { fb.selectedGrip = el.dataset.grip; renderFingerboard(); };
+  });
+  document.getElementById('fb-grip-legend').querySelectorAll('.chip').forEach((el) => {
     el.onclick = () => { fb.selectedGrip = el.dataset.grip; renderFingerboard(); };
   });
   document.getElementById('fb-weight').oninput = (e) => { fb.weight = e.target.value; };
