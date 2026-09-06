@@ -74,11 +74,10 @@ echten Einzel-Accounts nötig.
 
 ## Offene Punkte / bewusst nicht in v1
 
-- **Griff-mm-Werte**: Die Griffkategorien in [`data.js`](./data.js)
-  (`BOARDS.bm1000` / `BOARDS.bm2000`) sind als Kategorien modelliert, nicht
-  mit exakten mm-Angaben — die `note`-Felder sind Platzhalter. Da ihr beide
-  Boards physisch habt: einmal ablesen und eintragen, dann stimmen auch die
-  Beschriftungen im Fingerboard-Tool.
+- **Griff-mm-Werte**: BM2000 ist mit echten Herstellerangaben befüllt
+  (`BOARDS.bm2000` in [`data.js`](./data.js)). BM1000 hat noch Platzhalter
+  ("mm noch eintragen") — sobald eine ebenso eindeutige Quelle oder eigene
+  Messung vorliegt, dort analog eintragen.
 - **App-Icons**: Aktuell ein einfaches SVG (`icon.svg`). Für optimale
   iOS/Android-Installierbarkeit später durch echte PNG-Icons (192×192,
   512×512) ersetzen.

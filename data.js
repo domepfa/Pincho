@@ -11,9 +11,10 @@
    angeboten, die auf ALLEN beteiligten Boards existieren (siehe app.js,
    getSharedGripIds()).
 
-   Die Freitext-"note" pro Griff (exakte mm-Angabe) bitte einmal am eigenen
-   Board ablesen und hier eintragen — ihr habt beide Boards physisch vor Ort,
-   das ist zuverlässiger als eine geschätzte Angabe. */
+   BM2000-Werte sind reale Herstellerangaben (bestätigt anhand einer
+   beschrifteten Referenzgrafik, September 2026). BM1000 noch mit
+   Platzhaltern — sobald eine ebenso eindeutige Quelle/Messung vorliegt,
+   hier analog eintragen. */
 const BOARDS = {
   bm1000: {
     label: 'Beastmaker 1000',
@@ -39,21 +40,27 @@ const BOARDS = {
   bm2000: {
     label: 'Beastmaker 2000',
     grips: [
-      { id: 'edge_large', label: 'Grosse Kante', note: 'mm noch eintragen' },
-      { id: 'edge_medium', label: 'Mittlere Kante', note: 'mm noch eintragen' },
-      { id: 'edge_small', label: 'Kleine Kante', note: 'mm noch eintragen' },
-      { id: 'pocket4_deep', label: '4-Finger-Tasche tief', note: '' },
-      { id: 'pocket4_medium', label: '4-Finger-Tasche mittel', note: '' },
-      { id: 'pocket3', label: '3-Finger-Tasche', note: '' },
-      { id: 'pocket2', label: '2-Finger-Tasche', note: '' },
-      { id: 'mono', label: 'Mono-Tasche', note: '' },
+      { id: 'edge_large', label: 'Grosse Kante (4-Finger)', note: '50mm' },
+      { id: 'edge_medium', label: 'Mittlere Kante (4-Finger)', note: '33mm' },
+      { id: 'edge_small', label: 'Kleine Kante (4-Finger)', note: '20mm' },
+      { id: 'edge_xsmall', label: 'Kleinste Kante (4-Finger)', note: '15mm' },
+      { id: 'pocket3', label: '3-Finger-Tasche', note: '40mm' },
+      { id: 'pocket3_small', label: '3-Finger-Tasche klein', note: '20mm' },
+      { id: 'pocket2', label: '2-Finger-Tasche', note: '30mm' },
+      { id: 'pocket2_small', label: '2-Finger-Tasche klein', note: '20mm' },
+      { id: 'pocket2_offset', label: '2-Finger-Tasche versetzt (Mittel-/Zeigefinger)', note: '35 / 50mm' },
+      { id: 'mono', label: 'Mono-Tasche', note: '55mm' },
+      { id: 'mono_small', label: 'Mono-Tasche klein', note: '25mm' },
       { id: 'sloper_medium', label: 'Sloper 35°', note: '' },
       { id: 'sloper_hard', label: 'Sloper 45°', note: '' },
     ],
     layoutRows: [
-      ['edge_large', 'edge_medium', 'edge_small'],
-      ['pocket4_deep', 'pocket4_medium'],
-      ['pocket3', 'pocket2', 'mono'],
+      ['edge_large', 'edge_medium'],
+      ['edge_small', 'edge_xsmall'],
+      ['pocket3', 'pocket3_small'],
+      ['pocket2', 'pocket2_small'],
+      ['pocket2_offset'],
+      ['mono', 'mono_small'],
       ['sloper_medium', 'sloper_hard'],
     ],
   },

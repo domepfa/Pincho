@@ -401,13 +401,13 @@ function holdShapeSvg(grip, x, y, w, h) {
   if (id.startsWith('pocket4')) {
     return [0, 1, 2, 3].map((i) => `<circle cx="${x + w * (0.15 + i * 0.235)}" cy="${y + h * 0.55}" r="${Math.min(w * 0.11, h * 0.16)}"/>`).join('');
   }
-  if (id === 'pocket3') {
+  if (id.startsWith('pocket3')) {
     return [0, 1, 2].map((i) => `<circle cx="${x + w * (0.22 + i * 0.28)}" cy="${y + h * 0.55}" r="${Math.min(w * 0.13, h * 0.18)}"/>`).join('');
   }
-  if (id === 'pocket2') {
+  if (id.startsWith('pocket2')) {
     return [0, 1].map((i) => `<circle cx="${x + w * (0.32 + i * 0.36)}" cy="${y + h * 0.55}" r="${Math.min(w * 0.15, h * 0.2)}"/>`).join('');
   }
-  if (id === 'mono') {
+  if (id.startsWith('mono')) {
     return `<circle cx="${x + w / 2}" cy="${y + h * 0.55}" r="${Math.min(w * 0.13, h * 0.16)}"/>`;
   }
   if (id.startsWith('sloper')) {
