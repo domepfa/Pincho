@@ -9,7 +9,7 @@
    Siehe README.md für die kompletten Setup-Schritte inkl. Security Rules.
    ================================================================= */
 
-const FIREBASE_URL = 'https://REPLACE-ME-default-rtdb.europe-west1.firebasedatabase.app';
+const FIREBASE_URL = 'https://pincho-crew-default-rtdb.europe-west1.firebasedatabase.app';
 
 async function fbGet(path) {
   try {
