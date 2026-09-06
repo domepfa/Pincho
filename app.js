@@ -399,10 +399,29 @@ function renderBoardImage() {
     const active = fb.selectedGrip === h.grip;
     return `<button type="button" class="board-hotspot ${active ? 'active' : ''}" style="left:${h.x}%;top:${h.y}%;" data-grip="${h.grip}" title="${esc(grip.label)}${grip.note ? ' · ' + esc(grip.note) : ''}"></button>`;
   }).join('');
-  return `<div class="board-photo-wrap">
+  return `<div class="board-photo-wrap" id="fb-board-photo">
     <img src="${board.image}" alt="${esc(board.label)}">
     ${spots}
   </div>`;
+}
+
+/* Kalibrierhilfe: bei Klick irgendwo auf dem Bild (ausserhalb der
+   Hotspot-Kreise) die exakte %-Position anzeigen — damit sich die
+   hotspots-Koordinaten in data.js an den echten Löchern ausrichten lassen,
+   egal welches Bild verwendet wird. */
+function wireCalibration() {
+  const wrap = document.getElementById('fb-board-photo');
+  const readout = document.getElementById('fb-calib-readout');
+  if (!wrap || !readout) return;
+  wrap.addEventListener('click', (e) => {
+    if (e.target.closest('.board-hotspot')) return;
+    const rect = wrap.getBoundingClientRect();
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * 1000) / 10;
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * 1000) / 10;
+    const line = `{ grip: '???', x: ${x}, y: ${y} },`;
+    readout.textContent = line;
+    if (navigator.clipboard) navigator.clipboard.writeText(line).catch(() => {});
+  });
 }
 
 async function renderFingerboard() {
@@ -417,7 +436,8 @@ async function renderFingerboard() {
     </div>
 
     <div class="board-visual" id="fb-board-visual">${renderBoardImage()}</div>
-    <p class="login-hint" style="margin:-6px 0 10px;">${fb.selectedGrip ? 'Gewählt: ' + esc(gripLabel(fb.board, fb.selectedGrip)) : 'Griff am Board antippen, um ihn für einen neuen Hang-Satz zu wählen.'}</p>
+    <p class="login-hint" style="margin:-6px 0 4px;">${fb.selectedGrip ? 'Gewählt: ' + esc(gripLabel(fb.board, fb.selectedGrip)) : 'Griff am Board antippen, um ihn für einen neuen Hang-Satz zu wählen.'}</p>
+    <p class="mono" id="fb-calib-readout" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:0 0 10px;min-height:14px;"></p>
     <div class="chip-row" id="fb-grip-legend" style="margin-bottom:16px;">
       ${BOARDS[fb.board].grips.map((g) => `<button type="button" class="chip ${fb.selectedGrip === g.id ? 'active' : ''}" data-grip="${g.id}">${esc(g.label)}${g.note ? ' · ' + esc(g.note) : ''}</button>`).join('')}
     </div>
@@ -445,6 +465,7 @@ async function renderFingerboard() {
   `);
 
   renderFbBlocksList(); // rendert am Ende auch renderFbRuntime() mit
+  wireCalibration();
 
   document.getElementById('fb-board-toggle').querySelectorAll('.chip').forEach((btn) => {
     btn.onclick = () => {
@@ -475,30 +496,90 @@ async function renderFingerboard() {
   };
 }
 
+/* Geschätzte Gesamtdauer des Ablaufs in Sekunden. Hang-Sätze werden aus der
+   echten Phasenliste berechnet, Übungs-Sätze (kein fester Timer) grob mit
+   40s pro Satz veranschlagt. */
+function fbEstimateSeconds() {
+  return fb.blocks.reduce((total, b) => {
+    if (b.type === 'hang') {
+      const seq = buildSequence('custom', { hangSec: b.hangSec, restSec: b.restSec, sets: b.reps });
+      return total + seq.reduce((s, p) => s + p.seconds, 0);
+    }
+    return total + 40;
+  }, 0);
+}
+function fmtMinSec(totalSec) {
+  return `${Math.floor(totalSec / 60)}:${pad2(totalSec % 60)}`;
+}
+
+/* Kleines, unverzerrtes Board-Abbild mit einem Punkt an der Griffposition —
+   zeigt auf einen Blick, welcher Griff für diesen Hang-Satz gemeint ist. */
+function miniBoardThumb(boardId, gripId) {
+  const board = BOARDS[boardId];
+  const spot = board.hotspots.find((h) => h.grip === gripId);
+  const dot = spot ? `<span class="dot" style="left:${spot.x}%;top:${spot.y}%;"></span>` : '';
+  return `<div class="timeline-thumb"><img src="${board.image}" alt="">${dot}</div>`;
+}
+
+function fbBlockSub(b) {
+  return b.type === 'hang'
+    ? `${b.hangSec}s Hang · ${b.restSec}s Pause · ×${b.reps}`
+    : `× ${b.reps} Wiederholungen`;
+}
+
 function renderFbBlocksList() {
   const holder = document.getElementById('fb-blocks-list');
   if (!holder) return;
-  holder.innerHTML = fb.blocks.length ? fb.blocks.map((b, i) => (
-    b.type === 'hang' ? `
-      <div class="ex-row">
-        <span class="ex-row-name">Satz ${i + 1}: Hang @ ${esc(gripLabel(b.board, b.grip))}</span>
+
+  if (!fb.blocks.length) {
+    holder.innerHTML = '<div class="list-empty" style="margin-bottom:14px;">Noch kein Ablauf — Sätze unten hinzufügen.</div>';
+    renderFbRuntime();
+    return;
+  }
+
+  const stats = `
+    <div class="stat-tiles">
+      <div class="stat-tile"><div class="num">${fb.blocks.length}</div><div class="lbl">Sätze</div></div>
+      <div class="stat-tile"><div class="num mono" id="fb-stat-time">${fmtMinSec(fbEstimateSeconds())}</div><div class="lbl">~ Dauer</div></div>
+    </div>
+  `;
+
+  const items = fb.blocks.map((b, i) => {
+    const isHang = b.type === 'hang';
+    const title = isHang ? `Hang @ ${esc(gripLabel(b.board, b.grip))}` : esc(exerciseName(b.exerciseId));
+    const thumb = isHang ? miniBoardThumb(b.board, b.grip) : `<div class="timeline-thumb timeline-thumb-emoji">💪</div>`;
+    const edit = isHang ? `
         <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">
         <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzliche Wiederholung">+</button>
         <input type="number" data-i="${i}" data-f="hangSec" value="${b.hangSec}" class="ex-row-input" title="Hang (s)">
         <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec}" class="ex-row-input" title="Pause (s)">
-        <button type="button" class="ex-row-remove" data-remove="${i}">×</button>
-      </div>` : `
-      <div class="ex-row">
-        <span class="ex-row-name">Satz ${i + 1}: ${esc(exerciseName(b.exerciseId))}</span>
-        <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">
-        <button type="button" class="ex-row-remove" data-remove="${i}">×</button>
-      </div>`
-  )).join('') : '<div class="list-empty" style="margin-bottom:14px;">Noch kein Ablauf — Sätze unten hinzufügen.</div>';
+      ` : `<input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">`;
+    return `
+      <div class="timeline-item">
+        <div class="timeline-badge ${isHang ? '' : 'exercise'}">${i + 1}</div>
+        <div class="timeline-card">
+          ${thumb}
+          <div class="info">
+            <div class="title">${title}</div>
+            <div class="sub" id="fb-sub-${i}">${esc(fbBlockSub(b))}</div>
+            <div class="timeline-edit">${edit}</div>
+          </div>
+          <button type="button" class="timeline-remove" data-remove="${i}">×</button>
+        </div>
+      </div>
+    `;
+  }).join('');
 
-  holder.querySelectorAll('input').forEach((inp) => {
+  holder.innerHTML = stats + `<div class="timeline">${items}</div>`;
+
+  holder.querySelectorAll('.timeline-edit input').forEach((inp) => {
     inp.oninput = () => {
       const i = Number(inp.dataset.i);
       fb.blocks[i][inp.dataset.f] = Number(inp.value) || 0;
+      const subEl = document.getElementById(`fb-sub-${i}`);
+      if (subEl) subEl.textContent = fbBlockSub(fb.blocks[i]);
+      const timeEl = document.getElementById('fb-stat-time');
+      if (timeEl) timeEl.textContent = fmtMinSec(fbEstimateSeconds());
     };
   });
   holder.querySelectorAll('[data-step]').forEach((btn) => {
