@@ -28,6 +28,13 @@ const BOARDS = {
       { id: 'sloper_easy', label: 'Sloper 20°', note: '' },
       { id: 'sloper_medium', label: 'Sloper 35°', note: '' },
     ],
+    // Schematische Anordnung fürs grafische Board (Zeile für Zeile, oben→unten).
+    layoutRows: [
+      ['jug', 'edge_large', 'edge_medium'],
+      ['pocket4_deep', 'pocket4_medium'],
+      ['pocket3', 'pocket2'],
+      ['sloper_easy', 'sloper_medium'],
+    ],
   },
   bm2000: {
     label: 'Beastmaker 2000',
@@ -43,6 +50,12 @@ const BOARDS = {
       { id: 'sloper_medium', label: 'Sloper 35°', note: '' },
       { id: 'sloper_hard', label: 'Sloper 45°', note: '' },
     ],
+    layoutRows: [
+      ['edge_large', 'edge_medium', 'edge_small'],
+      ['pocket4_deep', 'pocket4_medium'],
+      ['pocket3', 'pocket2', 'mono'],
+      ['sloper_medium', 'sloper_hard'],
+    ],
   },
 };
 
@@ -50,6 +63,11 @@ function gripLabel(boardId, gripId) {
   const board = BOARDS[boardId];
   const grip = board && board.grips.find((g) => g.id === gripId);
   return grip ? grip.label : gripId;
+}
+
+function gripInfo(boardId, gripId) {
+  const board = BOARDS[boardId];
+  return board && board.grips.find((g) => g.id === gripId);
 }
 
 /* ---------- Fingerboard-Protokolle ---------- */
@@ -116,6 +134,7 @@ const EXERCISE_LIBRARY = [
   { id: 'y_t_w', name: 'Y-T-W-Raises', category: 'antagonist', pauseFriendly: true },
   // Rumpf
   { id: 'pallof', name: 'Pallof Press', category: 'rumpf', pauseFriendly: true },
+  { id: 'crunches', name: 'Crunches', category: 'rumpf', pauseFriendly: true },
   { id: 'hanging_leg_raise', name: 'Hanging Leg Raise', category: 'rumpf', pauseFriendly: true },
   { id: 'front_lever_prog', name: 'Front-Lever-Progression', category: 'rumpf', pauseFriendly: true },
   { id: 'toes_to_bar', name: 'Toes-to-Bar', category: 'rumpf', pauseFriendly: true },

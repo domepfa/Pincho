@@ -2,9 +2,10 @@
 
 Krafttraining-App fürs Klettern: Wochenplan, eigenes Logbuch mit
 Übungsdatenbank und Trainingsplan-Vorlagen (Sätze/Wdh/Gewicht), ein
-Fingerboard-Timer-Tool (Beastmaker 1000/2000) und Motivations-Challenges für
-eine kleine Crew (bis ~5 Personen). Kein Wettkampf, keine Rangliste — nur
-"hast du's auch gemacht?".
+grafisches Fingerboard-Tool (Beastmaker 1000/2000, Griffe zum Antippen mit
+mm-Angabe) mit frei zusammenstellbarem Ablauf aus Hang- und Übungs-Sätzen,
+und Motivations-Challenges für eine kleine Crew (bis ~5 Personen). Kein
+Wettkampf, keine Rangliste — nur "hast du's auch gemacht?".
 
 Reines HTML/CSS/JS ohne Framework und ohne Build-Schritt (gleiches Prinzip
 wie bei Firnspur/Fixseil), Speicherung über Firebase Realtime Database.
@@ -83,8 +84,10 @@ echten Einzel-Accounts nötig.
   512×512) ersetzen.
 - **Wearables (COROS etc.)**: bewusst nicht angebunden — siehe Chat-Verlauf,
   Aufwand/Nutzen für dieses Projekt aktuell nicht sinnvoll.
-- **Timer**: Start/Stop, kein Pause/Resume — Stop verwirft den aktuellen
-  Durchgang. Reicht für den Anwendungsfall, kann bei Bedarf ergänzt werden.
+- **Fingerboard-Ablauf**: Zwischen den Sätzen wird bewusst nicht automatisch
+  weitergezählt — nach jedem Satz erscheint "Los" für den nächsten, damit
+  Zeit zum Ablesen/Chalken bleibt. "Abbrechen" verwirft den laufenden Satz,
+  kein Pause/Resume innerhalb eines Hang-Satzes.
 
 ## Projektstruktur
 

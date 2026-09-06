@@ -148,15 +148,20 @@ button, input, select, textarea { font-family: inherit; }
 .ex-row-name { flex: 1; font-size: 12.5px; color: var(--ink); }
 .ex-row-input { width: 52px; flex-shrink: 0; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); padding: 6px 4px; font-size: 12px; text-align: center; }
 .ex-row-remove { flex-shrink: 0; background: none; border: 1px solid var(--line); color: var(--ink-faint); width: 26px; height: 26px; cursor: pointer; }
+.ex-row-step { flex-shrink: 0; background: none; border: 1px solid var(--accent); color: var(--accent); width: 22px; height: 22px; line-height: 1; cursor: pointer; font-size: 13px; }
 
 /* ---------- Fingerboard ---------- */
-.board-visual { border: 1px solid var(--line); background: var(--surface-2); padding: 10px; margin-bottom: 14px; }
+.board-visual { border: 1px solid var(--line); background: var(--surface-2); padding: 10px; margin-bottom: 6px; }
 .board-visual svg { width: 100%; height: auto; display: block; }
-.grip-btn { cursor: pointer; }
-.grip-btn rect, .grip-btn ellipse, .grip-btn circle { fill: var(--surface); stroke: var(--line); transition: fill .15s, stroke .15s; }
-.grip-btn.active rect, .grip-btn.active ellipse, .grip-btn.active circle { fill: var(--accent); stroke: var(--accent); }
-.grip-btn text { fill: var(--ink-faint); font-family: 'IBM Plex Mono', monospace; }
-.grip-btn.active text { fill: var(--accent-ink); }
+
+/* Holzbrett-Look fürs Fingerboard: warmer Holzton als Kontrast zum sonst
+   kühlen Granit-Theme — echte Fingerboards sind aus Holz. */
+.board-plank { fill: #8a6339; stroke: #5c4326; stroke-width: 2; }
+.grip-hold { cursor: pointer; }
+.grip-hold rect, .grip-hold circle, .grip-hold path { fill: #3c2a17; stroke: #241a0e; stroke-width: 1; transition: fill .15s, stroke .15s; }
+.grip-hold.active rect, .grip-hold.active circle, .grip-hold.active path { fill: var(--accent); stroke: var(--accent-ink); }
+.grip-hold-label { fill: #f2e9d8; font-family: 'IBM Plex Mono', monospace; font-size: 7px; }
+.grip-hold.active .grip-hold-label { fill: var(--accent); font-weight: 600; }
 
 .timer-box { text-align: center; margin: 6px 0 18px; }
 .timer-box .big { font-family: 'Bebas Neue', sans-serif; font-size: 88px; line-height: 1; color: var(--accent); }

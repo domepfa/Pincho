@@ -340,6 +340,7 @@ function renderLogExerciseRows() {
     <div class="ex-row">
       <span class="ex-row-name">${esc(exerciseName(ex.exerciseId))}</span>
       <input type="number" data-i="${i}" data-f="sets" value="${ex.sets}" placeholder="Sätze" class="ex-row-input" title="Sätze">
+      <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzlicher Satz">+</button>
       <input type="text" data-i="${i}" data-f="reps" value="${esc(String(ex.reps))}" placeholder="Wdh" class="ex-row-input" title="Wiederholungen">
       <input type="number" data-i="${i}" data-f="weight" value="${ex.weight}" placeholder="kg" step="0.5" class="ex-row-input" title="Gewicht">
       <button type="button" class="ex-row-remove" data-remove="${i}">×</button>
@@ -351,6 +352,13 @@ function renderLogExerciseRows() {
       const i = Number(inp.dataset.i);
       const f = inp.dataset.f;
       logBuilder.exercises[i][f] = f === 'reps' ? inp.value : (Number(inp.value) || 0);
+    };
+  });
+  holder.querySelectorAll('[data-step]').forEach((btn) => {
+    btn.onclick = () => {
+      const i = Number(btn.dataset.step);
+      logBuilder.exercises[i].sets = (Number(logBuilder.exercises[i].sets) || 0) + 1;
+      renderLogExerciseRows();
     };
   });
   holder.querySelectorAll('[data-remove]').forEach((btn) => {
@@ -366,61 +374,83 @@ function renderLogExerciseRows() {
    ================================================================= */
 const fb = {
   board: null,
-  grip: null,
-  protocolId: 'max_hang',
-  params: { ...PROTOCOLS.max_hang.defaults },
+  selectedGrip: null,   // am grafischen Board gewählter Griff, fürs Hinzufügen eines Hang-Satzes
+  blocks: [],            // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec} | {type:'exercise', exerciseId, reps}
   weight: '',
-  sequence: [],
+  blockIndex: 0,
+  running: false,
+  awaitingNext: false,   // Satz fertig, wartet auf "Los" für den nächsten
+  sequence: [],          // flache Phasenliste NUR für den gerade laufenden Hang-Satz
   stepIndex: 0,
   secondsLeft: 0,
-  running: false,
   intervalId: null,
   wakeLock: null,
 };
 
-function boardGripPositions(boardId) {
-  const grips = BOARDS[boardId].grips;
-  const cols = 2;
-  return grips.map((g, i) => ({
-    ...g,
-    x: 8 + (i % cols) * 104,
-    y: 8 + Math.floor(i / cols) * 46,
-  }));
-}
-
-/* Bricht ein Griff-Label in max. 2 Zeilen um (an einer Leerstelle nahe der
-   Mitte), damit es in der SVG-Box nicht überläuft. */
-function wrapGripLabel(label) {
-  if (label.length <= 13) return [label];
-  const words = label.split(' ');
-  if (words.length === 1) return [label];
-  let bestIdx = 0, bestDiff = Infinity;
-  for (let i = 1; i < words.length; i++) {
-    const a = words.slice(0, i).join(' ').length;
-    const b = words.slice(i).join(' ').length;
-    const diff = Math.abs(a - b);
-    if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
+/* Zeichnet die Griff-Silhouette passend zur Kategorie (Kante/Tasche/Sloper/
+   Jug) — grobe, aber klar unterscheidbare Formen statt generischer Buttons. */
+function holdShapeSvg(grip, x, y, w, h) {
+  const id = grip.id;
+  if (id.startsWith('edge')) {
+    const depth = id.endsWith('small') ? 0.5 : id.endsWith('medium') ? 0.4 : 0.3;
+    return `<rect x="${x + w * 0.05}" y="${y + h * (1 - depth)}" width="${w * 0.9}" height="${h * depth}" rx="3"/>`;
   }
-  return [words.slice(0, bestIdx).join(' '), words.slice(bestIdx).join(' ')];
+  if (id === 'jug') {
+    return `<rect x="${x + w * 0.08}" y="${y + h * 0.12}" width="${w * 0.84}" height="${h * 0.76}" rx="10"/>`;
+  }
+  if (id.startsWith('pocket4')) {
+    return [0, 1, 2, 3].map((i) => `<circle cx="${x + w * (0.15 + i * 0.235)}" cy="${y + h * 0.55}" r="${Math.min(w * 0.11, h * 0.16)}"/>`).join('');
+  }
+  if (id === 'pocket3') {
+    return [0, 1, 2].map((i) => `<circle cx="${x + w * (0.22 + i * 0.28)}" cy="${y + h * 0.55}" r="${Math.min(w * 0.13, h * 0.18)}"/>`).join('');
+  }
+  if (id === 'pocket2') {
+    return [0, 1].map((i) => `<circle cx="${x + w * (0.32 + i * 0.36)}" cy="${y + h * 0.55}" r="${Math.min(w * 0.15, h * 0.2)}"/>`).join('');
+  }
+  if (id === 'mono') {
+    return `<circle cx="${x + w / 2}" cy="${y + h * 0.55}" r="${Math.min(w * 0.13, h * 0.16)}"/>`;
+  }
+  if (id.startsWith('sloper')) {
+    const steep = id.endsWith('hard');
+    const topY = y + h * (steep ? 0.08 : 0.26);
+    return `<path d="M ${x + w * 0.08} ${y + h * 0.84} Q ${x + w * 0.5} ${topY} ${x + w * 0.92} ${y + h * 0.6} L ${x + w * 0.92} ${y + h * 0.9} Q ${x + w * 0.5} ${y + h * 0.98} ${x + w * 0.08} ${y + h * 0.9} Z"/>`;
+  }
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4"/>`;
 }
 
+/* Grafisches Board: Holzbrett-Hintergrund + Löcher/Griffe gemäss layoutRows,
+   Zeile für Zeile. mm-Angabe (grip.note) steht direkt unter jedem Griff,
+   sobald sie in data.js eingetragen ist — bis dahin die Kategorie-Bezeichnung. */
 function renderBoardSvg() {
-  const positions = boardGripPositions(fb.board);
-  const cols = 2;
-  const rows = Math.ceil(positions.length / cols);
-  const h = 8 + rows * 46 + 24;
-  const shapes = positions.map((g) => {
-    const lines = wrapGripLabel(g.label);
-    const startY = g.y + 21 - (lines.length - 1) * 5;
-    const tspans = lines.map((line, li) => `<tspan x="${g.x + 48}" y="${startY + li * 10}">${esc(line)}</tspan>`).join('');
-    return `
-    <g class="grip-btn ${fb.grip === g.id ? 'active' : ''}" data-grip="${g.id}">
-      <rect x="${g.x}" y="${g.y}" width="96" height="36" rx="4"></rect>
-      <text x="${g.x + 48}" y="${startY}" font-size="8" text-anchor="middle">${tspans}</text>
-    </g>
-  `;
-  }).join('');
-  return `<svg viewBox="0 0 216 ${h}" width="100%">${shapes}</svg>`;
+  const board = BOARDS[fb.board];
+  const rows = board.layoutRows;
+  const rowH = 60;
+  const pad = 10;
+  const svgW = 300;
+  const shapes = [];
+  rows.forEach((row, ri) => {
+    const cellW = (svgW - pad * 2) / row.length;
+    row.forEach((gripId, ci) => {
+      const grip = board.grips.find((g) => g.id === gripId);
+      const x = pad + ci * cellW;
+      const y = pad + ri * rowH;
+      const w = cellW - 8;
+      const h = rowH - 16;
+      const active = fb.selectedGrip === gripId;
+      const noteText = (grip.note && !grip.note.includes('noch eintragen')) ? grip.note : grip.label;
+      shapes.push(`
+        <g class="grip-hold ${active ? 'active' : ''}" data-grip="${gripId}">
+          ${holdShapeSvg(grip, x, y, w, h)}
+          <text x="${x + w / 2}" y="${y + h + 12}" text-anchor="middle" class="grip-hold-label">${esc(noteText)}</text>
+        </g>
+      `);
+    });
+  });
+  const svgH = pad * 2 + rows.length * rowH + 4;
+  return `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%">
+    <rect x="0" y="0" width="${svgW}" height="${svgH}" rx="10" class="board-plank"/>
+    ${shapes.join('')}
+  </svg>`;
 }
 
 async function renderFingerboard() {
@@ -435,67 +465,148 @@ async function renderFingerboard() {
     </div>
 
     <div class="board-visual" id="fb-board-visual">${renderBoardSvg()}</div>
+    <p class="login-hint" style="margin:-6px 0 16px;">${fb.selectedGrip ? 'Gewählt: ' + esc(gripLabel(fb.board, fb.selectedGrip)) : 'Griff am Board antippen, um ihn für einen neuen Hang-Satz zu wählen.'}</p>
 
-    <div class="chip-row" id="fb-protocol">
-      ${Object.keys(PROTOCOLS).map((p) => `<button class="chip ${fb.protocolId === p ? 'active' : ''}" data-proto="${p}">${PROTOCOLS[p].label}</button>`).join('')}
+    <div class="field"><label>Zusatzgewicht für diese Session (kg, negativ = Assistenz)</label><input type="number" id="fb-weight" value="${fb.weight}" step="0.5"></div>
+
+    <div class="sec-head"><h2 class="sec-title">Ablauf</h2><div class="sec-rule"></div></div>
+    <div id="fb-blocks-list"></div>
+
+    <div class="chip-row">
+      <button type="button" class="chip" id="fb-add-hang">+ Hang-Satz (Griff oben wählen)</button>
+    </div>
+    <div class="field-row" style="margin-bottom:16px;">
+      <select id="fb-exercise-picker" style="flex:2;">
+        ${Object.entries(EXERCISE_CATEGORY_LABEL).filter(([cat]) => ACCESSORY_EXERCISES.some((e) => e.category === cat)).map(([cat, label]) => `
+          <optgroup label="${label}">
+            ${ACCESSORY_EXERCISES.filter((e) => e.category === cat).map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join('')}
+          </optgroup>
+        `).join('')}
+      </select>
+      <button type="button" class="btn small" id="fb-add-exercise" style="flex:0 0 auto;">+ Übung</button>
     </div>
 
-    <div id="fb-params"></div>
-
-    <div class="field"><label>Zusatzgewicht (kg, negativ = Assistenz)</label><input type="number" id="fb-weight" value="${fb.weight}" step="0.5"></div>
-
-    <div class="timer-box">
-      <div class="big ${fb.sequence[fb.stepIndex] && fb.sequence[fb.stepIndex].phase !== 'Hang' ? 'rest' : ''}" id="fb-big">${fb.running ? pad2(fb.secondsLeft) : '--'}</div>
-      <div class="phase mono" id="fb-phase">${fb.running ? (fb.sequence[fb.stepIndex] ? fb.sequence[fb.stepIndex].phase : '') : 'bereit'}</div>
-    </div>
-
-    <div class="timer-controls">
-      ${fb.running
-        ? `<button class="btn ghost" id="fb-stop">STOP</button>`
-        : `<button class="btn" id="fb-start" ${fb.grip ? '' : 'disabled'}>START</button>`}
-    </div>
-    ${!fb.grip ? '<p class="login-hint">Zuerst einen Griff auswählen.</p>' : ''}
+    <div id="fb-runtime"></div>
   `);
 
-  renderFingerboardParams();
+  renderFbBlocksList(); // rendert am Ende auch renderFbRuntime() mit
 
   document.getElementById('fb-board-toggle').querySelectorAll('.chip').forEach((btn) => {
     btn.onclick = () => {
       fb.board = btn.dataset.board;
-      fb.grip = null;
+      fb.selectedGrip = null;
       state.members[state.member.id] = { ...state.members[state.member.id], board: fb.board };
       fbPatch(`members/${state.member.id}`, { board: fb.board });
       renderFingerboard();
     };
   });
-  document.getElementById('fb-board-visual').querySelectorAll('.grip-btn').forEach((el) => {
-    el.onclick = () => { fb.grip = el.dataset.grip; renderFingerboard(); };
-  });
-  document.getElementById('fb-protocol').querySelectorAll('.chip').forEach((btn) => {
-    btn.onclick = () => {
-      fb.protocolId = btn.dataset.proto;
-      fb.params = { ...PROTOCOLS[fb.protocolId].defaults };
-      renderFingerboard();
-    };
+  document.getElementById('fb-board-visual').querySelectorAll('.grip-hold').forEach((el) => {
+    el.onclick = () => { fb.selectedGrip = el.dataset.grip; renderFingerboard(); };
   });
   document.getElementById('fb-weight').oninput = (e) => { fb.weight = e.target.value; };
-  const startBtn = document.getElementById('fb-start');
-  if (startBtn) startBtn.onclick = startFingerboardTimer;
-  const stopBtn = document.getElementById('fb-stop');
-  if (stopBtn) stopBtn.onclick = stopFingerboardTimer;
+
+  document.getElementById('fb-add-hang').onclick = () => {
+    if (!fb.selectedGrip) { toast('Zuerst einen Griff am Board wählen.', 'err'); return; }
+    fb.blocks.push({ type: 'hang', board: fb.board, grip: fb.selectedGrip, reps: 3, hangSec: 7, restSec: 30 });
+    renderFbBlocksList();
+  };
+  document.getElementById('fb-add-exercise').onclick = () => {
+    const exerciseId = document.getElementById('fb-exercise-picker').value;
+    fb.blocks.push({ type: 'exercise', exerciseId, reps: 15 });
+    renderFbBlocksList();
+  };
 }
 
-function renderFingerboardParams() {
-  const holder = document.getElementById('fb-params');
+function renderFbBlocksList() {
+  const holder = document.getElementById('fb-blocks-list');
   if (!holder) return;
-  const fields = PROTOCOLS[fb.protocolId].fields;
-  const labelMap = { hangSec: 'Hang (s)', restSec: 'Pause (s)', reps: 'Wdh/Satz', sets: 'Sätze', restBetweenSec: 'Satzpause (s)' };
-  holder.innerHTML = `<div class="field-row">${fields.map((f) => `
-    <div class="field"><label>${labelMap[f]}</label><input type="number" data-p="${f}" value="${fb.params[f]}"></div>
-  `).join('')}</div>`;
+  holder.innerHTML = fb.blocks.length ? fb.blocks.map((b, i) => (
+    b.type === 'hang' ? `
+      <div class="ex-row">
+        <span class="ex-row-name">Satz ${i + 1}: Hang @ ${esc(gripLabel(b.board, b.grip))}</span>
+        <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">
+        <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzliche Wiederholung">+</button>
+        <input type="number" data-i="${i}" data-f="hangSec" value="${b.hangSec}" class="ex-row-input" title="Hang (s)">
+        <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec}" class="ex-row-input" title="Pause (s)">
+        <button type="button" class="ex-row-remove" data-remove="${i}">×</button>
+      </div>` : `
+      <div class="ex-row">
+        <span class="ex-row-name">Satz ${i + 1}: ${esc(exerciseName(b.exerciseId))}</span>
+        <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">
+        <button type="button" class="ex-row-remove" data-remove="${i}">×</button>
+      </div>`
+  )).join('') : '<div class="list-empty" style="margin-bottom:14px;">Noch kein Ablauf — Sätze unten hinzufügen.</div>';
+
   holder.querySelectorAll('input').forEach((inp) => {
-    inp.oninput = () => { fb.params[inp.dataset.p] = Number(inp.value) || 0; };
+    inp.oninput = () => {
+      const i = Number(inp.dataset.i);
+      fb.blocks[i][inp.dataset.f] = Number(inp.value) || 0;
+    };
   });
+  holder.querySelectorAll('[data-step]').forEach((btn) => {
+    btn.onclick = () => {
+      const i = Number(btn.dataset.step);
+      fb.blocks[i].reps = (Number(fb.blocks[i].reps) || 0) + 1;
+      renderFbBlocksList();
+    };
+  });
+  holder.querySelectorAll('[data-remove]').forEach((btn) => {
+    btn.onclick = () => {
+      fb.blocks.splice(Number(btn.dataset.remove), 1);
+      renderFbBlocksList();
+    };
+  });
+
+  renderFbRuntime(); // Start-Button-Status hängt von fb.blocks.length ab
+}
+
+function renderFbRuntime() {
+  const holder = document.getElementById('fb-runtime');
+  if (!holder) return;
+
+  if (!fb.running && !fb.awaitingNext) {
+    holder.innerHTML = `<button class="btn" id="fb-start-ablauf" ${fb.blocks.length ? '' : 'disabled'}>ABLAUF STARTEN</button>`;
+    const btn = document.getElementById('fb-start-ablauf');
+    if (btn) btn.onclick = startAblauf;
+    return;
+  }
+
+  if (fb.awaitingNext) {
+    const next = fb.blocks[fb.blockIndex];
+    if (!next) return;
+    holder.innerHTML = `
+      <div class="timer-box">
+        <div class="phase mono">NÄCHSTER SATZ (${fb.blockIndex + 1}/${fb.blocks.length})</div>
+        <div class="card-value" style="margin-top:6px;">${next.type === 'hang' ? 'Hang @ ' + esc(gripLabel(next.board, next.grip)) : esc(exerciseName(next.exerciseId)) + ' × ' + esc(String(next.reps))}</div>
+      </div>
+      <button class="btn" id="fb-continue">LOS</button>
+    `;
+    document.getElementById('fb-continue').onclick = startCurrentBlock;
+    return;
+  }
+
+  const block = fb.blocks[fb.blockIndex];
+  if (block.type === 'hang') {
+    const step = fb.sequence[fb.stepIndex];
+    holder.innerHTML = `
+      <div class="timer-box">
+        <div class="big ${step && step.phase !== 'Hang' ? 'rest' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
+        <div class="phase mono" id="fb-phase">${step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : ''}</div>
+      </div>
+      <button class="btn ghost" id="fb-cancel">ABBRECHEN</button>
+    `;
+  } else {
+    holder.innerHTML = `
+      <div class="timer-box">
+        <div class="phase mono">ÜBUNG (${fb.blockIndex + 1}/${fb.blocks.length})</div>
+        <div class="card-value" style="margin-top:6px;">${esc(exerciseName(block.exerciseId))} × ${esc(String(block.reps))}</div>
+      </div>
+      <button class="btn" id="fb-exercise-done">FERTIG</button>
+      <button class="btn ghost" id="fb-cancel" style="margin-top:8px;">ABBRECHEN</button>
+    `;
+    document.getElementById('fb-exercise-done').onclick = blockDone;
+  }
+  document.getElementById('fb-cancel').onclick = cancelAblauf;
 }
 
 function beep(freq, duration) {
@@ -519,24 +630,42 @@ function releaseWakeLock() {
   if (fb.wakeLock) { fb.wakeLock.release().catch(() => {}); fb.wakeLock = null; }
 }
 
-function startFingerboardTimer() {
-  fb.sequence = buildSequence(fb.protocolId, fb.params);
-  fb.stepIndex = 0;
-  fb.secondsLeft = fb.sequence[0].seconds;
-  fb.running = true;
-  beep(880, 200);
-  requestWakeLock();
-  updateTimerUI();
-  fb.intervalId = setInterval(tickFingerboardTimer, 1000);
-  renderFingerboard();
+function startAblauf() {
+  fb.blockIndex = 0;
+  fb.running = false;
+  fb.awaitingNext = true;
+  renderFbRuntime();
 }
 
-function tickFingerboardTimer() {
+function startCurrentBlock() {
+  const block = fb.blocks[fb.blockIndex];
+  if (!block) { finishAblauf(); return; }
+  fb.awaitingNext = false;
+  fb.running = true;
+  if (block.type === 'hang') {
+    fb.sequence = buildSequence('custom', { hangSec: block.hangSec, restSec: block.restSec, sets: block.reps });
+    fb.stepIndex = 0;
+    fb.secondsLeft = fb.sequence[0].seconds;
+    beep(880, 200);
+    requestWakeLock();
+    renderFbRuntime();
+    updateTimerUI();
+    fb.intervalId = setInterval(tickBlock, 1000);
+  } else {
+    renderFbRuntime();
+  }
+}
+
+function tickBlock() {
   fb.secondsLeft--;
   if (fb.secondsLeft <= 0) {
     fb.stepIndex++;
     if (fb.stepIndex >= fb.sequence.length) {
-      finishFingerboardTimer();
+      clearInterval(fb.intervalId);
+      fb.intervalId = null;
+      releaseWakeLock();
+      beep(1318, 300);
+      blockDone();
       return;
     }
     fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
@@ -555,33 +684,43 @@ function updateTimerUI() {
   phase.textContent = step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : '';
 }
 
-function stopFingerboardTimer() {
-  clearInterval(fb.intervalId);
-  fb.intervalId = null;
+function blockDone() {
+  fb.blockIndex++;
   fb.running = false;
-  releaseWakeLock();
-  renderFingerboard();
+  if (fb.blockIndex >= fb.blocks.length) {
+    finishAblauf();
+  } else {
+    fb.awaitingNext = true;
+    renderFbRuntime();
+  }
 }
 
-async function finishFingerboardTimer() {
+function cancelAblauf() {
   clearInterval(fb.intervalId);
   fb.intervalId = null;
-  fb.running = false;
   releaseWakeLock();
-  beep(1318, 400);
+  fb.running = false;
+  fb.awaitingNext = false;
+  fb.blockIndex = 0;
+  renderFbRuntime();
+}
+
+async function finishAblauf() {
+  fb.running = false;
+  fb.awaitingNext = false;
+  fb.blockIndex = 0;
+  beep(1568, 400);
 
   const session = {
     date: todayKey(),
     board: fb.board,
-    grip: fb.grip,
-    protocolId: fb.protocolId,
-    params: fb.params,
     weight: fb.weight || 0,
+    blocks: fb.blocks,
     createdAt: Date.now(),
   };
   await fbPush(`fingerboardSessions/${state.member.id}`, session);
-  toast('Fingerboard-Session gespeichert 💪', 'ok');
-  renderFingerboard();
+  toast('Ablauf gespeichert 💪', 'ok');
+  renderFbRuntime();
 }
 
 /* ================================================================
