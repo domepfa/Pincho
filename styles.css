@@ -344,6 +344,21 @@ button, input, select, textarea { font-family: inherit; }
   font-family: 'Bebas Neue', sans-serif; font-size: 52px; color: var(--accent); line-height: 1;
 }
 .fb-timer-ring .big.rest { color: var(--ink-dim); }
+.fb-timer-ring .big.rest-warn { color: var(--accent2); animation: bigWarnPulse .6s ease-in-out infinite; }
+.ring-fg.rest-warn { stroke: var(--accent2); animation: ringWarnPulse .6s ease-in-out infinite; }
+@keyframes bigWarnPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+@keyframes ringWarnPulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+/* Vorbereitungs-Countdown (5..1) vor einem Hang-Satz: grosse Zahl, die bei
+   jedem Tick neu einschwingt (neues DOM-Element pro Sekunde durch den
+   vollen Re-Render triggert die Animation von selbst); in den letzten
+   3 Sekunden wechselt sie auf die "Achtung"-Farbe und schlägt stärker aus. */
+.fb-precount {
+  font-family: 'Bebas Neue', sans-serif; font-size: 108px; line-height: 1;
+  color: var(--accent); margin: 2px 0; animation: popIn .35s cubic-bezier(.25, 1.4, .4, 1) both;
+}
+.fb-precount-tense { color: var(--accent2); animation: precountTick .5s cubic-bezier(.25, 1.4, .4, 1) both; }
+@keyframes precountTick { 0% { opacity: 0; transform: scale(1.4); } 60% { opacity: 1; transform: scale(.95); } 100% { transform: scale(1); } }
 
 .fb-overlay-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
 .fb-stage-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
@@ -426,6 +441,8 @@ button, input, select, textarea { font-family: inherit; }
   .fig-static { animation: none; }
   .fb-hang-figure, .fb-arm-shake { animation: none; }
   .ring-fg { transition: none; }
+  .ring-fg.rest-warn, .fb-timer-ring .big.rest-warn { animation: none; }
+  .fb-precount, .fb-precount-tense { animation: none; }
   .anim-in, .fb-done-emoji, .fb-overlay-done .fb-stage-title,
   .fb-overlay-done .fb-stage-sub, .fb-overlay-done .fb-stage-btn { animation: none; opacity: 1; transform: none; }
   .confetti-piece { display: none; }

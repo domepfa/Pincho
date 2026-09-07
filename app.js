@@ -398,6 +398,7 @@ const fb = {
   blockIndex: 0,
   running: false,
   awaitingNext: false,   // Satz fertig, wartet auf "Los" für den nächsten
+  preCount: null,        // 5..1 während des Vorbereitungs-Countdowns vor einem Hang-Satz, sonst null
   sequence: [],          // flache Phasenliste NUR für den gerade laufenden Hang-Satz
   stepIndex: 0,
   secondsLeft: 0,
@@ -1674,7 +1675,7 @@ function fbTogglePause() {
 
 function renderFbOverlay() {
   const el = ensureFbOverlay();
-  if (!fb.running && !fb.awaitingNext) { closeFbOverlay(); return; }
+  if (!fb.running && !fb.awaitingNext && fb.preCount == null) { closeFbOverlay(); return; }
 
   let stage = '';
   if (fb.awaitingNext) {
@@ -1690,6 +1691,17 @@ function renderFbOverlay() {
       ${fbTransportRow()}
       <button class="btn fb-stage-btn" id="fb-continue">LOS</button>
     `;
+  } else if (fb.preCount != null) {
+    const block = fb.blocks[fb.blockIndex];
+    const armNote = gripArmNote(block.board, block.grip);
+    const tense = fb.preCount <= 3;
+    stage = `
+      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${esc(gripLabel(block.board, block.grip))}${armNote ? ' · ' + armNote : ''}</div>
+      <div class="fb-stage-figure">${miniBoardThumb(block.board, block.grip)}</div>
+      <div class="fb-precount ${tense ? 'fb-precount-tense' : ''}" id="fb-precount">${fb.preCount}</div>
+      <div class="fb-stage-sub mono">Hände ans Board — gleich geht's los!</div>
+      <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
+    `;
   } else {
     const block = fb.blocks[fb.blockIndex];
     if (block.type === 'hang') {
@@ -1700,6 +1712,7 @@ function renderFbOverlay() {
       const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
       const armNote = gripArmNote(block.board, block.grip);
       const isPausedNow = !fb.intervalId;
+      const restWarn = !isHangPhase && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
       stage = `
         <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${esc(gripLabel(block.board, block.grip))}${armNote ? ' · ' + armNote : ''}</div>
         <div class="fb-stage-figure">${miniBoardThumb(block.board, block.grip)}</div>
@@ -1708,9 +1721,9 @@ function renderFbOverlay() {
           <div class="fb-timer-ring">
             <svg viewBox="0 0 120 120">
               <circle class="ring-bg" cx="60" cy="60" r="52"/>
-              <circle class="ring-fg ${isHangPhase ? '' : 'rest'}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
+              <circle class="ring-fg ${isHangPhase ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
             </svg>
-            <div class="big ${isHangPhase ? '' : 'rest'}" id="fb-big">${pad2(fb.secondsLeft)}</div>
+            <div class="big ${isHangPhase ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
           </div>
         </div>
         <div class="phase mono" id="fb-phase">${step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}${isPausedNow ? ' · PAUSIERT' : ''}` : ''}</div>
@@ -1749,12 +1762,16 @@ function renderFbOverlay() {
   `;
 
   document.getElementById('fb-overlay-close').onclick = cancelAblauf;
-  document.getElementById('fb-prev').onclick = fbGoBack;
-  document.getElementById('fb-skip').onclick = fbSkipForward;
+  const prevBtn = document.getElementById('fb-prev');
+  if (prevBtn) prevBtn.onclick = fbGoBack;
+  const skipBtn = document.getElementById('fb-skip');
+  if (skipBtn) skipBtn.onclick = fbSkipForward;
   const ppBtn = document.getElementById('fb-playpause');
   if (ppBtn && !ppBtn.disabled) ppBtn.onclick = fbTogglePause;
   if (fb.awaitingNext) {
     document.getElementById('fb-continue').onclick = startCurrentBlock;
+  } else if (fb.preCount != null) {
+    document.getElementById('fb-cancel').onclick = cancelAblauf;
   } else {
     const doneBtn = document.getElementById('fb-exercise-done');
     if (doneBtn) doneBtn.onclick = blockDone;
@@ -1801,17 +1818,24 @@ function beep(freq, duration) {
   } catch (e) { /* Audio nicht verfügbar, kein Problem */ }
 }
 
-/* Zwei klar unterscheidbare Signale statt eines einzelnen Tons pro
-   Phasenwechsel — wichtig, weil man beim Hängen meist nicht aufs Display
-   schaut: "los" = zwei kurze, hohe Töne (auffällig, energisch), "los-
-   lassen/Pause" = ein einzelner, tieferer, längerer Ton. Dadurch lässt
-   sich Start und Ende auch nur am Klang unterscheiden. */
+/* Zwei akustische Signale statt eines einzelnen Tons pro Ereignis:
+   - beepTick(): ein kurzer Piep pro Sekunde — sowohl beim Vorbereitungs-
+     Countdown (letzte 3 von 5 Sekunden) als auch am Ende einer Pause
+     (letzte 3 Sekunden), damit man auch ohne hinzuschauen merkt, dass es
+     gleich weitergeht.
+   - beepStart()/beepEnd(): ein einzelner, langer Ton für den tatsächlichen
+     Wechsel Hang↔Pause. Bewusst derselbe Klang für beide — der Kontext
+     (Countdown davor bzw. laufender Hang) macht schon eindeutig, was
+     gerade passiert, und ein einheitliches "Bing" wirkt klarer als zwei
+     ähnlich lange Töne, die man ohnehin kaum unterscheiden könnte. */
+function beepTick() {
+  beep(1400, 90);
+}
 function beepStart() {
-  beep(1200, 90);
-  setTimeout(() => beep(1200, 90), 150);
+  beep(1046, 380);
 }
 function beepEnd() {
-  beep(520, 320);
+  beep(1046, 380);
 }
 
 async function requestWakeLock() {
@@ -1825,30 +1849,57 @@ function startAblauf() {
   fb.blockIndex = 0;
   fb.running = false;
   fb.awaitingNext = true;
+  fb.preCount = null;
   openFbOverlay();
 }
 
+/* Tap auf "LOS": bei Hang-Sätzen erst ein 5-Sekunden-Countdown zum
+   Hände-ans-Board-Bekommen, danach automatisch der eigentliche Hang.
+   Übungs-Sätze starten weiterhin direkt (kein Board, das man greifen
+   müsste). */
 function startCurrentBlock() {
   const block = fb.blocks[fb.blockIndex];
   if (!block) { finishAblauf(); return; }
   fb.awaitingNext = false;
-  fb.running = true;
   if (block.type === 'hang') {
-    fb.sequence = buildSequence('custom', { hangSec: block.hangSec, restSec: block.restSec, sets: block.reps });
-    fb.stepIndex = 0;
-    fb.secondsLeft = fb.sequence[0].seconds;
-    beepStart();
+    fb.preCount = 5;
     requestWakeLock();
     renderFbOverlay();
-    updateTimerUI();
-    fb.intervalId = setInterval(tickBlock, 1000);
+    fb.intervalId = setInterval(tickPreCountdown, 1000);
   } else {
+    fb.running = true;
     renderFbOverlay();
   }
 }
 
+function tickPreCountdown() {
+  fb.preCount--;
+  if (fb.preCount <= 0) {
+    clearInterval(fb.intervalId);
+    fb.intervalId = null;
+    fb.preCount = null;
+    beginHangBlock();
+    return;
+  }
+  if (fb.preCount <= 3) beepTick();
+  renderFbOverlay();
+}
+
+function beginHangBlock() {
+  const block = fb.blocks[fb.blockIndex];
+  fb.running = true;
+  fb.sequence = buildSequence('custom', { hangSec: block.hangSec, restSec: block.restSec, sets: block.reps });
+  fb.stepIndex = 0;
+  fb.secondsLeft = fb.sequence[0].seconds;
+  beepStart();
+  renderFbOverlay();
+  updateTimerUI();
+  fb.intervalId = setInterval(tickBlock, 1000);
+}
+
 function tickBlock() {
   fb.secondsLeft--;
+  const step = fb.sequence[fb.stepIndex];
   if (fb.secondsLeft <= 0) {
     fb.stepIndex++;
     if (fb.stepIndex >= fb.sequence.length) {
@@ -1861,6 +1912,10 @@ function tickBlock() {
     }
     fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
     if (fb.sequence[fb.stepIndex].phase === 'Hang') beepStart(); else beepEnd();
+  } else if (step && step.phase !== 'Hang' && fb.secondsLeft <= 3) {
+    // Letzte 3 Sekunden einer Pause: kurzer Tick pro Sekunde als
+    // akustische Vorwarnung, dass der nächste Hang gleich losgeht.
+    beepTick();
   }
   updateTimerUI();
 }
@@ -1872,10 +1927,13 @@ function updateTimerUI() {
   const figureHolder = document.getElementById('fb-phase-figure');
   const step = fb.sequence[fb.stepIndex];
   const isHangPhase = !step || step.phase === 'Hang';
+  // Letzte 10 Sekunden einer Pause optisch hervorheben (Farbe + Pulsieren),
+  // damit man auch aus der Distanz merkt, dass es gleich weitergeht.
+  const restWarn = !isHangPhase && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
 
   if (big) {
     big.textContent = pad2(fb.secondsLeft);
-    big.className = 'big' + (isHangPhase ? '' : ' rest');
+    big.className = 'big' + (isHangPhase ? '' : ' rest') + (restWarn ? ' rest-warn' : '');
   }
   if (phase) phase.textContent = step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : '';
   if (ring) {
@@ -1883,6 +1941,7 @@ function updateTimerUI() {
     const frac = phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 0;
     ring.style.strokeDashoffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
     ring.classList.toggle('rest', !isHangPhase);
+    ring.classList.toggle('rest-warn', restWarn);
   }
   if (figureHolder && figureHolder.dataset.kind !== (isHangPhase ? 'hang' : 'rest')) {
     figureHolder.innerHTML = isHangPhase ? FB_HANG_FIGURE_SVG : FB_REST_FIGURE_SVG;
@@ -1909,6 +1968,7 @@ function cancelAblauf() {
   releaseWakeLock();
   fb.running = false;
   fb.awaitingNext = false;
+  fb.preCount = null;
   fb.blockIndex = 0;
   closeFbOverlay();
   renderFbRuntime();
