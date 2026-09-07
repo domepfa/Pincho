@@ -207,7 +207,7 @@ button, input, select, textarea { font-family: inherit; }
 .timeline-card { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line); padding: 10px; display: flex; gap: 10px; align-items: center; }
 .timeline-thumb { flex-shrink: 0; position: relative; width: 58px; height: 26px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
 .timeline-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.timeline-thumb .dot { position: absolute; width: 22%; aspect-ratio: 1; border-radius: 50%; background: var(--accent); border: 1px solid var(--accent-ink); transform: translate(-50%, -50%); }
+.timeline-thumb .dot { position: absolute; width: 12%; aspect-ratio: 1; border-radius: 50%; background: var(--accent); border: 1px solid var(--accent-ink); transform: translate(-50%, -50%); }
 .timeline-thumb-emoji { display: flex; align-items: center; justify-content: center; font-size: 16px; width: 58px; height: 26px; }
 .timeline-card .info { flex: 1; min-width: 0; }
 .timeline-card .title { font-size: 13px; color: var(--ink); font-weight: 600; }
@@ -286,24 +286,32 @@ button, input, select, textarea { font-family: inherit; }
   padding-top: 30px;
 }
 
-/* Fortschritt: Kletterer, der die Wand hochsteigt, statt einer Linie */
-.fb-overlay-progress { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.wall-track {
-  position: relative; width: 44px; height: 170px; flex-shrink: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, .06), transparent 40%),
-    repeating-linear-gradient(178deg, rgba(255, 255, 255, .05) 0 2px, transparent 2px 22px),
-    linear-gradient(160deg, #2a3140, #1b2028 55%, #12151a);
-  border: 1px solid var(--line);
-}
-.wall-flag { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: 17px; }
-.wall-climber {
-  position: absolute; left: 50%; bottom: 0;
-  transform: translate(-50%, 50%); font-size: 20px;
-  transition: bottom 1s linear;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .6));
-}
 .fb-progress-text { font-size: 11px; color: var(--ink-dim); text-align: center; }
+
+/* Hang/Pause-Visual: Ring füllt sich mit dem Fortschritt INNERHALB des
+   aktuellen Schritts, daneben ein Strichmännchen, das hängt (Hang) oder
+   sich lockert (Pause) — statt einer abstrakten Gesamt-Fortschrittsanzeige. */
+.fb-hang-visual { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.fb-phase-figure { width: 90px; flex-shrink: 0; }
+.fb-phase-figure .ex-figure { width: 100%; height: auto; display: block; }
+.fb-hang-figure { transform-origin: 50% 10%; animation: figSway 1.7s ease-in-out infinite; }
+.fb-arm-shake { transform-origin: 49.5% 32.5%; animation: figShake .9s ease-in-out infinite; }
+@keyframes figSway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes figShake { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+
+.fb-timer-ring { position: relative; width: 168px; height: 168px; flex-shrink: 0; }
+.fb-timer-ring svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--line); stroke-width: 7; }
+.ring-fg {
+  fill: none; stroke: var(--accent); stroke-width: 7; stroke-linecap: round;
+  stroke-dasharray: 326.7; transition: stroke-dashoffset .95s linear;
+}
+.ring-fg.rest { stroke: var(--ink-dim); }
+.fb-timer-ring .big {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: 'Bebas Neue', sans-serif; font-size: 52px; color: var(--accent); line-height: 1;
+}
+.fb-timer-ring .big.rest { color: var(--ink-dim); }
 
 .fb-overlay-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
 .fb-stage-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
@@ -345,5 +353,6 @@ button, input, select, textarea { font-family: inherit; }
   .fig-a { animation: none; opacity: 1; }
   .fig-b { animation: none; opacity: 0; }
   .fig-static { animation: none; }
-  .wall-climber { transition: none; }
+  .fb-hang-figure, .fb-arm-shake { animation: none; }
+  .ring-fg { transition: none; }
 }

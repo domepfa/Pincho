@@ -906,6 +906,395 @@ const EXERCISE_FIGURES = {
     <circle class="fig-joint fig-hi" cx="30" cy="118" r="5.5"/>
     <circle class="fig-joint fig-hi" cx="168" cy="128" r="5.5"/>
   ` },
+  ext_rotation: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="150" y1="70" x2="150" y2="110"/>
+    <circle class="fig-rig-dot" cx="150" cy="90" r="6"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="86" y2="196"/>
+      <line x1="99" y1="138" x2="114" y2="196"/>
+      <line x1="99" y1="66" x2="99" y2="90"/>
+    </g>
+    <circle class="fig-joint" cx="99" cy="90" r="5"/>
+    <path class="fig-motion" d="M80,95 Q100,108 133,86"/>
+    <polygon class="fig-arrow" points="133,86 122,84 128,95"/>
+    <g class="fig-pose fig-a" style="animation-duration:2s;">
+      <line x1="99" y1="90" x2="80" y2="95"/>
+      <circle class="fig-joint fig-hi" cx="80" cy="95" r="6"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2s;">
+      <line x1="99" y1="90" x2="135" y2="85"/>
+      <circle class="fig-joint fig-hi" cx="135" cy="85" r="6"/>
+    </g>
+  ` },
+  wrist_ext: { kind: 'dynamic', svg: `
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="86" y2="196"/>
+      <line x1="99" y1="138" x2="114" y2="196"/>
+      <line x1="99" y1="68" x2="140" y2="80"/>
+      <line x1="140" y1="80" x2="165" y2="80"/>
+    </g>
+    <circle class="fig-joint" cx="165" cy="80" r="5"/>
+    <path class="fig-motion" d="M178,95 L178,68"/>
+    <polygon class="fig-arrow" points="178,64 172,75 184,75"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.8s;">
+      <line x1="165" y1="80" x2="180" y2="94"/>
+      <circle class="fig-joint fig-hi" cx="180" cy="94" r="5.5"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.8s;">
+      <line x1="165" y1="80" x2="180" y2="65"/>
+      <circle class="fig-joint fig-hi" cx="180" cy="65" r="5.5"/>
+    </g>
+  ` },
+  y_t_w: { kind: 'dynamic', svg: `
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="86" y2="196"/>
+      <line x1="99" y1="138" x2="114" y2="196"/>
+    </g>
+    <circle class="fig-joint" cx="99" cy="65" r="5"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.1s;">
+      <line x1="99" y1="65" x2="50" y2="60"/>
+      <line x1="99" y1="65" x2="148" y2="60"/>
+      <circle class="fig-joint fig-hi" cx="50" cy="60" r="6"/>
+      <circle class="fig-joint fig-hi" cx="148" cy="60" r="6"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.1s;">
+      <line x1="99" y1="65" x2="60" y2="25"/>
+      <line x1="99" y1="65" x2="138" y2="25"/>
+      <circle class="fig-joint fig-hi" cx="60" cy="25" r="6"/>
+      <circle class="fig-joint fig-hi" cx="138" cy="25" r="6"/>
+    </g>
+  ` },
+  hanging_leg_raise: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="40" y1="20" x2="160" y2="20"/>
+    <g class="fig-pose fig-fixed">
+      <line x1="78" y1="20" x2="94" y2="58"/>
+      <line x1="122" y1="20" x2="106" y2="58"/>
+      <circle cx="100" cy="42" r="14"/>
+      <line x1="100" y1="58" x2="100" y2="120"/>
+    </g>
+    <circle class="fig-joint" cx="100" cy="120" r="5"/>
+    <path class="fig-motion" d="M100,150 Q125,130 150,108"/>
+    <polygon class="fig-arrow" points="150,108 138,110 144,120"/>
+    <g class="fig-pose fig-a" style="animation-duration:2s;">
+      <line x1="100" y1="120" x2="90" y2="180"/>
+      <line x1="100" y1="120" x2="110" y2="180"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2s;">
+      <line x1="100" y1="120" x2="150" y2="100"/>
+      <line x1="100" y1="120" x2="158" y2="112"/>
+      <circle class="fig-joint fig-hi" cx="150" cy="100" r="6"/>
+      <circle class="fig-joint fig-hi" cx="158" cy="112" r="6"/>
+    </g>
+  ` },
+  toes_to_bar: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="40" y1="20" x2="160" y2="20"/>
+    <g class="fig-pose fig-fixed">
+      <line x1="78" y1="20" x2="94" y2="58"/>
+      <line x1="122" y1="20" x2="106" y2="58"/>
+      <circle cx="100" cy="42" r="14"/>
+      <line x1="100" y1="58" x2="100" y2="120"/>
+    </g>
+    <circle class="fig-joint" cx="100" cy="120" r="5"/>
+    <path class="fig-motion" d="M100,150 Q95,90 92,40"/>
+    <polygon class="fig-arrow" points="90,30 84,44 96,42"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.1s;">
+      <line x1="100" y1="120" x2="90" y2="180"/>
+      <line x1="100" y1="120" x2="110" y2="180"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.1s;">
+      <line x1="100" y1="120" x2="85" y2="32"/>
+      <line x1="100" y1="120" x2="115" y2="32"/>
+      <circle class="fig-joint fig-hi" cx="85" cy="30" r="6"/>
+      <circle class="fig-joint fig-hi" cx="115" cy="30" r="6"/>
+    </g>
+  ` },
+  front_lever_prog: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="40" y1="20" x2="160" y2="20"/>
+    <g class="fig-pose fig-fixed">
+      <line x1="78" y1="20" x2="94" y2="58"/>
+      <line x1="122" y1="20" x2="106" y2="58"/>
+      <circle cx="100" cy="42" r="14"/>
+    </g>
+    <circle class="fig-joint" cx="100" cy="58" r="5"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.3s;">
+      <line x1="100" y1="58" x2="100" y2="120"/>
+      <line x1="100" y1="120" x2="90" y2="180"/>
+      <line x1="100" y1="120" x2="110" y2="180"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.3s;">
+      <line x1="100" y1="58" x2="155" y2="55"/>
+      <line x1="155" y1="55" x2="192" y2="52"/>
+      <circle class="fig-joint fig-hi" cx="192" cy="52" r="6"/>
+    </g>
+  ` },
+  dips: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="55" y1="70" x2="55" y2="76"/>
+    <line class="fig-rig" x1="145" y1="70" x2="145" y2="76"/>
+    <circle class="fig-joint" cx="70" cy="72" r="5"/>
+    <circle class="fig-joint" cx="130" cy="72" r="5"/>
+    <path class="fig-motion" d="M100,165 L100,115"/>
+    <polygon class="fig-arrow" points="100,110 94,122 106,122"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.9s;">
+      <circle cx="100" cy="60" r="14"/>
+      <line x1="70" y1="72" x2="97" y2="80"/>
+      <line x1="130" y1="72" x2="103" y2="80"/>
+      <line x1="100" y1="80" x2="100" y2="140"/>
+      <line x1="100" y1="140" x2="90" y2="190"/>
+      <line x1="100" y1="140" x2="110" y2="190"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.9s;">
+      <circle cx="100" cy="90" r="14"/>
+      <line x1="70" y1="72" x2="97" y2="108"/>
+      <line x1="130" y1="72" x2="103" y2="108"/>
+      <line x1="100" y1="108" x2="100" y2="168"/>
+      <line x1="100" y1="168" x2="90" y2="192"/>
+      <line x1="100" y1="168" x2="110" y2="192"/>
+    </g>
+  ` },
+  split_squat: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
+    <line class="fig-rig" x1="140" y1="150" x2="175" y2="150"/>
+    <circle class="fig-joint" cx="72" cy="196" r="5.5"/>
+    <g class="fig-pose fig-a" style="animation-duration:2s;">
+      <circle cx="86" cy="76" r="14"/>
+      <line x1="100" y1="85" x2="100" y2="128"/>
+      <line x1="100" y1="128" x2="80" y2="160"/>
+      <line x1="80" y1="160" x2="72" y2="196"/>
+      <line x1="100" y1="128" x2="130" y2="150"/>
+      <line x1="130" y1="150" x2="158" y2="150"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2s;">
+      <circle cx="80" cy="106" r="14"/>
+      <line x1="96" y1="115" x2="98" y2="150"/>
+      <line x1="98" y1="150" x2="68" y2="172"/>
+      <line x1="68" y1="172" x2="72" y2="196"/>
+      <line x1="98" y1="150" x2="132" y2="162"/>
+      <line x1="132" y1="162" x2="158" y2="150"/>
+      <circle class="fig-joint fig-hi" cx="68" cy="172" r="5.5"/>
+    </g>
+  ` },
+  calf_raise: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+    </g>
+    <path class="fig-motion" d="M99,178 L99,160"/>
+    <polygon class="fig-arrow" points="99,155 93,167 105,167"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.6s;">
+      <line x1="99" y1="138" x2="88" y2="196"/>
+      <line x1="99" y1="138" x2="112" y2="196"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.6s;">
+      <line x1="99" y1="138" x2="88" y2="184"/>
+      <line x1="88" y1="184" x2="94" y2="192"/>
+      <line x1="99" y1="138" x2="112" y2="184"/>
+      <line x1="112" y1="184" x2="118" y2="192"/>
+      <circle class="fig-joint fig-hi" cx="88" cy="184" r="4.5"/>
+      <circle class="fig-joint fig-hi" cx="112" cy="184" r="4.5"/>
+    </g>
+  ` },
+  wall_sit: { kind: 'static', svg: `
+    <line class="fig-rig" x1="170" y1="18" x2="170" y2="196"/>
+    <line class="fig-rig" x1="105" y1="196" x2="170" y2="196"/>
+    <circle class="fig-joint" cx="110" cy="196" r="5.5"/>
+    <g class="fig-pose">
+      <circle cx="165" cy="78" r="14"/>
+      <line x1="165" y1="92" x2="165" y2="150"/>
+      <line x1="165" y1="150" x2="110" y2="150"/>
+      <line x1="110" y1="150" x2="110" y2="196"/>
+    </g>
+  ` },
+  cat_cow: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
+    <g class="fig-pose fig-fixed">
+      <line x1="70" y1="90" x2="70" y2="150"/>
+      <line x1="150" y1="95" x2="150" y2="150"/>
+    </g>
+    <circle class="fig-joint" cx="70" cy="90" r="5"/>
+    <circle class="fig-joint" cx="150" cy="95" r="5"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.4s;">
+      <circle cx="52" cy="78" r="13"/>
+      <polyline points="70,90 110,106 150,95"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.4s;">
+      <circle cx="58" cy="102" r="13"/>
+      <polyline points="70,90 110,74 150,95"/>
+    </g>
+  ` },
+  worlds_greatest_stretch: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
+    <g class="fig-pose fig-fixed">
+      <line x1="100" y1="130" x2="75" y2="155"/>
+      <line x1="75" y1="155" x2="70" y2="196"/>
+      <line x1="100" y1="130" x2="140" y2="170"/>
+      <line x1="140" y1="170" x2="158" y2="196"/>
+    </g>
+    <path class="fig-motion" d="M78,118 Q105,105 135,66"/>
+    <polygon class="fig-arrow" points="140,60 128,62 133,72"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.4s;">
+      <circle cx="86" cy="88" r="13"/>
+      <line x1="100" y1="98" x2="100" y2="130"/>
+      <line x1="100" y1="100" x2="76" y2="120"/>
+      <circle class="fig-joint fig-hi" cx="76" cy="120" r="5.5"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.4s;">
+      <circle cx="112" cy="76" r="13"/>
+      <line x1="100" y1="98" x2="100" y2="130"/>
+      <line x1="100" y1="98" x2="138" y2="62"/>
+      <circle class="fig-joint fig-hi" cx="138" cy="62" r="5.5"/>
+    </g>
+  ` },
+  hip_9090: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="99" cy="72" r="14"/>
+      <line x1="99" y1="86" x2="99" y2="140"/>
+    </g>
+    <circle class="fig-joint" cx="99" cy="140" r="5"/>
+    <path class="fig-motion" d="M140,133 Q99,165 58,133"/>
+    <polygon class="fig-arrow" points="55,130 62,140 68,128"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.4s;">
+      <polyline points="99,140 138,144 148,122"/>
+      <polyline points="99,140 68,152 52,142"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.4s;">
+      <polyline points="99,140 60,144 50,122"/>
+      <polyline points="99,140 131,152 147,142"/>
+    </g>
+  ` },
+  thoracic_rotation: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="55" cy="80" r="13"/>
+      <line x1="70" y1="90" x2="150" y2="95"/>
+      <line x1="70" y1="90" x2="70" y2="150"/>
+      <line x1="150" y1="95" x2="150" y2="150"/>
+    </g>
+    <path class="fig-motion" d="M115,125 Q90,90 55,45"/>
+    <polygon class="fig-arrow" points="50,40 55,52 63,44"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.5s;">
+      <line x1="70" y1="90" x2="118" y2="128"/>
+      <circle class="fig-joint fig-hi" cx="118" cy="128" r="5.5"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.5s;">
+      <line x1="70" y1="90" x2="48" y2="38"/>
+      <circle class="fig-joint fig-hi" cx="48" cy="38" r="5.5"/>
+    </g>
+  ` },
+  shoulder_circles_band: { kind: 'dynamic', svg: `
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="86" y2="196"/>
+      <line x1="99" y1="138" x2="114" y2="196"/>
+    </g>
+    <circle class="fig-joint" cx="99" cy="62" r="5"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.2s;">
+      <line x1="99" y1="62" x2="132" y2="92"/>
+      <line x1="99" y1="70" x2="130" y2="98"/>
+      <circle class="fig-joint fig-hi" cx="132" cy="92" r="6"/>
+      <circle class="fig-joint fig-hi" cx="130" cy="98" r="6"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.2s;">
+      <line x1="99" y1="62" x2="68" y2="30"/>
+      <line x1="99" y1="70" x2="66" y2="38"/>
+      <circle class="fig-joint fig-hi" cx="68" cy="30" r="6"/>
+      <circle class="fig-joint fig-hi" cx="66" cy="38" r="6"/>
+    </g>
+  ` },
+  wrist_mobility: { kind: 'dynamic', svg: `
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="86" y2="196"/>
+      <line x1="99" y1="138" x2="114" y2="196"/>
+      <line x1="97" y1="68" x2="78" y2="95"/>
+      <line x1="97" y1="72" x2="118" y2="97"/>
+    </g>
+    <circle class="fig-joint" cx="78" cy="95" r="4.5"/>
+    <circle class="fig-joint" cx="118" cy="97" r="4.5"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.7s;">
+      <line x1="78" y1="95" x2="66" y2="86"/>
+      <line x1="118" y1="97" x2="130" y2="108"/>
+      <circle class="fig-joint fig-hi" cx="66" cy="86" r="5"/>
+      <circle class="fig-joint fig-hi" cx="130" cy="108" r="5"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.7s;">
+      <line x1="78" y1="95" x2="66" y2="106"/>
+      <line x1="118" y1="97" x2="130" y2="86"/>
+      <circle class="fig-joint fig-hi" cx="66" cy="106" r="5"/>
+      <circle class="fig-joint fig-hi" cx="130" cy="86" r="5"/>
+    </g>
+  ` },
+  leg_swings: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="108" y2="196"/>
+    </g>
+    <circle class="fig-joint" cx="99" cy="138" r="5"/>
+    <path class="fig-motion" d="M78,178 Q100,160 128,172"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.6s;">
+      <line x1="99" y1="138" x2="130" y2="172"/>
+      <circle class="fig-joint fig-hi" cx="130" cy="172" r="5.5"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.6s;">
+      <line x1="99" y1="138" x2="72" y2="178"/>
+      <circle class="fig-joint fig-hi" cx="72" cy="178" r="5.5"/>
+    </g>
+  ` },
+  ankle_rocks: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="120" y2="196"/>
+    </g>
+    <circle class="fig-joint" cx="99" cy="138" r="5"/>
+    <circle class="fig-joint" cx="83" cy="196" r="5"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.8s;">
+      <line x1="99" y1="138" x2="85" y2="170"/>
+      <line x1="85" y1="170" x2="83" y2="196"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.8s;">
+      <line x1="99" y1="138" x2="100" y2="175"/>
+      <line x1="100" y1="175" x2="83" y2="196"/>
+      <circle class="fig-joint fig-hi" cx="100" cy="175" r="5"/>
+    </g>
+  ` },
+  neck_mobility: { kind: 'dynamic', svg: `
+    <g class="fig-pose fig-fixed">
+      <line x1="99" y1="55" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="86" y2="196"/>
+      <line x1="99" y1="138" x2="114" y2="196"/>
+    </g>
+    <circle class="fig-joint" cx="99" cy="55" r="5"/>
+    <g class="fig-pose fig-a" style="animation-duration:2s;">
+      <circle cx="83" cy="40" r="15"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2s;">
+      <circle cx="115" cy="40" r="15"/>
+    </g>
+  ` },
+  doorway_pec_stretch: { kind: 'static', svg: `
+    <line class="fig-rig" x1="155" y1="18" x2="155" y2="196"/>
+    <circle class="fig-joint" cx="150" cy="65" r="5.5"/>
+    <g class="fig-pose">
+      <circle cx="93" cy="42" r="15"/>
+      <line x1="97" y1="60" x2="105" y2="138"/>
+      <line x1="105" y1="138" x2="92" y2="196"/>
+      <line x1="105" y1="138" x2="118" y2="196"/>
+      <line x1="97" y1="65" x2="150" y2="65"/>
+    </g>
+  ` },
 };
 
 function exerciseFigureSvg(exerciseId) {
@@ -918,9 +1307,14 @@ function exerciseFigureSvg(exerciseId) {
    zeigt auf einen Blick, welcher Griff für diesen Hang-Satz gemeint ist. */
 function miniBoardThumb(boardId, gripId) {
   const board = BOARDS[boardId];
-  const spot = board.hotspots.find((h) => h.grip === gripId);
-  const dot = spot ? `<span class="dot" style="left:${spot.x}%;top:${spot.y}%;"></span>` : '';
-  return `<div class="timeline-thumb"><img src="${board.image}" alt="">${dot}</div>`;
+  // Manche Griffe haben zwei Löcher (links + rechts gespiegelt) — beide
+  // markieren, sonst ist bei einem grossen Punkt in der Mitte nicht
+  // erkennbar, welches der beiden Löcher gemeint ist.
+  const dots = board.hotspots
+    .filter((h) => h.grip === gripId)
+    .map((s) => `<span class="dot" style="left:${s.x}%;top:${s.y}%;"></span>`)
+    .join('');
+  return `<div class="timeline-thumb"><img src="${board.image}" alt="">${dots}</div>`;
 }
 
 function fbBlockSub(b) {
@@ -1020,6 +1414,38 @@ function renderFbRuntime() {
    der an einer Felswand hochsteigt (Gesamtzeit statt nur eine Linie),
    die aktuelle Phase gross, und eine "Danach"-Ankündigung, was als
    Nächstes kommt. */
+/* Strichmännchen fürs Hang-/Pause-Timing (nicht in EXERCISE_FIGURES, da
+   kein Übungs-Objekt dahintersteht) — hängt am Brett während "Hang",
+   steht entspannt mit lockeren Armen während "Pause". Der Ring um die
+   grosse Zahl füllt sich dabei mit dem Fortschritt INNERHALB des
+   aktuellen Hang-/Pause-Schritts (nicht des ganzen Ablaufs). */
+const FB_RING_CIRCUMFERENCE = 326.7; // 2 * PI * r(52)
+const FB_HANG_FIGURE_SVG = `
+  <svg viewBox="0 0 200 200" class="ex-figure fb-hang-figure">
+    <line class="fig-rig" x1="40" y1="20" x2="160" y2="20"/>
+    <g class="fig-pose">
+      <line x1="78" y1="20" x2="94" y2="58"/>
+      <line x1="122" y1="20" x2="106" y2="58"/>
+      <circle cx="100" cy="42" r="14"/>
+      <line x1="100" y1="58" x2="100" y2="120"/>
+      <line x1="100" y1="120" x2="90" y2="180"/>
+      <line x1="100" y1="120" x2="110" y2="180"/>
+    </g>
+  </svg>
+`;
+const FB_REST_FIGURE_SVG = `
+  <svg viewBox="0 0 200 200" class="ex-figure fb-rest-figure">
+    <g class="fig-pose">
+      <circle cx="99" cy="42" r="15"/>
+      <line x1="99" y1="60" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="86" y2="196"/>
+      <line x1="99" y1="138" x2="114" y2="196"/>
+    </g>
+    <line class="fig-pose fb-arm-shake" x1="99" y1="65" x2="80" y2="112"/>
+    <line class="fig-pose fb-arm-shake" x1="99" y1="65" x2="118" y2="112"/>
+  </svg>
+`;
+
 function ensureFbOverlay() {
   let el = document.getElementById('fb-overlay');
   if (!el) {
@@ -1065,11 +1491,6 @@ function fbElapsedSeconds() {
   return elapsed;
 }
 
-function fbOverallProgress() {
-  const total = fbEstimateSeconds();
-  return total ? Math.min(1, fbElapsedSeconds() / total) : 0;
-}
-
 /* Was kommt als Nächstes dran — erst innerhalb des laufenden Hang-Blocks
    (nächste Phase in fb.sequence), sonst der nächste Block im Ablauf. */
 function fbUpcomingLabel() {
@@ -1084,10 +1505,8 @@ function fbUpcomingLabel() {
 }
 
 function updateFbProgressUI() {
-  const climber = document.getElementById('fb-wall-climber');
   const text = document.getElementById('fb-progress-text');
-  if (!climber || !text) return;
-  climber.style.bottom = `${(Math.min(1, fbOverallProgress()) * 92).toFixed(1)}%`;
+  if (!text) return;
   text.textContent = `Satz ${Math.min(fb.blockIndex + 1, fb.blocks.length)}/${fb.blocks.length} · ${fmtMinSec(fbElapsedSeconds())} / ${fmtMinSec(fbEstimateSeconds())}`;
 }
 
@@ -1116,13 +1535,24 @@ function renderFbOverlay() {
     const block = fb.blocks[fb.blockIndex];
     if (block.type === 'hang') {
       const step = fb.sequence[fb.stepIndex];
+      const isHangPhase = !step || step.phase === 'Hang';
+      const phaseTotal = step ? step.seconds : 1;
+      const frac = phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 0;
+      const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
       stage = `
         <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${esc(gripLabel(block.board, block.grip))}</div>
         <div class="fb-stage-figure">${miniBoardThumb(block.board, block.grip)}</div>
-        <div class="timer-box">
-          <div class="big ${step && step.phase !== 'Hang' ? 'rest' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
-          <div class="phase mono" id="fb-phase">${step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : ''}</div>
+        <div class="fb-hang-visual">
+          <div class="fb-phase-figure" id="fb-phase-figure" data-kind="${isHangPhase ? 'hang' : 'rest'}">${isHangPhase ? FB_HANG_FIGURE_SVG : FB_REST_FIGURE_SVG}</div>
+          <div class="fb-timer-ring">
+            <svg viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="52"/>
+              <circle class="ring-fg ${isHangPhase ? '' : 'rest'}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
+            </svg>
+            <div class="big ${isHangPhase ? '' : 'rest'}" id="fb-big">${pad2(fb.secondsLeft)}</div>
+          </div>
         </div>
+        <div class="phase mono" id="fb-phase">${step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : ''}</div>
         <div class="fb-stage-next mono" id="fb-upcoming"></div>
         <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
       `;
@@ -1142,10 +1572,7 @@ function renderFbOverlay() {
   el.innerHTML = `
     <button type="button" class="fb-overlay-close" id="fb-overlay-close" title="Abbrechen">✕</button>
     <div class="fb-overlay-inner">
-      <div class="fb-overlay-progress">
-        <div class="wall-track"><div class="wall-flag">🚩</div><div class="wall-climber" id="fb-wall-climber">🧗</div></div>
-        <div class="fb-progress-text mono" id="fb-progress-text"></div>
-      </div>
+      <div class="fb-progress-text mono" id="fb-progress-text"></div>
       <div class="fb-overlay-stage">${stage}</div>
     </div>
   `;
@@ -1230,11 +1657,25 @@ function tickBlock() {
 function updateTimerUI() {
   const big = document.getElementById('fb-big');
   const phase = document.getElementById('fb-phase');
-  if (big && phase) {
-    const step = fb.sequence[fb.stepIndex];
+  const ring = document.getElementById('fb-ring-fg');
+  const figureHolder = document.getElementById('fb-phase-figure');
+  const step = fb.sequence[fb.stepIndex];
+  const isHangPhase = !step || step.phase === 'Hang';
+
+  if (big) {
     big.textContent = pad2(fb.secondsLeft);
-    big.className = 'big' + (step && step.phase !== 'Hang' ? ' rest' : '');
-    phase.textContent = step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : '';
+    big.className = 'big' + (isHangPhase ? '' : ' rest');
+  }
+  if (phase) phase.textContent = step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : '';
+  if (ring) {
+    const phaseTotal = step ? step.seconds : 1;
+    const frac = phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 0;
+    ring.style.strokeDashoffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
+    ring.classList.toggle('rest', !isHangPhase);
+  }
+  if (figureHolder && figureHolder.dataset.kind !== (isHangPhase ? 'hang' : 'rest')) {
+    figureHolder.innerHTML = isHangPhase ? FB_HANG_FIGURE_SVG : FB_REST_FIGURE_SVG;
+    figureHolder.dataset.kind = isHangPhase ? 'hang' : 'rest';
   }
   updateFbUpcomingUI();
   updateFbProgressUI();
