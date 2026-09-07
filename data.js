@@ -345,6 +345,85 @@ const FINGERBOARD_TEMPLATES = [
       { type: 'exercise', exerciseId: 'neck_mobility', reps: 8, restSec: 0 },
     ],
   },
+  {
+    id: 'beginner_edge_flow',
+    name: 'Einsteiger-Flow — Grosse Kante',
+    note: 'Kurze, submaximale Hangs auf der grössten (sichersten) Kante statt Max Hangs — Fokus auf sauberer Technik und Sehnen-Gewöhnung, nicht auf Maximalkraft. ~20 Min.',
+    blocks: [
+      // Phase 1 — Aktivierung
+      { type: 'exercise', exerciseId: 'wrist_mobility', reps: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'shoulder_circles_band', reps: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'thoracic_rotation', reps: 8, restSec: 0 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 3, hangSec: 5, restSec: 30 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 3, hangSec: 6, restSec: 30 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 2, hangSec: 7, restSec: 40 },
+
+      // Phase 2 — Hauptblock: submaximale Einzel-Hangs, dazwischen leichte,
+      // nicht ermüdende Schulter-/Rumpfarbeit statt komplett passiver Pause.
+      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'face_pull', reps: 10, restSec: 60 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'band_pull_apart', reps: 12, restSec: 60 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'pallof', reps: 10, restSec: 60 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'bird_dog', reps: 8, restSec: 60 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'ext_rotation', reps: 10, restSec: 60 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
+
+      // Phase 3 — Ergänzung ohne Griffbrett
+      { type: 'exercise', exerciseId: 'plank', reps: 20, restSec: 30 },
+      { type: 'exercise', exerciseId: 'glute_bridge', reps: 12, restSec: 30 },
+      { type: 'exercise', exerciseId: 'hollow_hold', reps: 15, restSec: 30 },
+      { type: 'exercise', exerciseId: 'calf_raise', reps: 15, restSec: 0 },
+
+      // Phase 4 — Cool-down
+      { type: 'exercise', exerciseId: 'cat_cow', reps: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'doorway_pec_stretch', reps: 1, restSec: 0 },
+      { type: 'exercise', exerciseId: 'wrist_ext', reps: 12, restSec: 0 },
+    ],
+  },
+  {
+    id: 'beginner_sloper_flow',
+    name: 'Einsteiger-Flow — mit Sloper',
+    note: 'Slopers trainieren Körperspannung und Griffkraft über die offene Hand statt über die Fingerscheiben — schonender Einstieg als kleine Kanten/Taschen. ~20 Min.',
+    blocks: [
+      // Phase 1 — Aktivierung, kurzer Primer auf der sicheren Kante
+      { type: 'exercise', exerciseId: 'wrist_mobility', reps: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'shoulder_circles_band', reps: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'thoracic_rotation', reps: 8, restSec: 0 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 3, hangSec: 5, restSec: 30 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 2, hangSec: 6, restSec: 40 },
+
+      // Phase 2 — Hauptblock Sloper 20° (offene Hand, Körperspannung).
+      { type: 'hang', board: null, grip: 'sloper_easy', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'face_pull', reps: 10, restSec: 60 },
+      { type: 'hang', board: null, grip: 'sloper_easy', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'scapula_pull', reps: 10, restSec: 60 },
+      { type: 'hang', board: null, grip: 'sloper_easy', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'pallof', reps: 10, restSec: 60 },
+      { type: 'hang', board: null, grip: 'sloper_easy', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'bird_dog', reps: 8, restSec: 60 },
+      { type: 'hang', board: null, grip: 'sloper_easy', reps: 1, hangSec: 6, restSec: 0 },
+
+      // Phase 3 — Zweitgriff-Reiz: Sloper 35°, etwas steiler, kürzere Sätze.
+      { type: 'hang', board: null, grip: 'sloper_medium', reps: 1, hangSec: 5, restSec: 0 },
+      { type: 'exercise', exerciseId: 'hollow_hold', reps: 15, restSec: 50 },
+      { type: 'hang', board: null, grip: 'sloper_medium', reps: 1, hangSec: 5, restSec: 0 },
+      { type: 'exercise', exerciseId: 'russian_twist', reps: 14, restSec: 50 },
+      { type: 'hang', board: null, grip: 'sloper_medium', reps: 1, hangSec: 5, restSec: 0 },
+
+      // Phase 4 — Ergänzung ohne Griffbrett
+      { type: 'exercise', exerciseId: 'glute_bridge', reps: 12, restSec: 30 },
+      { type: 'exercise', exerciseId: 'calf_raise', reps: 15, restSec: 0 },
+
+      // Phase 5 — Cool-down
+      { type: 'exercise', exerciseId: 'cat_cow', reps: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'doorway_pec_stretch', reps: 1, restSec: 0 },
+      { type: 'exercise', exerciseId: 'wrist_ext', reps: 12, restSec: 0 },
+    ],
+  },
 ];
 
 /* ---------- Standard-Wochenplan (Startvorlage) ----------
