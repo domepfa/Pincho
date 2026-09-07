@@ -188,56 +188,60 @@ function buildSequence(protocolId, opts) {
    die sich in Fingerboard-Pausen machen lassen (kein Langhantel-Rack nötig)
    — genau diese Teilmenge wird bei Challenges angeboten
    (siehe ACCESSORY_EXERCISES unten). */
+/* `muscles` (primary/secondary) sind allgemeines Trainingswissen, keine
+   erfundenen Produktdaten — welche Muskelgruppe eine Standardübung wie
+   Klimmzug oder Kniebeuge beansprucht, ist Lehrbuchstoff. Zone-Ids
+   beziehen sich auf MUSCLE_ZONES_SVG/MUSCLE_ZONE_LABEL in app.js. */
 const EXERCISE_LIBRARY = [
   // Zug
-  { id: 'pullup', name: 'Klimmzug', category: 'zug' },
-  { id: 'pullup_weighted', name: 'Klimmzug mit Zusatzgewicht', category: 'zug' },
-  { id: 'lat_pulldown', name: 'Latzug', category: 'zug' },
-  { id: 'lat_pulldown_single', name: 'Latzug einarmig', category: 'zug' },
-  { id: 'row_cable', name: 'Rudern Kabel', category: 'zug' },
-  { id: 'row_barbell', name: 'Rudern Langhantel', category: 'zug' },
+  { id: 'pullup', name: 'Klimmzug', category: 'zug', muscles: { primary: ['lats'], secondary: ['biceps', 'forearms_front'] } },
+  { id: 'pullup_weighted', name: 'Klimmzug mit Zusatzgewicht', category: 'zug', muscles: { primary: ['lats'], secondary: ['biceps', 'forearms_front'] } },
+  { id: 'lat_pulldown', name: 'Latzug', category: 'zug', muscles: { primary: ['lats'], secondary: ['biceps', 'rear_delts'] } },
+  { id: 'lat_pulldown_single', name: 'Latzug einarmig', category: 'zug', muscles: { primary: ['lats'], secondary: ['biceps', 'obliques'] } },
+  { id: 'row_cable', name: 'Rudern Kabel', category: 'zug', muscles: { primary: ['lats', 'traps'], secondary: ['biceps', 'rear_delts'] } },
+  { id: 'row_barbell', name: 'Rudern Langhantel', category: 'zug', muscles: { primary: ['lats', 'traps'], secondary: ['biceps', 'lower_back'] } },
   // Antagonisten
-  { id: 'face_pull', name: 'Face Pulls', category: 'antagonist', pauseFriendly: true },
-  { id: 'ext_rotation', name: 'Aussenrotation Kabel', category: 'antagonist', pauseFriendly: true },
-  { id: 'wrist_ext', name: 'Reverse Wrist Curls', category: 'antagonist', pauseFriendly: true },
-  { id: 'y_t_w', name: 'Y-T-W-Raises', category: 'antagonist', pauseFriendly: true },
-  { id: 'scapula_pull', name: 'Scapula Pulls', category: 'antagonist', pauseFriendly: true },
-  { id: 'band_pull_apart', name: 'Band Pull-Apart', category: 'antagonist', pauseFriendly: true },
+  { id: 'face_pull', name: 'Face Pulls', category: 'antagonist', pauseFriendly: true, muscles: { primary: ['rear_delts', 'traps'], secondary: ['forearms_back'] } },
+  { id: 'ext_rotation', name: 'Aussenrotation Kabel', category: 'antagonist', pauseFriendly: true, muscles: { primary: ['rear_delts'], secondary: [] } },
+  { id: 'wrist_ext', name: 'Reverse Wrist Curls', category: 'antagonist', pauseFriendly: true, muscles: { primary: ['forearms_back'], secondary: [] } },
+  { id: 'y_t_w', name: 'Y-T-W-Raises', category: 'antagonist', pauseFriendly: true, muscles: { primary: ['rear_delts', 'traps'], secondary: ['lats'] } },
+  { id: 'scapula_pull', name: 'Scapula Pulls', category: 'antagonist', pauseFriendly: true, muscles: { primary: ['traps', 'lats'], secondary: ['rear_delts'] } },
+  { id: 'band_pull_apart', name: 'Band Pull-Apart', category: 'antagonist', pauseFriendly: true, muscles: { primary: ['rear_delts', 'traps'], secondary: [] } },
   // Rumpf
-  { id: 'pallof', name: 'Pallof Press', category: 'rumpf', pauseFriendly: true },
-  { id: 'crunches', name: 'Crunches', category: 'rumpf', pauseFriendly: true },
-  { id: 'hanging_leg_raise', name: 'Hanging Leg Raise', category: 'rumpf', pauseFriendly: true },
-  { id: 'front_lever_prog', name: 'Front-Lever-Progression', category: 'rumpf', pauseFriendly: true },
-  { id: 'toes_to_bar', name: 'Toes-to-Bar', category: 'rumpf', pauseFriendly: true },
-  { id: 'plank', name: 'Unterarmstütz (Plank)', category: 'rumpf', pauseFriendly: true },
-  { id: 'side_plank', name: 'Seitstütz', category: 'rumpf', pauseFriendly: true },
-  { id: 'russian_twist', name: 'Russian Twist', category: 'rumpf', pauseFriendly: true },
-  { id: 'hollow_hold', name: 'Hollow Body Hold', category: 'rumpf', pauseFriendly: true },
-  { id: 'superman', name: 'Superman', category: 'rumpf', pauseFriendly: true },
-  { id: 'bird_dog', name: 'Bird Dog', category: 'rumpf', pauseFriendly: true },
+  { id: 'pallof', name: 'Pallof Press', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['obliques', 'abs'], secondary: [] } },
+  { id: 'crunches', name: 'Crunches', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['abs'], secondary: [] } },
+  { id: 'hanging_leg_raise', name: 'Hanging Leg Raise', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['abs'], secondary: ['obliques', 'forearms_front'] } },
+  { id: 'front_lever_prog', name: 'Front-Lever-Progression', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['lats', 'abs'], secondary: ['shoulders', 'forearms_front'] } },
+  { id: 'toes_to_bar', name: 'Toes-to-Bar', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['abs'], secondary: ['lats', 'forearms_front'] } },
+  { id: 'plank', name: 'Unterarmstütz (Plank)', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['abs'], secondary: ['obliques', 'shoulders'] } },
+  { id: 'side_plank', name: 'Seitstütz', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['obliques'], secondary: ['abs'] } },
+  { id: 'russian_twist', name: 'Russian Twist', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['obliques'], secondary: ['abs'] } },
+  { id: 'hollow_hold', name: 'Hollow Body Hold', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['abs'], secondary: ['obliques'] } },
+  { id: 'superman', name: 'Superman', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['lower_back'], secondary: ['glutes'] } },
+  { id: 'bird_dog', name: 'Bird Dog', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['lower_back', 'abs'], secondary: ['glutes'] } },
   // Push
-  { id: 'push_up', name: 'Liegestütz', category: 'push', pauseFriendly: true },
-  { id: 'bench_press', name: 'Bankdrücken', category: 'push' },
-  { id: 'ohp', name: 'Overhead Press', category: 'push' },
-  { id: 'dips', name: 'Dips', category: 'push', pauseFriendly: true },
+  { id: 'push_up', name: 'Liegestütz', category: 'push', pauseFriendly: true, muscles: { primary: ['chest'], secondary: ['triceps', 'shoulders'] } },
+  { id: 'bench_press', name: 'Bankdrücken', category: 'push', muscles: { primary: ['chest'], secondary: ['triceps', 'shoulders'] } },
+  { id: 'ohp', name: 'Overhead Press', category: 'push', muscles: { primary: ['shoulders'], secondary: ['triceps'] } },
+  { id: 'dips', name: 'Dips', category: 'push', pauseFriendly: true, muscles: { primary: ['chest', 'triceps'], secondary: ['shoulders'] } },
   // Beine
-  { id: 'squat', name: 'Kniebeuge', category: 'beine' },
-  { id: 'deadlift', name: 'Kreuzheben', category: 'beine' },
-  { id: 'split_squat', name: 'Bulgarian Split Squat', category: 'beine', pauseFriendly: true },
-  { id: 'calf_raise', name: 'Wadenheben', category: 'beine', pauseFriendly: true },
-  { id: 'wall_sit', name: 'Wall Sit', category: 'beine', pauseFriendly: true },
-  { id: 'glute_bridge', name: 'Glute Bridge', category: 'beine', pauseFriendly: true },
+  { id: 'squat', name: 'Kniebeuge', category: 'beine', muscles: { primary: ['quads', 'glutes'], secondary: ['hamstrings'] } },
+  { id: 'deadlift', name: 'Kreuzheben', category: 'beine', muscles: { primary: ['hamstrings', 'glutes'], secondary: ['lower_back'] } },
+  { id: 'split_squat', name: 'Bulgarian Split Squat', category: 'beine', pauseFriendly: true, muscles: { primary: ['quads', 'glutes'], secondary: ['hamstrings'] } },
+  { id: 'calf_raise', name: 'Wadenheben', category: 'beine', pauseFriendly: true, muscles: { primary: ['calves'], secondary: [] } },
+  { id: 'wall_sit', name: 'Wall Sit', category: 'beine', pauseFriendly: true, muscles: { primary: ['quads'], secondary: [] } },
+  { id: 'glute_bridge', name: 'Glute Bridge', category: 'beine', pauseFriendly: true, muscles: { primary: ['glutes'], secondary: ['hamstrings'] } },
   // Mobilität
-  { id: 'cat_cow', name: 'Katze-Kuh', category: 'mobility', pauseFriendly: true },
-  { id: 'worlds_greatest_stretch', name: "World's Greatest Stretch", category: 'mobility', pauseFriendly: true },
-  { id: 'hip_9090', name: 'Hüftwechsel 90/90', category: 'mobility', pauseFriendly: true },
-  { id: 'thoracic_rotation', name: 'BWS-Rotation (Thread the Needle)', category: 'mobility', pauseFriendly: true },
-  { id: 'shoulder_circles_band', name: 'Schulterkreisen mit Band', category: 'mobility', pauseFriendly: true },
-  { id: 'wrist_mobility', name: 'Handgelenk-Mobilisation', category: 'mobility', pauseFriendly: true },
-  { id: 'leg_swings', name: 'Beinschwingen', category: 'mobility', pauseFriendly: true },
-  { id: 'ankle_rocks', name: 'Sprunggelenk-Mobilisation', category: 'mobility', pauseFriendly: true },
-  { id: 'neck_mobility', name: 'Nacken-Mobilisation', category: 'mobility', pauseFriendly: true },
-  { id: 'doorway_pec_stretch', name: 'Türrahmen-Dehnung Brust', category: 'mobility', pauseFriendly: true },
+  { id: 'cat_cow', name: 'Katze-Kuh', category: 'mobility', pauseFriendly: true, muscles: { primary: ['lower_back'], secondary: ['abs'] } },
+  { id: 'worlds_greatest_stretch', name: "World's Greatest Stretch", category: 'mobility', pauseFriendly: true, muscles: { primary: ['hamstrings', 'obliques'], secondary: ['quads'] } },
+  { id: 'hip_9090', name: 'Hüftwechsel 90/90', category: 'mobility', pauseFriendly: true, muscles: { primary: ['glutes'], secondary: [] } },
+  { id: 'thoracic_rotation', name: 'BWS-Rotation (Thread the Needle)', category: 'mobility', pauseFriendly: true, muscles: { primary: ['lats'], secondary: ['obliques'] } },
+  { id: 'shoulder_circles_band', name: 'Schulterkreisen mit Band', category: 'mobility', pauseFriendly: true, muscles: { primary: ['shoulders'], secondary: ['rear_delts'] } },
+  { id: 'wrist_mobility', name: 'Handgelenk-Mobilisation', category: 'mobility', pauseFriendly: true, muscles: { primary: ['forearms_front'], secondary: ['forearms_back'] } },
+  { id: 'leg_swings', name: 'Beinschwingen', category: 'mobility', pauseFriendly: true, muscles: { primary: ['hamstrings'], secondary: ['quads'] } },
+  { id: 'ankle_rocks', name: 'Sprunggelenk-Mobilisation', category: 'mobility', pauseFriendly: true, muscles: { primary: ['calves'], secondary: [] } },
+  { id: 'neck_mobility', name: 'Nacken-Mobilisation', category: 'mobility', pauseFriendly: true, muscles: { primary: ['neck_traps'], secondary: [] } },
+  { id: 'doorway_pec_stretch', name: 'Türrahmen-Dehnung Brust', category: 'mobility', pauseFriendly: true, muscles: { primary: ['chest'], secondary: ['shoulders'] } },
 ];
 
 const ACCESSORY_EXERCISES = EXERCISE_LIBRARY.filter((e) => e.pauseFriendly);
@@ -254,6 +258,11 @@ const EXERCISE_CATEGORY_LABEL = {
 function exerciseName(id) {
   const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
   return ex ? ex.name : id;
+}
+
+function exerciseMuscles(id) {
+  const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
+  return (ex && ex.muscles) || { primary: [], secondary: [] };
 }
 
 /* ---------- Trainingsplan-Vorlagen ----------

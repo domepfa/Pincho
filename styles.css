@@ -375,6 +375,16 @@ button, input, select, textarea { font-family: inherit; }
 .fb-stage-figure .ex-figure { width: 100%; height: auto; display: block; }
 .fb-stage-figure .ex-figure-emoji { font-size: 96px; text-align: center; line-height: 1.4; }
 
+/* Zielmuskeln-Übersicht: ein Körper-Umriss (vorne links, hinten rechts),
+   Zonen werden je Übung ein-/ausgeblendet statt neu gezeichnet. */
+.fb-muscle-block { margin-top: 6px; text-align: center; }
+.muscle-map { width: 150px; margin: 0 auto; display: block; }
+.muscle-head { fill: var(--ink-faint); opacity: .3; }
+.muscle-zone rect, .muscle-zone ellipse { fill: var(--ink-faint); opacity: .28; transition: fill .2s, opacity .2s; }
+.muscle-zone.secondary rect, .muscle-zone.secondary ellipse { fill: var(--accent); opacity: .5; }
+.muscle-zone.primary rect, .muscle-zone.primary ellipse { fill: var(--accent); opacity: .95; }
+.fb-muscle-label { font-size: 10.5px; color: var(--ink-dim); margin-top: 6px; max-width: 260px; margin-left: auto; margin-right: auto; }
+
 .fb-overlay-done { align-items: center; text-align: center; position: relative; overflow: hidden; }
 .fb-done-emoji { font-size: 64px; animation: popIn .5s cubic-bezier(.25, 1.4, .4, 1) both; }
 .fb-overlay-done .fb-stage-title { animation: riseIn .4s ease .1s both; }

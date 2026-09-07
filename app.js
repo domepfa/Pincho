@@ -1320,6 +1320,64 @@ function exerciseFigureSvg(exerciseId) {
   return `<svg viewBox="0 0 200 200" class="ex-figure ${fig.kind === 'static' ? 'fig-static' : ''}">${fig.svg}</svg>`;
 }
 
+/* ---------- Zielmuskeln-Übersicht ----------
+   Ein einziges, wiederverwendbares Körper-Umriss-SVG (vorne links, hinten
+   rechts) mit fest definierten Zonen — pro Übung wird nur die Klasse
+   (primary/secondary/inaktiv) der jeweiligen Zone umgeschaltet, das
+   Bild selbst bleibt immer dasselbe. Positionen sind bewusst schematisch
+   (Rechtecke/Ellipsen wie bei den Strichmännchen), keine anatomische
+   Illustration. */
+const MUSCLE_ZONES_SVG = {
+  neck_traps: '<rect x="33" y="25" width="24" height="8" rx="3"/>',
+  shoulders: '<ellipse cx="24" cy="34" rx="8" ry="7"/><ellipse cx="66" cy="34" rx="8" ry="7"/>',
+  chest: '<rect x="30" y="32" width="30" height="18" rx="4"/>',
+  biceps: '<rect x="14" y="38" width="9" height="20" rx="4"/><rect x="67" y="38" width="9" height="20" rx="4"/>',
+  forearms_front: '<rect x="10" y="60" width="8" height="24" rx="4"/><rect x="72" y="60" width="8" height="24" rx="4"/>',
+  abs: '<rect x="34" y="52" width="22" height="26" rx="4"/>',
+  obliques: '<rect x="26" y="54" width="7" height="22" rx="3"/><rect x="57" y="54" width="7" height="22" rx="3"/>',
+  quads: '<rect x="28" y="80" width="16" height="34" rx="5"/><rect x="46" y="80" width="16" height="34" rx="5"/>',
+  shins: '<rect x="30" y="116" width="11" height="28" rx="4"/><rect x="49" y="116" width="11" height="28" rx="4"/>',
+  traps: '<rect x="133" y="21" width="24" height="14" rx="4"/>',
+  rear_delts: '<ellipse cx="124" cy="34" rx="8" ry="7"/><ellipse cx="166" cy="34" rx="8" ry="7"/>',
+  lats: '<rect x="128" y="38" width="34" height="24" rx="5"/>',
+  triceps: '<rect x="112" y="38" width="9" height="20" rx="4"/><rect x="169" y="38" width="9" height="20" rx="4"/>',
+  forearms_back: '<rect x="108" y="60" width="8" height="24" rx="4"/><rect x="174" y="60" width="8" height="24" rx="4"/>',
+  lower_back: '<rect x="133" y="62" width="24" height="18" rx="4"/>',
+  glutes: '<rect x="128" y="80" width="34" height="18" rx="6"/>',
+  hamstrings: '<rect x="128" y="98" width="16" height="30" rx="5"/><rect x="146" y="98" width="16" height="30" rx="5"/>',
+  calves: '<rect x="130" y="130" width="11" height="26" rx="4"/><rect x="149" y="130" width="11" height="26" rx="4"/>',
+};
+
+const MUSCLE_ZONE_LABEL = {
+  neck_traps: 'Nacken', shoulders: 'Schultern', chest: 'Brust', biceps: 'Bizeps',
+  forearms_front: 'Unterarm (Beuger)', abs: 'Bauch', obliques: 'Seitl. Bauch',
+  quads: 'Quadrizeps', shins: 'Schienbein', traps: 'Trapezius', rear_delts: 'Hintere Schulter',
+  lats: 'Latissimus', triceps: 'Trizeps', forearms_back: 'Unterarm (Strecker)',
+  lower_back: 'Unterer Rücken', glutes: 'Gesäss', hamstrings: 'Hintere Oberschenkel', calves: 'Waden',
+};
+
+function bodyMapSvg(primary, secondary) {
+  const zoneEl = (id, shape) => {
+    const cls = primary.includes(id) ? 'muscle-zone primary' : secondary.includes(id) ? 'muscle-zone secondary' : 'muscle-zone';
+    return `<g class="${cls}">${shape}</g>`;
+  };
+  const zones = Object.entries(MUSCLE_ZONES_SVG).map(([id, shape]) => zoneEl(id, shape)).join('');
+  return `
+    <svg viewBox="0 0 190 160" class="muscle-map">
+      <circle class="muscle-head" cx="45" cy="13" r="9"/>
+      <circle class="muscle-head" cx="145" cy="13" r="9"/>
+      ${zones}
+    </svg>
+  `;
+}
+
+function muscleLabelsText(primary, secondary) {
+  const p = primary.map((id) => MUSCLE_ZONE_LABEL[id] || id);
+  const s = secondary.map((id) => MUSCLE_ZONE_LABEL[id] || id);
+  if (!p.length && !s.length) return '';
+  return s.length ? `${p.join(', ')} (+ ${s.join(', ')})` : p.join(', ');
+}
+
 /* Kleines, unverzerrtes Board-Abbild mit einem Punkt an der Griffposition —
    zeigt auf einen Blick, welcher Griff für diesen Hang-Satz gemeint ist. */
 function miniBoardThumb(boardId, gripId) {
@@ -1636,11 +1694,19 @@ function renderFbOverlay() {
         <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
       `;
     } else {
+      const muscles = exerciseMuscles(block.exerciseId);
+      const muscleText = muscleLabelsText(muscles.primary, muscles.secondary);
       stage = `
         <div class="fb-stage-label mono">ÜBUNG ${fb.blockIndex + 1}/${fb.blocks.length}</div>
         <div class="fb-stage-figure">${exerciseFigureSvg(block.exerciseId)}</div>
         <div class="fb-stage-title">${esc(exerciseName(block.exerciseId))} × ${esc(String(block.reps))}</div>
         ${block.restSec ? `<div class="fb-stage-sub mono">danach ~${block.restSec}s Pause</div>` : ''}
+        ${muscleText ? `
+          <div class="fb-muscle-block">
+            ${bodyMapSvg(muscles.primary, muscles.secondary)}
+            <div class="fb-muscle-label mono">${esc(muscleText)}</div>
+          </div>
+        ` : ''}
         <div class="fb-stage-next mono" id="fb-upcoming"></div>
         ${fbTransportRow()}
         <button class="btn fb-stage-btn" id="fb-exercise-done">FERTIG</button>
