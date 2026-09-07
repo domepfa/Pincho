@@ -553,9 +553,7 @@ function renderFbQuickstart() {
       if (fb.blocks.length && !confirm('Aktuellen Ablauf durch "' + t.name + '" ersetzen und sofort starten?')) return;
       fb.blocks = t.blocks.map((b) => (b.type === 'hang' ? { ...b, board: fb.board } : { ...b }));
       renderFbBlocksList();
-      startAblauf();
-      const runtime = document.getElementById('fb-runtime');
-      if (runtime) runtime.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      startAblauf(); // öffnet direkt das Ablauf-Vollbild
     };
   });
 }
@@ -634,6 +632,286 @@ function fbEstimateSeconds() {
 }
 function fmtMinSec(totalSec) {
   return `${Math.floor(totalSec / 60)}:${pad2(totalSec % 60)}`;
+}
+
+/* ---------- Übungs-Strichmännchen ----------
+   Kleine, animierte SVG-Strichmännchen fürs Ablauf-Vollbild: zeigen auf
+   einen Blick, welche Bewegung gemeint ist, ohne Foto/Video. Zwei Arten:
+   - 'dynamic': zwei Posen (Start/Ende der Bewegung) überblenden in Dauer-
+     schlaufe. Fixe Körperteile sind gedämpft (.fig-fixed), bewegte hell,
+     der eigentliche Arbeitspunkt (z. B. die ziehende Hand) lime; eine
+     gestrichelte Linie + Pfeil zeigt zusätzlich die Bewegungsrichtung.
+   - 'static': eine Pose (Halteübung), sanftes Pulsieren statt Bewegung.
+   Nicht jede Übung hat schon eine Animation — renderExerciseFigure()
+   fällt für alle anderen auf ein Emoji zurück (siehe dort). */
+const EXERCISE_FIGURES = {
+  face_pull: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="188" y1="40" x2="188" y2="140"/>
+    <circle class="fig-rig-dot" cx="188" cy="90" r="6"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="86" y2="196"/>
+      <line x1="99" y1="138" x2="114" y2="196"/>
+    </g>
+    <circle class="fig-joint" cx="99" cy="60" r="5"/>
+    <circle class="fig-joint" cx="99" cy="138" r="5"/>
+    <path class="fig-motion" d="M165,72 L60,71"/>
+    <polygon class="fig-arrow" points="60,71 72,65 72,77"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.2s;">
+      <polyline points="99,58 140,62 168,66"/>
+      <polyline points="99,66 138,72 166,78"/>
+      <circle class="fig-joint fig-mid" cx="140" cy="62" r="4.5"/>
+      <circle class="fig-joint fig-mid" cx="138" cy="72" r="4.5"/>
+      <circle class="fig-joint fig-hi" cx="168" cy="66" r="6"/>
+      <circle class="fig-joint fig-hi" cx="166" cy="78" r="6"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.2s;">
+      <polyline points="99,58 65,54 46,64"/>
+      <polyline points="99,66 63,66 44,78"/>
+      <circle class="fig-joint fig-mid" cx="65" cy="54" r="4.5"/>
+      <circle class="fig-joint fig-mid" cx="63" cy="66" r="4.5"/>
+      <circle class="fig-joint fig-hi" cx="46" cy="64" r="6"/>
+      <circle class="fig-joint fig-hi" cx="44" cy="78" r="6"/>
+    </g>
+  ` },
+  band_pull_apart: { kind: 'dynamic', svg: `
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="86" y2="196"/>
+      <line x1="99" y1="138" x2="114" y2="196"/>
+    </g>
+    <circle class="fig-joint" cx="99" cy="66" r="5"/>
+    <path class="fig-motion" d="M145,66 L53,66"/>
+    <polygon class="fig-arrow" points="53,66 65,60 65,72"/>
+    <polygon class="fig-arrow" points="145,66 133,60 133,72"/>
+    <g class="fig-pose fig-a" style="animation-duration:2s;">
+      <line x1="99" y1="66" x2="60" y2="70"/>
+      <line x1="99" y1="66" x2="138" y2="70"/>
+      <circle class="fig-joint fig-hi" cx="60" cy="70" r="6"/>
+      <circle class="fig-joint fig-hi" cx="138" cy="70" r="6"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2s;">
+      <line x1="99" y1="66" x2="40" y2="60"/>
+      <line x1="99" y1="66" x2="158" y2="60"/>
+      <circle class="fig-joint fig-hi" cx="40" cy="60" r="6"/>
+      <circle class="fig-joint fig-hi" cx="158" cy="60" r="6"/>
+    </g>
+  ` },
+  scapula_pull: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="100" y1="14" x2="100" y2="48"/>
+    <g class="fig-pose fig-fixed">
+      <line x1="70" y1="55" x2="130" y2="55"/>
+      <line x1="99" y1="70" x2="99" y2="140"/>
+      <line x1="99" y1="140" x2="86" y2="196"/>
+      <line x1="99" y1="140" x2="114" y2="196"/>
+    </g>
+    <path class="fig-motion" d="M99,90 L99,68"/>
+    <polygon class="fig-arrow" points="99,64 93,76 105,76"/>
+    <g class="fig-pose fig-a" style="animation-duration:2s;">
+      <circle cx="99" cy="66" r="15"/>
+      <line x1="70" y1="55" x2="99" y2="80"/>
+      <line x1="130" y1="55" x2="99" y2="80"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2s;">
+      <circle cx="99" cy="86" r="15"/>
+      <line x1="70" y1="55" x2="99" y2="100"/>
+      <line x1="130" y1="55" x2="99" y2="100"/>
+    </g>
+  ` },
+  pallof: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="12" y1="55" x2="12" y2="105"/>
+    <circle class="fig-rig-dot" cx="12" cy="80" r="6"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+      <line x1="99" y1="138" x2="86" y2="196"/>
+      <line x1="99" y1="138" x2="114" y2="196"/>
+    </g>
+    <circle class="fig-joint" cx="99" cy="70" r="5"/>
+    <path class="fig-motion" d="M108,78 L150,78"/>
+    <polygon class="fig-arrow" points="150,78 138,72 138,84"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.1s;">
+      <line x1="99" y1="70" x2="108" y2="82"/>
+      <line x1="99" y1="78" x2="108" y2="88"/>
+      <circle class="fig-joint fig-hi" cx="108" cy="85" r="6"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.1s;">
+      <line x1="99" y1="70" x2="150" y2="76"/>
+      <line x1="99" y1="78" x2="150" y2="82"/>
+      <circle class="fig-joint fig-hi" cx="150" cy="79" r="6"/>
+    </g>
+  ` },
+  bird_dog: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="55" cy="86" r="14"/>
+      <line x1="70" y1="90" x2="150" y2="95"/>
+      <line x1="70" y1="90" x2="70" y2="150"/>
+      <line x1="150" y1="95" x2="150" y2="150"/>
+    </g>
+    <circle class="fig-joint" cx="70" cy="90" r="5"/>
+    <circle class="fig-joint" cx="150" cy="95" r="5"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.3s;">
+      <line x1="70" y1="90" x2="85" y2="150"/>
+      <line x1="150" y1="95" x2="135" y2="150"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.3s;">
+      <line x1="70" y1="90" x2="38" y2="68"/>
+      <line x1="150" y1="95" x2="187" y2="108"/>
+      <circle class="fig-joint fig-hi" cx="38" cy="68" r="6"/>
+      <circle class="fig-joint fig-hi" cx="187" cy="108" r="6"/>
+    </g>
+  ` },
+  crunches: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="160" x2="190" y2="160"/>
+    <g class="fig-pose fig-fixed">
+      <line x1="120" y1="150" x2="150" y2="120"/>
+      <line x1="150" y1="120" x2="148" y2="160"/>
+    </g>
+    <circle class="fig-joint" cx="120" cy="150" r="5"/>
+    <circle class="fig-joint" cx="150" cy="120" r="4.5"/>
+    <path class="fig-motion" d="M58,150 Q75,112 90,100"/>
+    <polygon class="fig-arrow" points="82,109 92,96 96,111"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.2s;">
+      <line x1="120" y1="150" x2="70" y2="150"/>
+      <circle cx="58" cy="150" r="15"/>
+      <line x1="100" y1="150" x2="85" y2="163"/>
+      <circle class="fig-joint fig-mid" cx="70" cy="150" r="5"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.2s;">
+      <polyline points="120,150 112,128 100,112"/>
+      <circle cx="90" cy="100" r="15"/>
+      <line x1="100" y1="112" x2="128" y2="116"/>
+      <circle class="fig-joint fig-mid" cx="100" cy="112" r="5"/>
+      <circle class="fig-joint fig-hi" cx="128" cy="116" r="6"/>
+    </g>
+  ` },
+  russian_twist: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="170" x2="190" y2="170"/>
+    <g class="fig-pose fig-fixed">
+      <line x1="115" y1="160" x2="150" y2="130"/>
+      <line x1="150" y1="130" x2="148" y2="170"/>
+      <circle cx="60" cy="118" r="14"/>
+      <line x1="72" y1="128" x2="115" y2="160"/>
+    </g>
+    <circle class="fig-joint" cx="115" cy="160" r="5"/>
+    <circle class="fig-joint" cx="90" cy="140" r="5"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.8s;">
+      <line x1="90" y1="140" x2="120" y2="150"/>
+      <circle class="fig-joint fig-hi" cx="120" cy="150" r="6"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.8s;">
+      <line x1="90" y1="140" x2="55" y2="152"/>
+      <circle class="fig-joint fig-hi" cx="55" cy="152" r="6"/>
+    </g>
+  ` },
+  superman: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
+    <g class="fig-pose fig-fixed">
+      <line x1="90" y1="140" x2="130" y2="142"/>
+    </g>
+    <circle class="fig-joint" cx="90" cy="140" r="5"/>
+    <circle class="fig-joint" cx="130" cy="142" r="5"/>
+    <g class="fig-pose fig-a" style="animation-duration:2.3s;">
+      <circle cx="76" cy="140" r="14"/>
+      <line x1="90" y1="140" x2="60" y2="146"/>
+      <line x1="130" y1="142" x2="160" y2="148"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:2.3s;">
+      <circle cx="70" cy="118" r="14"/>
+      <line x1="90" y1="140" x2="55" y2="122"/>
+      <line x1="130" y1="142" x2="168" y2="126"/>
+      <circle class="fig-joint fig-hi" cx="55" cy="122" r="6"/>
+      <circle class="fig-joint fig-hi" cx="168" cy="126" r="6"/>
+    </g>
+  ` },
+  glute_bridge: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="170" x2="190" y2="170"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="150" cy="150" r="14"/>
+      <line x1="138" y1="160" x2="105" y2="160"/>
+      <line x1="60" y1="130" x2="60" y2="170"/>
+    </g>
+    <circle class="fig-joint" cx="105" cy="160" r="5"/>
+    <circle class="fig-joint" cx="60" cy="130" r="4.5"/>
+    <path class="fig-motion" d="M105,155 L105,130"/>
+    <polygon class="fig-arrow" points="105,126 99,138 111,138"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.9s;">
+      <line x1="105" y1="160" x2="60" y2="165"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.9s;">
+      <line x1="105" y1="160" x2="60" y2="130"/>
+      <circle class="fig-joint fig-hi" cx="82" cy="145" r="5.5"/>
+    </g>
+  ` },
+  push_up: { kind: 'dynamic', svg: `
+    <line class="fig-rig" x1="10" y1="150" x2="195" y2="150"/>
+    <circle class="fig-joint" cx="55" cy="150" r="5.5"/>
+    <circle class="fig-joint" cx="191" cy="149" r="5.5"/>
+    <path class="fig-motion" d="M61,127 L60,100"/>
+    <polygon class="fig-arrow" points="60,95 53,107 67,107"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.9s;">
+      <circle cx="44" cy="88" r="14"/>
+      <line x1="60" y1="95" x2="135" y2="100"/>
+      <line x1="135" y1="100" x2="190" y2="148"/>
+      <line x1="60" y1="95" x2="55" y2="150"/>
+      <circle class="fig-joint fig-mid" cx="60" cy="95" r="5"/>
+      <circle class="fig-joint fig-mid" cx="135" cy="100" r="5"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.9s;">
+      <circle cx="46" cy="124" r="14"/>
+      <line x1="62" y1="130" x2="135" y2="133"/>
+      <line x1="135" y1="133" x2="190" y2="149"/>
+      <polyline points="62,130 82,148 55,150"/>
+      <circle class="fig-joint fig-mid" cx="62" cy="130" r="5"/>
+      <circle class="fig-joint fig-mid" cx="135" cy="133" r="5"/>
+      <circle class="fig-joint fig-hi" cx="82" cy="148" r="5"/>
+    </g>
+  ` },
+  plank: { kind: 'static', svg: `
+    <line class="fig-rig" x1="10" y1="155" x2="195" y2="155"/>
+    <circle class="fig-joint" cx="90" cy="148" r="5.5"/>
+    <circle class="fig-joint" cx="191" cy="154" r="5.5"/>
+    <g class="fig-pose">
+      <circle cx="44" cy="90" r="14"/>
+      <line x1="60" y1="97" x2="135" y2="102"/>
+      <line x1="135" y1="102" x2="191" y2="150"/>
+      <line x1="60" y1="97" x2="58" y2="128"/>
+      <line x1="58" y1="128" x2="90" y2="148"/>
+    </g>
+  ` },
+  side_plank: { kind: 'static', svg: `
+    <line class="fig-rig" x1="10" y1="155" x2="195" y2="155"/>
+    <circle class="fig-joint" cx="58" cy="150" r="5.5"/>
+    <circle class="fig-joint" cx="191" cy="150" r="5.5"/>
+    <g class="fig-pose">
+      <circle cx="44" cy="90" r="14"/>
+      <line x1="60" y1="97" x2="135" y2="102"/>
+      <line x1="135" y1="102" x2="191" y2="150"/>
+      <line x1="60" y1="97" x2="58" y2="150"/>
+      <line x1="70" y1="88" x2="72" y2="34"/>
+    </g>
+    <circle class="fig-joint fig-hi" cx="72" cy="32" r="6"/>
+  ` },
+  hollow_hold: { kind: 'static', svg: `
+    <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
+    <g class="fig-pose">
+      <path d="M40,150 Q100,110 160,150" fill="none"/>
+      <circle cx="34" cy="140" r="13"/>
+      <line x1="46" y1="146" x2="30" y2="120"/>
+      <line x1="150" y1="146" x2="168" y2="130"/>
+    </g>
+    <circle class="fig-joint fig-hi" cx="30" cy="118" r="5.5"/>
+    <circle class="fig-joint fig-hi" cx="168" cy="128" r="5.5"/>
+  ` },
+};
+
+function exerciseFigureSvg(exerciseId) {
+  const fig = EXERCISE_FIGURES[exerciseId];
+  if (!fig) return `<div class="ex-figure-emoji">💪</div>`;
+  return `<svg viewBox="0 0 200 200" class="ex-figure ${fig.kind === 'static' ? 'fig-static' : ''}">${fig.svg}</svg>`;
 }
 
 /* Kleines, unverzerrtes Board-Abbild mit einem Punkt an der Griffposition —
@@ -725,53 +1003,163 @@ function renderFbBlocksList() {
   renderFbRuntime(); // Start-Button-Status hängt von fb.blocks.length ab
 }
 
+/* Nur noch der Idle-Zustand ("Ablauf starten") — sobald ein Ablauf läuft,
+   übernimmt das Vollbild (fb-overlay, siehe unten) komplett. */
 function renderFbRuntime() {
   const holder = document.getElementById('fb-runtime');
   if (!holder) return;
+  holder.innerHTML = `<button class="btn" id="fb-start-ablauf" ${fb.blocks.length ? '' : 'disabled'}>ABLAUF STARTEN</button>`;
+  const btn = document.getElementById('fb-start-ablauf');
+  if (btn) btn.onclick = startAblauf;
+}
 
-  if (!fb.running && !fb.awaitingNext) {
-    holder.innerHTML = `<button class="btn" id="fb-start-ablauf" ${fb.blocks.length ? '' : 'disabled'}>ABLAUF STARTEN</button>`;
-    const btn = document.getElementById('fb-start-ablauf');
-    if (btn) btn.onclick = startAblauf;
-    return;
+/* ---------- Ablauf-Vollbild ----------
+   Eigenes, fixed-positioniertes Overlay ausserhalb von #app — läuft über
+   den Firebase-Renderzyklus der Seite hinweg, damit der Timer beim
+   Navigieren nicht mitten drin abreisst. Zeigt: Fortschritt als Kletterer,
+   der an einer Felswand hochsteigt (Gesamtzeit statt nur eine Linie),
+   die aktuelle Phase gross, und eine "Danach"-Ankündigung, was als
+   Nächstes kommt. */
+function ensureFbOverlay() {
+  let el = document.getElementById('fb-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fb-overlay';
+    el.className = 'fb-overlay hidden';
+    document.body.appendChild(el);
   }
+  return el;
+}
 
+async function openFbOverlay() {
+  const el = ensureFbOverlay();
+  el.classList.remove('hidden');
+  if (el.requestFullscreen) {
+    try { await el.requestFullscreen(); } catch (e) { /* z.B. iOS Safari — CSS-Vollbild reicht als Fallback */ }
+  }
+  renderFbOverlay();
+}
+
+function closeFbOverlay() {
+  const el = document.getElementById('fb-overlay');
+  if (el) el.classList.add('hidden');
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+
+/* Dauer eines einzelnen Blocks in Sekunden — wie fbEstimateSeconds(),
+   aber pro Block statt summiert (fürs Fortschritts-Tracking nötig). */
+function fbBlockSeconds(b) {
+  if (b.type === 'hang') return buildSequence('custom', { hangSec: b.hangSec, restSec: b.restSec, sets: b.reps }).reduce((s, p) => s + p.seconds, 0);
+  return 40 + (b.restSec || 0);
+}
+
+function fbElapsedSeconds() {
+  let elapsed = 0;
+  for (let i = 0; i < fb.blockIndex; i++) elapsed += fbBlockSeconds(fb.blocks[i]);
+  const cur = fb.blocks[fb.blockIndex];
+  if (cur && cur.type === 'hang' && fb.running && fb.sequence.length) {
+    const done = fb.sequence.slice(0, fb.stepIndex).reduce((s, p) => s + p.seconds, 0);
+    const curTotal = fb.sequence[fb.stepIndex] ? fb.sequence[fb.stepIndex].seconds : 0;
+    elapsed += done + (curTotal - fb.secondsLeft);
+  }
+  return elapsed;
+}
+
+function fbOverallProgress() {
+  const total = fbEstimateSeconds();
+  return total ? Math.min(1, fbElapsedSeconds() / total) : 0;
+}
+
+/* Was kommt als Nächstes dran — erst innerhalb des laufenden Hang-Blocks
+   (nächste Phase in fb.sequence), sonst der nächste Block im Ablauf. */
+function fbUpcomingLabel() {
+  const block = fb.blocks[fb.blockIndex];
+  if (block && block.type === 'hang' && fb.sequence.length) {
+    const next = fb.sequence[fb.stepIndex + 1];
+    if (next) return `${next.phase} ${next.seconds}s`;
+  }
+  const nextBlock = fb.blocks[fb.blockIndex + 1];
+  if (!nextBlock) return 'Letzter Satz — gleich geschafft!';
+  return nextBlock.type === 'hang' ? 'Hang @ ' + gripLabel(nextBlock.board, nextBlock.grip) : exerciseName(nextBlock.exerciseId);
+}
+
+function updateFbProgressUI() {
+  const climber = document.getElementById('fb-wall-climber');
+  const text = document.getElementById('fb-progress-text');
+  if (!climber || !text) return;
+  climber.style.bottom = `${(Math.min(1, fbOverallProgress()) * 92).toFixed(1)}%`;
+  text.textContent = `Satz ${Math.min(fb.blockIndex + 1, fb.blocks.length)}/${fb.blocks.length} · ${fmtMinSec(fbElapsedSeconds())} / ${fmtMinSec(fbEstimateSeconds())}`;
+}
+
+function updateFbUpcomingUI() {
+  const el = document.getElementById('fb-upcoming');
+  if (el) el.textContent = 'Danach: ' + fbUpcomingLabel();
+}
+
+function renderFbOverlay() {
+  const el = ensureFbOverlay();
+  if (!fb.running && !fb.awaitingNext) { closeFbOverlay(); return; }
+
+  let stage = '';
   if (fb.awaitingNext) {
     const next = fb.blocks[fb.blockIndex];
-    if (!next) return;
-    holder.innerHTML = `
-      <div class="timer-box">
-        <div class="phase mono">NÄCHSTER SATZ (${fb.blockIndex + 1}/${fb.blocks.length})</div>
-        <div class="card-value" style="margin-top:6px;">${next.type === 'hang' ? 'Hang @ ' + esc(gripLabel(next.board, next.grip)) : esc(exerciseName(next.exerciseId)) + ' × ' + esc(String(next.reps))}</div>
-      </div>
-      <button class="btn" id="fb-continue">LOS</button>
-    `;
-    document.getElementById('fb-continue').onclick = startCurrentBlock;
-    return;
-  }
-
-  const block = fb.blocks[fb.blockIndex];
-  if (block.type === 'hang') {
-    const step = fb.sequence[fb.stepIndex];
-    holder.innerHTML = `
-      <div class="timer-box">
-        <div class="big ${step && step.phase !== 'Hang' ? 'rest' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
-        <div class="phase mono" id="fb-phase">${step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : ''}</div>
-      </div>
-      <button class="btn ghost" id="fb-cancel">ABBRECHEN</button>
+    if (!next) { closeFbOverlay(); return; }
+    const isHang = next.type === 'hang';
+    stage = `
+      <div class="fb-stage-label mono">NÄCHSTER SATZ (${fb.blockIndex + 1}/${fb.blocks.length})</div>
+      <div class="fb-stage-figure">${isHang ? miniBoardThumb(next.board, next.grip) : exerciseFigureSvg(next.exerciseId)}</div>
+      <div class="fb-stage-title">${isHang ? 'Hang @ ' + esc(gripLabel(next.board, next.grip)) : esc(exerciseName(next.exerciseId))}</div>
+      <div class="fb-stage-sub mono">${esc(fbBlockSub(next))}</div>
+      <button class="btn fb-stage-btn" id="fb-continue">LOS</button>
     `;
   } else {
-    holder.innerHTML = `
-      <div class="timer-box">
-        <div class="phase mono">ÜBUNG (${fb.blockIndex + 1}/${fb.blocks.length})</div>
-        <div class="card-value" style="margin-top:6px;">${esc(exerciseName(block.exerciseId))} × ${esc(String(block.reps))}</div>
-      </div>
-      <button class="btn" id="fb-exercise-done">FERTIG</button>
-      <button class="btn ghost" id="fb-cancel" style="margin-top:8px;">ABBRECHEN</button>
-    `;
-    document.getElementById('fb-exercise-done').onclick = blockDone;
+    const block = fb.blocks[fb.blockIndex];
+    if (block.type === 'hang') {
+      const step = fb.sequence[fb.stepIndex];
+      stage = `
+        <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${esc(gripLabel(block.board, block.grip))}</div>
+        <div class="fb-stage-figure">${miniBoardThumb(block.board, block.grip)}</div>
+        <div class="timer-box">
+          <div class="big ${step && step.phase !== 'Hang' ? 'rest' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
+          <div class="phase mono" id="fb-phase">${step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : ''}</div>
+        </div>
+        <div class="fb-stage-next mono" id="fb-upcoming"></div>
+        <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
+      `;
+    } else {
+      stage = `
+        <div class="fb-stage-label mono">ÜBUNG ${fb.blockIndex + 1}/${fb.blocks.length}</div>
+        <div class="fb-stage-figure">${exerciseFigureSvg(block.exerciseId)}</div>
+        <div class="fb-stage-title">${esc(exerciseName(block.exerciseId))} × ${esc(String(block.reps))}</div>
+        ${block.restSec ? `<div class="fb-stage-sub mono">danach ~${block.restSec}s Pause</div>` : ''}
+        <div class="fb-stage-next mono" id="fb-upcoming"></div>
+        <button class="btn fb-stage-btn" id="fb-exercise-done">FERTIG</button>
+        <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
+      `;
+    }
   }
-  document.getElementById('fb-cancel').onclick = cancelAblauf;
+
+  el.innerHTML = `
+    <button type="button" class="fb-overlay-close" id="fb-overlay-close" title="Abbrechen">✕</button>
+    <div class="fb-overlay-inner">
+      <div class="fb-overlay-progress">
+        <div class="wall-track"><div class="wall-flag">🚩</div><div class="wall-climber" id="fb-wall-climber">🧗</div></div>
+        <div class="fb-progress-text mono" id="fb-progress-text"></div>
+      </div>
+      <div class="fb-overlay-stage">${stage}</div>
+    </div>
+  `;
+
+  document.getElementById('fb-overlay-close').onclick = cancelAblauf;
+  if (fb.awaitingNext) {
+    document.getElementById('fb-continue').onclick = startCurrentBlock;
+  } else {
+    const doneBtn = document.getElementById('fb-exercise-done');
+    if (doneBtn) doneBtn.onclick = blockDone;
+    document.getElementById('fb-cancel').onclick = cancelAblauf;
+    updateFbUpcomingUI();
+  }
+  updateFbProgressUI();
 }
 
 function beep(freq, duration) {
@@ -799,7 +1187,7 @@ function startAblauf() {
   fb.blockIndex = 0;
   fb.running = false;
   fb.awaitingNext = true;
-  renderFbRuntime();
+  openFbOverlay();
 }
 
 function startCurrentBlock() {
@@ -813,11 +1201,11 @@ function startCurrentBlock() {
     fb.secondsLeft = fb.sequence[0].seconds;
     beep(880, 200);
     requestWakeLock();
-    renderFbRuntime();
+    renderFbOverlay();
     updateTimerUI();
     fb.intervalId = setInterval(tickBlock, 1000);
   } else {
-    renderFbRuntime();
+    renderFbOverlay();
   }
 }
 
@@ -842,11 +1230,14 @@ function tickBlock() {
 function updateTimerUI() {
   const big = document.getElementById('fb-big');
   const phase = document.getElementById('fb-phase');
-  if (!big || !phase) return;
-  const step = fb.sequence[fb.stepIndex];
-  big.textContent = pad2(fb.secondsLeft);
-  big.className = 'big' + (step && step.phase !== 'Hang' ? ' rest' : '');
-  phase.textContent = step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : '';
+  if (big && phase) {
+    const step = fb.sequence[fb.stepIndex];
+    big.textContent = pad2(fb.secondsLeft);
+    big.className = 'big' + (step && step.phase !== 'Hang' ? ' rest' : '');
+    phase.textContent = step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : '';
+  }
+  updateFbUpcomingUI();
+  updateFbProgressUI();
 }
 
 function blockDone() {
@@ -856,7 +1247,7 @@ function blockDone() {
     finishAblauf();
   } else {
     fb.awaitingNext = true;
-    renderFbRuntime();
+    renderFbOverlay();
   }
 }
 
@@ -867,6 +1258,7 @@ function cancelAblauf() {
   fb.running = false;
   fb.awaitingNext = false;
   fb.blockIndex = 0;
+  closeFbOverlay();
   renderFbRuntime();
 }
 
@@ -875,6 +1267,16 @@ async function finishAblauf() {
   fb.awaitingNext = false;
   fb.blockIndex = 0;
   beep(1568, 400);
+
+  const el = ensureFbOverlay();
+  el.innerHTML = `
+    <div class="fb-overlay-inner fb-overlay-done">
+      <div class="fb-done-emoji">🎉</div>
+      <div class="fb-stage-title">Ablauf geschafft!</div>
+      <button class="btn fb-stage-btn" id="fb-overlay-finish">Schliessen</button>
+    </div>
+  `;
+  document.getElementById('fb-overlay-finish').onclick = () => { closeFbOverlay(); renderFbRuntime(); };
 
   const session = {
     date: todayKey(),
@@ -885,7 +1287,6 @@ async function finishAblauf() {
   };
   await fbPush(`fingerboardSessions/${state.member.id}`, session);
   toast('Ablauf gespeichert 💪', 'ok');
-  renderFbRuntime();
 }
 
 /* ================================================================

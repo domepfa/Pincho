@@ -258,3 +258,92 @@ button, input, select, textarea { font-family: inherit; }
 }
 .toast.err { border-color: var(--danger); color: var(--danger); }
 .toast.ok { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- Ablauf-Vollbild ----------
+   Eigenständiges, fixed-positioniertes Overlay (an document.body gehängt,
+   nicht Teil von #app) — deckt den ganzen Bildschirm ab, solange ein
+   Fingerboard-Ablauf läuft. */
+.fb-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 700px 500px at 15% 8%, rgba(255, 255, 255, 0.045), transparent 60%),
+    radial-gradient(ellipse 650px 700px at 90% 85%, rgba(120, 175, 220, 0.05), transparent 55%),
+    repeating-linear-gradient(123deg, rgba(255, 255, 255, 0.02) 0px, rgba(255, 255, 255, 0.02) 1px, transparent 2px, transparent 130px);
+  display: flex; flex-direction: column; align-items: stretch;
+  padding: calc(18px + var(--safe-top)) 18px calc(18px + var(--safe-bottom));
+  overflow-y: auto;
+}
+.fb-overlay.hidden { display: none; }
+.fb-overlay-close {
+  position: absolute; top: calc(14px + var(--safe-top)); right: 16px; z-index: 2;
+  background: none; border: 1px solid var(--line); color: var(--ink-faint);
+  width: 34px; height: 34px; font-size: 15px; line-height: 1; cursor: pointer;
+}
+.fb-overlay-inner {
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+  max-width: 420px; width: 100%; margin: 0 auto; flex: 1; justify-content: center;
+  padding-top: 30px;
+}
+
+/* Fortschritt: Kletterer, der die Wand hochsteigt, statt einer Linie */
+.fb-overlay-progress { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.wall-track {
+  position: relative; width: 44px; height: 170px; flex-shrink: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .06), transparent 40%),
+    repeating-linear-gradient(178deg, rgba(255, 255, 255, .05) 0 2px, transparent 2px 22px),
+    linear-gradient(160deg, #2a3140, #1b2028 55%, #12151a);
+  border: 1px solid var(--line);
+}
+.wall-flag { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: 17px; }
+.wall-climber {
+  position: absolute; left: 50%; bottom: 0;
+  transform: translate(-50%, 50%); font-size: 20px;
+  transition: bottom 1s linear;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .6));
+}
+.fb-progress-text { font-size: 11px; color: var(--ink-dim); text-align: center; }
+
+.fb-overlay-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.fb-stage-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+.fb-stage-title { font-family: 'Bebas Neue', sans-serif; font-size: 26px; text-align: center; letter-spacing: .02em; }
+.fb-stage-sub { font-size: 12px; color: var(--ink-dim); text-align: center; }
+.fb-stage-next { font-size: 12px; color: var(--ink-faint); text-align: center; min-height: 16px; }
+.fb-stage-btn { width: 100%; max-width: 280px; margin-top: 4px; }
+.fb-stage-figure { width: 100%; max-width: 220px; }
+.fb-stage-figure .timeline-thumb { width: 100%; height: 110px; }
+.fb-stage-figure .ex-figure { width: 100%; height: auto; display: block; }
+.fb-stage-figure .ex-figure-emoji { font-size: 72px; text-align: center; line-height: 1.4; }
+
+.fb-overlay-done { align-items: center; text-align: center; }
+.fb-done-emoji { font-size: 56px; }
+
+/* ---------- Übungs-Strichmännchen (fig-*) ----------
+   Farb-Code: gedämpft = bleibt fix, hell = bewegter Körperteil, Lime =
+   der eigentliche Arbeitspunkt. Gestrichelte Linie + Pfeil zeigt die
+   Bewegungsrichtung — verhindert z. B. Verwechslungen mit einer Drehung. */
+.fig-pose { fill: none; stroke: var(--ink); stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+.fig-pose circle { fill: var(--ink); stroke: none; }
+.fig-pose.fig-fixed { stroke: var(--ink-faint); }
+.fig-pose.fig-fixed circle { fill: var(--ink-faint); }
+.fig-joint { fill: var(--ink-faint); }
+.fig-joint.fig-mid { fill: var(--ink); }
+.fig-joint.fig-hi { fill: var(--accent); }
+.fig-motion { stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 5 6; fill: none; opacity: .55; }
+.fig-arrow { fill: var(--accent); opacity: .8; }
+.fig-rig { stroke: var(--ink-faint); stroke-width: 3; fill: none; }
+.fig-rig-dot { fill: var(--accent); stroke: none; }
+.fig-a { animation-name: figPoseA; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+.fig-b { animation-name: figPoseB; animation-timing-function: ease-in-out; animation-iteration-count: infinite; opacity: 0; }
+@keyframes figPoseA { 0%, 15% { opacity: 1; } 40%, 60% { opacity: 0; } 85%, 100% { opacity: 1; } }
+@keyframes figPoseB { 0%, 15% { opacity: 0; } 40%, 60% { opacity: 1; } 85%, 100% { opacity: 0; } }
+.fig-static { animation: figPulse 2.4s ease-in-out infinite; }
+@keyframes figPulse { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fig-a { animation: none; opacity: 1; }
+  .fig-b { animation: none; opacity: 0; }
+  .fig-static { animation: none; }
+  .wall-climber { transition: none; }
+}

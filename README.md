@@ -89,6 +89,19 @@ echten Einzel-Accounts nötig.
   Abläufe landen pro Mitglied unter `fingerboardTemplates/{memberId}` in
   Firebase — Ablauf-Zeit inkl. Übungspausen wird über `restSec` bei
   Exercise-Sätzen mitgerechnet (siehe `fbEstimateSeconds` in `app.js`).
+- **Ablauf-Vollbild**: Sobald ein Ablauf startet, übernimmt `#fb-overlay`
+  (an `document.body` gehängt, nicht Teil von `#app`) den ganzen Bildschirm
+  — inkl. Best-effort `requestFullscreen()` (fällt auf iOS o. Ä. einfach auf
+  das CSS-Vollbild zurück). Fortschritt wird als Kletterer dargestellt, der
+  an einer Wand hochsteigt (`fbOverallProgress()`, zeitbasiert, nicht nur
+  Block-Index), plus eine "Danach: …"-Ankündigung, was als Nächstes kommt.
+  Übungen zeigen wo vorhanden ein animiertes Strichmännchen
+  (`EXERCISE_FIGURES`) — zwei Posen überblenden in Dauerschlaufe bei
+  dynamischen Bewegungen, ein sanftes Pulsieren bei Halteübungen (Plank
+  etc.); ohne hinterlegte Animation fällt es auf ein 💪-Emoji zurück. Neue
+  Übungen bekommen eine Animation, indem man `EXERCISE_FIGURES[exerciseId]`
+  in `app.js` ergänzt (Farbcode: gedämpft = fix, hell = bewegt, Lime = der
+  Arbeitspunkt).
 
 ## Projektstruktur
 
