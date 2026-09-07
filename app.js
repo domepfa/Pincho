@@ -442,6 +442,29 @@ function wireCalibration() {
   });
 }
 
+function fbSelectedGripHint() {
+  return fb.selectedGrip
+    ? 'Gewählt: ' + esc(gripLabel(fb.board, fb.selectedGrip))
+    : 'Griff am Board (oder in der Liste darunter) antippen, um ihn für einen neuen Hang-Satz zu wählen.';
+}
+
+/* Nur die betroffenen Elemente aktualisieren statt renderFingerboard()
+   komplett neu aufzurufen — ein voller Re-Render ersetzt #app und wirft
+   den Scroll dabei zurück nach oben. Beim wiederholten Antippen mehrerer
+   Griffe beim Ablauf-Bauen war das der eigentliche Grund fürs ständige
+   Hoch-/Runterscrollen, nicht nur die Reihenfolge der Abschnitte. */
+function selectFbGrip(gripId) {
+  fb.selectedGrip = gripId;
+  const hint = document.getElementById('fb-selected-hint');
+  if (hint) hint.textContent = fbSelectedGripHint();
+  document.querySelectorAll('#fb-board-visual .board-hotspot').forEach((el) => {
+    el.classList.toggle('active', el.dataset.grip === gripId);
+  });
+  document.querySelectorAll('#fb-grip-legend .chip').forEach((el) => {
+    el.classList.toggle('active', el.dataset.grip === gripId);
+  });
+}
+
 async function renderFingerboard() {
   if (!fb.board) fb.board = currentMemberBoard();
 
@@ -451,16 +474,32 @@ async function renderFingerboard() {
     <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Schnelltraining</h2><div class="sec-rule"></div></div>
     <div class="quickstart-grid" id="fb-quickstart"></div>
 
+    <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Eigenen Ablauf bauen</h2><div class="sec-rule"></div></div>
+
     <div class="chip-row" id="fb-board-toggle">
       <button class="chip ${fb.board === 'bm1000' ? 'active' : ''}" data-board="bm1000">BM 1000</button>
       <button class="chip ${fb.board === 'bm2000' ? 'active' : ''}" data-board="bm2000">BM 2000</button>
     </div>
 
+    <p class="login-hint" id="fb-selected-hint" style="margin:0 0 8px;">${fbSelectedGripHint()}</p>
     <div class="board-visual" id="fb-board-visual">${renderBoardImage()}</div>
-    <p class="login-hint" style="margin:-6px 0 4px;">${fb.selectedGrip ? 'Gewählt: ' + esc(gripLabel(fb.board, fb.selectedGrip)) : 'Griff am Board antippen, um ihn für einen neuen Hang-Satz zu wählen.'}</p>
-    <p class="mono" id="fb-calib-readout" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:0 0 10px;min-height:14px;"></p>
-    <div class="chip-row" id="fb-grip-legend" style="margin-bottom:16px;">
+    <p class="mono" id="fb-calib-readout" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:6px 0 10px;min-height:14px;"></p>
+    <div class="chip-row" id="fb-grip-legend" style="margin-bottom:14px;">
       ${BOARDS[fb.board].grips.map((g) => `<button type="button" class="chip ${fb.selectedGrip === g.id ? 'active' : ''}" data-grip="${g.id}">${esc(g.label)}${g.note ? ' · ' + esc(g.note) : ''}${gripArmNote(fb.board, g.id) ? ' · ' + gripArmNote(fb.board, g.id) : ''}</button>`).join('')}
+    </div>
+
+    <div class="chip-row">
+      <button type="button" class="chip" id="fb-add-hang">+ Hang-Satz</button>
+    </div>
+    <div class="field-row" style="margin-bottom:16px;">
+      <select id="fb-exercise-picker" style="flex:2;">
+        ${Object.entries(EXERCISE_CATEGORY_LABEL).filter(([cat]) => ACCESSORY_EXERCISES.some((e) => e.category === cat)).map(([cat, label]) => `
+          <optgroup label="${label}">
+            ${ACCESSORY_EXERCISES.filter((e) => e.category === cat).map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join('')}
+          </optgroup>
+        `).join('')}
+      </select>
+      <button type="button" class="btn small" id="fb-add-exercise" style="flex:0 0 auto;">+ Übung</button>
     </div>
 
     <div class="field"><label>Zusatzgewicht für diese Session (kg, negativ = Assistenz)</label><input type="number" id="fb-weight" value="${fb.weight}" step="0.5"></div>
@@ -480,20 +519,6 @@ async function renderFingerboard() {
 
     <div id="fb-blocks-list"></div>
 
-    <div class="chip-row">
-      <button type="button" class="chip" id="fb-add-hang">+ Hang-Satz (Griff oben wählen)</button>
-    </div>
-    <div class="field-row" style="margin-bottom:16px;">
-      <select id="fb-exercise-picker" style="flex:2;">
-        ${Object.entries(EXERCISE_CATEGORY_LABEL).filter(([cat]) => ACCESSORY_EXERCISES.some((e) => e.category === cat)).map(([cat, label]) => `
-          <optgroup label="${label}">
-            ${ACCESSORY_EXERCISES.filter((e) => e.category === cat).map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join('')}
-          </optgroup>
-        `).join('')}
-      </select>
-      <button type="button" class="btn small" id="fb-add-exercise" style="flex:0 0 auto;">+ Übung</button>
-    </div>
-
     <div id="fb-runtime"></div>
   `);
 
@@ -511,10 +536,10 @@ async function renderFingerboard() {
     };
   });
   document.getElementById('fb-board-visual').querySelectorAll('.board-hotspot').forEach((el) => {
-    el.onclick = () => { fb.selectedGrip = el.dataset.grip; renderFingerboard(); };
+    el.onclick = () => selectFbGrip(el.dataset.grip);
   });
   document.getElementById('fb-grip-legend').querySelectorAll('.chip').forEach((el) => {
-    el.onclick = () => { fb.selectedGrip = el.dataset.grip; renderFingerboard(); };
+    el.onclick = () => selectFbGrip(el.dataset.grip);
   });
   document.getElementById('fb-weight').oninput = (e) => { fb.weight = e.target.value; };
 
@@ -1776,6 +1801,19 @@ function beep(freq, duration) {
   } catch (e) { /* Audio nicht verfügbar, kein Problem */ }
 }
 
+/* Zwei klar unterscheidbare Signale statt eines einzelnen Tons pro
+   Phasenwechsel — wichtig, weil man beim Hängen meist nicht aufs Display
+   schaut: "los" = zwei kurze, hohe Töne (auffällig, energisch), "los-
+   lassen/Pause" = ein einzelner, tieferer, längerer Ton. Dadurch lässt
+   sich Start und Ende auch nur am Klang unterscheiden. */
+function beepStart() {
+  beep(1200, 90);
+  setTimeout(() => beep(1200, 90), 150);
+}
+function beepEnd() {
+  beep(520, 320);
+}
+
 async function requestWakeLock() {
   try { if ('wakeLock' in navigator) fb.wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* ignorieren */ }
 }
@@ -1799,7 +1837,7 @@ function startCurrentBlock() {
     fb.sequence = buildSequence('custom', { hangSec: block.hangSec, restSec: block.restSec, sets: block.reps });
     fb.stepIndex = 0;
     fb.secondsLeft = fb.sequence[0].seconds;
-    beep(880, 200);
+    beepStart();
     requestWakeLock();
     renderFbOverlay();
     updateTimerUI();
@@ -1822,7 +1860,7 @@ function tickBlock() {
       return;
     }
     fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
-    beep(fb.sequence[fb.stepIndex].phase === 'Hang' ? 1046 : 660, 220);
+    if (fb.sequence[fb.stepIndex].phase === 'Hang') beepStart(); else beepEnd();
   }
   updateTimerUI();
 }
