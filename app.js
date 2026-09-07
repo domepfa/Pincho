@@ -1125,6 +1125,26 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="168" cy="126" r="6"/>
     </g>
   ` },
+  swimmer: { kind: 'dynamic', caption: 'Seitenansicht, Bauchlage · Arm und gegenüberliegendes Bein heben abwechselnd', svg: `
+    <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
+    <g class="fig-pose fig-fixed">
+      <line x1="90" y1="140" x2="130" y2="142"/>
+      <circle cx="73" cy="129" r="13"/>
+      <circle cx="60" cy="129" r="3"/>
+    </g>
+    <circle class="fig-joint" cx="90" cy="140" r="5"/>
+    <circle class="fig-joint" cx="130" cy="142" r="5"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.6s;">
+      <line x1="90" y1="140" x2="58" y2="120"/>
+      <line x1="130" y1="142" x2="160" y2="150"/>
+      <circle class="fig-joint fig-hi" cx="58" cy="120" r="6"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.6s;">
+      <line x1="90" y1="140" x2="60" y2="148"/>
+      <line x1="130" y1="142" x2="168" y2="124"/>
+      <circle class="fig-joint fig-hi" cx="168" cy="124" r="6"/>
+    </g>
+  ` },
   glute_bridge: { kind: 'dynamic', caption: 'Seitenansicht, Rückenlage, Füsse aufgestellt · Becken hebt sich nach oben', svg: `
     <line class="fig-rig" x1="10" y1="170" x2="190" y2="170"/>
     <g class="fig-pose fig-fixed">
@@ -1409,6 +1429,28 @@ const EXERCISE_FIGURES = {
       <line x1="112" y1="184" x2="118" y2="192"/>
       <circle class="fig-joint fig-hi" cx="88" cy="184" r="4.5"/>
       <circle class="fig-joint fig-hi" cx="112" cy="184" r="4.5"/>
+    </g>
+  ` },
+  tibialis_raise: { kind: 'dynamic', caption: 'Seitenansicht, stehend · Ferse bleibt am Boden, Zehen/Vorfuss heben sich', svg: `
+    <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="40" r="15"/>
+      <circle cx="110" cy="40" r="3"/>
+      <line x1="97" y1="58" x2="99" y2="138"/>
+    </g>
+    <path class="fig-motion" d="M112,186 L119,168"/>
+    <polygon class="fig-arrow" points="122,162 111,167 121,174"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.7s;">
+      <line x1="99" y1="138" x2="88" y2="196"/>
+      <line x1="99" y1="138" x2="112" y2="196"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.7s;">
+      <line x1="99" y1="138" x2="88" y2="192"/>
+      <line x1="88" y1="192" x2="98" y2="180"/>
+      <line x1="99" y1="138" x2="112" y2="192"/>
+      <line x1="112" y1="192" x2="122" y2="180"/>
+      <circle class="fig-joint fig-hi" cx="98" cy="180" r="4.5"/>
+      <circle class="fig-joint fig-hi" cx="122" cy="180" r="4.5"/>
     </g>
   ` },
   wall_sit: { kind: 'static', caption: 'Seitenansicht, Rücken an der Wand · Oberschenkel waagrecht wie auf einem unsichtbaren Stuhl', svg: `
