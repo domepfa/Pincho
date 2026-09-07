@@ -173,10 +173,13 @@ function buildSequence(protocolId, opts) {
       if (s < sets - 1) seq.push({ phase: 'Satzpause', seconds: restBetweenSec });
     }
   } else {
+    // Pause auch nach dem letzten Hang anhängen (nicht nur zwischen den
+    // Wiederholungen): der Ablauf läuft jetzt block-übergreifend automatisch
+    // durch, diese Pause ist die einzige Erholung vor dem nächsten Satz.
     const { hangSec, restSec, sets } = opts;
     for (let s = 0; s < sets; s++) {
       seq.push({ phase: 'Hang', seconds: hangSec });
-      if (s < sets - 1) seq.push({ phase: 'Pause', seconds: restSec });
+      if (restSec > 0) seq.push({ phase: 'Pause', seconds: restSec });
     }
   }
   return seq;

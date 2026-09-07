@@ -392,7 +392,10 @@ function renderLogExerciseRows() {
 const fb = {
   board: null,
   selectedGrip: null,   // am grafischen Board gewählter Griff, fürs Hinzufügen eines Hang-Satzes
-  blocks: [],            // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec} | {type:'exercise', exerciseId, reps, restSec}
+  addType: 'hang',       // 'hang' | 'exercise' — welches Add-Panel gerade offen ist
+  newHang: { reps: 3, hangSec: 7, restSec: 30 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
+  newExercise: { reps: 15, workSec: 40, restSec: 30 },
+  blocks: [],            // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec} | {type:'exercise', exerciseId, reps, workSec, restSec}
   templates: [],         // eigene, in Firebase gespeicherte Abläufe (zusätzlich zu FINGERBOARD_TEMPLATES)
   weight: '',
   blockIndex: 0,
@@ -446,7 +449,7 @@ function wireCalibration() {
 function fbSelectedGripHint() {
   return fb.selectedGrip
     ? 'Gewählt: ' + esc(gripLabel(fb.board, fb.selectedGrip))
-    : 'Griff am Board (oder in der Liste darunter) antippen, um ihn für einen neuen Hang-Satz zu wählen.';
+    : 'Griff am Board antippen (oder unten aus der Liste wählen).';
 }
 
 /* Nur die betroffenen Elemente aktualisieren statt renderFingerboard()
@@ -461,9 +464,93 @@ function selectFbGrip(gripId) {
   document.querySelectorAll('#fb-board-visual .board-hotspot').forEach((el) => {
     el.classList.toggle('active', el.dataset.grip === gripId);
   });
-  document.querySelectorAll('#fb-grip-legend .chip').forEach((el) => {
-    el.classList.toggle('active', el.dataset.grip === gripId);
-  });
+  const select = document.getElementById('fb-grip-select');
+  if (select && select.value !== (gripId || '')) select.value = gripId || '';
+}
+
+/* ---------- "Eigenen Ablauf bauen": ein Satz nach dem anderen ----------
+   Ein einziges, kompaktes Add-Panel statt über die Seite verteilter
+   Abschnitte — Board (klein) + Namens-Liste als zweiter Auswahlweg direkt
+   darunter, dann Sätze/Zeiten, dann der Hinzufügen-Button. Nach dem
+   Hinzufügen bleibt man auf derselben Stelle stehen (kein Re-Render der
+   ganzen Seite) und kann direkt den nächsten Satz konfigurieren. */
+function renderFbAddPanel() {
+  const holder = document.getElementById('fb-add-panel');
+  if (!holder) return;
+
+  if (fb.addType === 'hang') {
+    holder.innerHTML = `
+      <div class="chip-row" id="fb-board-toggle">
+        <button class="chip ${fb.board === 'bm1000' ? 'active' : ''}" data-board="bm1000">BM 1000</button>
+        <button class="chip ${fb.board === 'bm2000' ? 'active' : ''}" data-board="bm2000">BM 2000</button>
+      </div>
+      <div class="board-visual" id="fb-board-visual">${renderBoardImage()}</div>
+      <p class="mono" id="fb-calib-readout" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:6px 0;min-height:14px;"></p>
+      <p class="login-hint" id="fb-selected-hint" style="margin:0 0 8px;">${fbSelectedGripHint()}</p>
+      <div class="field">
+        <label>Oder aus der Liste wählen</label>
+        <select id="fb-grip-select">
+          <option value="">— Griff wählen —</option>
+          ${BOARDS[fb.board].grips.map((g) => `<option value="${g.id}" ${fb.selectedGrip === g.id ? 'selected' : ''}>${esc(g.label)}${g.note ? ' · ' + esc(g.note) : ''}${gripArmNote(fb.board, g.id) ? ' · ' + gripArmNote(fb.board, g.id) : ''}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Sätze</label><input type="number" id="fb-new-reps" value="${fb.newHang.reps}" min="1"></div>
+        <div class="field"><label>Hang (s)</label><input type="number" id="fb-new-hangsec" value="${fb.newHang.hangSec}" min="1"></div>
+        <div class="field"><label>Pause (s)</label><input type="number" id="fb-new-restsec" value="${fb.newHang.restSec}" min="0"></div>
+      </div>
+      <button type="button" class="btn" id="fb-add-hang" style="width:100%;">+ Hang-Satz hinzufügen</button>
+    `;
+    wireCalibration();
+    document.getElementById('fb-board-toggle').querySelectorAll('.chip').forEach((btn) => {
+      btn.onclick = () => {
+        fb.board = btn.dataset.board;
+        fb.selectedGrip = null;
+        state.members[state.member.id] = { ...state.members[state.member.id], board: fb.board };
+        fbPatch(`members/${state.member.id}`, { board: fb.board });
+        renderFbAddPanel();
+      };
+    });
+    document.getElementById('fb-board-visual').querySelectorAll('.board-hotspot').forEach((el) => {
+      el.onclick = () => selectFbGrip(el.dataset.grip);
+    });
+    document.getElementById('fb-grip-select').onchange = (e) => selectFbGrip(e.target.value || null);
+    document.getElementById('fb-new-reps').oninput = (e) => { fb.newHang.reps = Number(e.target.value) || 1; };
+    document.getElementById('fb-new-hangsec').oninput = (e) => { fb.newHang.hangSec = Number(e.target.value) || 1; };
+    document.getElementById('fb-new-restsec').oninput = (e) => { fb.newHang.restSec = Number(e.target.value) || 0; };
+    document.getElementById('fb-add-hang').onclick = () => {
+      if (!fb.selectedGrip) { toast('Zuerst einen Griff wählen.', 'err'); return; }
+      fb.blocks.push({ type: 'hang', board: fb.board, grip: fb.selectedGrip, ...fb.newHang });
+      renderFbBlocksList();
+    };
+  } else {
+    holder.innerHTML = `
+      <div class="field">
+        <label>Übung</label>
+        <select id="fb-exercise-picker">
+          ${Object.entries(EXERCISE_CATEGORY_LABEL).filter(([cat]) => ACCESSORY_EXERCISES.some((e) => e.category === cat)).map(([cat, label]) => `
+            <optgroup label="${label}">
+              ${ACCESSORY_EXERCISES.filter((e) => e.category === cat).map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join('')}
+            </optgroup>
+          `).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Ziel-Wdh.</label><input type="number" id="fb-new-exreps" value="${fb.newExercise.reps}" min="1"></div>
+        <div class="field"><label>Dauer (s)</label><input type="number" id="fb-new-exwork" value="${fb.newExercise.workSec}" min="5"></div>
+        <div class="field"><label>Pause danach (s)</label><input type="number" id="fb-new-exrest" value="${fb.newExercise.restSec}" min="0"></div>
+      </div>
+      <button type="button" class="btn" id="fb-add-exercise" style="width:100%;">+ Übung hinzufügen</button>
+    `;
+    document.getElementById('fb-new-exreps').oninput = (e) => { fb.newExercise.reps = Number(e.target.value) || 1; };
+    document.getElementById('fb-new-exwork').oninput = (e) => { fb.newExercise.workSec = Number(e.target.value) || 5; };
+    document.getElementById('fb-new-exrest').oninput = (e) => { fb.newExercise.restSec = Number(e.target.value) || 0; };
+    document.getElementById('fb-add-exercise').onclick = () => {
+      const exerciseId = document.getElementById('fb-exercise-picker').value;
+      fb.blocks.push({ type: 'exercise', exerciseId, ...fb.newExercise });
+      renderFbBlocksList();
+    };
+  }
 }
 
 async function renderFingerboard() {
@@ -477,31 +564,11 @@ async function renderFingerboard() {
 
     <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Eigenen Ablauf bauen</h2><div class="sec-rule"></div></div>
 
-    <div class="chip-row" id="fb-board-toggle">
-      <button class="chip ${fb.board === 'bm1000' ? 'active' : ''}" data-board="bm1000">BM 1000</button>
-      <button class="chip ${fb.board === 'bm2000' ? 'active' : ''}" data-board="bm2000">BM 2000</button>
-    </div>
-
-    <p class="login-hint" id="fb-selected-hint" style="margin:0 0 8px;">${fbSelectedGripHint()}</p>
-    <div class="board-visual" id="fb-board-visual">${renderBoardImage()}</div>
-    <p class="mono" id="fb-calib-readout" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:6px 0 10px;min-height:14px;"></p>
-    <div class="chip-row" id="fb-grip-legend" style="margin-bottom:14px;">
-      ${BOARDS[fb.board].grips.map((g) => `<button type="button" class="chip ${fb.selectedGrip === g.id ? 'active' : ''}" data-grip="${g.id}">${esc(g.label)}${g.note ? ' · ' + esc(g.note) : ''}${gripArmNote(fb.board, g.id) ? ' · ' + gripArmNote(fb.board, g.id) : ''}</button>`).join('')}
-    </div>
-
     <div class="chip-row">
-      <button type="button" class="chip" id="fb-add-hang">+ Hang-Satz</button>
+      <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Hang-Satz</button>
+      <button class="chip ${fb.addType === 'exercise' ? 'active' : ''}" data-add-type="exercise">Fixübung</button>
     </div>
-    <div class="field-row" style="margin-bottom:16px;">
-      <select id="fb-exercise-picker" style="flex:2;">
-        ${Object.entries(EXERCISE_CATEGORY_LABEL).filter(([cat]) => ACCESSORY_EXERCISES.some((e) => e.category === cat)).map(([cat, label]) => `
-          <optgroup label="${label}">
-            ${ACCESSORY_EXERCISES.filter((e) => e.category === cat).map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join('')}
-          </optgroup>
-        `).join('')}
-      </select>
-      <button type="button" class="btn small" id="fb-add-exercise" style="flex:0 0 auto;">+ Übung</button>
-    </div>
+    <div id="fb-add-panel" style="margin:12px 0 16px;"></div>
 
     <div class="field"><label>Zusatzgewicht für diese Session (kg, negativ = Assistenz)</label><input type="number" id="fb-weight" value="${fb.weight}" step="0.5"></div>
 
@@ -523,37 +590,18 @@ async function renderFingerboard() {
     <div id="fb-runtime"></div>
   `);
 
+  renderFbAddPanel();
   renderFbBlocksList(); // rendert am Ende auch renderFbRuntime() mit
   renderFbQuickstart();
-  wireCalibration();
 
-  document.getElementById('fb-board-toggle').querySelectorAll('.chip').forEach((btn) => {
+  document.querySelectorAll('[data-add-type]').forEach((btn) => {
     btn.onclick = () => {
-      fb.board = btn.dataset.board;
-      fb.selectedGrip = null;
-      state.members[state.member.id] = { ...state.members[state.member.id], board: fb.board };
-      fbPatch(`members/${state.member.id}`, { board: fb.board });
-      renderFingerboard();
+      fb.addType = btn.dataset.addType;
+      document.querySelectorAll('[data-add-type]').forEach((b) => b.classList.toggle('active', b.dataset.addType === fb.addType));
+      renderFbAddPanel();
     };
   });
-  document.getElementById('fb-board-visual').querySelectorAll('.board-hotspot').forEach((el) => {
-    el.onclick = () => selectFbGrip(el.dataset.grip);
-  });
-  document.getElementById('fb-grip-legend').querySelectorAll('.chip').forEach((el) => {
-    el.onclick = () => selectFbGrip(el.dataset.grip);
-  });
   document.getElementById('fb-weight').oninput = (e) => { fb.weight = e.target.value; };
-
-  document.getElementById('fb-add-hang').onclick = () => {
-    if (!fb.selectedGrip) { toast('Zuerst einen Griff am Board wählen.', 'err'); return; }
-    fb.blocks.push({ type: 'hang', board: fb.board, grip: fb.selectedGrip, reps: 3, hangSec: 7, restSec: 30 });
-    renderFbBlocksList();
-  };
-  document.getElementById('fb-add-exercise').onclick = () => {
-    const exerciseId = document.getElementById('fb-exercise-picker').value;
-    fb.blocks.push({ type: 'exercise', exerciseId, reps: 15, restSec: 30 });
-    renderFbBlocksList();
-  };
 
   wireFbTemplatePicker();
   loadFbTemplates().then(() => {
@@ -574,9 +622,7 @@ function renderFbQuickstart() {
     return;
   }
   holder.innerHTML = all.map((t, i) => {
-    const totalSec = t.blocks.reduce((total, b) => (b.type === 'hang'
-      ? total + buildSequence('custom', { hangSec: b.hangSec, restSec: b.restSec, sets: b.reps }).reduce((s, p) => s + p.seconds, 0)
-      : total + 40 + (b.restSec || 0)), 0);
+    const totalSec = t.blocks.reduce((total, b) => total + fbBlockSeconds(b), 0);
     return `
       <div class="qs-card anim-in" style="animation-delay:${i * 55}ms">
         <div class="qs-top">
@@ -659,19 +705,24 @@ function wireFbTemplatePicker() {
   };
 }
 
-/* Geschätzte Gesamtdauer des Ablaufs in Sekunden. Hang-Sätze werden aus der
-   echten Phasenliste berechnet, Übungs-Sätze (kein fester Timer) grob mit
-   40s Ausführung + optionaler Pause danach (b.restSec) veranschlagt — so
-   lässt sich z. B. eine bewusste 2:30-Pause zwischen Max-Hang-Sätzen (mit
-   einer Übung dazwischen statt komplett passiv) korrekt einrechnen. */
+/* Phasenliste EINES Blocks — Hang-Sätze über buildSequence() (Hang/Pause je
+   Wiederholung), Übungs-Sätze als ein "Work"-Schritt (feste Dauer statt
+   Wiederholungszahl, damit der Timer automatisch weiterlaufen kann) plus
+   optionaler "Pause" danach. Treibt sowohl die Zeitschätzung als auch den
+   echten Timer im Ablauf-Vollbild — beides nutzt dieselbe Liste, damit sie
+   nie auseinanderlaufen. */
+function buildBlockSequence(b) {
+  if (b.type === 'hang') return buildSequence('custom', { hangSec: b.hangSec, restSec: b.restSec, sets: b.reps });
+  const seq = [{ phase: 'Work', seconds: b.workSec || 40 }];
+  if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec });
+  return seq;
+}
+function isWorkPhase(step) {
+  return !step || step.phase === 'Hang' || step.phase === 'Work';
+}
+
 function fbEstimateSeconds() {
-  return fb.blocks.reduce((total, b) => {
-    if (b.type === 'hang') {
-      const seq = buildSequence('custom', { hangSec: b.hangSec, restSec: b.restSec, sets: b.reps });
-      return total + seq.reduce((s, p) => s + p.seconds, 0);
-    }
-    return total + 40 + (b.restSec || 0);
-  }, 0);
+  return fb.blocks.reduce((total, b) => total + fbBlockSeconds(b), 0);
 }
 function fmtMinSec(totalSec) {
   return `${Math.floor(totalSec / 60)}:${pad2(totalSec % 60)}`;
@@ -688,7 +739,7 @@ function fmtMinSec(totalSec) {
    Nicht jede Übung hat schon eine Animation — renderExerciseFigure()
    fällt für alle anderen auf ein Emoji zurück (siehe dort). */
 const EXERCISE_FIGURES = {
-  face_pull: { kind: 'dynamic', svg: `
+  face_pull: { kind: 'dynamic', caption: 'Seitenansicht · Zughand kommt zum Gesicht, Ellbogen bleibt hoch', svg: `
     <line class="fig-rig" x1="188" y1="40" x2="188" y2="140"/>
     <circle class="fig-rig-dot" cx="188" cy="90" r="6"/>
     <g class="fig-pose fig-fixed">
@@ -718,7 +769,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="44" cy="78" r="6"/>
     </g>
   ` },
-  band_pull_apart: { kind: 'dynamic', svg: `
+  band_pull_apart: { kind: 'dynamic', caption: 'Vorderansicht, stehend · Arme ziehen das Band nach aussen auseinander', svg: `
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
@@ -742,7 +793,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="158" cy="60" r="6"/>
     </g>
   ` },
-  scapula_pull: { kind: 'dynamic', svg: `
+  scapula_pull: { kind: 'dynamic', caption: 'Vorderansicht · Arme bleiben oben gestreckt, nur die Schulterblätter senken sich', svg: `
     <line class="fig-rig" x1="100" y1="14" x2="100" y2="48"/>
     <g class="fig-pose fig-fixed">
       <line x1="70" y1="55" x2="130" y2="55"/>
@@ -763,7 +814,7 @@ const EXERCISE_FIGURES = {
       <line x1="130" y1="55" x2="99" y2="100"/>
     </g>
   ` },
-  pallof: { kind: 'dynamic', svg: `
+  pallof: { kind: 'dynamic', caption: 'Vorderansicht, Band von der Seite gehalten · Arme drücken das Band gerade nach vorne weg', svg: `
     <line class="fig-rig" x1="12" y1="55" x2="12" y2="105"/>
     <circle class="fig-rig-dot" cx="12" cy="80" r="6"/>
     <g class="fig-pose fig-fixed">
@@ -786,7 +837,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="150" cy="79" r="6"/>
     </g>
   ` },
-  bird_dog: { kind: 'dynamic', svg: `
+  bird_dog: { kind: 'dynamic', caption: 'Seitenansicht, Vierfüsslerstand · gegenüberliegender Arm und Bein strecken sich waagrecht aus', svg: `
     <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
     <g class="fig-pose fig-fixed">
       <circle cx="55" cy="86" r="14"/>
@@ -807,7 +858,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="187" cy="108" r="6"/>
     </g>
   ` },
-  crunches: { kind: 'dynamic', svg: `
+  crunches: { kind: 'dynamic', caption: 'Seitenansicht, Rückenlage · Oberkörper rollt nach vorne/oben ein', svg: `
     <line class="fig-rig" x1="10" y1="160" x2="190" y2="160"/>
     <g class="fig-pose fig-fixed">
       <line x1="120" y1="150" x2="150" y2="120"/>
@@ -831,7 +882,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="128" cy="116" r="6"/>
     </g>
   ` },
-  russian_twist: { kind: 'dynamic', svg: `
+  russian_twist: { kind: 'dynamic', caption: 'Seitenansicht, sitzend, Füsse leicht abgehoben · Oberkörper dreht abwechselnd nach links und rechts', svg: `
     <line class="fig-rig" x1="10" y1="170" x2="190" y2="170"/>
     <g class="fig-pose fig-fixed">
       <line x1="115" y1="160" x2="150" y2="130"/>
@@ -850,7 +901,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="55" cy="152" r="6"/>
     </g>
   ` },
-  superman: { kind: 'dynamic', svg: `
+  superman: { kind: 'dynamic', caption: 'Seitenansicht, Bauchlage · Arme und Beine heben sich gleichzeitig vom Boden ab', svg: `
     <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
     <g class="fig-pose fig-fixed">
       <line x1="90" y1="140" x2="130" y2="142"/>
@@ -870,7 +921,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="168" cy="126" r="6"/>
     </g>
   ` },
-  glute_bridge: { kind: 'dynamic', svg: `
+  glute_bridge: { kind: 'dynamic', caption: 'Seitenansicht, Rückenlage, Füsse aufgestellt · Becken hebt sich nach oben', svg: `
     <line class="fig-rig" x1="10" y1="170" x2="190" y2="170"/>
     <g class="fig-pose fig-fixed">
       <circle cx="150" cy="150" r="14"/>
@@ -889,7 +940,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="82" cy="145" r="5.5"/>
     </g>
   ` },
-  push_up: { kind: 'dynamic', svg: `
+  push_up: { kind: 'dynamic', caption: 'Seitenansicht, Bauchlage im Stütz · Körper senkt sich als gerade Linie ab und drückt wieder hoch', svg: `
     <line class="fig-rig" x1="10" y1="150" x2="195" y2="150"/>
     <circle class="fig-joint" cx="55" cy="150" r="5.5"/>
     <circle class="fig-joint" cx="191" cy="149" r="5.5"/>
@@ -913,7 +964,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="82" cy="148" r="5"/>
     </g>
   ` },
-  plank: { kind: 'static', svg: `
+  plank: { kind: 'static', caption: 'Seitenansicht, Unterarmstütz, Bauch nach unten · Körper hält eine gerade Linie von Kopf bis Ferse', svg: `
     <line class="fig-rig" x1="10" y1="155" x2="195" y2="155"/>
     <circle class="fig-joint" cx="90" cy="148" r="5.5"/>
     <circle class="fig-joint" cx="191" cy="154" r="5.5"/>
@@ -925,7 +976,7 @@ const EXERCISE_FIGURES = {
       <line x1="58" y1="128" x2="90" y2="148"/>
     </g>
   ` },
-  side_plank: { kind: 'static', svg: `
+  side_plank: { kind: 'static', caption: 'Seitenansicht, seitlicher Unterarmstütz · unterer Arm stützt, oberer Arm zeigt zur Decke, Hüfte bleibt oben', svg: `
     <line class="fig-rig" x1="10" y1="155" x2="195" y2="155"/>
     <circle class="fig-joint" cx="58" cy="150" r="5.5"/>
     <circle class="fig-joint" cx="191" cy="150" r="5.5"/>
@@ -938,7 +989,7 @@ const EXERCISE_FIGURES = {
     </g>
     <circle class="fig-joint fig-hi" cx="72" cy="32" r="6"/>
   ` },
-  hollow_hold: { kind: 'static', svg: `
+  hollow_hold: { kind: 'static', caption: 'Seitenansicht, Rückenlage · unterer Rücken bleibt am Boden, Arme und Beine schweben gestreckt', svg: `
     <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
     <g class="fig-pose">
       <path d="M40,150 Q100,110 160,150" fill="none"/>
@@ -949,7 +1000,7 @@ const EXERCISE_FIGURES = {
     <circle class="fig-joint fig-hi" cx="30" cy="118" r="5.5"/>
     <circle class="fig-joint fig-hi" cx="168" cy="128" r="5.5"/>
   ` },
-  ext_rotation: { kind: 'dynamic', svg: `
+  ext_rotation: { kind: 'dynamic', caption: 'Von oben, Ellbogen am Körper angewinkelt · Unterarm dreht vom Bauch weg nach aussen', svg: `
     <line class="fig-rig" x1="150" y1="70" x2="150" y2="110"/>
     <circle class="fig-rig-dot" cx="150" cy="90" r="6"/>
     <g class="fig-pose fig-fixed">
@@ -971,7 +1022,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="135" cy="85" r="6"/>
     </g>
   ` },
-  wrist_ext: { kind: 'dynamic', svg: `
+  wrist_ext: { kind: 'dynamic', caption: 'Seitenansicht, Unterarm aufgelegt, Hand über der Kante · Handrücken zieht nach oben', svg: `
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
@@ -992,7 +1043,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="180" cy="65" r="5.5"/>
     </g>
   ` },
-  y_t_w: { kind: 'dynamic', svg: `
+  y_t_w: { kind: 'dynamic', caption: 'Vorderansicht, leicht vorgebeugt · Arme heben abwechselnd in Y-, T- und W-Stellung', svg: `
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
@@ -1013,7 +1064,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="138" cy="25" r="6"/>
     </g>
   ` },
-  hanging_leg_raise: { kind: 'dynamic', svg: `
+  hanging_leg_raise: { kind: 'dynamic', caption: 'Vorderansicht, hängend am Griff · gestreckte Beine heben sich nach vorne/oben', svg: `
     <line class="fig-rig" x1="40" y1="20" x2="160" y2="20"/>
     <g class="fig-pose fig-fixed">
       <line x1="78" y1="20" x2="94" y2="58"/>
@@ -1035,7 +1086,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="158" cy="112" r="6"/>
     </g>
   ` },
-  toes_to_bar: { kind: 'dynamic', svg: `
+  toes_to_bar: { kind: 'dynamic', caption: 'Vorderansicht, hängend am Griff · Beine schwingen nach oben, Zehen Richtung Stange', svg: `
     <line class="fig-rig" x1="40" y1="20" x2="160" y2="20"/>
     <g class="fig-pose fig-fixed">
       <line x1="78" y1="20" x2="94" y2="58"/>
@@ -1057,7 +1108,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="115" cy="30" r="6"/>
     </g>
   ` },
-  front_lever_prog: { kind: 'dynamic', svg: `
+  front_lever_prog: { kind: 'dynamic', caption: 'Seitenansicht, hängend am Griff · Körper hebt sich aus dem Hang in die Waagrechte', svg: `
     <line class="fig-rig" x1="40" y1="20" x2="160" y2="20"/>
     <g class="fig-pose fig-fixed">
       <line x1="78" y1="20" x2="94" y2="58"/>
@@ -1076,7 +1127,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="192" cy="52" r="6"/>
     </g>
   ` },
-  dips: { kind: 'dynamic', svg: `
+  dips: { kind: 'dynamic', caption: 'Seitenansicht, Stütz auf Barren/Kante · Körper senkt sich mit gebeugten Armen ab und drückt hoch', svg: `
     <line class="fig-rig" x1="55" y1="70" x2="55" y2="76"/>
     <line class="fig-rig" x1="145" y1="70" x2="145" y2="76"/>
     <circle class="fig-joint" cx="70" cy="72" r="5"/>
@@ -1100,7 +1151,7 @@ const EXERCISE_FIGURES = {
       <line x1="100" y1="168" x2="110" y2="192"/>
     </g>
   ` },
-  split_squat: { kind: 'dynamic', svg: `
+  split_squat: { kind: 'dynamic', caption: 'Seitenansicht, Ausfallschritt, hinterer Fuss erhöht · Knie senkt sich gerade nach unten', svg: `
     <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
     <line class="fig-rig" x1="140" y1="150" x2="175" y2="150"/>
     <circle class="fig-joint" cx="72" cy="196" r="5.5"/>
@@ -1122,7 +1173,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="68" cy="172" r="5.5"/>
     </g>
   ` },
-  calf_raise: { kind: 'dynamic', svg: `
+  calf_raise: { kind: 'dynamic', caption: 'Seitenansicht, stehend · Fersen heben sich vom Boden ab in den Zehenstand', svg: `
     <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
@@ -1143,7 +1194,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="112" cy="184" r="4.5"/>
     </g>
   ` },
-  wall_sit: { kind: 'static', svg: `
+  wall_sit: { kind: 'static', caption: 'Seitenansicht, Rücken an der Wand · Oberschenkel waagrecht wie auf einem unsichtbaren Stuhl', svg: `
     <line class="fig-rig" x1="170" y1="18" x2="170" y2="196"/>
     <line class="fig-rig" x1="105" y1="196" x2="170" y2="196"/>
     <circle class="fig-joint" cx="110" cy="196" r="5.5"/>
@@ -1154,7 +1205,7 @@ const EXERCISE_FIGURES = {
       <line x1="110" y1="150" x2="110" y2="196"/>
     </g>
   ` },
-  cat_cow: { kind: 'dynamic', svg: `
+  cat_cow: { kind: 'dynamic', caption: 'Seitenansicht, Vierfüsslerstand · Rücken wölbt sich abwechselnd nach oben und hängt durch', svg: `
     <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
     <g class="fig-pose fig-fixed">
       <line x1="70" y1="90" x2="70" y2="150"/>
@@ -1171,7 +1222,7 @@ const EXERCISE_FIGURES = {
       <polyline points="70,90 110,74 150,95"/>
     </g>
   ` },
-  worlds_greatest_stretch: { kind: 'dynamic', svg: `
+  worlds_greatest_stretch: { kind: 'dynamic', caption: 'Seitenansicht, Ausfallschritt · Oberkörper und ein Arm drehen sich nach oben zur Decke', svg: `
     <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
     <g class="fig-pose fig-fixed">
       <line x1="100" y1="130" x2="75" y2="155"/>
@@ -1194,7 +1245,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="138" cy="62" r="5.5"/>
     </g>
   ` },
-  hip_9090: { kind: 'dynamic', svg: `
+  hip_9090: { kind: 'dynamic', caption: 'Von oben, sitzend · beide Knie klappen im 90°-Winkel abwechselnd von einer Seite zur anderen', svg: `
     <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
     <g class="fig-pose fig-fixed">
       <circle cx="99" cy="72" r="14"/>
@@ -1212,7 +1263,7 @@ const EXERCISE_FIGURES = {
       <polyline points="99,140 131,152 147,142"/>
     </g>
   ` },
-  thoracic_rotation: { kind: 'dynamic', svg: `
+  thoracic_rotation: { kind: 'dynamic', caption: 'Seitenansicht, Vierfüsslerstand · ein Arm dreht unter dem Körper durch und wieder nach oben zur Decke', svg: `
     <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
     <g class="fig-pose fig-fixed">
       <circle cx="55" cy="80" r="13"/>
@@ -1231,7 +1282,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="48" cy="38" r="5.5"/>
     </g>
   ` },
-  shoulder_circles_band: { kind: 'dynamic', svg: `
+  shoulder_circles_band: { kind: 'dynamic', caption: 'Seitenansicht, stehend · gestreckte Arme kreisen mit dem Band von unten nach oben', svg: `
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
@@ -1252,7 +1303,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="66" cy="38" r="6"/>
     </g>
   ` },
-  wrist_mobility: { kind: 'dynamic', svg: `
+  wrist_mobility: { kind: 'dynamic', caption: 'Seitenansicht, Arme vorgestreckt · Handgelenke kippen auf und ab', svg: `
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
@@ -1276,7 +1327,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="130" cy="86" r="5"/>
     </g>
   ` },
-  leg_swings: { kind: 'dynamic', svg: `
+  leg_swings: { kind: 'dynamic', caption: 'Seitenansicht, an etwas festhalten · gestrecktes Bein schwingt nach vorne und hinten', svg: `
     <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
@@ -1294,7 +1345,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="72" cy="178" r="5.5"/>
     </g>
   ` },
-  ankle_rocks: { kind: 'dynamic', svg: `
+  ankle_rocks: { kind: 'dynamic', caption: 'Seitenansicht, stehend · Knie schiebt über die Zehenspitzen, Ferse bleibt am Boden', svg: `
     <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
@@ -1313,7 +1364,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="100" cy="175" r="5"/>
     </g>
   ` },
-  neck_mobility: { kind: 'dynamic', svg: `
+  neck_mobility: { kind: 'dynamic', caption: 'Vorderansicht · Kopf dreht langsam nach links und rechts', svg: `
     <g class="fig-pose fig-fixed">
       <line x1="99" y1="55" x2="99" y2="138"/>
       <line x1="99" y1="138" x2="86" y2="196"/>
@@ -1327,7 +1378,7 @@ const EXERCISE_FIGURES = {
       <circle cx="115" cy="40" r="15"/>
     </g>
   ` },
-  doorway_pec_stretch: { kind: 'static', svg: `
+  doorway_pec_stretch: { kind: 'static', caption: 'Vorderansicht, Arm im Türrahmen angewinkelt · Körper dreht von der Wand weg, Brust dehnt sich', svg: `
     <line class="fig-rig" x1="155" y1="18" x2="155" y2="196"/>
     <circle class="fig-joint" cx="150" cy="65" r="5.5"/>
     <g class="fig-pose">
@@ -1340,10 +1391,16 @@ const EXERCISE_FIGURES = {
   ` },
 };
 
+/* Jedes Strichmännchen bekommt eine kurze Bildunterschrift, die Blickwinkel,
+   Ausgangsstellung und Bewegungsrichtung in Worten festhält — bei so
+   abstrakten Linienfiguren ist "vorne/hinten", "wie steht man zum Boden"
+   und "geht's nach innen/aussen bzw. hoch/runter" per Bild allein nicht
+   immer eindeutig, ein Satz Text macht es das aber zuverlässig. */
 function exerciseFigureSvg(exerciseId) {
   const fig = EXERCISE_FIGURES[exerciseId];
   if (!fig) return `<div class="ex-figure-emoji">💪</div>`;
-  return `<svg viewBox="0 0 200 200" class="ex-figure ${fig.kind === 'static' ? 'fig-static' : ''}">${fig.svg}</svg>`;
+  const svg = `<svg viewBox="0 0 200 200" class="ex-figure ${fig.kind === 'static' ? 'fig-static' : ''}">${fig.svg}</svg>`;
+  return fig.caption ? `${svg}<div class="ex-figure-caption">${esc(fig.caption)}</div>` : svg;
 }
 
 /* ---------- Zielmuskeln-Übersicht ----------
@@ -1420,7 +1477,7 @@ function miniBoardThumb(boardId, gripId) {
 
 function fbBlockSub(b) {
   if (b.type === 'hang') return `${b.hangSec}s Hang · ${b.restSec}s Pause · ×${b.reps}`;
-  return `× ${b.reps} Wiederholungen${b.restSec ? ' · ' + b.restSec + 's Pause danach' : ''}`;
+  return `${b.workSec || 40}s Ausführung · Ziel ${b.reps}×${b.restSec ? ' · ' + b.restSec + 's Pause danach' : ''}`;
 }
 
 function renderFbBlocksList() {
@@ -1450,7 +1507,8 @@ function renderFbBlocksList() {
         <input type="number" data-i="${i}" data-f="hangSec" value="${b.hangSec}" class="ex-row-input" title="Hang (s)">
         <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec}" class="ex-row-input" title="Pause (s)">
       ` : `
-        <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">
+        <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Ziel-Wiederholungen">
+        <input type="number" data-i="${i}" data-f="workSec" value="${b.workSec || 40}" class="ex-row-input" title="Dauer (s)">
         <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec || 0}" class="ex-row-input" title="Pause danach (s)">
       `;
     return `
@@ -1576,15 +1634,14 @@ function closeFbOverlay() {
 /* Dauer eines einzelnen Blocks in Sekunden — wie fbEstimateSeconds(),
    aber pro Block statt summiert (fürs Fortschritts-Tracking nötig). */
 function fbBlockSeconds(b) {
-  if (b.type === 'hang') return buildSequence('custom', { hangSec: b.hangSec, restSec: b.restSec, sets: b.reps }).reduce((s, p) => s + p.seconds, 0);
-  return 40 + (b.restSec || 0);
+  return buildBlockSequence(b).reduce((s, p) => s + p.seconds, 0);
 }
 
 function fbElapsedSeconds() {
   let elapsed = 0;
   for (let i = 0; i < fb.blockIndex; i++) elapsed += fbBlockSeconds(fb.blocks[i]);
   const cur = fb.blocks[fb.blockIndex];
-  if (cur && cur.type === 'hang' && fb.running && fb.sequence.length) {
+  if (cur && fb.running && fb.sequence.length) {
     const done = fb.sequence.slice(0, fb.stepIndex).reduce((s, p) => s + p.seconds, 0);
     const curTotal = fb.sequence[fb.stepIndex] ? fb.sequence[fb.stepIndex].seconds : 0;
     elapsed += done + (curTotal - fb.secondsLeft);
@@ -1592,11 +1649,11 @@ function fbElapsedSeconds() {
   return elapsed;
 }
 
-/* Was kommt als Nächstes dran — erst innerhalb des laufenden Hang-Blocks
+/* Was kommt als Nächstes dran — erst innerhalb des laufenden Blocks
    (nächste Phase in fb.sequence), sonst der nächste Block im Ablauf. */
 function fbUpcomingLabel() {
   const block = fb.blocks[fb.blockIndex];
-  if (block && block.type === 'hang' && fb.sequence.length) {
+  if (block && fb.sequence.length) {
     const next = fb.sequence[fb.stepIndex + 1];
     if (next) return `${next.phase} ${next.seconds}s`;
   }
@@ -1617,14 +1674,13 @@ function updateFbUpcomingUI() {
 }
 
 /* ---------- Transport-Leiste (Zurück / Play-Pause / Weiter) ----------
-   Zurück/Weiter springen immer zwischen "awaitingNext"-Haltepunkten hin
-   und her (unabhängig vom aktuellen Zustand) — einfaches, konsistentes
-   Modell statt Sonderfällen pro Block-Typ. Play/Pause pausiert nur einen
-   laufenden Hang-Timer (bei Übungs-Sätzen gibt es ohnehin keinen Timer,
-   dafür FERTIG). */
+   Der Ablauf läuft nach dem ersten "LOS" von allein durch alle Sätze
+   (Hang- wie Übungs-Sätze) — kein Antippen zwischen den Sätzen mehr nötig.
+   Zurück/Weiter springen direkt in den Nachbar-Satz (inkl. dessen eigenem
+   Vorbereitungs-Countdown bei Hang-Sätzen), Play/Pause hält den gerade
+   laufenden Timer an, ohne den Bildschirm auszuschalten. */
 function fbTransportRow() {
-  const block = fb.blocks[fb.blockIndex];
-  const canPause = fb.running && block && block.type === 'hang';
+  const canPause = fb.running;
   const isPaused = canPause && !fb.intervalId;
   return `
     <div class="fb-transport">
@@ -1638,36 +1694,28 @@ function fbTransportRow() {
 function fbGoBack() {
   clearInterval(fb.intervalId);
   fb.intervalId = null;
-  releaseWakeLock();
-  fb.running = false;
   fb.blockIndex = Math.max(0, fb.blockIndex - 1);
-  fb.awaitingNext = true;
-  renderFbOverlay();
+  beginBlock();
 }
 
 function fbSkipForward() {
   clearInterval(fb.intervalId);
   fb.intervalId = null;
-  releaseWakeLock();
-  fb.running = false;
   fb.blockIndex++;
   if (fb.blockIndex >= fb.blocks.length) {
+    releaseWakeLock();
     finishAblauf();
   } else {
-    fb.awaitingNext = true;
-    renderFbOverlay();
+    beginBlock();
   }
 }
 
 function fbTogglePause() {
-  const block = fb.blocks[fb.blockIndex];
-  if (!fb.running || !block || block.type !== 'hang') return;
+  if (!fb.running) return;
   if (fb.intervalId) {
     clearInterval(fb.intervalId);
     fb.intervalId = null;
-    releaseWakeLock();
   } else {
-    requestWakeLock();
     fb.intervalId = setInterval(tickBlock, 1000);
   }
   renderFbOverlay();
@@ -1703,54 +1751,60 @@ function renderFbOverlay() {
       <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
     `;
   } else {
+    // Ein einziges Template für Hang- UND Übungs-Sätze — beide laufen jetzt
+    // über dieselbe fb.sequence/tickBlock-Uhr, unterscheiden sich nur darin,
+    // was während "Work" gezeigt wird (Board-Punkt bzw. das animierte
+    // Strichmännchen der Übung).
     const block = fb.blocks[fb.blockIndex];
-    if (block.type === 'hang') {
-      const step = fb.sequence[fb.stepIndex];
-      const isHangPhase = !step || step.phase === 'Hang';
-      const phaseTotal = step ? step.seconds : 1;
-      const frac = phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 0;
-      const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
-      const armNote = gripArmNote(block.board, block.grip);
-      const isPausedNow = !fb.intervalId;
-      const restWarn = !isHangPhase && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
-      stage = `
-        <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${esc(gripLabel(block.board, block.grip))}${armNote ? ' · ' + armNote : ''}</div>
-        <div class="fb-stage-figure">${miniBoardThumb(block.board, block.grip)}</div>
-        <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
-          <div class="fb-phase-figure" id="fb-phase-figure" data-kind="${isHangPhase ? 'hang' : 'rest'}">${isHangPhase ? FB_HANG_FIGURE_SVG : FB_REST_FIGURE_SVG}</div>
-          <div class="fb-timer-ring">
-            <svg viewBox="0 0 120 120">
-              <circle class="ring-bg" cx="60" cy="60" r="52"/>
-              <circle class="ring-fg ${isHangPhase ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
-            </svg>
-            <div class="big ${isHangPhase ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
-          </div>
+    const isHang = block.type === 'hang';
+    const step = fb.sequence[fb.stepIndex];
+    const working = isWorkPhase(step);
+    const phaseTotal = step ? step.seconds : 1;
+    const frac = phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 0;
+    const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
+    const isPausedNow = fb.running && !fb.intervalId;
+    const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
+    const armNote = isHang ? gripArmNote(block.board, block.grip) : '';
+    const label = isHang
+      ? `Hang @ ${esc(gripLabel(block.board, block.grip))}${armNote ? ' · ' + armNote : ''}`
+      : esc(exerciseName(block.exerciseId));
+    const muscles = !isHang ? exerciseMuscles(block.exerciseId) : null;
+    const muscleText = muscles ? muscleLabelsText(muscles.primary, muscles.secondary) : '';
+    stage = `
+      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${label}${!isHang ? ' · Ziel ' + esc(String(block.reps)) + '×' : ''}</div>
+      ${isHang
+        ? `<div class="fb-stage-figure">${miniBoardThumb(block.board, block.grip)}</div>
+           <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
+             <div class="fb-phase-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}">${working ? FB_HANG_FIGURE_SVG : FB_REST_FIGURE_SVG}</div>
+             <div class="fb-timer-ring">
+               <svg viewBox="0 0 120 120">
+                 <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
+               </svg>
+               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
+             </div>
+           </div>`
+        : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}">${working ? exerciseFigureSvg(block.exerciseId) : FB_REST_FIGURE_SVG}</div>
+           <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
+             <div class="fb-timer-ring">
+               <svg viewBox="0 0 120 120">
+                 <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
+               </svg>
+               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
+             </div>
+           </div>`}
+      <div class="phase mono" id="fb-phase">${step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}${isPausedNow ? ' · PAUSIERT' : ''}` : ''}</div>
+      ${muscleText ? `
+        <div class="fb-muscle-block">
+          ${bodyMapSvg(muscles.primary, muscles.secondary)}
+          <div class="fb-muscle-label mono">${esc(muscleText)}</div>
         </div>
-        <div class="phase mono" id="fb-phase">${step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}${isPausedNow ? ' · PAUSIERT' : ''}` : ''}</div>
-        <div class="fb-stage-next mono" id="fb-upcoming"></div>
-        ${fbTransportRow()}
-        <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
-      `;
-    } else {
-      const muscles = exerciseMuscles(block.exerciseId);
-      const muscleText = muscleLabelsText(muscles.primary, muscles.secondary);
-      stage = `
-        <div class="fb-stage-label mono">ÜBUNG ${fb.blockIndex + 1}/${fb.blocks.length}</div>
-        <div class="fb-stage-figure">${exerciseFigureSvg(block.exerciseId)}</div>
-        <div class="fb-stage-title">${esc(exerciseName(block.exerciseId))} × ${esc(String(block.reps))}</div>
-        ${block.restSec ? `<div class="fb-stage-sub mono">danach ~${block.restSec}s Pause</div>` : ''}
-        ${muscleText ? `
-          <div class="fb-muscle-block">
-            ${bodyMapSvg(muscles.primary, muscles.secondary)}
-            <div class="fb-muscle-label mono">${esc(muscleText)}</div>
-          </div>
-        ` : ''}
-        <div class="fb-stage-next mono" id="fb-upcoming"></div>
-        ${fbTransportRow()}
-        <button class="btn fb-stage-btn" id="fb-exercise-done">FERTIG</button>
-        <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
-      `;
-    }
+      ` : ''}
+      <div class="fb-stage-next mono" id="fb-upcoming"></div>
+      ${fbTransportRow()}
+      <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
+    `;
   }
 
   el.innerHTML = `
@@ -1773,8 +1827,6 @@ function renderFbOverlay() {
   } else if (fb.preCount != null) {
     document.getElementById('fb-cancel').onclick = cancelAblauf;
   } else {
-    const doneBtn = document.getElementById('fb-exercise-done');
-    if (doneBtn) doneBtn.onclick = blockDone;
     document.getElementById('fb-cancel').onclick = cancelAblauf;
     updateFbUpcomingUI();
   }
@@ -1839,6 +1891,7 @@ function beepEnd() {
 }
 
 async function requestWakeLock() {
+  if (fb.wakeLock) return; // schon aktiv — nicht doppelt anfordern (würde den Handle auf das alte Lock verlieren)
   try { if ('wakeLock' in navigator) fb.wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* ignorieren */ }
 }
 function releaseWakeLock() {
@@ -1853,22 +1906,34 @@ function startAblauf() {
   openFbOverlay();
 }
 
-/* Tap auf "LOS": bei Hang-Sätzen erst ein 5-Sekunden-Countdown zum
-   Hände-ans-Board-Bekommen, danach automatisch der eigentliche Hang.
-   Übungs-Sätze starten weiterhin direkt (kein Board, das man greifen
-   müsste). */
+/* Tap auf "LOS" (nur ganz am Anfang nötig): der Ablauf läuft danach von
+   selbst durch alle Sätze — Hang-Sätze, Übungs-Sätze, die Pause dazwischen,
+   der nächste Satz — ohne dass man nochmal etwas antippen muss. Der
+   Bildschirm bleibt dabei durchgehend an (ein einziges Wake-Lock von hier
+   bis zum Ende/Abbruch, nicht pro Satz neu). Play/Pause bleibt jederzeit
+   möglich, ist aber optional. */
 function startCurrentBlock() {
+  fb.awaitingNext = false;
+  requestWakeLock();
+  beginBlock();
+}
+
+/* Startet fb.blockIndex: bei Hang-Sätzen erst der 5-Sekunden-Countdown zum
+   Hände-ans-Board-Bekommen, danach automatisch der Timer; bei Übungs-Sätzen
+   direkt der Timer (kein Board, das man greifen müsste). Wird sowohl beim
+   allerersten Satz als auch bei jedem automatischen Weiterschalten sowie
+   bei Zurück/Weiter aufgerufen — ein einziger Einstiegspunkt statt
+   Sonderfällen pro Aufrufer. */
+function beginBlock() {
   const block = fb.blocks[fb.blockIndex];
   if (!block) { finishAblauf(); return; }
-  fb.awaitingNext = false;
+  requestWakeLock();
   if (block.type === 'hang') {
     fb.preCount = 5;
-    requestWakeLock();
     renderFbOverlay();
     fb.intervalId = setInterval(tickPreCountdown, 1000);
   } else {
-    fb.running = true;
-    renderFbOverlay();
+    startSequence();
   }
 }
 
@@ -1878,17 +1943,17 @@ function tickPreCountdown() {
     clearInterval(fb.intervalId);
     fb.intervalId = null;
     fb.preCount = null;
-    beginHangBlock();
+    startSequence();
     return;
   }
   if (fb.preCount <= 3) beepTick();
   renderFbOverlay();
 }
 
-function beginHangBlock() {
+function startSequence() {
   const block = fb.blocks[fb.blockIndex];
   fb.running = true;
-  fb.sequence = buildSequence('custom', { hangSec: block.hangSec, restSec: block.restSec, sets: block.reps });
+  fb.sequence = buildBlockSequence(block);
   fb.stepIndex = 0;
   fb.secondsLeft = fb.sequence[0].seconds;
   beepStart();
@@ -1905,19 +1970,32 @@ function tickBlock() {
     if (fb.stepIndex >= fb.sequence.length) {
       clearInterval(fb.intervalId);
       fb.intervalId = null;
-      releaseWakeLock();
       beep(1318, 300);
-      blockDone();
+      advanceBlock();
       return;
     }
     fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
-    if (fb.sequence[fb.stepIndex].phase === 'Hang') beepStart(); else beepEnd();
-  } else if (step && step.phase !== 'Hang' && fb.secondsLeft <= 3) {
+    if (isWorkPhase(fb.sequence[fb.stepIndex])) beepStart(); else beepEnd();
+  } else if (step && !isWorkPhase(step) && fb.secondsLeft <= 3) {
     // Letzte 3 Sekunden einer Pause: kurzer Tick pro Sekunde als
-    // akustische Vorwarnung, dass der nächste Hang gleich losgeht.
+    // akustische Vorwarnung, dass der nächste Satz gleich losgeht.
     beepTick();
   }
   updateTimerUI();
+}
+
+/* Satz fertig -> sofort weiter zum nächsten (kein Warten auf einen erneuten
+   Tap) — das war der eigentliche Grund für "kein Flow", nicht nur die
+   Reihenfolge der Bau-Oberfläche. */
+function advanceBlock() {
+  fb.blockIndex++;
+  fb.running = false;
+  if (fb.blockIndex >= fb.blocks.length) {
+    releaseWakeLock();
+    finishAblauf();
+  } else {
+    beginBlock();
+  }
 }
 
 function updateTimerUI() {
@@ -1925,41 +2003,34 @@ function updateTimerUI() {
   const phase = document.getElementById('fb-phase');
   const ring = document.getElementById('fb-ring-fg');
   const figureHolder = document.getElementById('fb-phase-figure');
+  const block = fb.blocks[fb.blockIndex];
   const step = fb.sequence[fb.stepIndex];
-  const isHangPhase = !step || step.phase === 'Hang';
+  const working = isWorkPhase(step);
   // Letzte 10 Sekunden einer Pause optisch hervorheben (Farbe + Pulsieren),
   // damit man auch aus der Distanz merkt, dass es gleich weitergeht.
-  const restWarn = !isHangPhase && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
+  const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
 
   if (big) {
     big.textContent = pad2(fb.secondsLeft);
-    big.className = 'big' + (isHangPhase ? '' : ' rest') + (restWarn ? ' rest-warn' : '');
+    big.className = 'big' + (working ? '' : ' rest') + (restWarn ? ' rest-warn' : '');
   }
   if (phase) phase.textContent = step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : '';
   if (ring) {
     const phaseTotal = step ? step.seconds : 1;
     const frac = phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 0;
     ring.style.strokeDashoffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
-    ring.classList.toggle('rest', !isHangPhase);
+    ring.classList.toggle('rest', !working);
     ring.classList.toggle('rest-warn', restWarn);
   }
-  if (figureHolder && figureHolder.dataset.kind !== (isHangPhase ? 'hang' : 'rest')) {
-    figureHolder.innerHTML = isHangPhase ? FB_HANG_FIGURE_SVG : FB_REST_FIGURE_SVG;
-    figureHolder.dataset.kind = isHangPhase ? 'hang' : 'rest';
+  const kind = working ? 'work' : 'rest';
+  if (figureHolder && figureHolder.dataset.kind !== kind) {
+    figureHolder.innerHTML = working
+      ? (block.type === 'hang' ? FB_HANG_FIGURE_SVG : exerciseFigureSvg(block.exerciseId))
+      : FB_REST_FIGURE_SVG;
+    figureHolder.dataset.kind = kind;
   }
   updateFbUpcomingUI();
   updateFbProgressUI();
-}
-
-function blockDone() {
-  fb.blockIndex++;
-  fb.running = false;
-  if (fb.blockIndex >= fb.blocks.length) {
-    finishAblauf();
-  } else {
-    fb.awaitingNext = true;
-    renderFbOverlay();
-  }
 }
 
 function cancelAblauf() {
@@ -1978,6 +2049,7 @@ async function finishAblauf() {
   fb.running = false;
   fb.awaitingNext = false;
   fb.blockIndex = 0;
+  releaseWakeLock();
   beep(1568, 400);
 
   const el = ensureFbOverlay();
