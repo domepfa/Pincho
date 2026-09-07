@@ -123,17 +123,20 @@ function gripInfo(boardId, gripId) {
   return board && board.grips.find((g) => g.id === gripId);
 }
 
-/* Ein Loch pro Griff = einarmig (schwerer, nur eine Hand passt dort hin),
-   zwei gespiegelte Löcher = beidarmig (leichter, eine Hand pro Seite).
-   Rein aus den kalibrierten hotspots abgeleitet, nie fest hinterlegt —
-   bleibt so automatisch korrekt, wenn hotspots neu kalibriert werden. */
+/* Zwei gespiegelte Löcher (links + rechts) heisst zuverlässig beidarmig
+   (eine Hand pro Seite) — das lässt sich aus den kalibrierten hotspots
+   ableiten. EIN Loch ist dagegen mehrdeutig: das kann eine schmale,
+   wirklich einarmige Position sein, ODER eine durchgehende breite Kante,
+   die trotz nur einem Kalibrierpunkt ganz normal beidhändig genutzt wird
+   (z. B. die grosse Kante — klassischer beidhändiger Aufwärm-Hang trotz
+   nur einem Punkt in der Mitte). Ohne Rückmeldung vom echten Brett lässt
+   sich das nicht unterscheiden, darum wird bei einem Loch bewusst NICHTS
+   behauptet, statt zu raten. */
 function gripArmNote(boardId, gripId) {
   const board = BOARDS[boardId];
   if (!board) return '';
   const count = board.hotspots.filter((h) => h.grip === gripId).length;
-  if (count >= 2) return 'beidarmig';
-  if (count === 1) return 'einarmig';
-  return '';
+  return count >= 2 ? 'beidarmig' : '';
 }
 
 /* ---------- Fingerboard-Protokolle ---------- */
