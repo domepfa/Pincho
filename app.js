@@ -744,6 +744,7 @@ const EXERCISE_FIGURES = {
     <circle class="fig-rig-dot" cx="188" cy="90" r="6"/>
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
+      <circle cx="110" cy="40" r="3"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
       <line x1="99" y1="138" x2="86" y2="196"/>
       <line x1="99" y1="138" x2="114" y2="196"/>
@@ -841,6 +842,7 @@ const EXERCISE_FIGURES = {
     <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
     <g class="fig-pose fig-fixed">
       <circle cx="55" cy="86" r="14"/>
+      <circle cx="42" cy="86" r="3"/>
       <line x1="70" y1="90" x2="150" y2="95"/>
       <line x1="70" y1="90" x2="70" y2="150"/>
       <line x1="150" y1="95" x2="150" y2="150"/>
@@ -871,12 +873,14 @@ const EXERCISE_FIGURES = {
     <g class="fig-pose fig-a" style="animation-duration:2.2s;">
       <line x1="120" y1="150" x2="70" y2="150"/>
       <circle cx="58" cy="150" r="15"/>
+      <circle cx="58" cy="137" r="3"/>
       <line x1="100" y1="150" x2="85" y2="163"/>
       <circle class="fig-joint fig-mid" cx="70" cy="150" r="5"/>
     </g>
     <g class="fig-pose fig-b" style="animation-duration:2.2s;">
       <polyline points="120,150 112,128 100,112"/>
       <circle cx="90" cy="100" r="15"/>
+      <circle cx="99" cy="91" r="3"/>
       <line x1="100" y1="112" x2="128" y2="116"/>
       <circle class="fig-joint fig-mid" cx="100" cy="112" r="5"/>
       <circle class="fig-joint fig-hi" cx="128" cy="116" r="6"/>
@@ -888,6 +892,7 @@ const EXERCISE_FIGURES = {
       <line x1="115" y1="160" x2="150" y2="130"/>
       <line x1="150" y1="130" x2="148" y2="170"/>
       <circle cx="60" cy="118" r="14"/>
+      <circle cx="73" cy="118" r="3"/>
       <line x1="72" y1="128" x2="115" y2="160"/>
     </g>
     <circle class="fig-joint" cx="115" cy="160" r="5"/>
@@ -910,11 +915,13 @@ const EXERCISE_FIGURES = {
     <circle class="fig-joint" cx="130" cy="142" r="5"/>
     <g class="fig-pose fig-a" style="animation-duration:2.3s;">
       <circle cx="76" cy="140" r="14"/>
+      <circle cx="67" cy="149" r="3"/>
       <line x1="90" y1="140" x2="60" y2="146"/>
       <line x1="130" y1="142" x2="160" y2="148"/>
     </g>
     <g class="fig-pose fig-b" style="animation-duration:2.3s;">
       <circle cx="70" cy="118" r="14"/>
+      <circle cx="57" cy="116" r="3"/>
       <line x1="90" y1="140" x2="55" y2="122"/>
       <line x1="130" y1="142" x2="168" y2="126"/>
       <circle class="fig-joint fig-hi" cx="55" cy="122" r="6"/>
@@ -925,6 +932,7 @@ const EXERCISE_FIGURES = {
     <line class="fig-rig" x1="10" y1="170" x2="190" y2="170"/>
     <g class="fig-pose fig-fixed">
       <circle cx="150" cy="150" r="14"/>
+      <circle cx="150" cy="137" r="3"/>
       <line x1="138" y1="160" x2="105" y2="160"/>
       <line x1="60" y1="130" x2="60" y2="170"/>
     </g>
@@ -948,6 +956,7 @@ const EXERCISE_FIGURES = {
     <polygon class="fig-arrow" points="60,95 53,107 67,107"/>
     <g class="fig-pose fig-a" style="animation-duration:1.9s;">
       <circle cx="44" cy="88" r="14"/>
+      <circle cx="40" cy="100" r="3"/>
       <line x1="60" y1="95" x2="135" y2="100"/>
       <line x1="135" y1="100" x2="190" y2="148"/>
       <line x1="60" y1="95" x2="55" y2="150"/>
@@ -956,6 +965,7 @@ const EXERCISE_FIGURES = {
     </g>
     <g class="fig-pose fig-b" style="animation-duration:1.9s;">
       <circle cx="46" cy="124" r="14"/>
+      <circle cx="42" cy="136" r="3"/>
       <line x1="62" y1="130" x2="135" y2="133"/>
       <line x1="135" y1="133" x2="190" y2="149"/>
       <polyline points="62,130 82,148 55,150"/>
@@ -970,6 +980,7 @@ const EXERCISE_FIGURES = {
     <circle class="fig-joint" cx="191" cy="154" r="5.5"/>
     <g class="fig-pose">
       <circle cx="44" cy="90" r="14"/>
+      <circle cx="40" cy="102" r="3"/>
       <line x1="60" y1="97" x2="135" y2="102"/>
       <line x1="135" y1="102" x2="191" y2="150"/>
       <line x1="60" y1="97" x2="58" y2="128"/>
@@ -982,6 +993,7 @@ const EXERCISE_FIGURES = {
     <circle class="fig-joint" cx="191" cy="150" r="5.5"/>
     <g class="fig-pose">
       <circle cx="44" cy="90" r="14"/>
+      <circle cx="57" cy="90" r="3"/>
       <line x1="60" y1="97" x2="135" y2="102"/>
       <line x1="135" y1="102" x2="191" y2="150"/>
       <line x1="60" y1="97" x2="58" y2="150"/>
@@ -994,6 +1006,7 @@ const EXERCISE_FIGURES = {
     <g class="fig-pose">
       <path d="M40,150 Q100,110 160,150" fill="none"/>
       <circle cx="34" cy="140" r="13"/>
+      <circle cx="42" cy="130" r="3"/>
       <line x1="46" y1="146" x2="30" y2="120"/>
       <line x1="150" y1="146" x2="168" y2="130"/>
     </g>
@@ -1025,6 +1038,7 @@ const EXERCISE_FIGURES = {
   wrist_ext: { kind: 'dynamic', caption: 'Seitenansicht, Unterarm aufgelegt, Hand über der Kante · Handrücken zieht nach oben', svg: `
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
+      <circle cx="110" cy="40" r="3"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
       <line x1="99" y1="138" x2="86" y2="196"/>
       <line x1="99" y1="138" x2="114" y2="196"/>
@@ -1114,6 +1128,7 @@ const EXERCISE_FIGURES = {
       <line x1="78" y1="20" x2="94" y2="58"/>
       <line x1="122" y1="20" x2="106" y2="58"/>
       <circle cx="100" cy="42" r="14"/>
+      <circle cx="100" cy="55" r="3"/>
     </g>
     <circle class="fig-joint" cx="100" cy="58" r="5"/>
     <g class="fig-pose fig-a" style="animation-duration:2.3s;">
@@ -1136,6 +1151,7 @@ const EXERCISE_FIGURES = {
     <polygon class="fig-arrow" points="100,110 94,122 106,122"/>
     <g class="fig-pose fig-a" style="animation-duration:1.9s;">
       <circle cx="100" cy="60" r="14"/>
+      <circle cx="113" cy="60" r="3"/>
       <line x1="70" y1="72" x2="97" y2="80"/>
       <line x1="130" y1="72" x2="103" y2="80"/>
       <line x1="100" y1="80" x2="100" y2="140"/>
@@ -1144,6 +1160,7 @@ const EXERCISE_FIGURES = {
     </g>
     <g class="fig-pose fig-b" style="animation-duration:1.9s;">
       <circle cx="100" cy="90" r="14"/>
+      <circle cx="113" cy="90" r="3"/>
       <line x1="70" y1="72" x2="97" y2="108"/>
       <line x1="130" y1="72" x2="103" y2="108"/>
       <line x1="100" y1="108" x2="100" y2="168"/>
@@ -1157,6 +1174,7 @@ const EXERCISE_FIGURES = {
     <circle class="fig-joint" cx="72" cy="196" r="5.5"/>
     <g class="fig-pose fig-a" style="animation-duration:2s;">
       <circle cx="86" cy="76" r="14"/>
+      <circle cx="99" cy="76" r="3"/>
       <line x1="100" y1="85" x2="100" y2="128"/>
       <line x1="100" y1="128" x2="80" y2="160"/>
       <line x1="80" y1="160" x2="72" y2="196"/>
@@ -1165,6 +1183,7 @@ const EXERCISE_FIGURES = {
     </g>
     <g class="fig-pose fig-b" style="animation-duration:2s;">
       <circle cx="80" cy="106" r="14"/>
+      <circle cx="93" cy="106" r="3"/>
       <line x1="96" y1="115" x2="98" y2="150"/>
       <line x1="98" y1="150" x2="68" y2="172"/>
       <line x1="68" y1="172" x2="72" y2="196"/>
@@ -1177,6 +1196,7 @@ const EXERCISE_FIGURES = {
     <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
+      <circle cx="110" cy="40" r="3"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
     </g>
     <path class="fig-motion" d="M99,178 L99,160"/>
@@ -1200,6 +1220,7 @@ const EXERCISE_FIGURES = {
     <circle class="fig-joint" cx="110" cy="196" r="5.5"/>
     <g class="fig-pose">
       <circle cx="165" cy="78" r="14"/>
+      <circle cx="152" cy="78" r="3"/>
       <line x1="165" y1="92" x2="165" y2="150"/>
       <line x1="165" y1="150" x2="110" y2="150"/>
       <line x1="110" y1="150" x2="110" y2="196"/>
@@ -1215,10 +1236,12 @@ const EXERCISE_FIGURES = {
     <circle class="fig-joint" cx="150" cy="95" r="5"/>
     <g class="fig-pose fig-a" style="animation-duration:2.4s;">
       <circle cx="52" cy="78" r="13"/>
+      <circle cx="43" cy="87" r="3"/>
       <polyline points="70,90 110,106 150,95"/>
     </g>
     <g class="fig-pose fig-b" style="animation-duration:2.4s;">
       <circle cx="58" cy="102" r="13"/>
+      <circle cx="49" cy="93" r="3"/>
       <polyline points="70,90 110,74 150,95"/>
     </g>
   ` },
@@ -1234,12 +1257,14 @@ const EXERCISE_FIGURES = {
     <polygon class="fig-arrow" points="140,60 128,62 133,72"/>
     <g class="fig-pose fig-a" style="animation-duration:2.4s;">
       <circle cx="86" cy="88" r="13"/>
+      <circle cx="88" cy="75" r="3"/>
       <line x1="100" y1="98" x2="100" y2="130"/>
       <line x1="100" y1="100" x2="76" y2="120"/>
       <circle class="fig-joint fig-hi" cx="76" cy="120" r="5.5"/>
     </g>
     <g class="fig-pose fig-b" style="animation-duration:2.4s;">
       <circle cx="112" cy="76" r="13"/>
+      <circle cx="119" cy="65" r="3"/>
       <line x1="100" y1="98" x2="100" y2="130"/>
       <line x1="100" y1="98" x2="138" y2="62"/>
       <circle class="fig-joint fig-hi" cx="138" cy="62" r="5.5"/>
@@ -1267,6 +1292,7 @@ const EXERCISE_FIGURES = {
     <line class="fig-rig" x1="10" y1="150" x2="190" y2="150"/>
     <g class="fig-pose fig-fixed">
       <circle cx="55" cy="80" r="13"/>
+      <circle cx="42" cy="80" r="3"/>
       <line x1="70" y1="90" x2="150" y2="95"/>
       <line x1="70" y1="90" x2="70" y2="150"/>
       <line x1="150" y1="95" x2="150" y2="150"/>
@@ -1285,6 +1311,7 @@ const EXERCISE_FIGURES = {
   shoulder_circles_band: { kind: 'dynamic', caption: 'Seitenansicht, stehend · gestreckte Arme kreisen mit dem Band von unten nach oben', svg: `
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
+      <circle cx="110" cy="40" r="3"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
       <line x1="99" y1="138" x2="86" y2="196"/>
       <line x1="99" y1="138" x2="114" y2="196"/>
@@ -1306,6 +1333,7 @@ const EXERCISE_FIGURES = {
   wrist_mobility: { kind: 'dynamic', caption: 'Seitenansicht, Arme vorgestreckt · Handgelenke kippen auf und ab', svg: `
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
+      <circle cx="110" cy="40" r="3"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
       <line x1="99" y1="138" x2="86" y2="196"/>
       <line x1="99" y1="138" x2="114" y2="196"/>
@@ -1331,6 +1359,7 @@ const EXERCISE_FIGURES = {
     <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
+      <circle cx="110" cy="40" r="3"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
       <line x1="99" y1="138" x2="108" y2="196"/>
     </g>
@@ -1349,6 +1378,7 @@ const EXERCISE_FIGURES = {
     <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
     <g class="fig-pose fig-fixed">
       <circle cx="97" cy="40" r="15"/>
+      <circle cx="110" cy="40" r="3"/>
       <line x1="97" y1="58" x2="99" y2="138"/>
       <line x1="99" y1="138" x2="120" y2="196"/>
     </g>
@@ -1802,6 +1832,7 @@ function renderFbOverlay() {
         </div>
       ` : ''}
       <div class="fb-stage-next mono" id="fb-upcoming"></div>
+      ${!isHang ? `<button class="btn fb-stage-btn" id="fb-reps-done" ${working ? '' : 'hidden'}>Wiederholungen geschafft — weiter</button>` : ''}
       ${fbTransportRow()}
       <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
     `;
@@ -1828,6 +1859,8 @@ function renderFbOverlay() {
     document.getElementById('fb-cancel').onclick = cancelAblauf;
   } else {
     document.getElementById('fb-cancel').onclick = cancelAblauf;
+    const repsDoneBtn = document.getElementById('fb-reps-done');
+    if (repsDoneBtn) repsDoneBtn.onclick = fbSkipForward;
     updateFbUpcomingUI();
   }
   updateFbProgressUI();
@@ -2029,6 +2062,8 @@ function updateTimerUI() {
       : FB_REST_FIGURE_SVG;
     figureHolder.dataset.kind = kind;
   }
+  const repsDoneBtn = document.getElementById('fb-reps-done');
+  if (repsDoneBtn) repsDoneBtn.hidden = !working;
   updateFbUpcomingUI();
   updateFbProgressUI();
 }
