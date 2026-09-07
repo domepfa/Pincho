@@ -568,6 +568,52 @@ function renderLogExerciseRows() {
    FINGERBOARD
    ================================================================= */
 let fbQuickstartOpen = false; // Schnelltraining-Karten sind standardmässig eingeklappt
+let fbImportOpen = false; // JSON-Import-Panel ist standardmässig eingeklappt
+
+/* Ablauf aus JSON importieren — z. B. von einer anderen KI generiert (siehe
+   Vorlagen-Dokument). Alles-oder-nichts: bei auch nur einem ungültigen Satz
+   wird NICHTS übernommen und stattdessen die genaue Fehlerliste gezeigt —
+   lieber klar nachfragen/korrigieren lassen, als eine kaputte Zeile still
+   zu überspringen oder mit einem Rateweg zu füllen. */
+function parseImportedAblauf(text) {
+  let raw;
+  try { raw = JSON.parse(text); } catch (e) { return { errors: ['Ungültiges JSON: ' + e.message] }; }
+  if (!Array.isArray(raw)) return { errors: ['Erwartet ein JSON-Array von Sätzen, z. B. [ {...}, {...} ].'] };
+  if (!raw.length) return { errors: ['Das Array ist leer.'] };
+
+  const errors = [];
+  const blocks = [];
+  raw.forEach((b, i) => {
+    const n = i + 1;
+    if (!b || typeof b !== 'object' || Array.isArray(b)) { errors.push(`Satz ${n}: kein Objekt.`); return; }
+    if (b.type === 'hang') {
+      const board = BOARDS[b.board];
+      if (!board) { errors.push(`Satz ${n}: unbekanntes board "${b.board}" (erlaubt: bm1000, bm2000).`); return; }
+      if (!board.grips.some((g) => g.id === b.grip)) { errors.push(`Satz ${n}: unbekannter grip "${b.grip}" für ${b.board}.`); return; }
+      const reps = Number(b.reps);
+      const hangSec = Number(b.hangSec);
+      const restSec = Number(b.restSec);
+      if (!(reps > 0)) { errors.push(`Satz ${n}: reps muss eine Zahl > 0 sein.`); return; }
+      if (!(hangSec > 0)) { errors.push(`Satz ${n}: hangSec muss eine Zahl > 0 sein.`); return; }
+      if (!(restSec >= 0)) { errors.push(`Satz ${n}: restSec muss eine Zahl >= 0 sein.`); return; }
+      blocks.push({ type: 'hang', board: b.board, grip: b.grip, reps, hangSec, restSec });
+    } else if (b.type === 'exercise') {
+      if (!EXERCISE_LIBRARY.some((e) => e.id === b.exerciseId)) { errors.push(`Satz ${n}: unbekannte exerciseId "${b.exerciseId}".`); return; }
+      const reps = Number(b.reps);
+      const workSec = Number(b.workSec != null ? b.workSec : 40);
+      const restSec = Number(b.restSec != null ? b.restSec : 0);
+      if (!(reps > 0)) { errors.push(`Satz ${n}: reps muss eine Zahl > 0 sein.`); return; }
+      if (!(workSec > 0)) { errors.push(`Satz ${n}: workSec muss eine Zahl > 0 sein.`); return; }
+      if (!(restSec >= 0)) { errors.push(`Satz ${n}: restSec muss eine Zahl >= 0 sein.`); return; }
+      blocks.push({ type: 'exercise', exerciseId: b.exerciseId, reps, workSec, restSec });
+    } else {
+      errors.push(`Satz ${n}: "type" muss "hang" oder "exercise" sein (war "${b.type}").`);
+    }
+  });
+
+  if (errors.length) return { errors };
+  return { blocks };
+}
 
 const fb = {
   board: null,
@@ -769,6 +815,19 @@ async function renderFingerboard() {
       <button type="button" class="chip" id="fb-new-ablauf">Neuen, leeren Ablauf beginnen</button>
     </div>
 
+    <div class="sec-head" id="fb-import-toggle" style="cursor:pointer;margin-top:0;">
+      <h2 class="sec-title" style="font-size:15px;">Ablauf aus JSON importieren</h2><div class="sec-rule"></div>
+      <span class="sec-chevron" id="fb-import-chevron">${fbImportOpen ? '▾' : '▸'}</span>
+    </div>
+    <div id="fb-import-panel" ${fbImportOpen ? '' : 'hidden'} style="margin-bottom:16px;">
+      <div class="field">
+        <label>JSON einfügen</label>
+        <textarea id="fb-import-textarea" rows="6" placeholder='[{"type":"exercise","exerciseId":"face_pull","reps":15,"workSec":40,"restSec":30}]'></textarea>
+      </div>
+      <button type="button" class="btn small" id="fb-import-btn">Importieren</button>
+      <p class="login-hint" id="fb-import-status" style="margin-top:8px;white-space:pre-line;"></p>
+    </div>
+
     <div id="fb-blocks-list"></div>
 
     <div id="fb-runtime"></div>
@@ -798,6 +857,30 @@ async function renderFingerboard() {
     const picker = document.getElementById('fb-template-picker');
     if (picker) picker.value = '';
     renderFbBlocksList();
+  };
+
+  document.getElementById('fb-import-toggle').onclick = () => {
+    fbImportOpen = !fbImportOpen;
+    document.getElementById('fb-import-panel').hidden = !fbImportOpen;
+    document.getElementById('fb-import-chevron').textContent = fbImportOpen ? '▾' : '▸';
+  };
+  document.getElementById('fb-import-btn').onclick = () => {
+    const text = document.getElementById('fb-import-textarea').value.trim();
+    const statusEl = document.getElementById('fb-import-status');
+    if (!text) { statusEl.textContent = 'Erst JSON einfügen.'; statusEl.style.color = 'var(--danger)'; return; }
+    const result = parseImportedAblauf(text);
+    if (result.errors) {
+      statusEl.textContent = result.errors.join('\n');
+      statusEl.style.color = 'var(--danger)';
+      return;
+    }
+    if (fb.blocks.length && !confirm(`${result.blocks.length} Sätze importieren und aktuellen Ablauf ersetzen?`)) return;
+    fb.blocks = result.blocks;
+    const picker = document.getElementById('fb-template-picker');
+    if (picker) picker.value = '';
+    renderFbBlocksList();
+    statusEl.textContent = `${result.blocks.length} Sätze importiert.`;
+    statusEl.style.color = 'var(--accent)';
   };
 
   wireFbTemplatePicker();
