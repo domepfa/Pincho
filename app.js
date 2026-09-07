@@ -172,10 +172,27 @@ function renderShell(contentHtml) {
     <div class="shell">${contentHtml}</div>
     <nav class="bottomnav">
       ${NAV_ITEMS.map((n) => `<a href="#${n.route}" class="${state.route === n.route ? 'active' : ''}">${n.label}</a>`).join('')}
+      <span class="nav-indicator" id="nav-indicator"></span>
     </nav>
   `;
   document.getElementById('logout-btn').onclick = logout;
+  positionNavIndicator();
 }
+
+/* Schiebt die kleine Leuchtleiste unter dem aktiven Tab an die richtige
+   Stelle — per JS statt reinem CSS, weil die Tab-Breiten durch die
+   Textlänge variieren (flex:1 macht sie zwar gleich breit, aber nur zur
+   Laufzeit messbar). Ein zweiter Aufruf nach Resize hält es bei
+   Bildschirmdrehung synchron. */
+function positionNavIndicator() {
+  const nav = document.querySelector('.bottomnav');
+  const active = nav && nav.querySelector('a.active');
+  const indicator = document.getElementById('nav-indicator');
+  if (!nav || !active || !indicator) return;
+  indicator.style.left = active.offsetLeft + 'px';
+  indicator.style.width = active.offsetWidth + 'px';
+}
+window.addEventListener('resize', positionNavIndicator);
 
 function render() {
   if (!state.member) { boot(); return; }
@@ -530,12 +547,12 @@ function renderFbQuickstart() {
     holder.innerHTML = '<div class="list-empty">Noch keine Vorlagen — unten selbst einen Ablauf bauen und speichern.</div>';
     return;
   }
-  holder.innerHTML = all.map((t) => {
+  holder.innerHTML = all.map((t, i) => {
     const totalSec = t.blocks.reduce((total, b) => (b.type === 'hang'
       ? total + buildSequence('custom', { hangSec: b.hangSec, restSec: b.restSec, sets: b.reps }).reduce((s, p) => s + p.seconds, 0)
       : total + 40 + (b.restSec || 0)), 0);
     return `
-      <div class="qs-card">
+      <div class="qs-card anim-in" style="animation-delay:${i * 55}ms">
         <div class="qs-top">
           <div class="qs-name">${esc(t.name)}</div>
           ${t.custom ? '<span class="qs-badge">Eigene</span>' : ''}
@@ -1353,7 +1370,7 @@ function renderFbBlocksList() {
         <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec || 0}" class="ex-row-input" title="Pause danach (s)">
       `;
     return `
-      <div class="timeline-item">
+      <div class="timeline-item anim-in" style="animation-delay:${Math.min(i, 14) * 30}ms">
         <div class="timeline-badge ${isHang ? '' : 'exercise'}">${i + 1}</div>
         <div class="timeline-card">
           ${thumb}
@@ -1656,6 +1673,29 @@ function renderFbOverlay() {
   updateFbProgressUI();
 }
 
+/* Kleiner Konfetti-Regen für den "Ablauf geschafft"-Screen — reines CSS/
+   DOM, kein Canvas/Library nötig. Respektiert prefers-reduced-motion
+   (Browser ignoriert die Animation dann per CSS, hier nur zusätzlich
+   gar nicht erst erzeugen, um unnötige DOM-Arbeit zu sparen). */
+function spawnConfetti(container) {
+  if (!container || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = [getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(), '#ff6b47', '#ffffff', '#4fc3ff'];
+  for (let i = 0; i < 26; i++) {
+    const piece = document.createElement('span');
+    piece.className = 'confetti-piece';
+    const left = Math.random() * 100;
+    const delay = Math.random() * 0.3;
+    const duration = 1.6 + Math.random() * 1.2;
+    const spin = (Math.random() > 0.5 ? 1 : -1) * (360 + Math.random() * 360);
+    piece.style.left = left + '%';
+    piece.style.background = colors[i % colors.length];
+    piece.style.animationDelay = delay + 's';
+    piece.style.animationDuration = duration + 's';
+    piece.style.setProperty('--spin', spin + 'deg');
+    container.appendChild(piece);
+  }
+}
+
 function beep(freq, duration) {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -1781,10 +1821,12 @@ async function finishAblauf() {
     <div class="fb-overlay-inner fb-overlay-done">
       <div class="fb-done-emoji">🎉</div>
       <div class="fb-stage-title">Ablauf geschafft!</div>
+      <div class="fb-stage-sub mono">${fb.blocks.length} Sätze · ${fmtMinSec(fbEstimateSeconds())} Trainingszeit</div>
       <button class="btn fb-stage-btn" id="fb-overlay-finish">Schliessen</button>
     </div>
   `;
   document.getElementById('fb-overlay-finish').onclick = () => { closeFbOverlay(); renderFbRuntime(); };
+  spawnConfetti(document.querySelector('.fb-overlay-done'));
 
   const session = {
     date: todayKey(),
