@@ -185,12 +185,20 @@ const EXERCISE_LIBRARY = [
   { id: 'ext_rotation', name: 'Aussenrotation Kabel', category: 'antagonist', pauseFriendly: true },
   { id: 'wrist_ext', name: 'Reverse Wrist Curls', category: 'antagonist', pauseFriendly: true },
   { id: 'y_t_w', name: 'Y-T-W-Raises', category: 'antagonist', pauseFriendly: true },
+  { id: 'scapula_pull', name: 'Scapula Pulls', category: 'antagonist', pauseFriendly: true },
+  { id: 'band_pull_apart', name: 'Band Pull-Apart', category: 'antagonist', pauseFriendly: true },
   // Rumpf
   { id: 'pallof', name: 'Pallof Press', category: 'rumpf', pauseFriendly: true },
   { id: 'crunches', name: 'Crunches', category: 'rumpf', pauseFriendly: true },
   { id: 'hanging_leg_raise', name: 'Hanging Leg Raise', category: 'rumpf', pauseFriendly: true },
   { id: 'front_lever_prog', name: 'Front-Lever-Progression', category: 'rumpf', pauseFriendly: true },
   { id: 'toes_to_bar', name: 'Toes-to-Bar', category: 'rumpf', pauseFriendly: true },
+  { id: 'plank', name: 'Unterarmstütz (Plank)', category: 'rumpf', pauseFriendly: true },
+  { id: 'side_plank', name: 'Seitstütz', category: 'rumpf', pauseFriendly: true },
+  { id: 'russian_twist', name: 'Russian Twist', category: 'rumpf', pauseFriendly: true },
+  { id: 'hollow_hold', name: 'Hollow Body Hold', category: 'rumpf', pauseFriendly: true },
+  { id: 'superman', name: 'Superman', category: 'rumpf', pauseFriendly: true },
+  { id: 'bird_dog', name: 'Bird Dog', category: 'rumpf', pauseFriendly: true },
   // Push
   { id: 'push_up', name: 'Liegestütz', category: 'push', pauseFriendly: true },
   { id: 'bench_press', name: 'Bankdrücken', category: 'push' },
@@ -200,6 +208,9 @@ const EXERCISE_LIBRARY = [
   { id: 'squat', name: 'Kniebeuge', category: 'beine' },
   { id: 'deadlift', name: 'Kreuzheben', category: 'beine' },
   { id: 'split_squat', name: 'Bulgarian Split Squat', category: 'beine', pauseFriendly: true },
+  { id: 'calf_raise', name: 'Wadenheben', category: 'beine', pauseFriendly: true },
+  { id: 'wall_sit', name: 'Wall Sit', category: 'beine', pauseFriendly: true },
+  { id: 'glute_bridge', name: 'Glute Bridge', category: 'beine', pauseFriendly: true },
 ];
 
 const ACCESSORY_EXERCISES = EXERCISE_LIBRARY.filter((e) => e.pauseFriendly);
