@@ -431,6 +431,9 @@ async function renderFingerboard() {
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Fingerboard</h2><div class="sec-rule"></div></div>
 
+    <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Schnelltraining</h2><div class="sec-rule"></div></div>
+    <div class="quickstart-grid" id="fb-quickstart"></div>
+
     <div class="chip-row" id="fb-board-toggle">
       <button class="chip ${fb.board === 'bm1000' ? 'active' : ''}" data-board="bm1000">BM 1000</button>
       <button class="chip ${fb.board === 'bm2000' ? 'active' : ''}" data-board="bm2000">BM 2000</button>
@@ -478,6 +481,7 @@ async function renderFingerboard() {
   `);
 
   renderFbBlocksList(); // rendert am Ende auch renderFbRuntime() mit
+  renderFbQuickstart();
   wireCalibration();
 
   document.getElementById('fb-board-toggle').querySelectorAll('.chip').forEach((btn) => {
@@ -510,7 +514,49 @@ async function renderFingerboard() {
 
   wireFbTemplatePicker();
   loadFbTemplates().then(() => {
-    if (state.route === 'fingerboard') refreshFbTemplateOptions();
+    if (state.route === 'fingerboard') { refreshFbTemplateOptions(); renderFbQuickstart(); }
+  });
+}
+
+/* Ein Tap auf "Los" lädt die Vorlage UND startet den Ablauf sofort —
+   kein Umweg über "in den Builder laden, runterscrollen, ABLAUF STARTEN
+   antippen". Zeigt fest eingebaute (FINGERBOARD_TEMPLATES) und eigene,
+   in Firebase gespeicherte (fb.templates) Abläufe zusammen als Karten. */
+function renderFbQuickstart() {
+  const holder = document.getElementById('fb-quickstart');
+  if (!holder) return;
+  const all = [...FINGERBOARD_TEMPLATES, ...fb.templates];
+  if (!all.length) {
+    holder.innerHTML = '<div class="list-empty">Noch keine Vorlagen — unten selbst einen Ablauf bauen und speichern.</div>';
+    return;
+  }
+  holder.innerHTML = all.map((t) => {
+    const totalSec = t.blocks.reduce((total, b) => (b.type === 'hang'
+      ? total + buildSequence('custom', { hangSec: b.hangSec, restSec: b.restSec, sets: b.reps }).reduce((s, p) => s + p.seconds, 0)
+      : total + 40 + (b.restSec || 0)), 0);
+    return `
+      <div class="qs-card">
+        <div class="qs-top">
+          <div class="qs-name">${esc(t.name)}</div>
+          ${t.custom ? '<span class="qs-badge">Eigene</span>' : ''}
+        </div>
+        ${t.note ? `<div class="qs-note">${esc(t.note)}</div>` : ''}
+        <div class="qs-meta mono">${t.blocks.length} Sätze · ~${fmtMinSec(totalSec)}</div>
+        <button type="button" class="btn qs-start" data-tpl="${t.id}">Los</button>
+      </div>
+    `;
+  }).join('');
+  holder.querySelectorAll('.qs-start').forEach((btn) => {
+    btn.onclick = () => {
+      const t = FINGERBOARD_TEMPLATES.find((r) => r.id === btn.dataset.tpl) || fb.templates.find((r) => r.id === btn.dataset.tpl);
+      if (!t) return;
+      if (fb.blocks.length && !confirm('Aktuellen Ablauf durch "' + t.name + '" ersetzen und sofort starten?')) return;
+      fb.blocks = t.blocks.map((b) => (b.type === 'hang' ? { ...b, board: fb.board } : { ...b }));
+      renderFbBlocksList();
+      startAblauf();
+      const runtime = document.getElementById('fb-runtime');
+      if (runtime) runtime.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
   });
 }
 
