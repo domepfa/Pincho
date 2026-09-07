@@ -211,6 +211,17 @@ const EXERCISE_LIBRARY = [
   { id: 'calf_raise', name: 'Wadenheben', category: 'beine', pauseFriendly: true },
   { id: 'wall_sit', name: 'Wall Sit', category: 'beine', pauseFriendly: true },
   { id: 'glute_bridge', name: 'Glute Bridge', category: 'beine', pauseFriendly: true },
+  // Mobilität
+  { id: 'cat_cow', name: 'Katze-Kuh', category: 'mobility', pauseFriendly: true },
+  { id: 'worlds_greatest_stretch', name: "World's Greatest Stretch", category: 'mobility', pauseFriendly: true },
+  { id: 'hip_9090', name: 'Hüftwechsel 90/90', category: 'mobility', pauseFriendly: true },
+  { id: 'thoracic_rotation', name: 'BWS-Rotation (Thread the Needle)', category: 'mobility', pauseFriendly: true },
+  { id: 'shoulder_circles_band', name: 'Schulterkreisen mit Band', category: 'mobility', pauseFriendly: true },
+  { id: 'wrist_mobility', name: 'Handgelenk-Mobilisation', category: 'mobility', pauseFriendly: true },
+  { id: 'leg_swings', name: 'Beinschwingen', category: 'mobility', pauseFriendly: true },
+  { id: 'ankle_rocks', name: 'Sprunggelenk-Mobilisation', category: 'mobility', pauseFriendly: true },
+  { id: 'neck_mobility', name: 'Nacken-Mobilisation', category: 'mobility', pauseFriendly: true },
+  { id: 'doorway_pec_stretch', name: 'Türrahmen-Dehnung Brust', category: 'mobility', pauseFriendly: true },
 ];
 
 const ACCESSORY_EXERCISES = EXERCISE_LIBRARY.filter((e) => e.pauseFriendly);
@@ -221,6 +232,7 @@ const EXERCISE_CATEGORY_LABEL = {
   push: 'Push',
   beine: 'Beine',
   rumpf: 'Rumpf',
+  mobility: 'Mobilität',
 };
 
 function exerciseName(id) {
