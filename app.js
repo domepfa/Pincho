@@ -443,7 +443,7 @@ async function renderFingerboard() {
     <p class="login-hint" style="margin:-6px 0 4px;">${fb.selectedGrip ? 'Gewählt: ' + esc(gripLabel(fb.board, fb.selectedGrip)) : 'Griff am Board antippen, um ihn für einen neuen Hang-Satz zu wählen.'}</p>
     <p class="mono" id="fb-calib-readout" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:0 0 10px;min-height:14px;"></p>
     <div class="chip-row" id="fb-grip-legend" style="margin-bottom:16px;">
-      ${BOARDS[fb.board].grips.map((g) => `<button type="button" class="chip ${fb.selectedGrip === g.id ? 'active' : ''}" data-grip="${g.id}">${esc(g.label)}${g.note ? ' · ' + esc(g.note) : ''}</button>`).join('')}
+      ${BOARDS[fb.board].grips.map((g) => `<button type="button" class="chip ${fb.selectedGrip === g.id ? 'active' : ''}" data-grip="${g.id}">${esc(g.label)}${g.note ? ' · ' + esc(g.note) : ''}${gripArmNote(fb.board, g.id) ? ' · ' + gripArmNote(fb.board, g.id) : ''}</button>`).join('')}
     </div>
 
     <div class="field"><label>Zusatzgewicht für diese Session (kg, negativ = Assistenz)</label><input type="number" id="fb-weight" value="${fb.weight}" step="0.5"></div>
@@ -1515,6 +1515,63 @@ function updateFbUpcomingUI() {
   if (el) el.textContent = 'Danach: ' + fbUpcomingLabel();
 }
 
+/* ---------- Transport-Leiste (Zurück / Play-Pause / Weiter) ----------
+   Zurück/Weiter springen immer zwischen "awaitingNext"-Haltepunkten hin
+   und her (unabhängig vom aktuellen Zustand) — einfaches, konsistentes
+   Modell statt Sonderfällen pro Block-Typ. Play/Pause pausiert nur einen
+   laufenden Hang-Timer (bei Übungs-Sätzen gibt es ohnehin keinen Timer,
+   dafür FERTIG). */
+function fbTransportRow() {
+  const block = fb.blocks[fb.blockIndex];
+  const canPause = fb.running && block && block.type === 'hang';
+  const isPaused = canPause && !fb.intervalId;
+  return `
+    <div class="fb-transport">
+      <button type="button" class="fb-transport-btn" id="fb-prev" ${fb.blockIndex === 0 ? 'disabled' : ''} title="Zurück">⏮</button>
+      <button type="button" class="fb-transport-btn" id="fb-playpause" ${canPause ? '' : 'disabled'} title="${isPaused ? 'Weiter' : 'Pause'}">${isPaused ? '▶' : '⏸'}</button>
+      <button type="button" class="fb-transport-btn" id="fb-skip" title="Diesen Satz überspringen">⏭</button>
+    </div>
+  `;
+}
+
+function fbGoBack() {
+  clearInterval(fb.intervalId);
+  fb.intervalId = null;
+  releaseWakeLock();
+  fb.running = false;
+  fb.blockIndex = Math.max(0, fb.blockIndex - 1);
+  fb.awaitingNext = true;
+  renderFbOverlay();
+}
+
+function fbSkipForward() {
+  clearInterval(fb.intervalId);
+  fb.intervalId = null;
+  releaseWakeLock();
+  fb.running = false;
+  fb.blockIndex++;
+  if (fb.blockIndex >= fb.blocks.length) {
+    finishAblauf();
+  } else {
+    fb.awaitingNext = true;
+    renderFbOverlay();
+  }
+}
+
+function fbTogglePause() {
+  const block = fb.blocks[fb.blockIndex];
+  if (!fb.running || !block || block.type !== 'hang') return;
+  if (fb.intervalId) {
+    clearInterval(fb.intervalId);
+    fb.intervalId = null;
+    releaseWakeLock();
+  } else {
+    requestWakeLock();
+    fb.intervalId = setInterval(tickBlock, 1000);
+  }
+  renderFbOverlay();
+}
+
 function renderFbOverlay() {
   const el = ensureFbOverlay();
   if (!fb.running && !fb.awaitingNext) { closeFbOverlay(); return; }
@@ -1524,11 +1581,13 @@ function renderFbOverlay() {
     const next = fb.blocks[fb.blockIndex];
     if (!next) { closeFbOverlay(); return; }
     const isHang = next.type === 'hang';
+    const nextArmNote = isHang ? gripArmNote(next.board, next.grip) : '';
     stage = `
       <div class="fb-stage-label mono">NÄCHSTER SATZ (${fb.blockIndex + 1}/${fb.blocks.length})</div>
       <div class="fb-stage-figure">${isHang ? miniBoardThumb(next.board, next.grip) : exerciseFigureSvg(next.exerciseId)}</div>
       <div class="fb-stage-title">${isHang ? 'Hang @ ' + esc(gripLabel(next.board, next.grip)) : esc(exerciseName(next.exerciseId))}</div>
-      <div class="fb-stage-sub mono">${esc(fbBlockSub(next))}</div>
+      <div class="fb-stage-sub mono">${esc(fbBlockSub(next))}${nextArmNote ? ' · ' + nextArmNote : ''}</div>
+      ${fbTransportRow()}
       <button class="btn fb-stage-btn" id="fb-continue">LOS</button>
     `;
   } else {
@@ -1539,10 +1598,12 @@ function renderFbOverlay() {
       const phaseTotal = step ? step.seconds : 1;
       const frac = phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 0;
       const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
+      const armNote = gripArmNote(block.board, block.grip);
+      const isPausedNow = !fb.intervalId;
       stage = `
-        <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${esc(gripLabel(block.board, block.grip))}</div>
+        <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${esc(gripLabel(block.board, block.grip))}${armNote ? ' · ' + armNote : ''}</div>
         <div class="fb-stage-figure">${miniBoardThumb(block.board, block.grip)}</div>
-        <div class="fb-hang-visual">
+        <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
           <div class="fb-phase-figure" id="fb-phase-figure" data-kind="${isHangPhase ? 'hang' : 'rest'}">${isHangPhase ? FB_HANG_FIGURE_SVG : FB_REST_FIGURE_SVG}</div>
           <div class="fb-timer-ring">
             <svg viewBox="0 0 120 120">
@@ -1552,8 +1613,9 @@ function renderFbOverlay() {
             <div class="big ${isHangPhase ? '' : 'rest'}" id="fb-big">${pad2(fb.secondsLeft)}</div>
           </div>
         </div>
-        <div class="phase mono" id="fb-phase">${step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : ''}</div>
+        <div class="phase mono" id="fb-phase">${step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}${isPausedNow ? ' · PAUSIERT' : ''}` : ''}</div>
         <div class="fb-stage-next mono" id="fb-upcoming"></div>
+        ${fbTransportRow()}
         <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
       `;
     } else {
@@ -1563,6 +1625,7 @@ function renderFbOverlay() {
         <div class="fb-stage-title">${esc(exerciseName(block.exerciseId))} × ${esc(String(block.reps))}</div>
         ${block.restSec ? `<div class="fb-stage-sub mono">danach ~${block.restSec}s Pause</div>` : ''}
         <div class="fb-stage-next mono" id="fb-upcoming"></div>
+        ${fbTransportRow()}
         <button class="btn fb-stage-btn" id="fb-exercise-done">FERTIG</button>
         <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
       `;
@@ -1578,6 +1641,10 @@ function renderFbOverlay() {
   `;
 
   document.getElementById('fb-overlay-close').onclick = cancelAblauf;
+  document.getElementById('fb-prev').onclick = fbGoBack;
+  document.getElementById('fb-skip').onclick = fbSkipForward;
+  const ppBtn = document.getElementById('fb-playpause');
+  if (ppBtn && !ppBtn.disabled) ppBtn.onclick = fbTogglePause;
   if (fb.awaitingNext) {
     document.getElementById('fb-continue').onclick = startCurrentBlock;
   } else {

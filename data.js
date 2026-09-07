@@ -123,6 +123,19 @@ function gripInfo(boardId, gripId) {
   return board && board.grips.find((g) => g.id === gripId);
 }
 
+/* Ein Loch pro Griff = einarmig (schwerer, nur eine Hand passt dort hin),
+   zwei gespiegelte Löcher = beidarmig (leichter, eine Hand pro Seite).
+   Rein aus den kalibrierten hotspots abgeleitet, nie fest hinterlegt —
+   bleibt so automatisch korrekt, wenn hotspots neu kalibriert werden. */
+function gripArmNote(boardId, gripId) {
+  const board = BOARDS[boardId];
+  if (!board) return '';
+  const count = board.hotspots.filter((h) => h.grip === gripId).length;
+  if (count >= 2) return 'beidarmig';
+  if (count === 1) return 'einarmig';
+  return '';
+}
+
 /* ---------- Fingerboard-Protokolle ---------- */
 const PROTOCOLS = {
   max_hang: {
