@@ -583,6 +583,7 @@ async function renderFingerboard() {
     </div>
     <div class="chip-row" style="margin-bottom:16px;">
       <button type="button" class="chip" id="fb-template-save">Aktuellen Ablauf als Vorlage speichern</button>
+      <button type="button" class="chip" id="fb-new-ablauf">Neuen, leeren Ablauf beginnen</button>
     </div>
 
     <div id="fb-blocks-list"></div>
@@ -602,6 +603,13 @@ async function renderFingerboard() {
     };
   });
   document.getElementById('fb-weight').oninput = (e) => { fb.weight = e.target.value; };
+  document.getElementById('fb-new-ablauf').onclick = () => {
+    if (fb.blocks.length && !confirm('Aktuellen Ablauf verwerfen und ganz neu (leer) beginnen?')) return;
+    fb.blocks = [];
+    const picker = document.getElementById('fb-template-picker');
+    if (picker) picker.value = '';
+    renderFbBlocksList();
+  };
 
   wireFbTemplatePicker();
   loadFbTemplates().then(() => {
