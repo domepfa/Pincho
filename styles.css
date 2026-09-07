@@ -195,6 +195,17 @@ button, input, select, textarea { font-family: inherit; }
 .ex-row-remove { flex-shrink: 0; background: none; border: 1px solid var(--line); color: var(--ink-faint); width: 26px; height: 26px; cursor: pointer; }
 .ex-row-step { flex-shrink: 0; background: none; border: 1px solid var(--accent); color: var(--accent); width: 22px; height: 22px; line-height: 1; cursor: pointer; font-size: 13px; }
 
+/* ---------- Log: Freestyle (Übung wählen, Satz für Satz erfassen) ---------- */
+.fs-active-card { background: var(--surface-2); border: 1px solid var(--line); padding: 12px; margin-bottom: 14px; }
+.fs-active-name { font-family: 'Bebas Neue', sans-serif; font-size: 19px; letter-spacing: .02em; }
+.fs-last-value { font-size: 11.5px; color: var(--accent); margin: 2px 0 10px; }
+.fs-group { border: 1px solid var(--line); padding: 8px 10px; margin-bottom: 8px; }
+.fs-group.active { border-color: var(--accent); }
+.fs-group-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--ink); margin-bottom: 4px; }
+.fs-set-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-dim); padding: 3px 0; }
+.fs-set-row span:first-child { flex: 0 0 52px; color: var(--ink-faint); }
+.fs-set-row span:nth-child(2) { flex: 1; color: var(--ink); }
+
 /* ---------- Fingerboard: Schnelltraining ---------- */
 .quickstart-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
 .qs-card { border: 1px solid var(--line); background: var(--surface); padding: 14px; transition: border-color .18s, transform .18s; }
