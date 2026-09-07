@@ -375,7 +375,8 @@ function renderLogExerciseRows() {
 const fb = {
   board: null,
   selectedGrip: null,   // am grafischen Board gewählter Griff, fürs Hinzufügen eines Hang-Satzes
-  blocks: [],            // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec} | {type:'exercise', exerciseId, reps}
+  blocks: [],            // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec} | {type:'exercise', exerciseId, reps, restSec}
+  templates: [],         // eigene, in Firebase gespeicherte Abläufe (zusätzlich zu FINGERBOARD_TEMPLATES)
   weight: '',
   blockIndex: 0,
   running: false,
@@ -445,6 +446,18 @@ async function renderFingerboard() {
     <div class="field"><label>Zusatzgewicht für diese Session (kg, negativ = Assistenz)</label><input type="number" id="fb-weight" value="${fb.weight}" step="0.5"></div>
 
     <div class="sec-head"><h2 class="sec-title">Ablauf</h2><div class="sec-rule"></div></div>
+
+    <div class="field">
+      <label>Vorlage laden</label>
+      <div class="field-row">
+        <select id="fb-template-picker" style="flex:2;"></select>
+        <button type="button" class="btn small ghost" id="fb-template-delete" style="flex:0 0 auto;" title="Eigene Vorlage löschen">🗑</button>
+      </div>
+    </div>
+    <div class="chip-row" style="margin-bottom:16px;">
+      <button type="button" class="chip" id="fb-template-save">Aktuellen Ablauf als Vorlage speichern</button>
+    </div>
+
     <div id="fb-blocks-list"></div>
 
     <div class="chip-row">
@@ -491,21 +504,86 @@ async function renderFingerboard() {
   };
   document.getElementById('fb-add-exercise').onclick = () => {
     const exerciseId = document.getElementById('fb-exercise-picker').value;
-    fb.blocks.push({ type: 'exercise', exerciseId, reps: 15 });
+    fb.blocks.push({ type: 'exercise', exerciseId, reps: 15, restSec: 30 });
     renderFbBlocksList();
+  };
+
+  wireFbTemplatePicker();
+  loadFbTemplates().then(() => {
+    if (state.route === 'fingerboard') refreshFbTemplateOptions();
+  });
+}
+
+/* ---------- Fingerboard-Vorlagen (laden/speichern) ----------
+   FINGERBOARD_TEMPLATES (data.js) sind feste, mitgelieferte Abläufe;
+   fb.templates sind eigene, in Firebase gespeicherte — beide landen in
+   derselben Auswahl. Ids eigener Vorlagen sind ihre Firebase-Push-Keys,
+   fest eingebaute behalten ihre id aus data.js. */
+async function loadFbTemplates() {
+  const raw = await fbGet(`fingerboardTemplates/${state.member.id}`);
+  fb.templates = raw ? Object.entries(raw).map(([key, t]) => ({ ...t, id: key, custom: true })) : [];
+}
+
+function refreshFbTemplateOptions() {
+  const select = document.getElementById('fb-template-picker');
+  if (!select) return;
+  select.innerHTML = `
+    <option value="">— eigener Ablauf —</option>
+    ${FINGERBOARD_TEMPLATES.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
+    ${fb.templates.length ? `<optgroup label="Eigene Vorlagen">
+      ${fb.templates.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
+    </optgroup>` : ''}
+  `;
+}
+
+function wireFbTemplatePicker() {
+  refreshFbTemplateOptions();
+  document.getElementById('fb-template-picker').onchange = (e) => {
+    const id = e.target.value;
+    const t = FINGERBOARD_TEMPLATES.find((r) => r.id === id) || fb.templates.find((r) => r.id === id);
+    if (!t) return;
+    if (fb.blocks.length && !confirm('Aktuellen Ablauf durch "' + t.name + '" ersetzen?')) {
+      e.target.value = '';
+      return;
+    }
+    fb.blocks = t.blocks.map((b) => (b.type === 'hang' ? { ...b, board: fb.board } : { ...b }));
+    renderFbBlocksList();
+  };
+  document.getElementById('fb-template-save').onclick = async () => {
+    if (!fb.blocks.length) { toast('Erst einen Ablauf zusammenstellen.', 'err'); return; }
+    const name = prompt('Name für diese Vorlage:');
+    if (!name) return;
+    const key = await fbPush(`fingerboardTemplates/${state.member.id}`, { name, blocks: fb.blocks, createdAt: Date.now() });
+    if (!key) { toast('Speichern fehlgeschlagen.', 'err'); return; }
+    await loadFbTemplates();
+    refreshFbTemplateOptions();
+    document.getElementById('fb-template-picker').value = key;
+    toast('Vorlage gespeichert.', 'ok');
+  };
+  document.getElementById('fb-template-delete').onclick = async () => {
+    const select = document.getElementById('fb-template-picker');
+    const t = fb.templates.find((r) => r.id === select.value);
+    if (!t) { toast('Nur eigene Vorlagen lassen sich löschen.', 'err'); return; }
+    if (!confirm('Vorlage "' + t.name + '" löschen?')) return;
+    await fbDelete(`fingerboardTemplates/${state.member.id}/${t.id}`);
+    await loadFbTemplates();
+    refreshFbTemplateOptions();
+    toast('Vorlage gelöscht.', 'ok');
   };
 }
 
 /* Geschätzte Gesamtdauer des Ablaufs in Sekunden. Hang-Sätze werden aus der
    echten Phasenliste berechnet, Übungs-Sätze (kein fester Timer) grob mit
-   40s pro Satz veranschlagt. */
+   40s Ausführung + optionaler Pause danach (b.restSec) veranschlagt — so
+   lässt sich z. B. eine bewusste 2:30-Pause zwischen Max-Hang-Sätzen (mit
+   einer Übung dazwischen statt komplett passiv) korrekt einrechnen. */
 function fbEstimateSeconds() {
   return fb.blocks.reduce((total, b) => {
     if (b.type === 'hang') {
       const seq = buildSequence('custom', { hangSec: b.hangSec, restSec: b.restSec, sets: b.reps });
       return total + seq.reduce((s, p) => s + p.seconds, 0);
     }
-    return total + 40;
+    return total + 40 + (b.restSec || 0);
   }, 0);
 }
 function fmtMinSec(totalSec) {
@@ -522,9 +600,8 @@ function miniBoardThumb(boardId, gripId) {
 }
 
 function fbBlockSub(b) {
-  return b.type === 'hang'
-    ? `${b.hangSec}s Hang · ${b.restSec}s Pause · ×${b.reps}`
-    : `× ${b.reps} Wiederholungen`;
+  if (b.type === 'hang') return `${b.hangSec}s Hang · ${b.restSec}s Pause · ×${b.reps}`;
+  return `× ${b.reps} Wiederholungen${b.restSec ? ' · ' + b.restSec + 's Pause danach' : ''}`;
 }
 
 function renderFbBlocksList() {
@@ -553,7 +630,10 @@ function renderFbBlocksList() {
         <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzliche Wiederholung">+</button>
         <input type="number" data-i="${i}" data-f="hangSec" value="${b.hangSec}" class="ex-row-input" title="Hang (s)">
         <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec}" class="ex-row-input" title="Pause (s)">
-      ` : `<input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">`;
+      ` : `
+        <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">
+        <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec || 0}" class="ex-row-input" title="Pause danach (s)">
+      `;
     return `
       <div class="timeline-item">
         <div class="timeline-badge ${isHang ? '' : 'exercise'}">${i + 1}</div>

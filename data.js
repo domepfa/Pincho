@@ -277,6 +277,76 @@ const ROUTINE_TEMPLATES = [
   },
 ];
 
+/* ---------- Fingerboard-Ablauf-Vorlagen ----------
+   Vorgefertigte Abläufe (Hang- + Übungs-Sätze), die im Fingerboard-Tab
+   geladen werden können — siehe ROUTINE_TEMPLATES oben fürs Log-Pendant.
+   `grip` verwendet bewusst nur Kategorien, die auf BEIDEN Boards existieren
+   (siehe getSharedGripIds() in app.js), damit die Vorlage unabhängig vom
+   eigenen Board funktioniert; `board` fehlt hier deshalb absichtlich und
+   wird beim Laden auf das aktuell gewählte Board des Mitglieds gesetzt.
+   Exercise-Sätze tragen zusätzlich `restSec` (Pause NACH der Übung, bevor
+   der nächste Satz startet) — bei Hang-Sätzen mit nur 1 Wiederholung dient
+   das Timing zwischen den Sätzen als aktive Pause (siehe fbEstimateSeconds
+   in app.js). */
+const FINGERBOARD_TEMPLATES = [
+  {
+    id: 'advanced_45min_flow',
+    name: '45-Min Kraft-Flow (Fortgeschritten)',
+    note: 'Aktivierung → Max Hangs → Repeater-Finish → Zweitgriff-Reiz → Cool-down. ~42 Min. reine Ablaufzeit, mit Übergängen real ca. 45 Min.',
+    blocks: [
+      // Phase 1 — Aktivierung: allgemeine Mobilität, dann ansteigende Hangs
+      // bis knapp an die Arbeitsintensität (verhindert kalte Finger/Rolluli-Belastung).
+      { type: 'exercise', exerciseId: 'shoulder_circles_band', reps: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'wrist_mobility', reps: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'thoracic_rotation', reps: 8, restSec: 0 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 3, hangSec: 7, restSec: 30 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 3, hangSec: 7, restSec: 45 },
+      { type: 'hang', board: null, grip: 'edge_small', reps: 2, hangSec: 8, restSec: 60 },
+      { type: 'hang', board: null, grip: 'edge_small', reps: 1, hangSec: 10, restSec: 0 },
+
+      // Phase 2 — Max Hangs auf dem Hauptgriff (edge_small): 6×10s nahe
+      // Maximalkraft, volle 2:30 Pause pro Satz — genutzt für leichte,
+      // nicht-ermüdende Schulter-/Rumpfarbeit statt komplett passiv zu warten.
+      { type: 'hang', board: null, grip: 'edge_small', reps: 1, hangSec: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'face_pull', reps: 12, restSec: 150 },
+      { type: 'hang', board: null, grip: 'edge_small', reps: 1, hangSec: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'band_pull_apart', reps: 15, restSec: 150 },
+      { type: 'hang', board: null, grip: 'edge_small', reps: 1, hangSec: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'scapula_pull', reps: 10, restSec: 150 },
+      { type: 'hang', board: null, grip: 'edge_small', reps: 1, hangSec: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'pallof', reps: 10, restSec: 150 },
+      { type: 'hang', board: null, grip: 'edge_small', reps: 1, hangSec: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'bird_dog', reps: 8, restSec: 150 },
+      { type: 'hang', board: null, grip: 'edge_small', reps: 1, hangSec: 10, restSec: 0 },
+
+      // Phase 3 — Repeater-Finish auf grossem Griff (Arbeitskapazität statt
+      // Maximalkraft, deshalb bewusst ein einfacherer Griff bei Vorermüdung).
+      { type: 'hang', board: null, grip: 'edge_large', reps: 6, hangSec: 7, restSec: 3 },
+      { type: 'exercise', exerciseId: 'plank', reps: 30, restSec: 180 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 6, hangSec: 7, restSec: 3 },
+
+      // Phase 4 — Zweitgriff-Reiz (Spezifität): andere Griffart, damit die
+      // Session nicht nur eine einzige Kante trainiert.
+      { type: 'hang', board: null, grip: 'pocket3', reps: 1, hangSec: 7, restSec: 0 },
+      { type: 'exercise', exerciseId: 'hollow_hold', reps: 20, restSec: 100 },
+      { type: 'hang', board: null, grip: 'pocket3', reps: 1, hangSec: 7, restSec: 0 },
+      { type: 'exercise', exerciseId: 'russian_twist', reps: 16, restSec: 100 },
+      { type: 'hang', board: null, grip: 'pocket3', reps: 1, hangSec: 7, restSec: 0 },
+      { type: 'exercise', exerciseId: 'side_plank', reps: 20, restSec: 100 },
+      { type: 'hang', board: null, grip: 'pocket3', reps: 1, hangSec: 7, restSec: 0 },
+      { type: 'exercise', exerciseId: 'superman', reps: 12, restSec: 100 },
+      { type: 'hang', board: null, grip: 'pocket3', reps: 1, hangSec: 7, restSec: 0 },
+
+      // Phase 5 — Cool-down: kurze, gezielte Mobilisation/Dehnung.
+      { type: 'exercise', exerciseId: 'doorway_pec_stretch', reps: 1, restSec: 0 },
+      { type: 'exercise', exerciseId: 'cat_cow', reps: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'wrist_ext', reps: 12, restSec: 0 },
+      { type: 'exercise', exerciseId: 'leg_swings', reps: 10, restSec: 0 },
+      { type: 'exercise', exerciseId: 'neck_mobility', reps: 8, restSec: 0 },
+    ],
+  },
+];
+
 /* ---------- Standard-Wochenplan (Startvorlage) ----------
    Wird pro Mitglied einmalig nach Firebase kopiert und ist dort danach
    frei editierbar (siehe app.js renderPlan). */

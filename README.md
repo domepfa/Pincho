@@ -83,6 +83,12 @@ echten Einzel-Accounts nötig.
   weitergezählt — nach jedem Satz erscheint "Los" für den nächsten, damit
   Zeit zum Ablesen/Chalken bleibt. "Abbrechen" verwirft den laufenden Satz,
   kein Pause/Resume innerhalb eines Hang-Satzes.
+- **Fingerboard-Vorlagen**: `FINGERBOARD_TEMPLATES` in `data.js` liefert fest
+  eingebaute Abläufe (u. a. einen wissenschaftlich hergeleiteten 45-Min-Flow
+  für Fortgeschrittene). Eigene, per "Als Vorlage speichern" gesicherte
+  Abläufe landen pro Mitglied unter `fingerboardTemplates/{memberId}` in
+  Firebase — Ablauf-Zeit inkl. Übungspausen wird über `restSec` bei
+  Exercise-Sätzen mitgerechnet (siehe `fbEstimateSeconds` in `app.js`).
 
 ## Projektstruktur
 
