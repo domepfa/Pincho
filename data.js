@@ -304,20 +304,34 @@ const ROUTINE_TEMPLATES = [
    der nächste Satz startet) — bei Hang-Sätzen mit nur 1 Wiederholung dient
    das Timing zwischen den Sätzen als aktive Pause (siehe fbEstimateSeconds
    in app.js). */
+/* ---------- Pausen-Philosophie in den Hang-Sätzen unten ----------
+   Nicht überall dieselbe Pausenlänge — je nach Zweck:
+   - Aufwärm-Rampe (submaximal, Muskeltemperatur/Sehnen aktivieren): KURZ,
+     10-25s reichen, da nichts erschöpft wird, das sich erst erholen muss.
+   - Submaximale Arbeitssätze (Einsteiger — Sehnen-Gewöhnung, nicht
+     Maximalkraft): MODERAT, ~45s — genug für ordentliche Erholung ohne die
+     3-Minuten-Pausen zu brauchen, die nur bei echten Maximalversuchen
+     sinnvoll sind.
+   - Max Hangs (nahe am Limit, Fortgeschrittene): LANG, 2:30-3:00 — volle
+     ATP-CP-Regeneration zwischen nahezu maximalen Einzelversuchen.
+   - Repeater (7/3-Protokoll): die kurze 3s-Pause GEHÖRT zum Protokoll
+     (simuliert Ausschütteln am Fels), dafür lange Pause zwischen den
+     Sätzen selbst. */
 const FINGERBOARD_TEMPLATES = [
   {
     id: 'advanced_45min_flow',
     name: '45-Min Kraft-Flow (Fortgeschritten)',
-    note: 'Aktivierung → Max Hangs → Repeater-Finish → Zweitgriff-Reiz → Cool-down. ~42 Min. reine Ablaufzeit, mit Übergängen real ca. 45 Min.',
+    note: 'Aktivierung → Max Hangs → Repeater-Finish → Zweitgriff-Reiz → Cool-down. ~40 Min. reine Ablaufzeit, mit Übergängen real ca. 45 Min.',
     blocks: [
       // Phase 1 — Aktivierung: allgemeine Mobilität, dann ansteigende Hangs
-      // bis knapp an die Arbeitsintensität (verhindert kalte Finger/Rolluli-Belastung).
+      // bis knapp an die Arbeitsintensität. Kurze Pausen (submaximal, es
+      // gibt hier nichts "voll" zu regenerieren).
       { type: 'exercise', exerciseId: 'shoulder_circles_band', reps: 10, restSec: 0 },
       { type: 'exercise', exerciseId: 'wrist_mobility', reps: 10, restSec: 0 },
       { type: 'exercise', exerciseId: 'thoracic_rotation', reps: 8, restSec: 0 },
-      { type: 'hang', board: null, grip: 'edge_large', reps: 3, hangSec: 7, restSec: 30 },
-      { type: 'hang', board: null, grip: 'edge_medium', reps: 3, hangSec: 7, restSec: 45 },
-      { type: 'hang', board: null, grip: 'edge_small', reps: 2, hangSec: 8, restSec: 60 },
+      { type: 'hang', board: null, grip: 'edge_large', reps: 3, hangSec: 7, restSec: 15 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 3, hangSec: 7, restSec: 20 },
+      { type: 'hang', board: null, grip: 'edge_small', reps: 2, hangSec: 8, restSec: 25 },
       { type: 'hang', board: null, grip: 'edge_small', reps: 1, hangSec: 10, restSec: 0 },
 
       // Phase 2 — Max Hangs auf dem Hauptgriff (edge_small): 6×10s nahe
@@ -363,30 +377,31 @@ const FINGERBOARD_TEMPLATES = [
   },
   {
     id: 'beginner_edge_flow',
-    name: 'Einsteiger-Flow — Grosse Kante',
-    note: 'Kurze, submaximale Hangs auf der grössten (sichersten) Kante statt Max Hangs — Fokus auf sauberer Technik und Sehnen-Gewöhnung, nicht auf Maximalkraft. ~20 Min.',
+    name: 'Einsteiger-Flow — Kante (beidarmig)',
+    note: 'Kurze, submaximale Hangs auf einer beidhändig belegten Kante (bewusst KEINE Einhand-Positionen — die sind Expertenlevel) statt Max Hangs — Fokus auf sauberer Technik und Sehnen-Gewöhnung. ~18 Min.',
     blocks: [
-      // Phase 1 — Aktivierung
+      // Phase 1 — Aktivierung: kurze Pausen, da submaximal.
       { type: 'exercise', exerciseId: 'wrist_mobility', reps: 10, restSec: 0 },
       { type: 'exercise', exerciseId: 'shoulder_circles_band', reps: 10, restSec: 0 },
       { type: 'exercise', exerciseId: 'thoracic_rotation', reps: 8, restSec: 0 },
-      { type: 'hang', board: null, grip: 'edge_large', reps: 3, hangSec: 5, restSec: 30 },
-      { type: 'hang', board: null, grip: 'edge_large', reps: 3, hangSec: 6, restSec: 30 },
-      { type: 'hang', board: null, grip: 'edge_large', reps: 2, hangSec: 7, restSec: 40 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 3, hangSec: 5, restSec: 12 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 3, hangSec: 6, restSec: 15 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 2, hangSec: 7, restSec: 20 },
 
-      // Phase 2 — Hauptblock: submaximale Einzel-Hangs, dazwischen leichte,
-      // nicht ermüdende Schulter-/Rumpfarbeit statt komplett passiver Pause.
-      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
-      { type: 'exercise', exerciseId: 'face_pull', reps: 10, restSec: 60 },
-      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
-      { type: 'exercise', exerciseId: 'band_pull_apart', reps: 12, restSec: 60 },
-      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
-      { type: 'exercise', exerciseId: 'pallof', reps: 10, restSec: 60 },
-      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
-      { type: 'exercise', exerciseId: 'bird_dog', reps: 8, restSec: 60 },
-      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
-      { type: 'exercise', exerciseId: 'ext_rotation', reps: 10, restSec: 60 },
-      { type: 'hang', board: null, grip: 'edge_large', reps: 1, hangSec: 6, restSec: 0 },
+      // Phase 2 — Hauptblock: submaximale Einzel-Hangs, ~45s moderate Pause
+      // (genug Erholung für submaximale Reize, keine Max-Hang-Pausen nötig),
+      // dazwischen leichte, nicht ermüdende Schulter-/Rumpfarbeit.
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'face_pull', reps: 10, restSec: 45 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'band_pull_apart', reps: 12, restSec: 45 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'pallof', reps: 10, restSec: 45 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'bird_dog', reps: 8, restSec: 45 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 1, hangSec: 6, restSec: 0 },
+      { type: 'exercise', exerciseId: 'ext_rotation', reps: 10, restSec: 45 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 1, hangSec: 6, restSec: 0 },
 
       // Phase 3 — Ergänzung ohne Griffbrett
       { type: 'exercise', exerciseId: 'plank', reps: 20, restSec: 30 },
@@ -403,31 +418,32 @@ const FINGERBOARD_TEMPLATES = [
   {
     id: 'beginner_sloper_flow',
     name: 'Einsteiger-Flow — mit Sloper',
-    note: 'Slopers trainieren Körperspannung und Griffkraft über die offene Hand statt über die Fingerscheiben — schonender Einstieg als kleine Kanten/Taschen. ~20 Min.',
+    note: 'Slopers trainieren Körperspannung und Griffkraft über die offene, beidhändig belegte Hand statt über die Fingerscheiben — schonender Einstieg als kleine Kanten/Taschen. ~16 Min.',
     blocks: [
-      // Phase 1 — Aktivierung, kurzer Primer auf der sicheren Kante
+      // Phase 1 — Aktivierung, kurzer Primer auf einer beidhändigen Kante
       { type: 'exercise', exerciseId: 'wrist_mobility', reps: 10, restSec: 0 },
       { type: 'exercise', exerciseId: 'shoulder_circles_band', reps: 10, restSec: 0 },
       { type: 'exercise', exerciseId: 'thoracic_rotation', reps: 8, restSec: 0 },
-      { type: 'hang', board: null, grip: 'edge_large', reps: 3, hangSec: 5, restSec: 30 },
-      { type: 'hang', board: null, grip: 'edge_large', reps: 2, hangSec: 6, restSec: 40 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 3, hangSec: 5, restSec: 12 },
+      { type: 'hang', board: null, grip: 'edge_medium', reps: 2, hangSec: 6, restSec: 15 },
 
-      // Phase 2 — Hauptblock Sloper 20° (offene Hand, Körperspannung).
+      // Phase 2 — Hauptblock Sloper 20° (offene Hand, Körperspannung),
+      // ~45s moderate Pause statt Max-Hang-Pausen (submaximaler Reiz).
       { type: 'hang', board: null, grip: 'sloper_easy', reps: 1, hangSec: 6, restSec: 0 },
-      { type: 'exercise', exerciseId: 'face_pull', reps: 10, restSec: 60 },
+      { type: 'exercise', exerciseId: 'face_pull', reps: 10, restSec: 45 },
       { type: 'hang', board: null, grip: 'sloper_easy', reps: 1, hangSec: 6, restSec: 0 },
-      { type: 'exercise', exerciseId: 'scapula_pull', reps: 10, restSec: 60 },
+      { type: 'exercise', exerciseId: 'scapula_pull', reps: 10, restSec: 45 },
       { type: 'hang', board: null, grip: 'sloper_easy', reps: 1, hangSec: 6, restSec: 0 },
-      { type: 'exercise', exerciseId: 'pallof', reps: 10, restSec: 60 },
+      { type: 'exercise', exerciseId: 'pallof', reps: 10, restSec: 45 },
       { type: 'hang', board: null, grip: 'sloper_easy', reps: 1, hangSec: 6, restSec: 0 },
-      { type: 'exercise', exerciseId: 'bird_dog', reps: 8, restSec: 60 },
+      { type: 'exercise', exerciseId: 'bird_dog', reps: 8, restSec: 45 },
       { type: 'hang', board: null, grip: 'sloper_easy', reps: 1, hangSec: 6, restSec: 0 },
 
       // Phase 3 — Zweitgriff-Reiz: Sloper 35°, etwas steiler, kürzere Sätze.
       { type: 'hang', board: null, grip: 'sloper_medium', reps: 1, hangSec: 5, restSec: 0 },
-      { type: 'exercise', exerciseId: 'hollow_hold', reps: 15, restSec: 50 },
+      { type: 'exercise', exerciseId: 'hollow_hold', reps: 15, restSec: 40 },
       { type: 'hang', board: null, grip: 'sloper_medium', reps: 1, hangSec: 5, restSec: 0 },
-      { type: 'exercise', exerciseId: 'russian_twist', reps: 14, restSec: 50 },
+      { type: 'exercise', exerciseId: 'russian_twist', reps: 14, restSec: 40 },
       { type: 'hang', board: null, grip: 'sloper_medium', reps: 1, hangSec: 5, restSec: 0 },
 
       // Phase 4 — Ergänzung ohne Griffbrett
