@@ -76,7 +76,7 @@ function renderPasswordGate() {
         <label>Team-Code</label>
         <input type="password" id="login-password" placeholder="••••" autofocus>
       </div>
-      <button class="btn" id="login-password-submit">REIN AN DIE WAND</button>
+      <button class="btn" id="login-password-submit">PINCHIBOY, COME MAKE ME SCREAM!</button>
       <p class="login-hint" id="login-password-hint">Erste Anmeldung überhaupt? Der hier eingegebene Code wird zum neuen Team-Code.</p>
     </div>
   `;
@@ -473,8 +473,8 @@ function renderFsActive() {
       <div class="fs-active-name">${esc(exerciseName(g.exerciseId))}</div>
       ${last ? `<div class="fs-last-value mono">Letztes Mal: ${last.weight !== '' && last.weight != null ? esc(String(last.weight)) + 'kg × ' : ''}${esc(String(last.reps))}</div>` : ''}
       <div class="field-row">
-        <div class="field"><label>Gewicht (kg)</label><input type="number" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
-        <div class="field"><label>Wdh.</label><input type="text" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
+        <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
+        <div class="field"><label>Wdh.</label><input type="text" inputmode="numeric" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
       </div>
       <button type="button" class="btn small" id="fs-add-set" style="width:100%;">+ Satz</button>
     </div>
@@ -536,7 +536,7 @@ function renderLogExerciseRows() {
       <span class="ex-row-name">${esc(exerciseName(ex.exerciseId))}</span>
       <input type="number" data-i="${i}" data-f="sets" value="${ex.sets}" placeholder="Sätze" class="ex-row-input" title="Sätze">
       <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzlicher Satz">+</button>
-      <input type="text" data-i="${i}" data-f="reps" value="${esc(String(ex.reps))}" placeholder="Wdh" class="ex-row-input" title="Wiederholungen">
+      <input type="text" inputmode="numeric" data-i="${i}" data-f="reps" value="${esc(String(ex.reps))}" placeholder="Wdh" class="ex-row-input" title="Wiederholungen">
       <input type="number" data-i="${i}" data-f="weight" value="${ex.weight}" placeholder="kg" step="0.5" class="ex-row-input" title="Gewicht">
       <button type="button" class="ex-row-remove" data-remove="${i}">×</button>
     </div>
@@ -567,6 +567,8 @@ function renderLogExerciseRows() {
 /* ================================================================
    FINGERBOARD
    ================================================================= */
+let fbQuickstartOpen = false; // Schnelltraining-Karten sind standardmässig eingeklappt
+
 const fb = {
   board: null,
   selectedGrip: null,   // am grafischen Board gewählter Griff, fürs Hinzufügen eines Hang-Satzes
@@ -737,8 +739,11 @@ async function renderFingerboard() {
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Fingerboard</h2><div class="sec-rule"></div></div>
 
-    <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Schnelltraining</h2><div class="sec-rule"></div></div>
-    <div class="quickstart-grid" id="fb-quickstart"></div>
+    <div class="sec-head" id="fb-quickstart-toggle" style="cursor:pointer;">
+      <h2 class="sec-title" style="font-size:18px;">Schnelltraining</h2><div class="sec-rule"></div>
+      <span class="sec-chevron" id="fb-quickstart-chevron">${fbQuickstartOpen ? '▾' : '▸'}</span>
+    </div>
+    <div class="quickstart-grid" id="fb-quickstart" ${fbQuickstartOpen ? '' : 'hidden'}></div>
 
     <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Eigenen Ablauf bauen</h2><div class="sec-rule"></div></div>
 
@@ -772,6 +777,12 @@ async function renderFingerboard() {
   renderFbAddPanel();
   renderFbBlocksList(); // rendert am Ende auch renderFbRuntime() mit
   renderFbQuickstart();
+
+  document.getElementById('fb-quickstart-toggle').onclick = () => {
+    fbQuickstartOpen = !fbQuickstartOpen;
+    document.getElementById('fb-quickstart').hidden = !fbQuickstartOpen;
+    document.getElementById('fb-quickstart-chevron').textContent = fbQuickstartOpen ? '▾' : '▸';
+  };
 
   document.querySelectorAll('[data-add-type]').forEach((btn) => {
     btn.onclick = () => {
@@ -1828,8 +1839,35 @@ function ensureFbOverlay() {
     el.id = 'fb-overlay';
     el.className = 'fb-overlay hidden';
     document.body.appendChild(el);
+    wireFbOverlaySwipe(el);
   }
   return el;
+}
+
+/* Nach links wischen = "fertig, weiter" (dasselbe wie ⏭/"Wiederholungen
+   geschafft"), nach rechts = zurück — v. a. bei Übungs-Sätzen soll man so
+   ohne genaues Zielen auf einen Button weiterkommen. Einmal auf das
+   Overlay-Element selbst gebunden (bleibt über jedes innerHTML-Neurendern
+   hinweg bestehen), nicht auf einzelne Kind-Elemente. */
+function wireFbOverlaySwipe(el) {
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { tracking = false; return; }
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+  el.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    if (!fb.running || fb.preCount != null) return; // nur während eines laufenden Satzes
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.3) return; // zu kurz oder zu diagonal
+    if (dx < 0) fbSkipForward(); else fbGoBack();
+  }, { passive: true });
 }
 
 async function openFbOverlay() {

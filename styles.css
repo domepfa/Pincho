@@ -116,6 +116,7 @@ button, input, select, textarea { font-family: inherit; }
   background: var(--accent); transform: skewX(-14deg);
 }
 .sec-rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
+.sec-chevron { color: var(--ink-faint); font-size: 14px; flex-shrink: 0; }
 
 /* ---------- Cards / lists ---------- */
 .card { background: var(--surface); border: 1px solid var(--line); padding: 16px; margin-bottom: 12px; }
@@ -202,12 +203,21 @@ button, input, select, textarea { font-family: inherit; }
 .fs-group { border: 1px solid var(--line); padding: 8px 10px; margin-bottom: 8px; }
 .fs-group.active { border-color: var(--accent); }
 .fs-group-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--ink); margin-bottom: 4px; }
-.fs-set-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-dim); padding: 3px 0; }
+.fs-set-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-dim); padding: 4px 0; }
 .fs-set-row span:first-child { flex: 0 0 52px; color: var(--ink-faint); }
-.fs-set-row span:nth-child(2) { flex: 1; color: var(--ink); }
+.fs-set-row span:nth-child(2) {
+  flex: 1; color: var(--accent); font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: .02em;
+}
+/* Gewicht/Wdh beim Erfassen bewusst gross und knallig statt als normales,
+   unauffälliges Formularfeld — das sind die Kernzahlen des Satzes. */
+#fs-weight, #fs-reps {
+  font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: .02em;
+  color: var(--ink); text-align: center;
+}
 
 /* ---------- Fingerboard: Schnelltraining ---------- */
 .quickstart-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+.quickstart-grid[hidden] { display: none; }
 .qs-card { border: 1px solid var(--line); background: var(--surface); padding: 14px; transition: border-color .18s, transform .18s; }
 .qs-card:hover { border-color: var(--line-soft); transform: translateY(-2px); }
 .qs-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -314,8 +324,8 @@ button, input, select, textarea { font-family: inherit; }
     radial-gradient(ellipse 650px 700px at 90% 85%, rgba(120, 175, 220, 0.05), transparent 55%),
     repeating-linear-gradient(123deg, rgba(255, 255, 255, 0.02) 0px, rgba(255, 255, 255, 0.02) 1px, transparent 2px, transparent 130px);
   display: flex; flex-direction: column; align-items: stretch;
-  padding: calc(18px + var(--safe-top)) 18px calc(18px + var(--safe-bottom));
-  overflow-y: auto;
+  padding: calc(10px + var(--safe-top)) 18px calc(10px + var(--safe-bottom));
+  overflow: hidden;
 }
 .fb-overlay.hidden { display: none; }
 .fb-overlay-close {
@@ -323,10 +333,15 @@ button, input, select, textarea { font-family: inherit; }
   background: none; border: 1px solid var(--line); color: var(--ink-faint);
   width: 34px; height: 34px; font-size: 15px; line-height: 1; cursor: pointer;
 }
+/* Alles muss ohne Scrollen aufs Display passen — statt einer festen
+   Blockgrösse mit "justify-content:center" (die auf kurzen Screens
+   überläuft) verteilt space-evenly den verfügbaren Platz auf alle Kinder,
+   und Figur/Ring/Countdown unten sind in vh geklammert statt fix in px,
+   damit sie sich automatisch verkleinern statt abzuschneiden. */
 .fb-overlay-inner {
-  display: flex; flex-direction: column; align-items: center; gap: 18px;
-  max-width: 420px; width: 100%; margin: 0 auto; flex: 1; justify-content: center;
-  padding-top: 30px;
+  display: flex; flex-direction: column; align-items: center; gap: clamp(3px, 1.1vh, 14px);
+  max-width: 420px; width: 100%; margin: 0 auto; flex: 1; min-height: 0;
+  justify-content: space-evenly; overflow: hidden;
 }
 
 .fb-progress-text { font-size: 11px; color: var(--ink-dim); text-align: center; }
@@ -334,15 +349,15 @@ button, input, select, textarea { font-family: inherit; }
 /* Hang/Pause-Visual: Ring füllt sich mit dem Fortschritt INNERHALB des
    aktuellen Schritts, daneben ein Strichmännchen, das hängt (Hang) oder
    sich lockert (Pause) — statt einer abstrakten Gesamt-Fortschrittsanzeige. */
-.fb-hang-visual { display: flex; align-items: center; justify-content: center; gap: 18px; }
-.fb-phase-figure { width: 90px; flex-shrink: 0; }
+.fb-hang-visual { display: flex; align-items: center; justify-content: center; gap: clamp(8px, 3vw, 18px); }
+.fb-phase-figure { width: clamp(56px, 13vh, 90px); flex-shrink: 0; }
 .fb-phase-figure .ex-figure { width: 100%; height: auto; display: block; }
 .fb-hang-figure { transform-origin: 50% 10%; animation: figSway 1.7s ease-in-out infinite; }
 .fb-arm-shake { transform-origin: 49.5% 32.5%; animation: figShake .9s ease-in-out infinite; }
 @keyframes figSway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
 @keyframes figShake { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
 
-.fb-timer-ring { position: relative; width: 168px; height: 168px; flex-shrink: 0; }
+.fb-timer-ring { position: relative; width: clamp(80px, 17vh, 168px); height: clamp(80px, 17vh, 168px); flex-shrink: 0; }
 .fb-timer-ring svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
 .ring-bg { fill: none; stroke: var(--line); stroke-width: 7; }
 .ring-fg {
@@ -352,7 +367,7 @@ button, input, select, textarea { font-family: inherit; }
 .ring-fg.rest { stroke: var(--ink-dim); }
 .fb-timer-ring .big {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  font-family: 'Bebas Neue', sans-serif; font-size: 52px; color: var(--accent); line-height: 1;
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(26px, 7vh, 52px); color: var(--accent); line-height: 1;
 }
 .fb-timer-ring .big.rest { color: var(--ink-dim); }
 .fb-timer-ring .big.rest-warn { color: var(--accent2); animation: bigWarnPulse .6s ease-in-out infinite; }
@@ -365,7 +380,7 @@ button, input, select, textarea { font-family: inherit; }
    vollen Re-Render triggert die Animation von selbst); in den letzten
    3 Sekunden wechselt sie auf die "Achtung"-Farbe und schlägt stärker aus. */
 .fb-precount {
-  font-family: 'Bebas Neue', sans-serif; font-size: 108px; line-height: 1;
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(56px, 16vh, 108px); line-height: 1;
   color: var(--accent); margin: 2px 0; animation: popIn .35s cubic-bezier(.25, 1.4, .4, 1) both;
 }
 .fb-precount-tense { color: var(--accent2); animation: precountTick .5s cubic-bezier(.25, 1.4, .4, 1) both; }
@@ -375,19 +390,19 @@ button, input, select, textarea { font-family: inherit; }
 .fb-stage-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
 .fb-stage-title { font-family: 'Bebas Neue', sans-serif; font-size: 26px; text-align: center; letter-spacing: .02em; }
 .fb-stage-sub { font-size: 12px; color: var(--ink-dim); text-align: center; }
-.fb-stage-next { font-size: 12px; color: var(--ink-faint); text-align: center; min-height: 16px; }
-.fb-stage-btn { width: 100%; max-width: 280px; margin-top: 4px; }
+.fb-stage-next { font-size: 12px; color: var(--ink-faint); text-align: center; min-height: 12px; }
+.fb-stage-btn { width: 100%; max-width: 280px; margin-top: 0; padding: clamp(7px, 1.8vh, 13px); }
 
-.fb-transport { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
+.fb-transport { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 14px); margin-top: 0; }
 .fb-transport-btn {
   background: none; border: 1px solid var(--line); color: var(--ink-dim);
-  width: 68px; height: 56px; font-size: 24px; cursor: pointer;
+  width: clamp(48px, 10vh, 68px); height: clamp(42px, 9vh, 56px); font-size: 22px; cursor: pointer;
   transition: border-color .13s, color .13s, transform .13s;
 }
 .fb-transport-btn:disabled { opacity: .3; cursor: not-allowed; }
 .fb-transport-btn:not(:disabled):active { border-color: var(--accent); color: var(--accent); transform: scale(.93); }
 .fb-transport-btn.fb-play {
-  width: 84px; height: 72px; font-size: 30px;
+  width: clamp(58px, 12vh, 84px); height: clamp(50px, 11vh, 72px); font-size: 28px;
   border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .1);
 }
 .fb-transport-btn.fb-play:disabled { border-color: var(--line); color: var(--ink-dim); background: none; }
@@ -396,15 +411,18 @@ button, input, select, textarea { font-family: inherit; }
 .fb-hang-visual.fb-paused .fb-arm-shake,
 .fb-hang-visual.fb-paused .fig-a,
 .fb-hang-visual.fb-paused .fig-b { animation-play-state: paused; }
-.fb-stage-figure { width: 100%; }
-.fb-stage-figure .timeline-thumb { width: 100%; height: 200px; }
-.fb-stage-figure .ex-figure { width: 100%; height: auto; display: block; }
-.fb-stage-figure .ex-figure-emoji { font-size: 96px; text-align: center; line-height: 1.4; }
+/* Höhe statt Breite begrenzen — bei voller Container-Breite (bis 420px)
+   würde die quadratische Figur sonst so hoch werden, dass Ring/Timer und
+   die Buttons darunter nicht mehr ohne Scrollen aufs Display passen. */
+.fb-stage-figure { width: 100%; display: flex; justify-content: center; }
+.fb-stage-figure .timeline-thumb { width: auto; max-width: 100%; height: auto; max-height: 19vh; }
+.fb-stage-figure .ex-figure { width: auto; max-width: 100%; height: auto; max-height: 19vh; display: block; }
+.fb-stage-figure .ex-figure-emoji { font-size: clamp(48px, 10vh, 96px); text-align: center; line-height: 1.2; }
 
 /* Zielmuskeln-Übersicht: ein Körper-Umriss (vorne links, hinten rechts),
    Zonen werden je Übung ein-/ausgeblendet statt neu gezeichnet. */
-.fb-muscle-block { margin-top: 6px; text-align: center; }
-.muscle-map { width: 150px; margin: 0 auto; display: block; }
+.fb-muscle-block { margin-top: 0; text-align: center; }
+.muscle-map { width: clamp(70px, 11vh, 150px); margin: 0 auto; display: block; }
 .muscle-head { fill: var(--ink-faint); opacity: .3; }
 .muscle-zone rect, .muscle-zone ellipse { fill: var(--ink-faint); opacity: .28; transition: fill .2s, opacity .2s; }
 .muscle-zone.secondary rect, .muscle-zone.secondary ellipse { fill: var(--accent); opacity: .5; }
