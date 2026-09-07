@@ -208,10 +208,12 @@ button, input, select, textarea { font-family: inherit; }
 .fs-set-row span:nth-child(2) {
   flex: 1; color: var(--accent); font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: .02em;
 }
-/* Gewicht/Wdh beim Erfassen bewusst gross und knallig statt als normales,
-   unauffälliges Formularfeld — das sind die Kernzahlen des Satzes. */
+/* Gewicht/Wdh: die Beschriftung (was trage ich hier ein) soll auffallen,
+   nicht primär die Zahl selbst — Label darum hell statt im sonst üblichen
+   gedämpften Feld-Label-Grau, Zahl bewusst kleiner als vorher. */
+.fs-active-card .field label { color: var(--ink); font-weight: 600; }
 #fs-weight, #fs-reps {
-  font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: .02em;
+  font-family: 'Bebas Neue', sans-serif; font-size: 19px; letter-spacing: .02em;
   color: var(--ink); text-align: center;
 }
 
