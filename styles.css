@@ -159,6 +159,10 @@ button, input, select, textarea { font-family: inherit; }
 .field textarea { resize: vertical; min-height: 64px; }
 .field-row { display: flex; gap: 10px; }
 .field-row .field { flex: 1; }
+.kg-field { position: relative; display: flex; align-items: center; }
+.kg-field input { width: 100%; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); padding: 11px 34px 11px 12px; font-size: 14px; }
+.kg-field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.kg-field span { position: absolute; right: 12px; font-size: 12px; color: var(--ink-faint); pointer-events: none; }
 
 .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .chip {
@@ -409,6 +413,27 @@ button, input, select, textarea { font-family: inherit; }
 .fb-stage-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
 .fb-stage-title { font-family: 'Bebas Neue', sans-serif; font-size: 26px; text-align: center; letter-spacing: .02em; }
 .fb-stage-sub { font-size: 12px; color: var(--ink-dim); text-align: center; }
+
+/* Check-in während der letzten Pause eines Satzes — läuft nebenher, ohne
+   den Ablauf zu unterbrechen (siehe openBlockCheckin in app.js). */
+.fb-checkin { width: 100%; max-width: 280px; border: 1px dashed var(--line); padding: clamp(6px, 1.5vh, 12px); box-sizing: border-box; }
+.fb-checkin[hidden] { display: none; }
+.fb-checkin-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 8px; text-align: center; }
+.fb-checkin-chips { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.fb-chip {
+  width: 32px; height: 32px; border: 1px solid var(--line); background: none; color: var(--ink-dim);
+  font-family: 'IBM Plex Mono', monospace; font-size: 13px; cursor: pointer; transition: all .15s;
+}
+.fb-chip.ok { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .1); }
+.fb-chip.fail { border-color: var(--danger); color: var(--danger); background: rgba(255, 107, 107, .08); text-decoration: line-through; }
+.fb-checkin-row { display: flex; gap: 8px; }
+.fb-checkin-row input[type="text"] { width: 70px; text-align: center; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); padding: 11px 8px; font-size: 14px; box-sizing: border-box; }
+.fb-checkin-row .kg-field { flex: 1; }
+
+/* Übersicht auf dem "Ablauf geschafft!"-Screen */
+.fb-summary-headline { font-size: 13px; color: var(--accent); margin-bottom: 2px; text-align: center; }
+.fb-summary-list { width: 100%; max-width: 280px; max-height: 22vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box; }
+.fb-summary-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--ink-dim); border-bottom: 1px solid var(--line); padding: 4px 2px; }
 .fb-stage-next { font-size: 12px; color: var(--ink-faint); text-align: center; min-height: 12px; }
 .fb-stage-btn { width: 100%; max-width: 280px; margin-top: 0; padding: clamp(7px, 1.8vh, 13px); }
 

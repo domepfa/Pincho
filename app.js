@@ -745,6 +745,7 @@ const fb = {
   secondsLeft: 0,
   intervalId: null,
   wakeLock: null,
+  runResults: [],        // pro Blockindex: {type:'hang', doneReps:[bool,...]} | {type:'exercise', reps, weight} — was beim Durchlauf tatsächlich geschafft wurde
 };
 
 /* Echtes Board-Bild (eigene Illustration/eigenes Foto, siehe assets/) mit
@@ -905,7 +906,7 @@ async function renderFingerboard() {
     </div>
     <div id="fb-add-panel" style="margin:12px 0 16px;"></div>
 
-    <div class="field"><label>Zusatzgewicht für diese Session (kg, negativ = Assistenz)</label><input type="number" id="fb-weight" value="${fb.weight}" step="0.5"></div>
+    <div class="field"><label>Zusatzgewicht für diese Session (negativ = Assistenz)</label><div class="kg-field"><input type="number" inputmode="decimal" id="fb-weight" value="${fb.weight}" step="0.5"><span class="mono">kg</span></div></div>
 
     <div class="sec-head"><h2 class="sec-title">Ablauf</h2><div class="sec-rule"></div></div>
 
@@ -2188,6 +2189,7 @@ function fbGoBack() {
 function fbSkipForward() {
   clearInterval(fb.intervalId);
   fb.intervalId = null;
+  initBlockResult(fb.blockIndex); // frühzeitig übersprungen (z. B. "Wiederholungen geschafft") — trotzdem Standardwerte fürs Ergebnis
   fb.blockIndex++;
   if (fb.blockIndex >= fb.blocks.length) {
     releaseWakeLock();
@@ -2289,6 +2291,7 @@ function renderFbOverlay() {
         </div>
       ` : ''}
       <div class="fb-stage-next mono" id="fb-upcoming"></div>
+      <div class="fb-checkin" id="fb-checkin" ${fb.stepIndex === fb.sequence.length - 1 && !working ? '' : 'hidden'}>${fb.stepIndex === fb.sequence.length - 1 && !working ? checkinPanelHtml(fb.blockIndex) : ''}</div>
       ${!isHang ? `<button class="btn fb-stage-btn" id="fb-reps-done" ${working ? '' : 'hidden'}>Wiederholungen geschafft — weiter</button>` : ''}
       ${fbTransportRow()}
       <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
@@ -2318,6 +2321,7 @@ function renderFbOverlay() {
     document.getElementById('fb-cancel').onclick = cancelAblauf;
     const repsDoneBtn = document.getElementById('fb-reps-done');
     if (repsDoneBtn) repsDoneBtn.onclick = fbSkipForward;
+    if (fb.runResults[fb.blockIndex]) wireCheckinPanel(fb.blockIndex);
     updateFbUpcomingUI();
   }
   updateFbProgressUI();
@@ -2393,7 +2397,82 @@ function startAblauf() {
   fb.running = false;
   fb.awaitingNext = true;
   fb.preCount = null;
+  fb.runResults = [];
   openFbOverlay();
+}
+
+/* Ergebnis-Eintrag für einen Block anlegen, falls noch nicht geschehen —
+   idempotent, damit sowohl der Check-in-Aufruf während der Pause als auch
+   das Sicherheitsnetz in advanceBlock() (falls keine Pause Zeit dafür
+   liess) dieselbe Funktion nutzen können, ohne sich zu überschreiben.
+   Vorbelegung ist immer "alles geschafft" bzw. Zielwerte/letztes Gewicht —
+   wer nichts anfasst, bekommt genau das geloggt. */
+function initBlockResult(index) {
+  if (fb.runResults[index]) return;
+  const block = fb.blocks[index];
+  if (!block) return;
+  if (block.type === 'hang') {
+    fb.runResults[index] = { type: 'hang', doneReps: new Array(block.reps).fill(true) };
+  } else {
+    const last = lastValueForExercise(block.exerciseId);
+    fb.runResults[index] = { type: 'exercise', reps: block.reps, weight: last && last.weight != null ? last.weight : '' };
+  }
+}
+
+/* Baut das Check-in-Panel (Chips fürs Hang, Wdh./Gewicht fürs Übungs-
+   Set) und verdrahtet es — genutzt sowohl beim Öffnen während der
+   Pause (tickBlock) als auch bei einem vollen Neurendern der Bühne
+   (renderFbOverlay), z. B. nach Pause/Weiter, damit der Zwischenstand
+   nicht verloren geht. */
+function checkinPanelHtml(index) {
+  const result = fb.runResults[index];
+  if (!result) return '';
+  if (result.type === 'hang') {
+    return `
+      <div class="fb-checkin-label mono">GESCHAFFTE SÄTZE — nicht geschaffte abwählen</div>
+      <div class="fb-checkin-chips">
+        ${result.doneReps.map((ok, i) => `<button type="button" class="fb-chip ${ok ? 'ok' : 'fail'}" data-satz="${i}">${i + 1}</button>`).join('')}
+      </div>
+    `;
+  }
+  return `
+    <div class="fb-checkin-label mono">GESCHAFFT</div>
+    <div class="fb-checkin-row">
+      <input type="text" inputmode="numeric" id="fb-checkin-reps" value="${esc(String(result.reps))}" placeholder="Wdh.">
+      <div class="kg-field"><input type="number" inputmode="decimal" id="fb-checkin-weight" value="${esc(String(result.weight))}" step="0.5" placeholder="0"><span class="mono">kg</span></div>
+    </div>
+  `;
+}
+function wireCheckinPanel(index) {
+  const holder = document.getElementById('fb-checkin');
+  const result = fb.runResults[index];
+  if (!holder || !result) return;
+  if (result.type === 'hang') {
+    holder.querySelectorAll('.fb-chip').forEach((btn) => {
+      btn.onclick = () => {
+        const i = Number(btn.dataset.satz);
+        result.doneReps[i] = !result.doneReps[i];
+        btn.classList.toggle('ok', result.doneReps[i]);
+        btn.classList.toggle('fail', !result.doneReps[i]);
+      };
+    });
+  } else {
+    document.getElementById('fb-checkin-reps').oninput = (e) => { result.reps = e.target.value; };
+    document.getElementById('fb-checkin-weight').oninput = (e) => { result.weight = e.target.value === '' ? '' : Number(e.target.value); };
+  }
+}
+/* Öffnet das Check-in fürs gerade beendete Set — wird genau beim Eintritt
+   in die abschliessende Pause des Blocks aufgerufen (tickBlock), läuft
+   also nebenher, ohne den Ablauf zu unterbrechen: Standard ist "alles
+   geschafft"/Zielwerte, wer nichts antippt, bekommt genau das geloggt,
+   sobald die Pause endet und advanceBlock() den nächsten Satz einläutet. */
+function openBlockCheckin() {
+  initBlockResult(fb.blockIndex);
+  const holder = document.getElementById('fb-checkin');
+  if (!holder) return;
+  holder.hidden = false;
+  holder.innerHTML = checkinPanelHtml(fb.blockIndex);
+  wireCheckinPanel(fb.blockIndex);
 }
 
 /* Tap auf "LOS" (nur ganz am Anfang nötig): der Ablauf läuft danach von
@@ -2465,7 +2544,12 @@ function tickBlock() {
       return;
     }
     fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
-    if (isWorkPhase(fb.sequence[fb.stepIndex])) beepStart(); else beepEnd();
+    const newStep = fb.sequence[fb.stepIndex];
+    if (isWorkPhase(newStep)) beepStart(); else beepEnd();
+    // Letzte Pause des Blocks (danach kommt der nächste Satz) — genau hier
+    // ist Zeit fürs Check-in, ohne den Ablauf zu unterbrechen: es läuft
+    // nebenher während der ohnehin schon geplanten Erholung.
+    if (!isWorkPhase(newStep) && fb.stepIndex === fb.sequence.length - 1) openBlockCheckin();
   } else if (step && !isWorkPhase(step) && fb.secondsLeft <= 3) {
     // Letzte 3 Sekunden einer Pause: kurzer Tick pro Sekunde als
     // akustische Vorwarnung, dass der nächste Satz gleich losgeht.
@@ -2478,6 +2562,10 @@ function tickBlock() {
    Tap) — das war der eigentliche Grund für "kein Flow", nicht nur die
    Reihenfolge der Bau-Oberfläche. */
 function advanceBlock() {
+  // Sicherheitsnetz: Blöcke ohne Pause danach (restSec 0) hatten keine Zeit
+  // fürs Check-in während des Laufs — hier trotzdem die Standardwerte
+  // eintragen, damit jeder Block ein Ergebnis für die Übersicht am Ende hat.
+  initBlockResult(fb.blockIndex);
   fb.blockIndex++;
   fb.running = false;
   if (fb.blockIndex >= fb.blocks.length) {
@@ -2537,6 +2625,28 @@ function cancelAblauf() {
   renderFbRuntime();
 }
 
+/* Übersicht am Ende: pro Block, was tatsächlich geschafft wurde (nicht nur
+   was geplant war) — Hang-Sätze als X/Y, Übungs-Sätze als geloggte
+   Wdh.×kg. Headline zählt nur die Hang-Sätze (einzige Ja/Nein-Metrik). */
+function fbResultsSummaryHtml(blocks, results) {
+  let totalReps = 0;
+  let doneReps = 0;
+  const rows = blocks.map((b, i) => {
+    const r = results[i];
+    if (!r) return '';
+    if (r.type === 'hang') {
+      const done = r.doneReps.filter(Boolean).length;
+      totalReps += r.doneReps.length;
+      doneReps += done;
+      return `<div class="fb-summary-row"><span>${esc(gripLabel(b.board, b.grip))}</span><span class="mono">${done}/${r.doneReps.length}</span></div>`;
+    }
+    const weightText = r.weight !== '' && r.weight != null ? ` × ${esc(String(r.weight))}kg` : '';
+    return `<div class="fb-summary-row"><span>${esc(exerciseName(b.exerciseId))}</span><span class="mono">${esc(String(r.reps))}${weightText}</span></div>`;
+  }).join('');
+  const headline = totalReps ? `<div class="fb-summary-headline mono">${doneReps}/${totalReps} Hänge geschafft</div>` : '';
+  return `${headline}<div class="fb-summary-list">${rows}</div>`;
+}
+
 async function finishAblauf() {
   fb.running = false;
   fb.awaitingNext = false;
@@ -2546,6 +2656,7 @@ async function finishAblauf() {
 
   const board = fb.board;
   const blocks = fb.blocks;
+  const results = fb.runResults.slice();
 
   const el = ensureFbOverlay();
   el.innerHTML = `
@@ -2553,6 +2664,7 @@ async function finishAblauf() {
       <div class="fb-done-emoji">🎉</div>
       <div class="fb-stage-title">Ablauf geschafft!</div>
       <div class="fb-stage-sub mono">${blocks.length} Sätze · ${fmtMinSec(fbEstimateSeconds())} Trainingszeit</div>
+      ${fbResultsSummaryHtml(blocks, results)}
       <button class="btn fb-stage-btn ghost" id="fb-overlay-share">Als Challenge teilen (72h)</button>
       <button class="btn fb-stage-btn" id="fb-overlay-finish">Schliessen</button>
     </div>
@@ -2570,6 +2682,7 @@ async function finishAblauf() {
     board,
     weight: fb.weight || 0,
     blocks,
+    results,
     createdAt: Date.now(),
   };
   await fbPush(`fingerboardSessions/${state.member.id}`, session);
