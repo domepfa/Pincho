@@ -2595,6 +2595,7 @@ function renderFbBlocksList() {
       <div class="timeline-item anim-in" style="animation-delay:${Math.min(i, 14) * 30}ms">
         <div class="timeline-badge ${isHang ? '' : 'exercise'}">${i + 1}</div>
         <div class="timeline-card">
+          <div class="timeline-drag-handle" data-drag="${i}" title="Ziehen zum Verschieben">⠿</div>
           ${thumb}
           <div class="info">
             <div class="title">${title}</div>
@@ -2653,8 +2654,86 @@ function renderFbBlocksList() {
       renderFbBlocksList();
     };
   });
+  wireFbBlocksDragReorder(holder);
 
   renderFbRuntime(); // Start-Button-Status hängt von fb.blocks.length ab
+}
+
+/* Verschieben per Ziehen am Griff-Symbol (⠿), zusätzlich zu den ▲/▼-
+   Buttons — per Pointer Events (deckt Maus UND Touch einheitlich ab).
+   Der gezogene Satz wird während des Ziehens aus dem normalen Fluss
+   herausgenommen (position:fixed) und an seiner Stelle steht ein
+   Platzhalter mit gleicher Höhe; die übrigen Sätze haben unterschiedliche
+   Höhen (Hang/Übung/Campus/Pause haben verschieden viele Eingabefelder),
+   deshalb lässt der Platzhalter den Browser selbst neu fliessen, statt
+   mit einem festen Versatz zu rechnen. Reihenfolge wird erst beim
+   Loslassen in fb.blocks übernommen und per renderFbBlocksList() (das
+   auch speichert) neu aufgebaut. */
+function wireFbBlocksDragReorder(holder) {
+  const list = holder.querySelector('.timeline');
+  if (!list) return;
+  list.querySelectorAll('[data-drag]').forEach((handle) => {
+    handle.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const item = handle.closest('.timeline-item');
+      const startIndex = Number(handle.dataset.drag);
+      const rect = item.getBoundingClientRect();
+      const startY = e.clientY;
+      const startTop = rect.top;
+
+      const placeholder = document.createElement('div');
+      placeholder.className = 'timeline-item timeline-drag-placeholder';
+      placeholder.style.height = rect.height + 'px';
+      list.insertBefore(placeholder, item);
+
+      item.classList.add('dragging');
+      item.style.position = 'fixed';
+      item.style.top = startTop + 'px';
+      item.style.left = rect.left + 'px';
+      item.style.width = rect.width + 'px';
+      document.body.appendChild(item);
+
+      try { handle.setPointerCapture(e.pointerId); } catch (err) { /* z. B. sehr alte Browser — Drag funktioniert trotzdem */ }
+
+      const onMove = (ev) => {
+        const dy = ev.clientY - startY;
+        item.style.top = (startTop + dy) + 'px';
+        const centerY = startTop + dy + rect.height / 2;
+        let moved = true;
+        while (moved) {
+          moved = false;
+          const siblings = Array.from(list.children);
+          const phIndex = siblings.indexOf(placeholder);
+          const prev = siblings[phIndex - 1];
+          if (prev) {
+            const pr = prev.getBoundingClientRect();
+            if (centerY < pr.top + pr.height / 2) { list.insertBefore(placeholder, prev); moved = true; continue; }
+          }
+          const next = siblings[phIndex + 1];
+          if (next) {
+            const nr = next.getBoundingClientRect();
+            if (centerY > nr.top + nr.height / 2) { list.insertBefore(placeholder, next.nextSibling); moved = true; }
+          }
+        }
+      };
+      const onUp = () => {
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        handle.removeEventListener('pointercancel', onUp);
+        const finalIndex = Array.from(list.children).indexOf(placeholder);
+        placeholder.remove();
+        item.remove();
+        if (finalIndex !== -1 && finalIndex !== startIndex) {
+          const [moved] = fb.blocks.splice(startIndex, 1);
+          fb.blocks.splice(finalIndex, 0, moved);
+        }
+        renderFbBlocksList();
+      };
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+      handle.addEventListener('pointercancel', onUp);
+    });
+  });
 }
 
 /* Nur noch der Idle-Zustand ("Ablauf starten") — sobald ein Ablauf läuft,
