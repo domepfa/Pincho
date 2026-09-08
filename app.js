@@ -29,6 +29,21 @@ function esc(str) {
   }[c]));
 }
 
+/* Unfertige Eingaben (eigener Fingerboard-Ablauf, Log-/Freestyle-Sätze) nur
+   im Speicher zu halten hiess: Seite neu laden (oder Handy sperrt sich,
+   PWA wird vom System beendet) → alles weg. Deshalb hier zusätzlich in
+   localStorage gespiegelt und beim Start wiederhergestellt — bis der
+   Nutzer aktiv speichert oder zurücksetzt. */
+function saveDraft(key, data) {
+  try { localStorage.setItem('pincho_draft_' + key, JSON.stringify(data)); } catch (e) { /* ignorieren */ }
+}
+function loadDraft(key) {
+  try {
+    const raw = localStorage.getItem('pincho_draft_' + key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
 /* Tippbares Übungs-Raster statt <select>-Dropdown — bei Dutzenden Übungen
    ist ein natives Dropdown auf dem Handy ein langes, unübersichtliches
    Scrollen; ein Raster lässt sich auf einen Blick überfliegen (gleiche
@@ -40,7 +55,7 @@ function exercisePickerGridHtml(list, selectedId) {
     .map(([cat, label]) => `
       <div class="ex-cat-label">${label}</div>
       <div class="ex-pick-grid">
-        ${list.filter((e) => e.category === cat).map((e) => `
+        ${list.filter((e) => e.category === cat).sort((a, b) => a.name.localeCompare(b.name, 'de')).map((e) => `
           <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">${esc(e.name)}</button>
         `).join('')}
       </div>
@@ -310,7 +325,7 @@ async function renderPlan() {
 /* ================================================================
    LOG
    ================================================================= */
-let logBuilder = { exercises: [] };
+let logBuilder = { exercises: loadDraft('log_exercises') || [] };
 let logMode = 'planned'; // 'planned' | 'freestyle'
 let logPickerExerciseId = EXERCISE_LIBRARY[0].id;
 /* Freestyle: kein fester Plan — Übung wählen, Satz für Satz mit Gewicht/Wdh
@@ -318,7 +333,7 @@ let logPickerExerciseId = EXERCISE_LIBRARY[0].id;
    erst beim Speichern wird daraus ein Log-Eintrag. exercises: Liste von
    {exerciseId, sets: [{weight, reps}, ...]} in der Reihenfolge, in der die
    Übungen zum ersten Mal gewählt wurden. */
-let freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id };
+let freestyleBuilder = loadDraft('freestyle') || { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id };
 
 /* Letzter bekannter Wert für eine Übung — über die komplette Session-
    Historie (state.logs, neueste zuerst), egal ob geplant oder freestyle
@@ -403,6 +418,8 @@ async function renderLog() {
       toast('Session gespeichert.', 'ok');
       logBuilder = { exercises: [] };
       freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id };
+      saveDraft('log_exercises', logBuilder.exercises);
+      saveDraft('freestyle', freestyleBuilder);
       renderLog();
     } else toast('Konnte nicht speichern.', 'err');
   };
@@ -527,6 +544,7 @@ function renderFsActive() {
 }
 
 function renderFsEntries() {
+  saveDraft('freestyle', freestyleBuilder);
   const holder = document.getElementById('fs-entries');
   if (!holder) return;
   if (!freestyleBuilder.exercises.length) {
@@ -567,6 +585,7 @@ function renderFsEntries() {
 }
 
 function renderLogExerciseRows() {
+  saveDraft('log_exercises', logBuilder.exercises);
   const holder = document.getElementById('log-exercise-rows');
   if (!holder) return;
   holder.innerHTML = logBuilder.exercises.length ? logBuilder.exercises.map((ex, i) => `
@@ -585,6 +604,7 @@ function renderLogExerciseRows() {
       const i = Number(inp.dataset.i);
       const f = inp.dataset.f;
       logBuilder.exercises[i][f] = f === 'reps' ? inp.value : (Number(inp.value) || 0);
+      saveDraft('log_exercises', logBuilder.exercises);
     };
   });
   holder.querySelectorAll('[data-step]').forEach((btn) => {
@@ -659,7 +679,7 @@ const fb = {
   addType: 'hang',       // 'hang' | 'exercise' — welches Add-Panel gerade offen ist
   newHang: { reps: 3, hangSec: 7, restSec: 30 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
-  blocks: [],            // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec} | {type:'exercise', exerciseId, reps, workSec, restSec}
+  blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec} | {type:'exercise', exerciseId, reps, workSec, restSec}
   templates: [],         // eigene, in Firebase gespeicherte Abläufe (zusätzlich zu FINGERBOARD_TEMPLATES)
   weight: '',
   blockIndex: 0,
@@ -1865,6 +1885,7 @@ function fbBlockSub(b) {
 }
 
 function renderFbBlocksList() {
+  saveDraft('fb_blocks', fb.blocks);
   const holder = document.getElementById('fb-blocks-list');
   if (!holder) return;
 
@@ -1917,6 +1938,7 @@ function renderFbBlocksList() {
     inp.oninput = () => {
       const i = Number(inp.dataset.i);
       fb.blocks[i][inp.dataset.f] = Number(inp.value) || 0;
+      saveDraft('fb_blocks', fb.blocks);
       const subEl = document.getElementById(`fb-sub-${i}`);
       if (subEl) subEl.textContent = fbBlockSub(fb.blocks[i]);
       const timeEl = document.getElementById('fb-stat-time');
