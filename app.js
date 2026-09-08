@@ -405,11 +405,11 @@ function lastValueForExercise(exerciseId) {
 }
 
 async function renderLog() {
-  const isEndurance = logMode === 'endurance';
+  const isWall = logMode === 'wall';
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Neue Session</h2><div class="sec-rule"></div></div>
     <div class="card">
-      ${isEndurance ? '' : `
+      ${isWall ? '' : `
       <div class="field-row">
         <div class="field"><label>Datum</label><input type="date" id="log-date" value="${todayKey()}"></div>
         <div class="field"><label>Typ</label>
@@ -422,12 +422,12 @@ async function renderLog() {
       <div class="chip-row">
         <button type="button" class="chip ${logMode === 'planned' ? 'active' : ''}" data-log-mode="planned">Geplant</button>
         <button type="button" class="chip ${logMode === 'freestyle' ? 'active' : ''}" data-log-mode="freestyle">Freestyle</button>
-        <button type="button" class="chip ${logMode === 'endurance' ? 'active' : ''}" data-log-mode="endurance">Ausdauer</button>
+        <button type="button" class="chip ${logMode === 'wall' ? 'active' : ''}" data-log-mode="wall">An die Wand</button>
       </div>
 
       <div id="log-builder-panel"></div>
 
-      ${isEndurance ? '' : `
+      ${isWall ? '' : `
       <div class="field"><label>Notiz (optional)</label><textarea id="log-note" placeholder="Befinden, Bedingungen, Sonstiges…"></textarea></div>
       <div class="field"><label>RPE (1–10, optional)</label><input type="number" id="log-rpe" min="1" max="10"></div>
       <button class="btn" id="log-save">SESSION SPEICHERN</button>`}
@@ -446,7 +446,7 @@ async function renderLog() {
     };
   });
 
-  if (isEndurance) { renderLogHistory(); return; }
+  if (isWall) { renderLogHistory(); return; }
 
   document.getElementById('log-save').onclick = async () => {
     const exercises = logMode === 'freestyle'
@@ -477,8 +477,8 @@ async function renderLog() {
 }
 
 /* Verlauf-Liste — eigene Funktion, weil sie sowohl vom normalen
-   Geplant/Freestyle-Zweig als auch vom Ausdauer-Zweig (der die übrigen
-   Formularfelder gar nicht erst anzeigt) gebraucht wird. */
+   Geplant/Freestyle-Zweig als auch vom "An die Wand"-Zweig (der die
+   übrigen Formularfelder gar nicht erst anzeigt) gebraucht wird. */
 async function renderLogHistory() {
   const raw = await fbGet(`logs/${state.member.id}`);
   const entries = Object.entries(raw || {}).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
@@ -488,7 +488,7 @@ async function renderLogHistory() {
   list.innerHTML = entries.length ? entries.map(([id, e]) => `
     <div class="log-item">
       <div class="top"><span>${esc(e.date)}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
-      ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>⏱ Ausdauer</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
+      ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>🧗 An die Wand</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
       ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => `
         <div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>
       `).join('')}</div>` : ''}
@@ -511,151 +511,239 @@ async function renderLogHistory() {
 }
 
 /* ================================================================
-   AUSDAUER (freies Klettern/Bouldern nach Minuten, statt Sätzen/Wdh.)
-   Eigenständiger, einfacher Countdown — bewusst NICHT ins Fingerboard-
-   Block-System eingebaut, das ist konzeptionell Hangboard-Training.
-   Speichert direkt in logs/{member}, landet damit automatisch im
-   selben Verlauf und ist über den bestehenden "Als Challenge teilen"-
-   Weg genauso teilbar wie jede andere Session. */
-const endurance = { minutes: 20, running: false, secondsLeft: 0, totalSeconds: 0, intervalId: null };
+   AN DIE WAND (freies Klettern/Bouldern als selbst gebauter Ablauf aus
+   Wand- und Pause-Blöcken, z. B. 3min Wand · 4min Pause · 5min Wand —
+   individuell zusammenstellbar, statt fixer Sätze/Wdh. Eigenständiger,
+   einfacher Block-Ablauf, bewusst NICHT ins Fingerboard-System
+   eingebaut, das ist konzeptionell Hangboard-Training. Speichert direkt
+   in logs/{member}, landet damit automatisch im selben Verlauf und ist
+   über den bestehenden "Als Challenge teilen"-Weg genauso teilbar wie
+   jede andere Session. Die Blockliste bleibt nach einer Session bewusst
+   erhalten (nicht wie logBuilder/freestyleBuilder geleert) — dieselbe
+   Struktur lässt sich so ohne erneutes Bauen wiederverwenden. */
+let wallBlocks = loadDraft('wall_blocks') || []; // [{type:'wand'|'pause', minutes}]
+let wallNewType = 'wand';
+let wallNewMinutes = 3;
+const wall = { blockIndex: 0, running: false, secondsLeft: 0, totalSeconds: 0, intervalId: null, wandSecondsDone: 0 };
 
-function ensureEnduranceOverlay() {
-  let el = document.getElementById('endurance-overlay');
+function wallFigureSvg() { return `<div class="ex-figure-emoji">🧗</div>`; }
+
+function renderWallBuilder(holder) {
+  holder.innerHTML = `
+    <div class="chip-row" id="wall-type-toggle">
+      <button type="button" class="chip ${wallNewType === 'wand' ? 'active' : ''}" data-wall-type="wand">Wand</button>
+      <button type="button" class="chip ${wallNewType === 'pause' ? 'active' : ''}" data-wall-type="pause">Pause</button>
+    </div>
+    <div class="field"><label>Minuten</label><input type="number" inputmode="numeric" id="wall-new-minutes" value="${wallNewMinutes}" min="1"></div>
+    <button type="button" class="btn" id="wall-add-block" style="width:100%;margin-bottom:14px;">+ Hinzufügen</button>
+    <div id="wall-blocks-list"></div>
+    <button type="button" class="btn" id="wall-start" style="width:100%;" ${wallBlocks.length ? '' : 'disabled'}>TIMER STARTEN</button>
+  `;
+  document.getElementById('wall-type-toggle').querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => {
+      wallNewType = btn.dataset.wallType;
+      document.getElementById('wall-type-toggle').querySelectorAll('.chip').forEach((b) => b.classList.toggle('active', b === btn));
+    };
+  });
+  document.getElementById('wall-new-minutes').oninput = (e) => { wallNewMinutes = Number(e.target.value) || 1; };
+  document.getElementById('wall-add-block').onclick = () => {
+    wallBlocks.push({ type: wallNewType, minutes: wallNewMinutes });
+    saveDraft('wall_blocks', wallBlocks);
+    renderWallBlocksList();
+  };
+  document.getElementById('wall-start').onclick = startWallSession;
+  renderWallBlocksList();
+}
+
+function renderWallBlocksList() {
+  const holder = document.getElementById('wall-blocks-list');
+  if (!holder) return;
+  holder.innerHTML = wallBlocks.length ? wallBlocks.map((b, i) => `
+    <div class="timeline-item anim-in" style="animation-delay:${Math.min(i, 14) * 30}ms">
+      <div class="timeline-badge ${b.type === 'wand' ? '' : 'exercise'}">${i + 1}</div>
+      <div class="timeline-card">
+        <div class="timeline-thumb timeline-thumb-emoji">${b.type === 'wand' ? '🧗' : '💤'}</div>
+        <div class="info">
+          <div class="title">${b.type === 'wand' ? 'Wand' : 'Pause'}</div>
+          <div class="timeline-edit"><input type="number" data-i="${i}" value="${b.minutes}" class="ex-row-input" title="Minuten"><span class="mono" style="align-self:center;color:var(--ink-faint);font-size:12px;">Min.</span></div>
+        </div>
+      </div>
+      <button type="button" class="timeline-remove" data-remove="${i}">×</button>
+    </div>
+  `).join('') : '<div class="list-empty" style="margin-bottom:14px;">Noch keine Blöcke — oben hinzufügen.</div>';
+  holder.querySelectorAll('input[data-i]').forEach((inp) => {
+    inp.oninput = () => {
+      wallBlocks[Number(inp.dataset.i)].minutes = Number(inp.value) || 1;
+      saveDraft('wall_blocks', wallBlocks);
+    };
+  });
+  holder.querySelectorAll('[data-remove]').forEach((btn) => {
+    btn.onclick = () => {
+      wallBlocks.splice(Number(btn.dataset.remove), 1);
+      saveDraft('wall_blocks', wallBlocks);
+      renderWallBlocksList();
+    };
+  });
+  const startBtn = document.getElementById('wall-start');
+  if (startBtn) startBtn.disabled = !wallBlocks.length;
+}
+
+function ensureWallOverlay() {
+  let el = document.getElementById('wall-overlay');
   if (!el) {
     el = document.createElement('div');
-    el.id = 'endurance-overlay';
+    el.id = 'wall-overlay';
     el.className = 'fb-overlay hidden';
     document.body.appendChild(el);
   }
   return el;
 }
 
-async function startEnduranceTimer() {
-  endurance.totalSeconds = endurance.minutes * 60;
-  endurance.secondsLeft = endurance.totalSeconds;
-  endurance.running = true;
-  const el = ensureEnduranceOverlay();
+function startWallSession() {
+  if (!wallBlocks.length) return;
+  wall.blockIndex = 0;
+  wall.running = true;
+  wall.wandSecondsDone = 0;
+  beginWallBlock();
+}
+
+async function beginWallBlock() {
+  const block = wallBlocks[wall.blockIndex];
+  if (!block) { finishWallSession(); return; }
+  wall.totalSeconds = block.minutes * 60;
+  wall.secondsLeft = wall.totalSeconds;
+  const el = ensureWallOverlay();
   el.classList.remove('hidden');
-  if (el.requestFullscreen) {
+  if (el.requestFullscreen && !document.fullscreenElement) {
     try { await el.requestFullscreen(); } catch (e) { /* z.B. iOS Safari — CSS-Vollbild reicht als Fallback */ }
   }
-  endurance.intervalId = setInterval(tickEndurance, 1000);
-  renderEnduranceOverlay();
+  wall.intervalId = setInterval(tickWall, 1000);
+  renderWallOverlay();
   beepStart();
 }
 
-function tickEndurance() {
-  endurance.secondsLeft--;
-  if (endurance.secondsLeft <= 0) {
-    clearInterval(endurance.intervalId);
-    endurance.intervalId = null;
+function tickWall() {
+  wall.secondsLeft--;
+  if (wallBlocks[wall.blockIndex].type === 'wand') wall.wandSecondsDone++;
+  if (wall.secondsLeft <= 0) {
+    clearInterval(wall.intervalId);
+    wall.intervalId = null;
     beep(1318, 300);
-    finishEndurance();
+    wall.blockIndex++;
+    if (wall.blockIndex >= wallBlocks.length) { finishWallSession(); return; }
+    beginWallBlock();
     return;
   }
-  if (endurance.secondsLeft <= 3) beepTick();
-  updateEnduranceUI();
+  if (wall.secondsLeft <= 3) beepTick();
+  updateWallUI();
 }
 
-function toggleEndurancePause() {
-  if (!endurance.running) return;
-  if (endurance.intervalId) { clearInterval(endurance.intervalId); endurance.intervalId = null; }
-  else { endurance.intervalId = setInterval(tickEndurance, 1000); }
-  renderEnduranceOverlay();
+function toggleWallPause() {
+  if (!wall.running) return;
+  if (wall.intervalId) { clearInterval(wall.intervalId); wall.intervalId = null; }
+  else { wall.intervalId = setInterval(tickWall, 1000); }
+  renderWallOverlay();
 }
 
-function cancelEndurance() {
-  clearInterval(endurance.intervalId);
-  endurance.intervalId = null;
-  endurance.running = false;
-  const el = document.getElementById('endurance-overlay');
+function cancelWall() {
+  clearInterval(wall.intervalId);
+  wall.intervalId = null;
+  wall.running = false;
+  const el = document.getElementById('wall-overlay');
   if (el) el.classList.add('hidden');
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
 
-function renderEnduranceOverlay() {
-  const el = ensureEnduranceOverlay();
-  const isPausedNow = endurance.running && !endurance.intervalId;
-  const frac = endurance.totalSeconds ? 1 - endurance.secondsLeft / endurance.totalSeconds : 0;
+function renderWallOverlay() {
+  const el = ensureWallOverlay();
+  const block = wallBlocks[wall.blockIndex];
+  const working = block.type === 'wand';
+  const isPausedNow = wall.running && !wall.intervalId;
+  const frac = wall.totalSeconds ? 1 - wall.secondsLeft / wall.totalSeconds : 0;
   const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
-  const mm = Math.floor(endurance.secondsLeft / 60);
-  const ss = endurance.secondsLeft % 60;
+  const mm = Math.floor(wall.secondsLeft / 60);
+  const ss = wall.secondsLeft % 60;
+  const next = wallBlocks[wall.blockIndex + 1];
+  const nextText = next ? `Danach: ${next.type === 'wand' ? 'Wand' : 'Pause'} ${next.minutes} Min.` : 'Letzter Block — gleich geschafft!';
   el.innerHTML = `
-    <button type="button" class="fb-overlay-close" id="endurance-close" title="Abbrechen">✕</button>
+    <button type="button" class="fb-overlay-close" id="wall-close" title="Abbrechen">✕</button>
     <div class="fb-overlay-inner">
-      <div class="fb-stage-label mono">AUSDAUER</div>
+      <div class="fb-stage-label mono">SATZ ${wall.blockIndex + 1}/${wallBlocks.length} · ${working ? 'WAND' : 'PAUSE'}</div>
+      <div class="fb-stage-figure" id="wall-figure">${working ? wallFigureSvg() : FB_REST_FIGURE_SVG}</div>
       <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
         <div class="fb-timer-ring">
           <svg viewBox="0 0 120 120">
             <circle class="ring-bg" cx="60" cy="60" r="52"/>
-            <circle class="ring-fg" id="endurance-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
+            <circle class="ring-fg ${working ? '' : 'rest'}" id="wall-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
           </svg>
-          <div class="big" id="endurance-big">${pad2(mm)}:${pad2(ss)}</div>
+          <div class="big ${working ? '' : 'rest'}" id="wall-big">${pad2(mm)}:${pad2(ss)}</div>
         </div>
       </div>
-      <div class="phase mono">${isPausedNow ? 'PAUSIERT' : 'Läuft'}</div>
+      <div class="phase mono">${isPausedNow ? 'PAUSIERT' : working ? 'Wand' : 'Pause'}</div>
+      <div class="fb-stage-next mono">${esc(nextText)}</div>
       <div class="fb-transport">
-        <button type="button" class="fb-transport-btn fb-play" id="endurance-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? '▶' : '⏸'}</button>
+        <button type="button" class="fb-transport-btn fb-play" id="wall-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? '▶' : '⏸'}</button>
       </div>
-      <button class="btn fb-stage-btn" id="endurance-done-btn">FERTIG</button>
-      <button class="btn ghost fb-stage-btn" id="endurance-cancel-btn">ABBRECHEN</button>
+      <button class="btn fb-stage-btn" id="wall-done-btn">FERTIG</button>
+      <button class="btn ghost fb-stage-btn" id="wall-cancel-btn">ABBRECHEN</button>
     </div>
   `;
-  document.getElementById('endurance-close').onclick = cancelEndurance;
-  document.getElementById('endurance-cancel-btn').onclick = cancelEndurance;
-  document.getElementById('endurance-playpause').onclick = toggleEndurancePause;
-  document.getElementById('endurance-done-btn').onclick = () => finishEndurance();
+  document.getElementById('wall-close').onclick = cancelWall;
+  document.getElementById('wall-cancel-btn').onclick = cancelWall;
+  document.getElementById('wall-playpause').onclick = toggleWallPause;
+  document.getElementById('wall-done-btn').onclick = () => finishWallSession();
 }
 
-function updateEnduranceUI() {
-  const big = document.getElementById('endurance-big');
-  const ring = document.getElementById('endurance-ring-fg');
-  const mm = Math.floor(endurance.secondsLeft / 60);
-  const ss = endurance.secondsLeft % 60;
+function updateWallUI() {
+  const big = document.getElementById('wall-big');
+  const ring = document.getElementById('wall-ring-fg');
+  const mm = Math.floor(wall.secondsLeft / 60);
+  const ss = wall.secondsLeft % 60;
   if (big) big.textContent = `${pad2(mm)}:${pad2(ss)}`;
   if (ring) {
-    const frac = endurance.totalSeconds ? 1 - endurance.secondsLeft / endurance.totalSeconds : 0;
+    const frac = wall.totalSeconds ? 1 - wall.secondsLeft / wall.totalSeconds : 0;
     ring.style.strokeDashoffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
   }
 }
 
-/* Läuft der Timer komplett ab ODER wird "FERTIG" früher angetippt — in
-   beiden Fällen wird die tatsächlich vergangene Zeit geloggt (nicht die
-   ursprünglich eingestellte), falls man früher aufhört als geplant. */
-async function finishEndurance() {
-  clearInterval(endurance.intervalId);
-  endurance.intervalId = null;
-  endurance.running = false;
-  const elapsedMin = Math.max(1, Math.round((endurance.totalSeconds - Math.max(endurance.secondsLeft, 0)) / 60));
+/* Läuft die ganze Blockliste durch ODER wird "FERTIG" früher angetippt —
+   in beiden Fällen wird die tatsächlich an der Wand verbrachte Zeit
+   geloggt (nur die Wand-Blöcke, nicht die Pausen), nicht die ursprünglich
+   geplante Gesamtdauer. */
+async function finishWallSession() {
+  clearInterval(wall.intervalId);
+  wall.intervalId = null;
+  wall.running = false;
+  const elapsedMin = Math.max(1, Math.round(wall.wandSecondsDone / 60));
   beep(1568, 400);
 
-  const el = ensureEnduranceOverlay();
+  const el = ensureWallOverlay();
   el.innerHTML = `
     <div class="fb-overlay-inner fb-overlay-done">
       <div class="fb-done-emoji">🎉</div>
-      <div class="fb-stage-title">Ausdauer geschafft!</div>
-      <div class="fb-stage-sub mono">${elapsedMin} ${elapsedMin === 1 ? 'Minute' : 'Minuten'}</div>
-      ${challengeDurationChipsHtml('endurance-share', CHALLENGE_WINDOW_H)}
-      <button class="btn fb-stage-btn ghost" id="endurance-share-btn">Als Challenge teilen</button>
-      <button class="btn fb-stage-btn" id="endurance-finish-btn">Schliessen</button>
+      <div class="fb-stage-title">An der Wand geschafft!</div>
+      <div class="fb-stage-sub mono">${elapsedMin} ${elapsedMin === 1 ? 'Minute' : 'Minuten'} an der Wand</div>
+      ${challengeDurationChipsHtml('wall-share', CHALLENGE_WINDOW_H)}
+      <button class="btn fb-stage-btn ghost" id="wall-share-btn">Als Challenge teilen</button>
+      <button class="btn fb-stage-btn" id="wall-finish-btn">Schliessen</button>
     </div>
   `;
-  wireChallengeDurationChips('endurance-share');
-  spawnConfetti(document.querySelector('#endurance-overlay .fb-overlay-done'));
+  wireChallengeDurationChips('wall-share');
+  spawnConfetti(document.querySelector('#wall-overlay .fb-overlay-done'));
 
   const entry = { date: todayKey(), type: 'klettern', durationMin: elapsedMin, exercises: [], note: '', rpe: null, createdAt: Date.now() };
   const id = await fbPush(`logs/${state.member.id}`, entry);
-  if (id) toast('Ausdauer-Session gespeichert 💪', 'ok'); else toast('Konnte nicht speichern.', 'err');
+  if (id) toast('An die Wand-Session gespeichert 💪', 'ok'); else toast('Konnte nicht speichern.', 'err');
 
-  document.getElementById('endurance-finish-btn').onclick = () => {
-    const overlay = document.getElementById('endurance-overlay');
+  document.getElementById('wall-finish-btn').onclick = () => {
+    const overlay = document.getElementById('wall-overlay');
     if (overlay) overlay.classList.add('hidden');
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     renderLogHistory();
   };
-  document.getElementById('endurance-share-btn').onclick = async (e) => {
+  document.getElementById('wall-share-btn').onclick = async (e) => {
     e.target.disabled = true;
-    await shareLogEntryAsChallenge(entry, selectedChallengeHours('endurance-share'));
+    await shareLogEntryAsChallenge(entry, selectedChallengeHours('wall-share'));
     e.target.textContent = 'Geteilt ✓';
   };
 }
@@ -674,13 +762,8 @@ function renderLogBuilderPanel() {
   const holder = document.getElementById('log-builder-panel');
   if (!holder) return;
 
-  if (logMode === 'endurance') {
-    holder.innerHTML = `
-      <div class="field"><label>Minuten</label><input type="number" inputmode="numeric" id="endurance-minutes" value="${endurance.minutes}" min="1"></div>
-      <button type="button" class="btn" id="endurance-start" style="width:100%;">TIMER STARTEN</button>
-    `;
-    document.getElementById('endurance-minutes').oninput = (e) => { endurance.minutes = Number(e.target.value) || 1; };
-    document.getElementById('endurance-start').onclick = startEnduranceTimer;
+  if (logMode === 'wall') {
+    renderWallBuilder(holder);
   } else if (logMode === 'freestyle') {
     holder.innerHTML = `
       <div class="field">
@@ -874,7 +957,16 @@ function parseImportedAblauf(text) {
     if (b.type === 'hang') {
       const board = BOARDS[b.board];
       if (!board) { errors.push(`Satz ${n}: unbekanntes board "${b.board}" (erlaubt: bm1000, bm2000).`); return; }
-      if (!board.grips.some((g) => g.id === b.grip)) { errors.push(`Satz ${n}: unbekannter grip "${b.grip}" für ${b.board}.`); return; }
+      const isAsym = b.gripLeft != null || b.gripRight != null;
+      let gripFields = {};
+      if (isAsym) {
+        if (!board.grips.some((g) => g.id === b.gripLeft)) { errors.push(`Satz ${n}: unbekannter gripLeft "${b.gripLeft}" für ${b.board}.`); return; }
+        if (!board.grips.some((g) => g.id === b.gripRight)) { errors.push(`Satz ${n}: unbekannter gripRight "${b.gripRight}" für ${b.board}.`); return; }
+        gripFields = { gripLeft: b.gripLeft, gripRight: b.gripRight };
+      } else {
+        if (!board.grips.some((g) => g.id === b.grip)) { errors.push(`Satz ${n}: unbekannter grip "${b.grip}" für ${b.board}.`); return; }
+        gripFields = { grip: b.grip };
+      }
       const reps = Number(b.reps);
       const hangSec = Number(b.hangSec);
       const restSec = Number(b.restSec);
@@ -883,7 +975,7 @@ function parseImportedAblauf(text) {
       if (!(hangSec > 0)) { errors.push(`Satz ${n}: hangSec muss eine Zahl > 0 sein.`); return; }
       if (!(restSec >= 0)) { errors.push(`Satz ${n}: restSec muss eine Zahl >= 0 sein.`); return; }
       if (blockRestSec != null && !(blockRestSec >= 0)) { errors.push(`Satz ${n}: blockRestSec muss eine Zahl >= 0 sein.`); return; }
-      blocks.push({ type: 'hang', board: b.board, grip: b.grip, reps, hangSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}) });
+      blocks.push({ type: 'hang', board: b.board, ...gripFields, reps, hangSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}) });
     } else if (b.type === 'exercise') {
       if (!EXERCISE_LIBRARY.some((e) => e.id === b.exerciseId)) { errors.push(`Satz ${n}: unbekannte exerciseId "${b.exerciseId}".`); return; }
       const reps = Number(b.reps);
@@ -932,6 +1024,10 @@ function parseImportedAblauf(text) {
 const fb = {
   board: null,
   selectedGrip: null,   // am grafischen Board gewählter Griff, fürs Hinzufügen eines Hang-Satzes
+  gripMode: 'same',     // 'same' | 'different' — ein Griff für beide Hände, oder pro Hand ein eigener
+  pickingHand: 'left',  // 'left' | 'right' — welche Hand gerade am Board gewählt wird, wenn gripMode==='different'
+  selectedGripLeft: null,
+  selectedGripRight: null,
   addType: 'hang',       // 'hang' | 'exercise' | 'campus' — welches Add-Panel gerade offen ist
   newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
@@ -964,8 +1060,10 @@ function renderBoardImage() {
   const board = BOARDS[fb.board];
   const spots = board.hotspots.map((h) => {
     const grip = board.grips.find((g) => g.id === h.grip);
-    const active = fb.selectedGrip === h.grip;
-    return `<button type="button" class="board-hotspot ${active ? 'active' : ''}" style="left:${h.x}%;top:${h.y}%;" data-grip="${h.grip}" title="${esc(grip.label)}${grip.note ? ' · ' + esc(grip.note) : ''}"></button>`;
+    const cls = fb.gripMode === 'different'
+      ? [h.grip === fb.selectedGripLeft ? 'active-left' : '', h.grip === fb.selectedGripRight ? 'active-right' : ''].filter(Boolean).join(' ')
+      : (fb.selectedGrip === h.grip ? 'active' : '');
+    return `<button type="button" class="board-hotspot ${cls}" style="left:${h.x}%;top:${h.y}%;" data-grip="${h.grip}" title="${esc(grip.label)}${grip.note ? ' · ' + esc(grip.note) : ''}"></button>`;
   }).join('');
   return `<div class="board-photo-wrap" id="fb-board-photo">
     <img src="${board.image}" alt="${esc(board.label)}">
@@ -993,6 +1091,11 @@ function wireCalibration() {
 }
 
 function fbSelectedGripHint() {
+  if (fb.gripMode === 'different') {
+    const left = fb.selectedGripLeft ? esc(gripLabel(fb.board, fb.selectedGripLeft)) : '—';
+    const right = fb.selectedGripRight ? esc(gripLabel(fb.board, fb.selectedGripRight)) : '—';
+    return `Links: ${left} · Rechts: ${right}`;
+  }
   return fb.selectedGrip
     ? 'Gewählt: ' + esc(gripLabel(fb.board, fb.selectedGrip))
     : 'Griff am Board antippen (oder unten aus der Liste wählen).';
@@ -1002,16 +1105,36 @@ function fbSelectedGripHint() {
    komplett neu aufzurufen — ein voller Re-Render ersetzt #app und wirft
    den Scroll dabei zurück nach oben. Beim wiederholten Antippen mehrerer
    Griffe beim Ablauf-Bauen war das der eigentliche Grund fürs ständige
-   Hoch-/Runterscrollen, nicht nur die Reihenfolge der Abschnitte. */
+   Hoch-/Runterscrollen, nicht nur die Reihenfolge der Abschnitte. Bei
+   gripMode==='different' schreibt ein Tap auf die gerade aktive Hand
+   (fb.pickingHand), beide Hände bleiben gleichzeitig am Board sichtbar
+   (unterschiedlich eingefärbt), damit man den Unterschied sofort sieht. */
 function selectFbGrip(gripId) {
-  fb.selectedGrip = gripId;
+  if (fb.gripMode === 'different') {
+    if (fb.pickingHand === 'left') fb.selectedGripLeft = gripId;
+    else fb.selectedGripRight = gripId;
+  } else {
+    fb.selectedGrip = gripId;
+  }
   const hint = document.getElementById('fb-selected-hint');
   if (hint) hint.textContent = fbSelectedGripHint();
   document.querySelectorAll('#fb-board-visual .board-hotspot').forEach((el) => {
-    el.classList.toggle('active', el.dataset.grip === gripId);
+    if (fb.gripMode === 'different') {
+      el.classList.toggle('active-left', el.dataset.grip === fb.selectedGripLeft);
+      el.classList.toggle('active-right', el.dataset.grip === fb.selectedGripRight);
+    } else {
+      el.classList.toggle('active', el.dataset.grip === gripId);
+    }
   });
   const select = document.getElementById('fb-grip-select');
   if (select && select.value !== (gripId || '')) select.value = gripId || '';
+  const handLabels = document.getElementById('fb-hand-toggle');
+  if (handLabels) {
+    const leftBtn = handLabels.querySelector('[data-hand="left"]');
+    const rightBtn = handLabels.querySelector('[data-hand="right"]');
+    if (leftBtn) leftBtn.textContent = 'Links' + (fb.selectedGripLeft ? ': ' + gripLabel(fb.board, fb.selectedGripLeft) : ' wählen');
+    if (rightBtn) rightBtn.textContent = 'Rechts' + (fb.selectedGripRight ? ': ' + gripLabel(fb.board, fb.selectedGripRight) : ' wählen');
+  }
 }
 
 /* ---------- "Eigenen Ablauf bauen": ein Satz nach dem anderen ----------
@@ -1030,14 +1153,24 @@ function renderFbAddPanel() {
         <button class="chip ${fb.board === 'bm1000' ? 'active' : ''}" data-board="bm1000">BM 1000</button>
         <button class="chip ${fb.board === 'bm2000' ? 'active' : ''}" data-board="bm2000">BM 2000</button>
       </div>
+      <div class="chip-row" id="fb-gripmode-toggle">
+        <button class="chip ${fb.gripMode === 'same' ? 'active' : ''}" data-grip-mode="same">Beide Hände gleich</button>
+        <button class="chip ${fb.gripMode === 'different' ? 'active' : ''}" data-grip-mode="different">Unterschiedlich</button>
+      </div>
+      ${fb.gripMode === 'different' ? `
+        <div class="chip-row" id="fb-hand-toggle">
+          <button class="chip ${fb.pickingHand === 'left' ? 'active' : ''}" data-hand="left">Links${fb.selectedGripLeft ? ': ' + esc(gripLabel(fb.board, fb.selectedGripLeft)) : ' wählen'}</button>
+          <button class="chip ${fb.pickingHand === 'right' ? 'active' : ''}" data-hand="right">Rechts${fb.selectedGripRight ? ': ' + esc(gripLabel(fb.board, fb.selectedGripRight)) : ' wählen'}</button>
+        </div>
+      ` : ''}
       <div class="board-visual" id="fb-board-visual">${renderBoardImage()}</div>
       <p class="mono" id="fb-calib-readout" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:6px 0;min-height:14px;"></p>
       <p class="login-hint" id="fb-selected-hint" style="margin:0 0 8px;">${fbSelectedGripHint()}</p>
       <div class="field">
-        <label>Oder aus der Liste wählen</label>
+        <label>${fb.gripMode === 'different' ? `Oder aus der Liste wählen (für ${fb.pickingHand === 'left' ? 'links' : 'rechts'})` : 'Oder aus der Liste wählen'}</label>
         <select id="fb-grip-select">
           <option value="">— Griff wählen —</option>
-          ${BOARDS[fb.board].grips.map((g) => `<option value="${g.id}" ${fb.selectedGrip === g.id ? 'selected' : ''}>${esc(g.label)}${g.note ? ' · ' + esc(g.note) : ''}${gripArmNote(fb.board, g.id) ? ' · ' + gripArmNote(fb.board, g.id) : ''}</option>`).join('')}
+          ${BOARDS[fb.board].grips.map((g) => `<option value="${g.id}" ${(fb.gripMode === 'different' ? (fb.pickingHand === 'left' ? fb.selectedGripLeft : fb.selectedGripRight) : fb.selectedGrip) === g.id ? 'selected' : ''}>${esc(g.label)}${g.note ? ' · ' + esc(g.note) : ''}${gripArmNote(fb.board, g.id) ? ' · ' + gripArmNote(fb.board, g.id) : ''}</option>`).join('')}
         </select>
       </div>
       <div class="field-row">
@@ -1055,11 +1188,33 @@ function renderFbAddPanel() {
       btn.onclick = () => {
         fb.board = btn.dataset.board;
         fb.selectedGrip = null;
+        fb.selectedGripLeft = null;
+        fb.selectedGripRight = null;
         state.members[state.member.id] = { ...state.members[state.member.id], board: fb.board };
         fbPatch(`members/${state.member.id}`, { board: fb.board });
         renderFbAddPanel();
       };
     });
+    document.getElementById('fb-gripmode-toggle').querySelectorAll('.chip').forEach((btn) => {
+      btn.onclick = () => {
+        fb.gripMode = btn.dataset.gripMode;
+        fb.pickingHand = 'left';
+        renderFbAddPanel();
+      };
+    });
+    const handToggle = document.getElementById('fb-hand-toggle');
+    if (handToggle) {
+      handToggle.querySelectorAll('.chip').forEach((btn) => {
+        btn.onclick = () => {
+          fb.pickingHand = btn.dataset.hand;
+          handToggle.querySelectorAll('.chip').forEach((b) => b.classList.toggle('active', b === btn));
+          const select = document.getElementById('fb-grip-select');
+          if (select) select.value = (fb.pickingHand === 'left' ? fb.selectedGripLeft : fb.selectedGripRight) || '';
+          const label = document.querySelector('#fb-add-panel .field label');
+          if (label) label.textContent = `Oder aus der Liste wählen (für ${fb.pickingHand === 'left' ? 'links' : 'rechts'})`;
+        };
+      });
+    }
     document.getElementById('fb-board-visual').querySelectorAll('.board-hotspot').forEach((el) => {
       el.onclick = () => selectFbGrip(el.dataset.grip);
     });
@@ -1069,8 +1224,13 @@ function renderFbAddPanel() {
     document.getElementById('fb-new-restsec').oninput = (e) => { fb.newHang.restSec = Number(e.target.value) || 0; };
     document.getElementById('fb-new-blockrestsec').oninput = (e) => { fb.newHang.blockRestSec = Number(e.target.value) || 0; };
     document.getElementById('fb-add-hang').onclick = () => {
-      if (!fb.selectedGrip) { toast('Zuerst einen Griff wählen.', 'err'); return; }
-      fb.blocks.push({ type: 'hang', board: fb.board, grip: fb.selectedGrip, ...fb.newHang });
+      if (fb.gripMode === 'different') {
+        if (!fb.selectedGripLeft || !fb.selectedGripRight) { toast('Zuerst Griff für links UND rechts wählen.', 'err'); return; }
+        fb.blocks.push({ type: 'hang', board: fb.board, gripLeft: fb.selectedGripLeft, gripRight: fb.selectedGripRight, ...fb.newHang });
+      } else {
+        if (!fb.selectedGrip) { toast('Zuerst einen Griff wählen.', 'err'); return; }
+        fb.blocks.push({ type: 'hang', board: fb.board, grip: fb.selectedGrip, ...fb.newHang });
+      }
       renderFbBlocksList();
     };
   } else if (fb.addType === 'exercise') {
@@ -2282,16 +2442,38 @@ function muscleLabelsText(primary, secondary) {
 
 /* Kleines, unverzerrtes Board-Abbild mit einem Punkt an der Griffposition —
    zeigt auf einen Blick, welcher Griff für diesen Hang-Satz gemeint ist. */
-function miniBoardThumb(boardId, gripId) {
+function miniBoardThumb(boardId, gripId, gripId2) {
   const board = BOARDS[boardId];
   // Manche Griffe haben zwei Löcher (links + rechts gespiegelt) — beide
   // markieren, sonst ist bei einem grossen Punkt in der Mitte nicht
-  // erkennbar, welches der beiden Löcher gemeint ist.
+  // erkennbar, welches der beiden Löcher gemeint ist. gripId2 (optional):
+  // zweiter, andersfarbig markierter Griff für Sätze mit unterschiedlichem
+  // Griff pro Hand (siehe hangBoardThumb).
   const dots = board.hotspots
     .filter((h) => h.grip === gripId)
     .map((s) => `<span class="dot" style="left:${s.x}%;top:${s.y}%;"></span>`)
     .join('');
-  return `<div class="timeline-thumb"><img src="${board.image}" alt="">${dots}</div>`;
+  const dots2 = gripId2 ? board.hotspots
+    .filter((h) => h.grip === gripId2)
+    .map((s) => `<span class="dot dot-alt" style="left:${s.x}%;top:${s.y}%;"></span>`)
+    .join('') : '';
+  return `<div class="timeline-thumb"><img src="${board.image}" alt="">${dots}${dots2}</div>`;
+}
+
+/* Hang-Sätze mit unterschiedlichem Griff pro Hand (b.gripLeft/gripRight
+   statt einem gemeinsamen b.grip) — überall, wo bisher ein einzelner
+   Griff angezeigt wurde, jetzt beide anzeigen, wenn gesetzt. */
+function hangIsAsymmetric(b) { return b.gripLeft != null; }
+function hangGripLabel(b) {
+  return hangIsAsymmetric(b)
+    ? `L: ${gripLabel(b.board, b.gripLeft)} · R: ${gripLabel(b.board, b.gripRight)}`
+    : gripLabel(b.board, b.grip);
+}
+function hangArmNote(b) {
+  return hangIsAsymmetric(b) ? '' : gripArmNote(b.board, b.grip);
+}
+function hangBoardThumb(b) {
+  return hangIsAsymmetric(b) ? miniBoardThumb(b.board, b.gripLeft, b.gripRight) : miniBoardThumb(b.board, b.grip);
 }
 
 /* Campus-Sätze brauchen keine Foto-Hotspots wie beim Hangboard — die
@@ -2343,9 +2525,9 @@ function renderFbBlocksList() {
   const items = fb.blocks.map((b, i) => {
     const isHang = b.type === 'hang';
     const isCampus = b.type === 'campus';
-    const title = isHang ? `Hang @ ${esc(gripLabel(b.board, b.grip))}` : isCampus ? campusLabel(b) : esc(exerciseName(b.exerciseId));
+    const title = isHang ? `Hang @ ${esc(hangGripLabel(b))}` : isCampus ? campusLabel(b) : esc(exerciseName(b.exerciseId));
     const thumb = isHang
-      ? miniBoardThumb(b.board, b.grip)
+      ? hangBoardThumb(b)
       : isCampus
         ? `<div class="timeline-thumb"><img src="${CAMPUS_BOARD_IMAGE}" alt=""></div>`
         : `<div class="timeline-thumb timeline-thumb-emoji">💪</div>`;
@@ -2541,7 +2723,7 @@ function fbUpcomingLabel() {
   }
   const nextBlock = fb.blocks[fb.blockIndex + 1];
   if (!nextBlock) return 'Letzter Satz — gleich geschafft!';
-  if (nextBlock.type === 'hang') return 'Hang @ ' + gripLabel(nextBlock.board, nextBlock.grip);
+  if (nextBlock.type === 'hang') return 'Hang @ ' + hangGripLabel(nextBlock);
   if (nextBlock.type === 'campus') return campusLabel(nextBlock);
   return exerciseName(nextBlock.exerciseId);
 }
@@ -2618,22 +2800,22 @@ function renderFbOverlay() {
     if (!next) { closeFbOverlay(); return; }
     const isHang = next.type === 'hang';
     const isCampus = next.type === 'campus';
-    const nextArmNote = isHang ? gripArmNote(next.board, next.grip) : '';
+    const nextArmNote = isHang ? hangArmNote(next) : '';
     stage = `
       <div class="fb-stage-label mono">NÄCHSTER SATZ (${fb.blockIndex + 1}/${fb.blocks.length})</div>
-      <div class="fb-stage-figure">${isHang ? miniBoardThumb(next.board, next.grip) : isCampus ? campusFigureSvg() : exerciseFigureSvg(next.exerciseId)}</div>
-      <div class="fb-stage-title">${isHang ? 'Hang @ ' + esc(gripLabel(next.board, next.grip)) : isCampus ? campusLabel(next) : esc(exerciseName(next.exerciseId))}</div>
+      <div class="fb-stage-figure">${isHang ? hangBoardThumb(next) : isCampus ? campusFigureSvg() : exerciseFigureSvg(next.exerciseId)}</div>
+      <div class="fb-stage-title">${isHang ? 'Hang @ ' + esc(hangGripLabel(next)) : isCampus ? campusLabel(next) : esc(exerciseName(next.exerciseId))}</div>
       <div class="fb-stage-sub mono">${esc(fbBlockSub(next))}${nextArmNote ? ' · ' + nextArmNote : ''}</div>
       ${fbTransportRow()}
       <button class="btn fb-stage-btn" id="fb-continue">LOS</button>
     `;
   } else if (fb.preCount != null) {
     const block = fb.blocks[fb.blockIndex];
-    const armNote = gripArmNote(block.board, block.grip);
+    const armNote = hangArmNote(block);
     const tense = fb.preCount <= 3;
     stage = `
-      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${esc(gripLabel(block.board, block.grip))}${armNote ? ' · ' + armNote : ''}</div>
-      <div class="fb-stage-figure">${miniBoardThumb(block.board, block.grip)}</div>
+      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${esc(hangGripLabel(block))}${armNote ? ' · ' + armNote : ''}</div>
+      <div class="fb-stage-figure">${hangBoardThumb(block)}</div>
       <div class="fb-precount ${tense ? 'fb-precount-tense' : ''}" id="fb-precount">${fb.preCount}</div>
       <div class="fb-stage-sub mono">Hände ans Board — gleich geht's los!</div>
       <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
@@ -2654,16 +2836,16 @@ function renderFbOverlay() {
     const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
     const isPausedNow = fb.running && !fb.intervalId;
     const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
-    const armNote = isHang ? gripArmNote(block.board, block.grip) : '';
+    const armNote = isHang ? hangArmNote(block) : '';
     const label = isHang
-      ? `Hang @ ${esc(gripLabel(block.board, block.grip))}${armNote ? ' · ' + armNote : ''}`
+      ? `Hang @ ${esc(hangGripLabel(block))}${armNote ? ' · ' + armNote : ''}`
       : isCampus ? campusLabel(block) : esc(exerciseName(block.exerciseId));
     const muscles = isExercise ? exerciseMuscles(block.exerciseId) : null;
     const muscleText = muscles ? muscleLabelsText(muscles.primary, muscles.secondary) : '';
     stage = `
       <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${label}${isExercise ? ' · Ziel ' + esc(String(block.reps)) + '×' : ''}</div>
       ${isHang
-        ? `<div class="fb-stage-figure">${miniBoardThumb(block.board, block.grip)}</div>
+        ? `<div class="fb-stage-figure">${hangBoardThumb(block)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
              <div class="fb-phase-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}">${working ? FB_HANG_FIGURE_SVG : FB_REST_FIGURE_SVG}</div>
              <div class="fb-timer-ring">
@@ -3058,7 +3240,7 @@ function fbResultsSummaryHtml(blocks, results) {
       const done = r.doneReps.filter(Boolean).length;
       totalReps += r.doneReps.length;
       doneReps += done;
-      return `<div class="fb-summary-row"><span>${esc(gripLabel(b.board, b.grip))}</span><span class="mono">${done}/${r.doneReps.length}</span></div>`;
+      return `<div class="fb-summary-row"><span>${esc(hangGripLabel(b))}</span><span class="mono">${done}/${r.doneReps.length}</span></div>`;
     }
     if (r.type === 'campus') {
       const done = r.doneReps.filter(Boolean).length;
@@ -3248,13 +3430,13 @@ function renderChallengeCard(id, c, now) {
   if (c.kind === 'fingerboard') {
     title = `Fingerboard · ${esc(BOARDS[c.board].label)}`;
     detail = (c.blocks || []).map((b) => b.type === 'hang'
-      ? `<div class="ex core">Hang @ ${esc(gripLabel(b.board || c.board, b.grip))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`
+      ? `<div class="ex core">Hang @ ${esc(hangGripLabel({ ...b, board: b.board || c.board }))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`
       : `<div class="ex core">${esc(exerciseName(b.exerciseId))} · ${b.workSec || 40}s × ${esc(String(b.reps))}</div>`
     ).join('');
   } else {
     title = LOG_TYPE_LABEL[c.sessionType] || esc(c.sessionType || 'Training');
     detail = c.durationMin
-      ? `<div class="ex core">⏱ Ausdauer · ${c.durationMin} Min.</div>`
+      ? `<div class="ex core">🧗 An die Wand · ${c.durationMin} Min.</div>`
       : (c.exercises || []).map((ex) => `<div class="ex core">${esc(exerciseName(ex.exerciseId))} · ${esc(fbExerciseSetsText(ex))}</div>`).join('');
   }
 
