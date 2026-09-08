@@ -405,9 +405,11 @@ function lastValueForExercise(exerciseId) {
 }
 
 async function renderLog() {
+  const isEndurance = logMode === 'endurance';
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Neue Session</h2><div class="sec-rule"></div></div>
     <div class="card">
+      ${isEndurance ? '' : `
       <div class="field-row">
         <div class="field"><label>Datum</label><input type="date" id="log-date" value="${todayKey()}"></div>
         <div class="field"><label>Typ</label>
@@ -415,18 +417,20 @@ async function renderLog() {
             ${Object.entries(LOG_TYPE_LABEL).map(([v, label]) => `<option value="${v}" ${v === 'gym' ? 'selected' : ''}>${label}</option>`).join('')}
           </select>
         </div>
-      </div>
+      </div>`}
 
       <div class="chip-row">
         <button type="button" class="chip ${logMode === 'planned' ? 'active' : ''}" data-log-mode="planned">Geplant</button>
         <button type="button" class="chip ${logMode === 'freestyle' ? 'active' : ''}" data-log-mode="freestyle">Freestyle</button>
+        <button type="button" class="chip ${logMode === 'endurance' ? 'active' : ''}" data-log-mode="endurance">Ausdauer</button>
       </div>
 
       <div id="log-builder-panel"></div>
 
+      ${isEndurance ? '' : `
       <div class="field"><label>Notiz (optional)</label><textarea id="log-note" placeholder="Befinden, Bedingungen, Sonstiges…"></textarea></div>
       <div class="field"><label>RPE (1–10, optional)</label><input type="number" id="log-rpe" min="1" max="10"></div>
-      <button class="btn" id="log-save">SESSION SPEICHERN</button>
+      <button class="btn" id="log-save">SESSION SPEICHERN</button>`}
     </div>
 
     <div class="sec-head"><h2 class="sec-title">Verlauf</h2><div class="sec-rule"></div></div>
@@ -438,10 +442,11 @@ async function renderLog() {
   document.querySelectorAll('[data-log-mode]').forEach((btn) => {
     btn.onclick = () => {
       logMode = btn.dataset.logMode;
-      document.querySelectorAll('[data-log-mode]').forEach((b) => b.classList.toggle('active', b.dataset.logMode === logMode));
-      renderLogBuilderPanel();
+      renderLog();
     };
   });
+
+  if (isEndurance) { renderLogHistory(); return; }
 
   document.getElementById('log-save').onclick = async () => {
     const exercises = logMode === 'freestyle'
@@ -467,15 +472,23 @@ async function renderLog() {
     } else toast('Konnte nicht speichern.', 'err');
   };
 
+  if (logMode === 'freestyle') renderFsActive(); // "Letztes Mal"-Hinweis nachreichen, falls schon eine Übung aktiv ist
+  await renderLogHistory();
+}
+
+/* Verlauf-Liste — eigene Funktion, weil sie sowohl vom normalen
+   Geplant/Freestyle-Zweig als auch vom Ausdauer-Zweig (der die übrigen
+   Formularfelder gar nicht erst anzeigt) gebraucht wird. */
+async function renderLogHistory() {
   const raw = await fbGet(`logs/${state.member.id}`);
   const entries = Object.entries(raw || {}).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
   state.logs = entries.map(([, e]) => e);
-  if (logMode === 'freestyle') renderFsActive(); // "Letztes Mal"-Hinweis nachreichen, falls schon eine Übung aktiv ist
   const list = document.getElementById('log-list');
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
   list.innerHTML = entries.length ? entries.map(([id, e]) => `
     <div class="log-item">
       <div class="top"><span>${esc(e.date)}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
+      ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>⏱ Ausdauer</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
       ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => `
         <div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>
       `).join('')}</div>` : ''}
@@ -497,6 +510,156 @@ async function renderLog() {
   });
 }
 
+/* ================================================================
+   AUSDAUER (freies Klettern/Bouldern nach Minuten, statt Sätzen/Wdh.)
+   Eigenständiger, einfacher Countdown — bewusst NICHT ins Fingerboard-
+   Block-System eingebaut, das ist konzeptionell Hangboard-Training.
+   Speichert direkt in logs/{member}, landet damit automatisch im
+   selben Verlauf und ist über den bestehenden "Als Challenge teilen"-
+   Weg genauso teilbar wie jede andere Session. */
+const endurance = { minutes: 20, running: false, secondsLeft: 0, totalSeconds: 0, intervalId: null };
+
+function ensureEnduranceOverlay() {
+  let el = document.getElementById('endurance-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'endurance-overlay';
+    el.className = 'fb-overlay hidden';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+async function startEnduranceTimer() {
+  endurance.totalSeconds = endurance.minutes * 60;
+  endurance.secondsLeft = endurance.totalSeconds;
+  endurance.running = true;
+  const el = ensureEnduranceOverlay();
+  el.classList.remove('hidden');
+  if (el.requestFullscreen) {
+    try { await el.requestFullscreen(); } catch (e) { /* z.B. iOS Safari — CSS-Vollbild reicht als Fallback */ }
+  }
+  endurance.intervalId = setInterval(tickEndurance, 1000);
+  renderEnduranceOverlay();
+  beepStart();
+}
+
+function tickEndurance() {
+  endurance.secondsLeft--;
+  if (endurance.secondsLeft <= 0) {
+    clearInterval(endurance.intervalId);
+    endurance.intervalId = null;
+    beep(1318, 300);
+    finishEndurance();
+    return;
+  }
+  if (endurance.secondsLeft <= 3) beepTick();
+  updateEnduranceUI();
+}
+
+function toggleEndurancePause() {
+  if (!endurance.running) return;
+  if (endurance.intervalId) { clearInterval(endurance.intervalId); endurance.intervalId = null; }
+  else { endurance.intervalId = setInterval(tickEndurance, 1000); }
+  renderEnduranceOverlay();
+}
+
+function cancelEndurance() {
+  clearInterval(endurance.intervalId);
+  endurance.intervalId = null;
+  endurance.running = false;
+  const el = document.getElementById('endurance-overlay');
+  if (el) el.classList.add('hidden');
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+
+function renderEnduranceOverlay() {
+  const el = ensureEnduranceOverlay();
+  const isPausedNow = endurance.running && !endurance.intervalId;
+  const frac = endurance.totalSeconds ? 1 - endurance.secondsLeft / endurance.totalSeconds : 0;
+  const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
+  const mm = Math.floor(endurance.secondsLeft / 60);
+  const ss = endurance.secondsLeft % 60;
+  el.innerHTML = `
+    <button type="button" class="fb-overlay-close" id="endurance-close" title="Abbrechen">✕</button>
+    <div class="fb-overlay-inner">
+      <div class="fb-stage-label mono">AUSDAUER</div>
+      <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
+        <div class="fb-timer-ring">
+          <svg viewBox="0 0 120 120">
+            <circle class="ring-bg" cx="60" cy="60" r="52"/>
+            <circle class="ring-fg" id="endurance-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
+          </svg>
+          <div class="big" id="endurance-big">${pad2(mm)}:${pad2(ss)}</div>
+        </div>
+      </div>
+      <div class="phase mono">${isPausedNow ? 'PAUSIERT' : 'Läuft'}</div>
+      <div class="fb-transport">
+        <button type="button" class="fb-transport-btn fb-play" id="endurance-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? '▶' : '⏸'}</button>
+      </div>
+      <button class="btn fb-stage-btn" id="endurance-done-btn">FERTIG</button>
+      <button class="btn ghost fb-stage-btn" id="endurance-cancel-btn">ABBRECHEN</button>
+    </div>
+  `;
+  document.getElementById('endurance-close').onclick = cancelEndurance;
+  document.getElementById('endurance-cancel-btn').onclick = cancelEndurance;
+  document.getElementById('endurance-playpause').onclick = toggleEndurancePause;
+  document.getElementById('endurance-done-btn').onclick = () => finishEndurance();
+}
+
+function updateEnduranceUI() {
+  const big = document.getElementById('endurance-big');
+  const ring = document.getElementById('endurance-ring-fg');
+  const mm = Math.floor(endurance.secondsLeft / 60);
+  const ss = endurance.secondsLeft % 60;
+  if (big) big.textContent = `${pad2(mm)}:${pad2(ss)}`;
+  if (ring) {
+    const frac = endurance.totalSeconds ? 1 - endurance.secondsLeft / endurance.totalSeconds : 0;
+    ring.style.strokeDashoffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
+  }
+}
+
+/* Läuft der Timer komplett ab ODER wird "FERTIG" früher angetippt — in
+   beiden Fällen wird die tatsächlich vergangene Zeit geloggt (nicht die
+   ursprünglich eingestellte), falls man früher aufhört als geplant. */
+async function finishEndurance() {
+  clearInterval(endurance.intervalId);
+  endurance.intervalId = null;
+  endurance.running = false;
+  const elapsedMin = Math.max(1, Math.round((endurance.totalSeconds - Math.max(endurance.secondsLeft, 0)) / 60));
+  beep(1568, 400);
+
+  const el = ensureEnduranceOverlay();
+  el.innerHTML = `
+    <div class="fb-overlay-inner fb-overlay-done">
+      <div class="fb-done-emoji">🎉</div>
+      <div class="fb-stage-title">Ausdauer geschafft!</div>
+      <div class="fb-stage-sub mono">${elapsedMin} ${elapsedMin === 1 ? 'Minute' : 'Minuten'}</div>
+      ${challengeDurationChipsHtml('endurance-share', CHALLENGE_WINDOW_H)}
+      <button class="btn fb-stage-btn ghost" id="endurance-share-btn">Als Challenge teilen</button>
+      <button class="btn fb-stage-btn" id="endurance-finish-btn">Schliessen</button>
+    </div>
+  `;
+  wireChallengeDurationChips('endurance-share');
+  spawnConfetti(document.querySelector('#endurance-overlay .fb-overlay-done'));
+
+  const entry = { date: todayKey(), type: 'klettern', durationMin: elapsedMin, exercises: [], note: '', rpe: null, createdAt: Date.now() };
+  const id = await fbPush(`logs/${state.member.id}`, entry);
+  if (id) toast('Ausdauer-Session gespeichert 💪', 'ok'); else toast('Konnte nicht speichern.', 'err');
+
+  document.getElementById('endurance-finish-btn').onclick = () => {
+    const overlay = document.getElementById('endurance-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    renderLogHistory();
+  };
+  document.getElementById('endurance-share-btn').onclick = async (e) => {
+    e.target.disabled = true;
+    await shareLogEntryAsChallenge(entry, selectedChallengeHours('endurance-share'));
+    e.target.textContent = 'Geteilt ✓';
+  };
+}
+
 /* Kompakte Satz-Anzeige fürs Verlauf: geplante Einträge (fester Wert für
    alle Sätze) und Freestyle-Einträge (jeder Satz einzeln erfasst) sehen
    unterschiedlich aus, laufen aber in derselben Liste zusammen. */
@@ -511,7 +674,14 @@ function renderLogBuilderPanel() {
   const holder = document.getElementById('log-builder-panel');
   if (!holder) return;
 
-  if (logMode === 'freestyle') {
+  if (logMode === 'endurance') {
+    holder.innerHTML = `
+      <div class="field"><label>Minuten</label><input type="number" inputmode="numeric" id="endurance-minutes" value="${endurance.minutes}" min="1"></div>
+      <button type="button" class="btn" id="endurance-start" style="width:100%;">TIMER STARTEN</button>
+    `;
+    document.getElementById('endurance-minutes').oninput = (e) => { endurance.minutes = Number(e.target.value) || 1; };
+    document.getElementById('endurance-start').onclick = startEnduranceTimer;
+  } else if (logMode === 'freestyle') {
     holder.innerHTML = `
       <div class="field">
         <label>Übung</label>
@@ -2217,6 +2387,7 @@ function fbTransportRow() {
 function fbGoBack() {
   clearInterval(fb.intervalId);
   fb.intervalId = null;
+  fbCheckinTyping = false; // Feld ist beim Blockwechsel weg — sonst bliebe die Zeit im neuen Block angehalten
   fb.blockIndex = Math.max(0, fb.blockIndex - 1);
   beginBlock();
 }
@@ -2224,6 +2395,7 @@ function fbGoBack() {
 function fbSkipForward() {
   clearInterval(fb.intervalId);
   fb.intervalId = null;
+  fbCheckinTyping = false; // Feld ist beim Blockwechsel weg — sonst bliebe die Zeit im neuen Block angehalten
   initBlockResult(fb.blockIndex); // frühzeitig übersprungen (z. B. "Wiederholungen geschafft") — trotzdem Standardwerte fürs Ergebnis
   fb.blockIndex++;
   if (fb.blockIndex >= fb.blocks.length) {
@@ -2356,7 +2528,13 @@ function renderFbOverlay() {
     document.getElementById('fb-cancel').onclick = cancelAblauf;
     const repsDoneBtn = document.getElementById('fb-reps-done');
     if (repsDoneBtn) repsDoneBtn.onclick = fbSkipForward;
-    if (fb.runResults[fb.blockIndex]) wireCheckinPanel(fb.blockIndex);
+    // Nur verdrahten, wenn das Check-in-Markup gerade tatsächlich im DOM
+    // steht (exakt dieselbe Bedingung wie beim Einbetten oben) — sonst
+    // existiert z. B. nach "Zurück" zu einem bereits abgeschlossenen Block
+    // (der schon ein Ergebnis hat, aber gerade nicht in der Schluss-Pause
+    // steht) kein #fb-checkin-Inhalt zum Verdrahten.
+    const inCheckinWindow = fb.stepIndex === fb.sequence.length - 1 && !isWorkPhase(fb.sequence[fb.stepIndex]);
+    if (inCheckinWindow && fb.runResults[fb.blockIndex]) wireCheckinPanel(fb.blockIndex);
     updateFbUpcomingUI();
   }
   updateFbProgressUI();
@@ -2569,10 +2747,10 @@ function startSequence() {
   fb.sequence = buildBlockSequence(block);
   fb.stepIndex = 0;
   fb.secondsLeft = fb.sequence[0].seconds;
+  fb.intervalId = setInterval(tickBlock, 1000);
   beepStart();
   renderFbOverlay();
   updateTimerUI();
-  fb.intervalId = setInterval(tickBlock, 1000);
 }
 
 function tickBlock() {
@@ -2806,6 +2984,7 @@ function shareLogEntryAsChallenge(entry, hours) {
     kind: 'session',
     sessionType: entry.type,
     exercises: entry.exercises,
+    ...(entry.durationMin ? { durationMin: entry.durationMin } : {}),
     note: entry.note || '',
   }, hours);
 }
@@ -2872,7 +3051,9 @@ function renderChallengeCard(id, c, now) {
     ).join('');
   } else {
     title = LOG_TYPE_LABEL[c.sessionType] || esc(c.sessionType || 'Training');
-    detail = (c.exercises || []).map((ex) => `<div class="ex core">${esc(exerciseName(ex.exerciseId))} · ${esc(fbExerciseSetsText(ex))}</div>`).join('');
+    detail = c.durationMin
+      ? `<div class="ex core">⏱ Ausdauer · ${c.durationMin} Min.</div>`
+      : (c.exercises || []).map((ex) => `<div class="ex core">${esc(exerciseName(ex.exerciseId))} · ${esc(fbExerciseSetsText(ex))}</div>`).join('');
   }
 
   return `
