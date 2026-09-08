@@ -5,7 +5,7 @@
 
 const APP_ROOT = document.getElementById('app');
 const TOAST_ROOT = document.getElementById('toast-root');
-const APP_TAGLINE = 'Kraft, die an der Wand ankommt.';
+const APP_TAGLINE = 'Pinchiboy, come make me scream!';
 let appTaglineTyped = false; // Buchstabe-für-Buchstabe-Effekt läuft nur einmal pro App-Öffnung, nicht bei jeder Navigation
 
 /* Buchstaben-für-Buchstaben-Aufploppen, schnell statt gemächlich — reine
@@ -46,13 +46,16 @@ function exercisePickerGridHtml(list, selectedId) {
       </div>
     `).join('');
 }
-function wireExercisePickerGrid(containerId, onSelect) {
+function wireExercisePickerGrid(containerId, onSelect, scrollTargetId) {
   const holder = document.getElementById(containerId);
   if (!holder) return;
   holder.querySelectorAll('.ex-pick-btn').forEach((btn) => {
     btn.onclick = () => {
       holder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
       onSelect(btn.dataset.exercise);
+      if (scrollTargetId) {
+        document.getElementById(scrollTargetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     };
   });
 }
@@ -120,7 +123,7 @@ function renderPasswordGate() {
         <label>Team-Code</label>
         <input type="password" id="login-password" placeholder="••••" autofocus>
       </div>
-      <button class="btn" id="login-password-submit">PINCHIBOY, COME MAKE ME SCREAM!</button>
+      <button class="btn" id="login-password-submit">REIN AN DIE WAND</button>
       <p class="login-hint" id="login-password-hint">Erste Anmeldung überhaupt? Der hier eingegebene Code wird zum neuen Team-Code.</p>
     </div>
   `;
@@ -441,22 +444,20 @@ function renderLogBuilderPanel() {
         <label>Übung</label>
         <div id="fs-exercise-grid">${exercisePickerGridHtml(EXERCISE_LIBRARY, freestyleBuilder.pickerExerciseId)}</div>
       </div>
-      <button type="button" class="btn" id="fs-add-exercise" style="width:100%;margin-bottom:14px;">+ Übung</button>
       <div id="fs-active"></div>
       <div id="fs-entries"></div>
     `;
-    wireExercisePickerGrid('fs-exercise-grid', (id) => { freestyleBuilder.pickerExerciseId = id; });
-    document.getElementById('fs-add-exercise').onclick = () => {
-      const exerciseId = freestyleBuilder.pickerExerciseId;
-      let idx = freestyleBuilder.exercises.findIndex((g) => g.exerciseId === exerciseId);
+    wireExercisePickerGrid('fs-exercise-grid', (id) => {
+      freestyleBuilder.pickerExerciseId = id;
+      let idx = freestyleBuilder.exercises.findIndex((g) => g.exerciseId === id);
       if (idx === -1) {
-        freestyleBuilder.exercises.push({ exerciseId, sets: [] });
+        freestyleBuilder.exercises.push({ exerciseId: id, sets: [] });
         idx = freestyleBuilder.exercises.length - 1;
       }
       freestyleBuilder.activeIndex = idx;
       renderFsActive();
       renderFsEntries();
-    };
+    }, 'fs-active');
     renderFsActive();
     renderFsEntries();
   } else {
@@ -478,7 +479,7 @@ function renderLogBuilderPanel() {
       </div>
     `;
     renderLogExerciseRows();
-    wireExercisePickerGrid('log-exercise-grid', (id) => { logPickerExerciseId = id; });
+    wireExercisePickerGrid('log-exercise-grid', (id) => { logPickerExerciseId = id; }, 'log-exercise-add');
     document.getElementById('log-template').onchange = (e) => {
       const t = ROUTINE_TEMPLATES.find((r) => r.id === e.target.value);
       logBuilder.exercises = t ? t.exercises.map((ex) => ({ ...ex, weight: '' })) : [];
@@ -799,7 +800,7 @@ function renderFbAddPanel() {
       </div>
       <button type="button" class="btn" id="fb-add-exercise" style="width:100%;">+ Übung hinzufügen</button>
     `;
-    wireExercisePickerGrid('fb-exercise-grid', (id) => { fb.newExercise.exerciseId = id; });
+    wireExercisePickerGrid('fb-exercise-grid', (id) => { fb.newExercise.exerciseId = id; }, 'fb-add-exercise');
     document.getElementById('fb-new-exreps').oninput = (e) => { fb.newExercise.reps = Number(e.target.value) || 1; };
     document.getElementById('fb-new-exwork').oninput = (e) => { fb.newExercise.workSec = Number(e.target.value) || 5; };
     document.getElementById('fb-new-exrest').oninput = (e) => { fb.newExercise.restSec = Number(e.target.value) || 0; };
