@@ -417,26 +417,37 @@ button, input, select, textarea { font-family: inherit; }
 .fb-stage-sub { font-size: 12px; color: var(--ink-dim); text-align: center; }
 
 /* Check-in während der letzten Pause eines Satzes — läuft nebenher, ohne
-   den Ablauf zu unterbrechen (siehe openBlockCheckin in app.js). */
-.fb-checkin { width: 100%; max-width: 280px; border: 1px dashed var(--line); padding: clamp(6px, 1.5vh, 12px); box-sizing: border-box; }
+   den Ablauf zu unterbrechen (siehe openBlockCheckin in app.js). Bewusst
+   sehr kräftig/gross: das Handy liegt beim Training meist am Boden, aus
+   der Distanz oder im Vorbeigehen abgelesen — kein Platz für zurückhaltende
+   Feinschrift. */
+.fb-checkin { width: 100%; max-width: 320px; border: 2px solid var(--accent); background: rgba(var(--accent-rgb), .1); padding: clamp(10px, 2.2vh, 18px); box-sizing: border-box; }
 .fb-checkin[hidden] { display: none; }
-.fb-checkin-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 8px; text-align: center; }
-.fb-checkin-chips { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
-.fb-chip {
-  width: 32px; height: 32px; border: 1px solid var(--line); background: none; color: var(--ink-dim);
-  font-family: 'IBM Plex Mono', monospace; font-size: 13px; cursor: pointer; transition: all .15s;
+.fb-checkin-label {
+  font-family: 'IBM Plex Mono', monospace; font-size: clamp(12px, 3.2vw, 15px); font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--ink); margin-bottom: 10px; text-align: center;
 }
-.fb-chip.ok { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .1); }
-.fb-chip.fail { border-color: var(--danger); color: var(--danger); background: rgba(255, 107, 107, .08); text-decoration: line-through; }
-.fb-checkin-row { display: flex; gap: 8px; }
-.fb-checkin-row input[type="text"] { width: 70px; text-align: center; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); padding: 11px 8px; font-size: 14px; box-sizing: border-box; }
+.fb-checkin-chips { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.fb-chip {
+  width: clamp(46px, 13vw, 62px); height: clamp(46px, 13vw, 62px); border: 3px solid var(--line); background: var(--surface-2); color: var(--ink);
+  font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: clamp(18px, 5vw, 24px); cursor: pointer; transition: all .15s;
+}
+.fb-chip.ok { border-color: var(--accent); color: #04141c; background: var(--accent); box-shadow: 0 0 14px -2px rgba(var(--accent-rgb), .7); }
+.fb-chip.fail { border-color: var(--danger); color: #1a0606; background: var(--danger); text-decoration: line-through; box-shadow: 0 0 14px -2px rgba(255, 107, 107, .6); }
+.fb-checkin-row { display: flex; gap: 10px; }
+.fb-checkin-row input[type="text"] {
+  width: 88px; text-align: center; background: var(--surface-2); border: 3px solid var(--accent); color: var(--ink);
+  padding: clamp(9px, 2vh, 14px) 8px; font-size: clamp(20px, 6vw, 26px); font-weight: 700; box-sizing: border-box;
+}
 .fb-checkin-row .kg-field { flex: 1; }
+.fb-checkin-row .kg-field input { border: 3px solid var(--accent); font-size: clamp(20px, 6vw, 26px); font-weight: 700; padding: clamp(9px, 2vh, 14px) 44px clamp(9px, 2vh, 14px) 12px; }
+.fb-checkin-row .kg-field span { font-size: 14px; font-weight: 700; color: var(--ink); }
 
 /* Übersicht auf dem "Ablauf geschafft!"-Screen */
 .fb-summary-headline { font-size: 13px; color: var(--accent); margin-bottom: 2px; text-align: center; }
 .fb-summary-list { width: 100%; max-width: 280px; max-height: 22vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box; }
 .fb-summary-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--ink-dim); border-bottom: 1px solid var(--line); padding: 4px 2px; }
-.fb-stage-next { font-size: 12px; color: var(--ink-faint); text-align: center; min-height: 12px; }
+.fb-stage-next { font-size: clamp(14px, 3.8vw, 18px); font-weight: 700; color: var(--ink); text-align: center; min-height: 16px; }
 .fb-stage-btn { width: 100%; max-width: 280px; margin-top: 0; padding: clamp(7px, 1.8vh, 13px); }
 
 .fb-transport { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 14px); margin-top: 0; }
