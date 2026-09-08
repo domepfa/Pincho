@@ -69,7 +69,7 @@ function wireExercisePickerGrid(containerId, onSelect, scrollTargetId) {
       holder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
       onSelect(btn.dataset.exercise);
       if (scrollTargetId) {
-        document.getElementById(scrollTargetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById(scrollTargetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     };
   });
@@ -92,7 +92,7 @@ function pad2(n) { return String(n).padStart(2, '0'); }
 /* ---------- State ---------- */
 const state = {
   member: JSON.parse(localStorage.getItem('pincho_member') || 'null'),
-  route: (location.hash || '#plan').replace('#', ''),
+  route: (location.hash || '#fingerboard').replace('#', ''),
   members: {},        // {id: {name, board}}
   logs: [],           // eigene Logs, neueste zuerst
   challenges: {},      // {id: {...}}
@@ -261,9 +261,9 @@ function markChallengesSeenNow() {
    SHELL + ROUTER
    ================================================================= */
 const NAV_ITEMS = [
-  { route: 'plan', label: 'Plan' },
-  { route: 'log', label: 'Log' },
   { route: 'fingerboard', label: 'Board' },
+  { route: 'log', label: 'Log' },
+  { route: 'plan', label: 'Plan' },
   { route: 'challenges', label: 'Challenges' },
 ];
 
@@ -422,7 +422,7 @@ async function renderLog() {
       <div class="chip-row">
         <button type="button" class="chip ${logMode === 'planned' ? 'active' : ''}" data-log-mode="planned">Geplant</button>
         <button type="button" class="chip ${logMode === 'freestyle' ? 'active' : ''}" data-log-mode="freestyle">Freestyle</button>
-        <button type="button" class="chip ${logMode === 'wall' ? 'active' : ''}" data-log-mode="wall">An die Wand</button>
+        <button type="button" class="chip ${logMode === 'wall' ? 'active' : ''}" data-log-mode="wall">Ausdauer</button>
       </div>
 
       <div id="log-builder-panel"></div>
@@ -488,13 +488,16 @@ async function renderLogHistory() {
   list.innerHTML = entries.length ? entries.map(([id, e]) => `
     <div class="log-item">
       <div class="top"><span>${esc(e.date)}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
-      ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>🧗 An die Wand</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
+      ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>🧗 Ausdauer</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
       ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => `
         <div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>
       `).join('')}</div>` : ''}
       ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
       ${challengeDurationChipsHtml(`log-share-${id}`, CHALLENGE_WINDOW_H)}
-      <button type="button" class="btn ghost small" data-share-log="${id}" style="margin-top:6px;">Als Challenge teilen</button>
+      <div class="field-row" style="margin-top:6px;">
+        <button type="button" class="btn ghost small" data-share-log="${id}">Als Challenge teilen</button>
+        <button type="button" class="btn ghost small" data-delete-log="${id}">Löschen</button>
+      </div>
     </div>
   `).join('') : '<div class="list-empty">Noch keine Einträge.</div>';
 
@@ -506,6 +509,14 @@ async function renderLogHistory() {
       btn.disabled = true;
       await shareLogEntryAsChallenge(found[1], selectedChallengeHours(`log-share-${btn.dataset.shareLog}`));
       btn.disabled = false;
+    };
+  });
+  list.querySelectorAll('[data-delete-log]').forEach((btn) => {
+    btn.onclick = async () => {
+      if (!confirm('Diesen Eintrag wirklich löschen?')) return;
+      await fbDelete(`logs/${state.member.id}/${btn.dataset.deleteLog}`);
+      toast('Eintrag gelöscht.', 'ok');
+      renderLogHistory();
     };
   });
 }
@@ -721,8 +732,8 @@ async function finishWallSession() {
   el.innerHTML = `
     <div class="fb-overlay-inner fb-overlay-done">
       <div class="fb-done-emoji">🎉</div>
-      <div class="fb-stage-title">An der Wand geschafft!</div>
-      <div class="fb-stage-sub mono">${elapsedMin} ${elapsedMin === 1 ? 'Minute' : 'Minuten'} an der Wand</div>
+      <div class="fb-stage-title">Ausdauer geschafft!</div>
+      <div class="fb-stage-sub mono">${elapsedMin} ${elapsedMin === 1 ? 'Minute' : 'Minuten'} Ausdauer</div>
       ${challengeDurationChipsHtml('wall-share', CHALLENGE_WINDOW_H)}
       <button class="btn fb-stage-btn ghost" id="wall-share-btn">Als Challenge teilen</button>
       <button class="btn fb-stage-btn" id="wall-finish-btn">Schliessen</button>
@@ -733,7 +744,7 @@ async function finishWallSession() {
 
   const entry = { date: todayKey(), type: 'klettern', durationMin: elapsedMin, exercises: [], note: '', rpe: null, createdAt: Date.now() };
   const id = await fbPush(`logs/${state.member.id}`, entry);
-  if (id) toast('An die Wand-Session gespeichert 💪', 'ok'); else toast('Konnte nicht speichern.', 'err');
+  if (id) toast('Ausdauer-Session gespeichert 💪', 'ok'); else toast('Konnte nicht speichern.', 'err');
 
   document.getElementById('wall-finish-btn').onclick = () => {
     const overlay = document.getElementById('wall-overlay');
@@ -796,13 +807,13 @@ function renderLogBuilderPanel() {
         </select>
       </div>
 
-      <div id="log-exercise-rows"></div>
-
       <div class="field">
         <label>Übung hinzufügen</label>
         <div id="log-exercise-grid">${exercisePickerGridHtml(EXERCISE_LIBRARY, logPickerExerciseId)}</div>
         <button type="button" class="btn" id="log-exercise-add" style="width:100%;margin-top:8px;">+ Hinzufügen</button>
       </div>
+
+      <div id="log-exercise-rows"></div>
     `;
     renderLogExerciseRows();
     wireExercisePickerGrid('log-exercise-grid', (id) => { logPickerExerciseId = id; }, 'log-exercise-add');
@@ -814,6 +825,10 @@ function renderLogBuilderPanel() {
     document.getElementById('log-exercise-add').onclick = () => {
       logBuilder.exercises.push({ exerciseId: logPickerExerciseId, sets: 3, reps: '', weight: '' });
       renderLogExerciseRows();
+      // Direkt zur neu hinzugefügten Zeile scrollen, damit man das Gewicht/
+      // die Wiederholungen sofort eintragen kann, ohne zurückscrollen zu
+      // müssen — die Zeile landet sonst ausserhalb des sichtbaren Bereichs.
+      document.getElementById(`log-exercise-row-${logBuilder.exercises.length - 1}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
   }
 }
@@ -843,6 +858,10 @@ function renderFsActive() {
       <button type="button" class="btn small" id="fs-add-set" style="width:100%;">+ Satz</button>
     </div>
   `;
+  // Beim Antippen sofort leeren statt den alten Wert erst löschen zu
+  // müssen — man tippt hier ja gerade rein, weil man ihn ändern will.
+  document.getElementById('fs-weight').onfocus = (e) => { e.target.value = ''; };
+  document.getElementById('fs-reps').onfocus = (e) => { e.target.value = ''; };
   document.getElementById('fs-add-set').onclick = () => {
     const reps = document.getElementById('fs-reps').value.trim();
     if (!reps) { toast('Wiederholungen eingeben.', 'err'); return; }
@@ -898,7 +917,7 @@ function renderLogExerciseRows() {
   const holder = document.getElementById('log-exercise-rows');
   if (!holder) return;
   holder.innerHTML = logBuilder.exercises.length ? logBuilder.exercises.map((ex, i) => `
-    <div class="ex-row">
+    <div class="ex-row" id="log-exercise-row-${i}">
       <span class="ex-row-name">${esc(exerciseName(ex.exerciseId))}</span>
       <input type="number" data-i="${i}" data-f="sets" value="${ex.sets}" placeholder="Sätze" class="ex-row-input" title="Sätze">
       <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzlicher Satz">+</button>
@@ -3631,7 +3650,7 @@ function renderChallengeCard(id, c, now) {
   } else {
     title = LOG_TYPE_LABEL[c.sessionType] || esc(c.sessionType || 'Training');
     detail = c.durationMin
-      ? `<div class="ex core">🧗 An die Wand · ${c.durationMin} Min.</div>`
+      ? `<div class="ex core">🧗 Ausdauer · ${c.durationMin} Min.</div>`
       : (c.exercises || []).map((ex) => `<div class="ex core">${esc(exerciseName(ex.exerciseId))} · ${esc(fbExerciseSetsText(ex))}</div>`).join('');
   }
 
@@ -3654,7 +3673,7 @@ function renderChallengeCard(id, c, now) {
 
 /* ---------- Start ---------- */
 window.addEventListener('hashchange', () => {
-  state.route = (location.hash || '#plan').replace('#', '');
+  state.route = (location.hash || '#fingerboard').replace('#', '');
   render();
 });
 boot();
