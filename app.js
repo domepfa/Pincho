@@ -141,7 +141,7 @@ function currentMemberBoard() {
 function renderPasswordGate() {
   APP_ROOT.innerHTML = `
     <div class="login-shell">
-      <h1 class="login-word">PIN<em>CHO</em></h1>
+      <img class="login-logo" src="./assets/icon-512-any.png" alt="Pincho">
       <p class="login-tag">${APP_TAGLINE}</p>
       <div class="field">
         <label>Team-Code</label>
@@ -178,7 +178,7 @@ async function submitPasswordGate() {
 function renderNamePicker() {
   APP_ROOT.innerHTML = `
     <div class="login-shell">
-      <h1 class="login-word">PIN<em>CHO</em></h1>
+      <img class="login-logo" src="./assets/icon-512-any.png" alt="Pincho">
       <p class="login-tag">Wer trainiert?</p>
       <div class="chip-row" id="name-picker-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
       <p class="login-hint">Einmal pro Gerät — danach merkt sich Pincho, wer du bist.</p>
@@ -1012,8 +1012,12 @@ function parseImportedAblauf(text) {
         }
         blocks.push({ ...common, startRung, pattern: b.pattern.map(Number) });
       }
+    } else if (b.type === 'pause') {
+      const seconds = Number(b.seconds);
+      if (!(seconds > 0)) { errors.push(`Satz ${n}: seconds muss eine Zahl > 0 sein.`); return; }
+      blocks.push({ type: 'pause', seconds });
     } else {
-      errors.push(`Satz ${n}: "type" muss "hang", "exercise" oder "campus" sein (war "${b.type}").`);
+      errors.push(`Satz ${n}: "type" muss "hang", "exercise", "campus" oder "pause" sein (war "${b.type}").`);
     }
   });
 
@@ -1028,7 +1032,7 @@ const fb = {
   pickingHand: 'left',  // 'left' | 'right' — welche Hand gerade am Board gewählt wird, wenn gripMode==='different'
   selectedGripLeft: null,
   selectedGripRight: null,
-  addType: 'hang',       // 'hang' | 'exercise' | 'campus' — welches Add-Panel gerade offen ist
+  addType: 'hang',       // 'hang' | 'exercise' | 'campus' | 'pause' — welches Add-Panel gerade offen ist
   newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
   newCampus: {
@@ -1036,7 +1040,8 @@ const fb = {
     fromRung: 1, toRung: 4, startRung: 1, pattern: [],
     reps: 4, workSec: 3, restSec: 15, blockRestSec: 90,
   },
-  blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec, blockRestSec} | {type:'exercise', exerciseId, reps, workSec, restSec} | {type:'campus', rungType, moveMode, reps, workSec, restSec, blockRestSec, fromRung/toRung ODER startRung/pattern}
+  newPause: { seconds: 60 },
+  blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec, blockRestSec} | {type:'exercise', exerciseId, reps, workSec, restSec} | {type:'campus', rungType, moveMode, reps, workSec, restSec, blockRestSec, fromRung/toRung ODER startRung/pattern} | {type:'pause', seconds}
   templates: [],         // eigene, in Firebase gespeicherte Abläufe (zusätzlich zu FINGERBOARD_TEMPLATES)
   weight: '',
   blockIndex: 0,
@@ -1110,9 +1115,13 @@ function fbSelectedGripHint() {
    (fb.pickingHand), beide Hände bleiben gleichzeitig am Board sichtbar
    (unterschiedlich eingefärbt), damit man den Unterschied sofort sieht. */
 function selectFbGrip(gripId) {
+  // Nach der linken Hand automatisch zur rechten weiterschalten — ein Klick
+  // weniger, da als Nächstes ohnehin der rechte Griff drankommt.
+  const advanceToRight = fb.gripMode === 'different' && fb.pickingHand === 'left';
   if (fb.gripMode === 'different') {
     if (fb.pickingHand === 'left') fb.selectedGripLeft = gripId;
     else fb.selectedGripRight = gripId;
+    if (advanceToRight) fb.pickingHand = 'right';
   } else {
     fb.selectedGrip = gripId;
   }
@@ -1127,13 +1136,20 @@ function selectFbGrip(gripId) {
     }
   });
   const select = document.getElementById('fb-grip-select');
-  if (select && select.value !== (gripId || '')) select.value = gripId || '';
+  const selectValue = fb.gripMode === 'different' ? (fb.pickingHand === 'left' ? fb.selectedGripLeft : fb.selectedGripRight) : gripId;
+  if (select) select.value = selectValue || '';
   const handLabels = document.getElementById('fb-hand-toggle');
   if (handLabels) {
     const leftBtn = handLabels.querySelector('[data-hand="left"]');
     const rightBtn = handLabels.querySelector('[data-hand="right"]');
     if (leftBtn) leftBtn.textContent = 'Links' + (fb.selectedGripLeft ? ': ' + gripLabel(fb.board, fb.selectedGripLeft) : ' wählen');
     if (rightBtn) rightBtn.textContent = 'Rechts' + (fb.selectedGripRight ? ': ' + gripLabel(fb.board, fb.selectedGripRight) : ' wählen');
+    if (advanceToRight) {
+      leftBtn.classList.remove('active');
+      rightBtn.classList.add('active');
+      const label = document.querySelector('#fb-add-panel .field label');
+      if (label) label.textContent = 'Oder aus der Liste wählen (für rechts)';
+    }
   }
 }
 
@@ -1254,9 +1270,25 @@ function renderFbAddPanel() {
       fb.blocks.push({ type: 'exercise', ...fb.newExercise });
       renderFbBlocksList();
     };
-  } else {
+  } else if (fb.addType === 'campus') {
     renderCampusAddPanel(holder);
+  } else {
+    renderPauseAddPanel(holder);
   }
+}
+
+/* Reine Pause zum freien Einfügen in den Ablauf — z. B. zwischen zwei
+   Board-Sätzen, ohne dass sie an einen bestimmten Satz-Typ gekoppelt ist. */
+function renderPauseAddPanel(holder) {
+  holder.innerHTML = `
+    <div class="field"><label>Pause (s)</label><input type="number" id="fb-new-pause-seconds" value="${fb.newPause.seconds}" min="1"></div>
+    <button type="button" class="btn" id="fb-add-pause" style="width:100%;">+ Pause hinzufügen</button>
+  `;
+  document.getElementById('fb-new-pause-seconds').oninput = (e) => { fb.newPause.seconds = Number(e.target.value) || 1; };
+  document.getElementById('fb-add-pause').onclick = () => {
+    fb.blocks.push({ type: 'pause', seconds: fb.newPause.seconds });
+    renderFbBlocksList();
+  };
 }
 
 /* Campus-Board: keine Foto-Hotspots wie beim Hangboard (Sprossen sind
@@ -1385,6 +1417,7 @@ async function renderFingerboard() {
       <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Hang-Satz</button>
       <button class="chip ${fb.addType === 'exercise' ? 'active' : ''}" data-add-type="exercise">Fixübung</button>
       <button class="chip ${fb.addType === 'campus' ? 'active' : ''}" data-add-type="campus">Campus</button>
+      <button class="chip ${fb.addType === 'pause' ? 'active' : ''}" data-add-type="pause">Pause</button>
     </div>
     <div id="fb-add-panel" style="margin:12px 0 16px;"></div>
 
@@ -1618,6 +1651,9 @@ function buildBlockSequence(b) {
       }
     }
     return seq;
+  }
+  if (b.type === 'pause') {
+    return [{ phase: 'Pause', seconds: b.seconds }];
   }
   return [
     { phase: 'Work', seconds: b.workSec || 40 },
@@ -2493,6 +2529,9 @@ function campusFigureSvg() {
 }
 
 function fbBlockSub(b) {
+  if (b.type === 'pause') {
+    return `${b.seconds}s Pause`;
+  }
   if (b.type === 'hang') {
     const blockRestSec = b.blockRestSec != null ? b.blockRestSec : b.restSec;
     return `${b.hangSec}s Hang · ${b.restSec}s zw. Sätzen · ${blockRestSec}s danach · ×${b.reps}`;
@@ -2525,13 +2564,18 @@ function renderFbBlocksList() {
   const items = fb.blocks.map((b, i) => {
     const isHang = b.type === 'hang';
     const isCampus = b.type === 'campus';
-    const title = isHang ? `Hang @ ${esc(hangGripLabel(b))}` : isCampus ? campusLabel(b) : esc(exerciseName(b.exerciseId));
-    const thumb = isHang
-      ? hangBoardThumb(b)
-      : isCampus
-        ? `<div class="timeline-thumb"><img src="${CAMPUS_BOARD_IMAGE}" alt=""></div>`
-        : `<div class="timeline-thumb timeline-thumb-emoji">💪</div>`;
-    const edit = isHang ? `
+    const isPause = b.type === 'pause';
+    const title = isPause ? 'Pause' : isHang ? `Hang @ ${esc(hangGripLabel(b))}` : isCampus ? campusLabel(b) : esc(exerciseName(b.exerciseId));
+    const thumb = isPause
+      ? `<div class="timeline-thumb timeline-thumb-emoji">⏸</div>`
+      : isHang
+        ? hangBoardThumb(b)
+        : isCampus
+          ? `<div class="timeline-thumb"><img src="${CAMPUS_BOARD_IMAGE}" alt=""></div>`
+          : `<div class="timeline-thumb timeline-thumb-emoji">💪</div>`;
+    const edit = isPause ? `
+        <input type="number" data-i="${i}" data-f="seconds" value="${b.seconds}" class="ex-row-input" title="Pause (s)">
+      ` : isHang ? `
         <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">
         <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzliche Wiederholung">+</button>
         <input type="number" data-i="${i}" data-f="hangSec" value="${b.hangSec}" class="ex-row-input" title="Hang (s)">
@@ -2556,6 +2600,10 @@ function renderFbBlocksList() {
             <div class="title">${title}</div>
             <div class="sub" id="fb-sub-${i}">${esc(fbBlockSub(b))}</div>
             <div class="timeline-edit">${edit}</div>
+          </div>
+          <div class="timeline-move">
+            <button type="button" class="timeline-move-btn" data-move-up="${i}" ${i === 0 ? 'disabled' : ''} title="Nach oben verschieben">▲</button>
+            <button type="button" class="timeline-move-btn" data-move-down="${i}" ${i === fb.blocks.length - 1 ? 'disabled' : ''} title="Nach unten verschieben">▼</button>
           </div>
           <button type="button" class="timeline-remove" data-remove="${i}">×</button>
         </div>
@@ -2586,6 +2634,22 @@ function renderFbBlocksList() {
   holder.querySelectorAll('[data-remove]').forEach((btn) => {
     btn.onclick = () => {
       fb.blocks.splice(Number(btn.dataset.remove), 1);
+      renderFbBlocksList();
+    };
+  });
+  holder.querySelectorAll('[data-move-up]').forEach((btn) => {
+    btn.onclick = () => {
+      const i = Number(btn.dataset.moveUp);
+      if (i <= 0) return;
+      [fb.blocks[i - 1], fb.blocks[i]] = [fb.blocks[i], fb.blocks[i - 1]];
+      renderFbBlocksList();
+    };
+  });
+  holder.querySelectorAll('[data-move-down]').forEach((btn) => {
+    btn.onclick = () => {
+      const i = Number(btn.dataset.moveDown);
+      if (i >= fb.blocks.length - 1) return;
+      [fb.blocks[i], fb.blocks[i + 1]] = [fb.blocks[i + 1], fb.blocks[i]];
       renderFbBlocksList();
     };
   });
@@ -2725,6 +2789,7 @@ function fbUpcomingLabel() {
   if (!nextBlock) return 'Letzter Satz — gleich geschafft!';
   if (nextBlock.type === 'hang') return 'Hang @ ' + hangGripLabel(nextBlock);
   if (nextBlock.type === 'campus') return campusLabel(nextBlock);
+  if (nextBlock.type === 'pause') return 'Pause';
   return exerciseName(nextBlock.exerciseId);
 }
 
@@ -2800,11 +2865,12 @@ function renderFbOverlay() {
     if (!next) { closeFbOverlay(); return; }
     const isHang = next.type === 'hang';
     const isCampus = next.type === 'campus';
+    const isPause = next.type === 'pause';
     const nextArmNote = isHang ? hangArmNote(next) : '';
     stage = `
       <div class="fb-stage-label mono">NÄCHSTER SATZ (${fb.blockIndex + 1}/${fb.blocks.length})</div>
-      <div class="fb-stage-figure">${isHang ? hangBoardThumb(next) : isCampus ? campusFigureSvg() : exerciseFigureSvg(next.exerciseId)}</div>
-      <div class="fb-stage-title">${isHang ? 'Hang @ ' + esc(hangGripLabel(next)) : isCampus ? campusLabel(next) : esc(exerciseName(next.exerciseId))}</div>
+      <div class="fb-stage-figure">${isPause ? FB_REST_FIGURE_SVG : isHang ? hangBoardThumb(next) : isCampus ? campusFigureSvg() : exerciseFigureSvg(next.exerciseId)}</div>
+      <div class="fb-stage-title">${isPause ? 'Pause' : isHang ? 'Hang @ ' + esc(hangGripLabel(next)) : isCampus ? campusLabel(next) : esc(exerciseName(next.exerciseId))}</div>
       <div class="fb-stage-sub mono">${esc(fbBlockSub(next))}${nextArmNote ? ' · ' + nextArmNote : ''}</div>
       ${fbTransportRow()}
       <button class="btn fb-stage-btn" id="fb-continue">LOS</button>
@@ -2829,6 +2895,7 @@ function renderFbOverlay() {
     const isHang = block.type === 'hang';
     const isExercise = block.type === 'exercise';
     const isCampus = block.type === 'campus';
+    const isPause = block.type === 'pause';
     const step = fb.sequence[fb.stepIndex];
     const working = isWorkPhase(step);
     const phaseTotal = step ? step.seconds : 1;
@@ -2837,9 +2904,11 @@ function renderFbOverlay() {
     const isPausedNow = fb.running && !fb.intervalId;
     const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
     const armNote = isHang ? hangArmNote(block) : '';
-    const label = isHang
-      ? `Hang @ ${esc(hangGripLabel(block))}${armNote ? ' · ' + armNote : ''}`
-      : isCampus ? campusLabel(block) : esc(exerciseName(block.exerciseId));
+    const label = isPause
+      ? 'Pause'
+      : isHang
+        ? `Hang @ ${esc(hangGripLabel(block))}${armNote ? ' · ' + armNote : ''}`
+        : isCampus ? campusLabel(block) : esc(exerciseName(block.exerciseId));
     const muscles = isExercise ? exerciseMuscles(block.exerciseId) : null;
     const muscleText = muscles ? muscleLabelsText(muscles.primary, muscles.secondary) : '';
     stage = `
@@ -3001,6 +3070,10 @@ function initBlockResult(index) {
   if (fb.runResults[index]) return;
   const block = fb.blocks[index];
   if (!block) return;
+  if (block.type === 'pause') {
+    fb.runResults[index] = { type: 'pause' };
+    return;
+  }
   if (block.type === 'hang' || block.type === 'campus') {
     // Campus-Züge sind wie Hang-Sätze binär "geschafft/nicht" pro
     // Wiederholung, keine variable Wdh./Gewicht-Erfassung wie bei Übungen.
@@ -3018,7 +3091,7 @@ function initBlockResult(index) {
    nicht verloren geht. */
 function checkinPanelHtml(index) {
   const result = fb.runResults[index];
-  if (!result) return '';
+  if (!result || result.type === 'pause') return '';
   if (result.type !== 'exercise') {
     return `
       <div class="fb-checkin-label mono">GESCHAFFTE SÄTZE — nicht geschaffte abwählen</div>
@@ -3038,7 +3111,7 @@ function checkinPanelHtml(index) {
 function wireCheckinPanel(index) {
   const holder = document.getElementById('fb-checkin');
   const result = fb.runResults[index];
-  if (!holder || !result) return;
+  if (!holder || !result || result.type === 'pause') return;
   if (result.type !== 'exercise') {
     holder.querySelectorAll('.fb-chip').forEach((btn) => {
       btn.onclick = () => {
@@ -3235,7 +3308,7 @@ function fbResultsSummaryHtml(blocks, results) {
   let doneReps = 0;
   const rows = blocks.map((b, i) => {
     const r = results[i];
-    if (!r) return '';
+    if (!r || r.type === 'pause') return '';
     if (r.type === 'hang') {
       const done = r.doneReps.filter(Boolean).length;
       totalReps += r.doneReps.length;
@@ -3429,10 +3502,11 @@ function renderChallengeCard(id, c, now) {
   let title, detail;
   if (c.kind === 'fingerboard') {
     title = `Fingerboard · ${esc(BOARDS[c.board].label)}`;
-    detail = (c.blocks || []).map((b) => b.type === 'hang'
-      ? `<div class="ex core">Hang @ ${esc(hangGripLabel({ ...b, board: b.board || c.board }))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`
-      : `<div class="ex core">${esc(exerciseName(b.exerciseId))} · ${b.workSec || 40}s × ${esc(String(b.reps))}</div>`
-    ).join('');
+    detail = (c.blocks || []).map((b) => {
+      if (b.type === 'hang') return `<div class="ex core">Hang @ ${esc(hangGripLabel({ ...b, board: b.board || c.board }))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`;
+      if (b.type === 'pause') return `<div class="ex core">⏸ Pause · ${b.seconds}s</div>`;
+      return `<div class="ex core">${esc(exerciseName(b.exerciseId))} · ${b.workSec || 40}s × ${esc(String(b.reps))}</div>`;
+    }).join('');
   } else {
     title = LOG_TYPE_LABEL[c.sessionType] || esc(c.sessionType || 'Training');
     detail = c.durationMin
