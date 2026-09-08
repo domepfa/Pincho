@@ -893,8 +893,35 @@ function parseImportedAblauf(text) {
       if (!(workSec > 0)) { errors.push(`Satz ${n}: workSec muss eine Zahl > 0 sein.`); return; }
       if (!(restSec >= 0)) { errors.push(`Satz ${n}: restSec muss eine Zahl >= 0 sein.`); return; }
       blocks.push({ type: 'exercise', exerciseId: b.exerciseId, reps, workSec, restSec });
+    } else if (b.type === 'campus') {
+      if (!CAMPUS_RUNG_TYPES.some((t) => t.id === b.rungType)) { errors.push(`Satz ${n}: unbekannter rungType "${b.rungType}".`); return; }
+      if (b.moveMode !== 'direct' && b.moveMode !== 'pattern') { errors.push(`Satz ${n}: moveMode muss "direct" oder "pattern" sein.`); return; }
+      const reps = Number(b.reps);
+      const workSec = Number(b.workSec);
+      const restSec = Number(b.restSec != null ? b.restSec : 0);
+      const blockRestSec = b.blockRestSec != null ? Number(b.blockRestSec) : null;
+      if (!(reps > 0)) { errors.push(`Satz ${n}: reps muss eine Zahl > 0 sein.`); return; }
+      if (!(workSec > 0)) { errors.push(`Satz ${n}: workSec muss eine Zahl > 0 sein.`); return; }
+      if (!(restSec >= 0)) { errors.push(`Satz ${n}: restSec muss eine Zahl >= 0 sein.`); return; }
+      if (blockRestSec != null && !(blockRestSec >= 0)) { errors.push(`Satz ${n}: blockRestSec muss eine Zahl >= 0 sein.`); return; }
+      const common = { type: 'campus', rungType: b.rungType, moveMode: b.moveMode, reps, workSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}) };
+      if (b.moveMode === 'direct') {
+        const fromRung = Number(b.fromRung);
+        const toRung = Number(b.toRung);
+        if (!(fromRung > 0)) { errors.push(`Satz ${n}: fromRung muss eine Zahl > 0 sein.`); return; }
+        if (!(toRung > 0)) { errors.push(`Satz ${n}: toRung muss eine Zahl > 0 sein.`); return; }
+        blocks.push({ ...common, fromRung, toRung });
+      } else {
+        const startRung = Number(b.startRung);
+        if (!(startRung > 0)) { errors.push(`Satz ${n}: startRung muss eine Zahl > 0 sein.`); return; }
+        if (!Array.isArray(b.pattern) || !b.pattern.length || !b.pattern.every((p) => Number.isFinite(Number(p)) && Number(p) !== 0)) {
+          errors.push(`Satz ${n}: pattern muss ein nicht-leeres Array von Zahlen ungleich 0 sein, z. B. [2, -1].`);
+          return;
+        }
+        blocks.push({ ...common, startRung, pattern: b.pattern.map(Number) });
+      }
     } else {
-      errors.push(`Satz ${n}: "type" muss "hang" oder "exercise" sein (war "${b.type}").`);
+      errors.push(`Satz ${n}: "type" muss "hang", "exercise" oder "campus" sein (war "${b.type}").`);
     }
   });
 
@@ -905,10 +932,15 @@ function parseImportedAblauf(text) {
 const fb = {
   board: null,
   selectedGrip: null,   // am grafischen Board gewählter Griff, fürs Hinzufügen eines Hang-Satzes
-  addType: 'hang',       // 'hang' | 'exercise' — welches Add-Panel gerade offen ist
+  addType: 'hang',       // 'hang' | 'exercise' | 'campus' — welches Add-Panel gerade offen ist
   newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
-  blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec, blockRestSec} | {type:'exercise', exerciseId, reps, workSec, restSec}
+  newCampus: {
+    rungType: CAMPUS_RUNG_TYPES[0].id, moveMode: 'direct',
+    fromRung: 1, toRung: 4, startRung: 1, pattern: [],
+    reps: 4, workSec: 3, restSec: 15, blockRestSec: 90,
+  },
+  blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec, blockRestSec} | {type:'exercise', exerciseId, reps, workSec, restSec} | {type:'campus', rungType, moveMode, reps, workSec, restSec, blockRestSec, fromRung/toRung ODER startRung/pattern}
   templates: [],         // eigene, in Firebase gespeicherte Abläufe (zusätzlich zu FINGERBOARD_TEMPLATES)
   weight: '',
   blockIndex: 0,
@@ -1041,7 +1073,7 @@ function renderFbAddPanel() {
       fb.blocks.push({ type: 'hang', board: fb.board, grip: fb.selectedGrip, ...fb.newHang });
       renderFbBlocksList();
     };
-  } else {
+  } else if (fb.addType === 'exercise') {
     holder.innerHTML = `
       <div class="field">
         <label>Übung</label>
@@ -1062,7 +1094,117 @@ function renderFbAddPanel() {
       fb.blocks.push({ type: 'exercise', ...fb.newExercise });
       renderFbBlocksList();
     };
+  } else {
+    renderCampusAddPanel(holder);
   }
+}
+
+/* Campus-Board: keine Foto-Hotspots wie beim Hangboard (Sprossen sind
+   durchnummeriert, immer in einer Spalte) — stattdessen Sprossen-TYP per
+   Chip + die Bewegung rein über Zahlen/Stepper, entweder als direkter
+   Sprung ("Von → Zu") oder als sich wiederholendes Muster ("+2/-1 usw."). */
+function renderCampusAddPanel(holder) {
+  const c = fb.newCampus;
+  holder.innerHTML = `
+    <div class="field">
+      <label>Sprossen-Typ</label>
+      <div class="chip-row" id="campus-rung-toggle" style="margin-bottom:6px;">
+        ${CAMPUS_RUNG_TYPES.map((t) => `<button type="button" class="chip ${c.rungType === t.id ? 'active' : ''}" data-rung="${t.id}">${esc(t.label)}</button>`).join('')}
+      </div>
+      <div class="campus-ref">
+        <img src="${CAMPUS_BOARD_IMAGE}" alt="">
+        <div class="campus-ref-label">Zur Orientierung — nicht antippbar</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Bewegung</label>
+      <div class="chip-row" id="campus-mode-toggle" style="margin-bottom:10px;">
+        <button type="button" class="chip ${c.moveMode === 'direct' ? 'active' : ''}" data-mode="direct">Von → Zu</button>
+        <button type="button" class="chip ${c.moveMode === 'pattern' ? 'active' : ''}" data-mode="pattern">Muster</button>
+      </div>
+      ${c.moveMode === 'direct' ? `
+        <div class="stepper-row">
+          <div style="flex:1;">
+            <div class="fb-checkin-label" style="text-align:left;margin-bottom:6px;">Von Sprosse</div>
+            <div class="stepper-row">
+              <button type="button" class="stepper-btn" data-step="fromRung" data-dir="-1">−</button>
+              <div class="stepper-num">${c.fromRung}</div>
+              <button type="button" class="stepper-btn" data-step="fromRung" data-dir="1">+</button>
+            </div>
+          </div>
+          <div class="arrow">→</div>
+          <div style="flex:1;">
+            <div class="fb-checkin-label" style="text-align:left;margin-bottom:6px;">Zu Sprosse</div>
+            <div class="stepper-row">
+              <button type="button" class="stepper-btn" data-step="toRung" data-dir="-1">−</button>
+              <div class="stepper-num">${c.toRung}</div>
+              <button type="button" class="stepper-btn" data-step="toRung" data-dir="1">+</button>
+            </div>
+          </div>
+        </div>
+      ` : `
+        <div class="fb-checkin-label" style="text-align:left;margin-bottom:6px;">Start-Sprosse</div>
+        <div class="stepper-row" style="margin-bottom:14px;">
+          <button type="button" class="stepper-btn" data-step="startRung" data-dir="-1">−</button>
+          <div class="stepper-num">${c.startRung}</div>
+          <button type="button" class="stepper-btn" data-step="startRung" data-dir="1">+</button>
+        </div>
+        <div class="fb-checkin-label" style="text-align:left;margin-bottom:6px;">Muster antippen (wiederholt sich automatisch)</div>
+        <div class="chip-row" style="margin-bottom:0;">
+          <button type="button" class="pattern-btn up" data-add-pat="1">+1</button>
+          <button type="button" class="pattern-btn up" data-add-pat="2">+2</button>
+          <button type="button" class="pattern-btn up" data-add-pat="3">+3</button>
+          <button type="button" class="pattern-btn down" data-add-pat="-1">−1</button>
+          <button type="button" class="pattern-btn down" data-add-pat="-2">−2</button>
+        </div>
+        <div class="pattern-strip">
+          ${c.pattern.length
+            ? c.pattern.map((p) => `<span class="pattern-pill ${p < 0 ? 'down' : ''}">${Math.abs(p)} ${p > 0 ? '↑' : '↓'}</span>`).join('')
+            : '<span class="mono" style="color:var(--ink-faint);font-size:12px;">noch kein Muster</span>'}
+          ${c.pattern.length ? '<span class="pattern-clear" id="campus-pattern-clear">Zurücksetzen ×</span>' : ''}
+        </div>
+      `}
+    </div>
+
+    <div class="field-row">
+      <div class="field"><label>${c.moveMode === 'pattern' ? 'Wdh. des Musters' : 'Sätze'}</label><input type="number" id="campus-reps" value="${c.reps}" min="1"></div>
+      <div class="field"><label>Ausführung (s)</label><input type="number" id="campus-worksec" value="${c.workSec}" min="1"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Pause zw. Sätzen (s)</label><input type="number" id="campus-restsec" value="${c.restSec}" min="0"></div>
+      <div class="field"><label>Pause danach (s)</label><input type="number" id="campus-blockrestsec" value="${c.blockRestSec}" min="0"></div>
+    </div>
+    <button type="button" class="btn" id="fb-add-campus" style="width:100%;">+ Campus-Satz hinzufügen</button>
+  `;
+
+  document.getElementById('campus-rung-toggle').querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => { c.rungType = btn.dataset.rung; renderFbAddPanel(); };
+  });
+  document.getElementById('campus-mode-toggle').querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => { c.moveMode = btn.dataset.mode; renderFbAddPanel(); };
+  });
+  holder.querySelectorAll('[data-step]').forEach((btn) => {
+    btn.onclick = () => {
+      const field = btn.dataset.step;
+      c[field] = Math.max(1, c[field] + Number(btn.dataset.dir));
+      renderFbAddPanel();
+    };
+  });
+  holder.querySelectorAll('[data-add-pat]').forEach((btn) => {
+    btn.onclick = () => { c.pattern.push(Number(btn.dataset.addPat)); renderFbAddPanel(); };
+  });
+  const clearBtn = document.getElementById('campus-pattern-clear');
+  if (clearBtn) clearBtn.onclick = () => { c.pattern = []; renderFbAddPanel(); };
+  document.getElementById('campus-reps').oninput = (e) => { c.reps = Number(e.target.value) || 1; };
+  document.getElementById('campus-worksec').oninput = (e) => { c.workSec = Number(e.target.value) || 1; };
+  document.getElementById('campus-restsec').oninput = (e) => { c.restSec = Number(e.target.value) || 0; };
+  document.getElementById('campus-blockrestsec').oninput = (e) => { c.blockRestSec = Number(e.target.value) || 0; };
+  document.getElementById('fb-add-campus').onclick = () => {
+    if (c.moveMode === 'pattern' && !c.pattern.length) { toast('Zuerst ein Muster antippen.', 'err'); return; }
+    fb.blocks.push({ type: 'campus', ...c, pattern: c.pattern.slice() });
+    renderFbBlocksList();
+  };
 }
 
 async function renderFingerboard() {
@@ -1082,6 +1224,7 @@ async function renderFingerboard() {
     <div class="chip-row">
       <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Hang-Satz</button>
       <button class="chip ${fb.addType === 'exercise' ? 'active' : ''}" data-add-type="exercise">Fixübung</button>
+      <button class="chip ${fb.addType === 'campus' ? 'active' : ''}" data-add-type="campus">Campus</button>
     </div>
     <div id="fb-add-panel" style="margin:12px 0 16px;"></div>
 
@@ -1291,6 +1434,22 @@ function buildBlockSequence(b) {
     const seq = [];
     for (let s = 0; s < b.reps; s++) {
       seq.push({ phase: 'Hang', seconds: b.hangSec });
+      if (s < b.reps - 1) {
+        if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec });
+      } else {
+        const trailingRest = b.blockRestSec != null ? b.blockRestSec : b.restSec;
+        seq.push({ phase: trailingRest > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(trailingRest, 10) });
+      }
+    }
+    return seq;
+  }
+  if (b.type === 'campus') {
+    // Gleiche Struktur wie Hang-Sätze (mehrere Wiederholungen mit Pause
+    // dazwischen), nur mit "Work" statt "Hang" als Phase — Campus-Züge
+    // sind eine aktive Bewegung, kein Halten.
+    const seq = [];
+    for (let s = 0; s < b.reps; s++) {
+      seq.push({ phase: 'Work', seconds: b.workSec });
       if (s < b.reps - 1) {
         if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec });
       } else {
@@ -2135,10 +2294,30 @@ function miniBoardThumb(boardId, gripId) {
   return `<div class="timeline-thumb"><img src="${board.image}" alt="">${dots}</div>`;
 }
 
+/* Campus-Sätze brauchen keine Foto-Hotspots wie beim Hangboard — die
+   Sprossen sind durchnummeriert, deshalb reicht die Bewegung als reiner
+   Zahlen-Text ("Sprosse 1→4" bzw. "Start 1 · Muster +2/-1" fürs
+   Wiederholmuster, siehe fb.newCampus.moveMode). */
+function campusMoveText(b) {
+  return b.moveMode === 'pattern'
+    ? `Start ${b.startRung} · Muster ${b.pattern.map((p) => (p > 0 ? '+' + p : String(p))).join('/')}`
+    : `Sprosse ${b.fromRung}→${b.toRung}`;
+}
+function campusLabel(b) {
+  return `Campus (${esc(campusRungLabel(b.rungType))}) · ${esc(campusMoveText(b))}`;
+}
+function campusFigureSvg() {
+  return `<div class="ex-figure-emoji">🤸</div>`;
+}
+
 function fbBlockSub(b) {
   if (b.type === 'hang') {
     const blockRestSec = b.blockRestSec != null ? b.blockRestSec : b.restSec;
     return `${b.hangSec}s Hang · ${b.restSec}s zw. Sätzen · ${blockRestSec}s danach · ×${b.reps}`;
+  }
+  if (b.type === 'campus') {
+    const blockRestSec = b.blockRestSec != null ? b.blockRestSec : b.restSec;
+    return `${campusMoveText(b)} · ${b.workSec}s Ausführung · ${b.restSec}s zw. Sätzen · ${blockRestSec}s danach · ×${b.reps}`;
   }
   return `${b.workSec || 40}s Ausführung · Ziel ${b.reps}×${b.restSec ? ' · ' + b.restSec + 's Pause danach' : ''}`;
 }
@@ -2163,12 +2342,22 @@ function renderFbBlocksList() {
 
   const items = fb.blocks.map((b, i) => {
     const isHang = b.type === 'hang';
-    const title = isHang ? `Hang @ ${esc(gripLabel(b.board, b.grip))}` : esc(exerciseName(b.exerciseId));
-    const thumb = isHang ? miniBoardThumb(b.board, b.grip) : `<div class="timeline-thumb timeline-thumb-emoji">💪</div>`;
+    const isCampus = b.type === 'campus';
+    const title = isHang ? `Hang @ ${esc(gripLabel(b.board, b.grip))}` : isCampus ? campusLabel(b) : esc(exerciseName(b.exerciseId));
+    const thumb = isHang
+      ? miniBoardThumb(b.board, b.grip)
+      : isCampus
+        ? `<div class="timeline-thumb"><img src="${CAMPUS_BOARD_IMAGE}" alt=""></div>`
+        : `<div class="timeline-thumb timeline-thumb-emoji">💪</div>`;
     const edit = isHang ? `
         <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">
         <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzliche Wiederholung">+</button>
         <input type="number" data-i="${i}" data-f="hangSec" value="${b.hangSec}" class="ex-row-input" title="Hang (s)">
+        <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec}" class="ex-row-input" title="Pause zwischen Sätzen (s)">
+        <input type="number" data-i="${i}" data-f="blockRestSec" value="${b.blockRestSec != null ? b.blockRestSec : b.restSec}" class="ex-row-input" title="Pause danach, vor dem nächsten Satz (s)">
+      ` : isCampus ? `
+        <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Sätze / Wdh. des Musters">
+        <input type="number" data-i="${i}" data-f="workSec" value="${b.workSec}" class="ex-row-input" title="Ausführung (s)">
         <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec}" class="ex-row-input" title="Pause zwischen Sätzen (s)">
         <input type="number" data-i="${i}" data-f="blockRestSec" value="${b.blockRestSec != null ? b.blockRestSec : b.restSec}" class="ex-row-input" title="Pause danach, vor dem nächsten Satz (s)">
       ` : `
@@ -2352,7 +2541,9 @@ function fbUpcomingLabel() {
   }
   const nextBlock = fb.blocks[fb.blockIndex + 1];
   if (!nextBlock) return 'Letzter Satz — gleich geschafft!';
-  return nextBlock.type === 'hang' ? 'Hang @ ' + gripLabel(nextBlock.board, nextBlock.grip) : exerciseName(nextBlock.exerciseId);
+  if (nextBlock.type === 'hang') return 'Hang @ ' + gripLabel(nextBlock.board, nextBlock.grip);
+  if (nextBlock.type === 'campus') return campusLabel(nextBlock);
+  return exerciseName(nextBlock.exerciseId);
 }
 
 function updateFbProgressUI() {
@@ -2426,11 +2617,12 @@ function renderFbOverlay() {
     const next = fb.blocks[fb.blockIndex];
     if (!next) { closeFbOverlay(); return; }
     const isHang = next.type === 'hang';
+    const isCampus = next.type === 'campus';
     const nextArmNote = isHang ? gripArmNote(next.board, next.grip) : '';
     stage = `
       <div class="fb-stage-label mono">NÄCHSTER SATZ (${fb.blockIndex + 1}/${fb.blocks.length})</div>
-      <div class="fb-stage-figure">${isHang ? miniBoardThumb(next.board, next.grip) : exerciseFigureSvg(next.exerciseId)}</div>
-      <div class="fb-stage-title">${isHang ? 'Hang @ ' + esc(gripLabel(next.board, next.grip)) : esc(exerciseName(next.exerciseId))}</div>
+      <div class="fb-stage-figure">${isHang ? miniBoardThumb(next.board, next.grip) : isCampus ? campusFigureSvg() : exerciseFigureSvg(next.exerciseId)}</div>
+      <div class="fb-stage-title">${isHang ? 'Hang @ ' + esc(gripLabel(next.board, next.grip)) : isCampus ? campusLabel(next) : esc(exerciseName(next.exerciseId))}</div>
       <div class="fb-stage-sub mono">${esc(fbBlockSub(next))}${nextArmNote ? ' · ' + nextArmNote : ''}</div>
       ${fbTransportRow()}
       <button class="btn fb-stage-btn" id="fb-continue">LOS</button>
@@ -2447,12 +2639,14 @@ function renderFbOverlay() {
       <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
     `;
   } else {
-    // Ein einziges Template für Hang- UND Übungs-Sätze — beide laufen jetzt
-    // über dieselbe fb.sequence/tickBlock-Uhr, unterscheiden sich nur darin,
-    // was während "Work" gezeigt wird (Board-Punkt bzw. das animierte
-    // Strichmännchen der Übung).
+    // Ein einziges Template für Hang-, Übungs- UND Campus-Sätze — alle
+    // laufen über dieselbe fb.sequence/tickBlock-Uhr, unterscheiden sich
+    // nur darin, was während "Work" gezeigt wird (Board-Punkt, animiertes
+    // Strichmännchen der Übung, oder das Campus-Symbol).
     const block = fb.blocks[fb.blockIndex];
     const isHang = block.type === 'hang';
+    const isExercise = block.type === 'exercise';
+    const isCampus = block.type === 'campus';
     const step = fb.sequence[fb.stepIndex];
     const working = isWorkPhase(step);
     const phaseTotal = step ? step.seconds : 1;
@@ -2463,11 +2657,11 @@ function renderFbOverlay() {
     const armNote = isHang ? gripArmNote(block.board, block.grip) : '';
     const label = isHang
       ? `Hang @ ${esc(gripLabel(block.board, block.grip))}${armNote ? ' · ' + armNote : ''}`
-      : esc(exerciseName(block.exerciseId));
-    const muscles = !isHang ? exerciseMuscles(block.exerciseId) : null;
+      : isCampus ? campusLabel(block) : esc(exerciseName(block.exerciseId));
+    const muscles = isExercise ? exerciseMuscles(block.exerciseId) : null;
     const muscleText = muscles ? muscleLabelsText(muscles.primary, muscles.secondary) : '';
     stage = `
-      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${label}${!isHang ? ' · Ziel ' + esc(String(block.reps)) + '×' : ''}</div>
+      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${label}${isExercise ? ' · Ziel ' + esc(String(block.reps)) + '×' : ''}</div>
       ${isHang
         ? `<div class="fb-stage-figure">${miniBoardThumb(block.board, block.grip)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
@@ -2480,7 +2674,7 @@ function renderFbOverlay() {
                <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
              </div>
            </div>`
-        : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}">${working ? exerciseFigureSvg(block.exerciseId) : FB_REST_FIGURE_SVG}</div>
+        : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}">${working ? (isCampus ? campusFigureSvg() : exerciseFigureSvg(block.exerciseId)) : FB_REST_FIGURE_SVG}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
              <div class="fb-timer-ring">
                <svg viewBox="0 0 120 120">
@@ -2499,7 +2693,7 @@ function renderFbOverlay() {
       ` : ''}
       <div class="fb-stage-next mono" id="fb-upcoming"></div>
       <div class="fb-checkin" id="fb-checkin" ${fb.stepIndex === fb.sequence.length - 1 && !working ? '' : 'hidden'}>${fb.stepIndex === fb.sequence.length - 1 && !working ? checkinPanelHtml(fb.blockIndex) : ''}</div>
-      ${!isHang ? `<button class="btn fb-stage-btn" id="fb-reps-done" ${working ? '' : 'hidden'}>Wiederholungen geschafft — weiter</button>` : ''}
+      ${isExercise ? `<button class="btn fb-stage-btn" id="fb-reps-done" ${working ? '' : 'hidden'}>Wiederholungen geschafft — weiter</button>` : ''}
       ${fbTransportRow()}
       <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
     `;
@@ -2625,8 +2819,10 @@ function initBlockResult(index) {
   if (fb.runResults[index]) return;
   const block = fb.blocks[index];
   if (!block) return;
-  if (block.type === 'hang') {
-    fb.runResults[index] = { type: 'hang', doneReps: new Array(block.reps).fill(true) };
+  if (block.type === 'hang' || block.type === 'campus') {
+    // Campus-Züge sind wie Hang-Sätze binär "geschafft/nicht" pro
+    // Wiederholung, keine variable Wdh./Gewicht-Erfassung wie bei Übungen.
+    fb.runResults[index] = { type: block.type, doneReps: new Array(block.reps).fill(true) };
   } else {
     const last = lastValueForExercise(block.exerciseId);
     fb.runResults[index] = { type: 'exercise', reps: block.reps, weight: last && last.weight != null ? last.weight : '' };
@@ -2641,7 +2837,7 @@ function initBlockResult(index) {
 function checkinPanelHtml(index) {
   const result = fb.runResults[index];
   if (!result) return '';
-  if (result.type === 'hang') {
+  if (result.type !== 'exercise') {
     return `
       <div class="fb-checkin-label mono">GESCHAFFTE SÄTZE — nicht geschaffte abwählen</div>
       <div class="fb-checkin-chips">
@@ -2661,7 +2857,7 @@ function wireCheckinPanel(index) {
   const holder = document.getElementById('fb-checkin');
   const result = fb.runResults[index];
   if (!holder || !result) return;
-  if (result.type === 'hang') {
+  if (result.type !== 'exercise') {
     holder.querySelectorAll('.fb-chip').forEach((btn) => {
       btn.onclick = () => {
         const i = Number(btn.dataset.satz);
@@ -2826,7 +3022,7 @@ function updateTimerUI() {
   const kind = working ? 'work' : 'rest';
   if (figureHolder && figureHolder.dataset.kind !== kind) {
     figureHolder.innerHTML = working
-      ? (block.type === 'hang' ? FB_HANG_FIGURE_SVG : exerciseFigureSvg(block.exerciseId))
+      ? (block.type === 'hang' ? FB_HANG_FIGURE_SVG : block.type === 'campus' ? campusFigureSvg() : exerciseFigureSvg(block.exerciseId))
       : FB_REST_FIGURE_SVG;
     figureHolder.dataset.kind = kind;
   }
@@ -2864,10 +3060,16 @@ function fbResultsSummaryHtml(blocks, results) {
       doneReps += done;
       return `<div class="fb-summary-row"><span>${esc(gripLabel(b.board, b.grip))}</span><span class="mono">${done}/${r.doneReps.length}</span></div>`;
     }
+    if (r.type === 'campus') {
+      const done = r.doneReps.filter(Boolean).length;
+      totalReps += r.doneReps.length;
+      doneReps += done;
+      return `<div class="fb-summary-row"><span>${campusLabel(b)}</span><span class="mono">${done}/${r.doneReps.length}</span></div>`;
+    }
     const weightText = r.weight !== '' && r.weight != null ? ` × ${esc(String(r.weight))}kg` : '';
     return `<div class="fb-summary-row"><span>${esc(exerciseName(b.exerciseId))}</span><span class="mono">${esc(String(r.reps))}${weightText}</span></div>`;
   }).join('');
-  const headline = totalReps ? `<div class="fb-summary-headline mono">${doneReps}/${totalReps} Hänge geschafft</div>` : '';
+  const headline = totalReps ? `<div class="fb-summary-headline mono">${doneReps}/${totalReps} Sätze geschafft</div>` : '';
   return `${headline}<div class="fb-summary-list">${rows}</div>`;
 }
 

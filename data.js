@@ -117,6 +117,27 @@ const BOARDS = {
   },
 };
 
+/* ---------- Campus-Board ----------
+   Anders als beim Hangboard geht es hier nicht um exakte Griff-Positionen
+   (die Sprossen sind ohnehin durchnummeriert und immer in einer Spalte) —
+   deshalb kein Foto-Hotspot-Picker wie bei BOARDS, sondern nur der
+   Sprossen-TYP (unterschiedliche Leisten-/Sprossengrössen = unterschiedlich
+   schwer) plus die Bewegung als Zahlen (siehe app.js, Satz-Typ 'campus'). */
+const CAMPUS_BOARD_IMAGE = './assets/board-campus.jpg';
+const CAMPUS_RUNG_TYPES = [
+  { id: 'rundleiste_gross', label: 'Rundleiste gross' },
+  { id: 'kugel_gross', label: 'Kugel gross' },
+  { id: 'kugel_klein', label: 'Kugel klein' },
+  { id: 'leiste_35', label: 'Leiste 35' },
+  { id: 'leiste_27', label: 'Leiste 27' },
+  { id: 'leiste_19', label: 'Leiste 19' },
+  { id: 'leiste_gross', label: 'Leiste gross' },
+];
+function campusRungLabel(rungTypeId) {
+  const t = CAMPUS_RUNG_TYPES.find((r) => r.id === rungTypeId);
+  return t ? t.label : rungTypeId;
+}
+
 function gripLabel(boardId, gripId) {
   const board = BOARDS[boardId];
   const grip = board && board.grips.find((g) => g.id === gripId);
