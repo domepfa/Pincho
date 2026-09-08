@@ -127,13 +127,14 @@ const CAMPUS_BOARD_IMAGE = './assets/board-campus.jpg';
 /* lineX/lineX2 (% von Bildbreite, siehe assets/board-campus.jpg): markiert
    im Referenzbild per Strich, welche Spalte gemeint ist — bei den Kugeln
    zwei Striche, da deren Löcher im Zickzack (zwei versetzte Spalten) statt
-   einer geraden Reihe angeordnet sind. Grob per Augenmass am Bild
-   geschätzt, nicht pixelgenau vermessen — bei Bedarf über die Kalibrier-
-   Anzeige direkt am Referenzbild nachjustierbar. */
+   einer geraden Reihe angeordnet sind. Anordnung der vier Kugel-Spalten
+   von links nach rechts: gross/klein/klein/gross (aussen = gross, innen =
+   klein) — bei Bedarf über die Kalibrier-Anzeige direkt am Referenzbild
+   nachjustierbar. */
 const CAMPUS_RUNG_TYPES = [
   { id: 'rundleiste_gross', label: 'Rundleiste gross', lineX: 7 },
-  { id: 'kugel_gross', label: 'Kugel gross', lineX: 19.5, lineX2: 23 },
-  { id: 'kugel_klein', label: 'Kugel klein', lineX: 28, lineX2: 31.5 },
+  { id: 'kugel_gross', label: 'Kugel gross', lineX: 19.5, lineX2: 31.5 },
+  { id: 'kugel_klein', label: 'Kugel klein', lineX: 23, lineX2: 28 },
   { id: 'leiste_35', label: 'Leiste 35', lineX: 44 },
   { id: 'leiste_27', label: 'Leiste 27', lineX: 60 },
   { id: 'leiste_19', label: 'Leiste 19', lineX: 77 },
