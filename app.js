@@ -371,7 +371,7 @@ async function renderPlan() {
 /* ================================================================
    LOG
    ================================================================= */
-const LOG_TYPE_LABEL = { klettern: 'Klettern', gym: 'Gym', fingerboard: 'Fingerboard', mobility: 'Mobility', sonstiges: 'Sonstiges' };
+const LOG_TYPE_LABEL = { klettern: 'Klettern', gym: 'Gym', fingerboard: 'Fingerboard', mobility: 'Mobility', yoga: 'Yoga', jogging: 'Jogging', pilates: 'Pilates', sonstiges: 'Sonstiges' };
 let logBuilder = { exercises: loadDraft('log_exercises') || [] };
 let logMode = 'planned'; // 'planned' | 'freestyle'
 let logPickerExerciseId = EXERCISE_LIBRARY[0].id;
