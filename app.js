@@ -5,7 +5,7 @@
 
 const APP_ROOT = document.getElementById('app');
 const TOAST_ROOT = document.getElementById('toast-root');
-const APP_TAGLINE = 'Pinchiboy, come make me scream!';
+const APP_TAGLINE = 'PINCHIBOY, come make me scream!';
 let appTaglineTyped = false; // Buchstabe-für-Buchstabe-Effekt läuft nur einmal pro App-Öffnung, nicht bei jeder Navigation
 
 /* Buchstaben-für-Buchstaben-Aufploppen, schnell statt gemächlich — reine
