@@ -103,6 +103,11 @@ button, input, select, textarea { font-family: inherit; }
   transition: color .2s;
 }
 .bottomnav a.active { color: var(--accent); }
+.nav-dot {
+  position: absolute; top: 6px; right: 18%; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--accent2);
+  box-shadow: 0 0 6px 1px rgba(255, 107, 71, .6);
+}
 .nav-indicator {
   position: absolute; top: -1px; height: 2px; background: var(--accent);
   box-shadow: 0 0 8px 1px rgba(var(--accent-rgb), .6);
@@ -300,10 +305,9 @@ button, input, select, textarea { font-family: inherit; }
 .crew .p { font-family: 'IBM Plex Mono', monospace; font-size: 10px; border: 1px solid var(--line); color: var(--ink-faint); padding: 4px 8px; }
 .crew .p.done { border-color: var(--accent); color: var(--accent); }
 .crew .p.expired { border-color: var(--ink-faint); color: var(--ink-faint); text-decoration: line-through; }
+.chal-actions { display: flex; gap: 8px; }
+.chal-actions .btn { flex: 1; }
 
-.new-challenge-form { border: 1px dashed var(--line); padding: 14px; margin-bottom: 20px; }
-.ex-check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; }
-.ex-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-dim); }
 .ex-cat-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); margin: 10px 0 6px; }
 
 /* Übungs-Raster (Einzelauswahl) — Ersatz für ein langes <select>-Dropdown

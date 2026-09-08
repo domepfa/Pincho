@@ -111,6 +111,15 @@ async function boot() {
   render();
   await loadMembers();
   if (state.route === 'fingerboard' || state.route === 'challenges') render();
+
+  // Läuft unabhängig von der gerade offenen Ansicht — nur so kann der
+  // Benachrichtigungspunkt schon beim App-Start stimmen, nicht erst wenn
+  // man zufällig auf "Challenges" tippt.
+  fbGet('challenges').then((raw) => {
+    if (raw === undefined) return;
+    state.challenges = raw || {};
+    setChallengeUnseenCount(countUnseenChallenges(state.challenges));
+  });
 }
 
 async function loadMembers() {
@@ -212,6 +221,43 @@ function logout() {
 }
 
 /* ================================================================
+   BENACHRICHTIGUNGSPUNKT (Challenges)
+   Echtes Push (auch bei geschlossener App) bräuchte einen eigenen Server,
+   der bei einer neuen Challenge aktiv etwas an alle Geräte schickt — das
+   hat diese App (rein statisch, direkt gegen Firebase) nicht. Was ohne
+   Server geht: sobald die App geöffnet wird, im Hintergrund nachsehen, ob
+   es neue Challenges von anderen gibt, und dafür sowohl einen Punkt im
+   Tab-Menü als auch — wo vom Betriebssystem unterstützt (Badging API,
+   z. B. installierte PWA auf Android/Desktop) — einen Zähler direkt auf
+   dem App-Icon setzen. Kein Echtzeit-Push bei gesperrtem Handy, aber
+   sichtbar, sobald man die App das nächste Mal öffnet. */
+let challengeUnseenCount = 0;
+
+function getChallengesSeenAt() {
+  return Number(localStorage.getItem('pincho_challenges_seen_at') || 0);
+}
+function countUnseenChallenges(challengesObj) {
+  const seenAt = getChallengesSeenAt();
+  const now = Date.now();
+  return Object.values(challengesObj || {})
+    .filter((c) => c.createdBy !== state.member.id && c.createdAt > seenAt && now < c.expiresAt)
+    .length;
+}
+function setChallengeUnseenCount(n) {
+  challengeUnseenCount = n;
+  const dot = document.getElementById('nav-challenge-dot');
+  if (dot) dot.hidden = n === 0;
+  try {
+    if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n).catch(() => {});
+    else if (n === 0 && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
+  } catch (e) { /* Badging API evtl. nicht unterstützt */ }
+}
+function markChallengesSeenNow() {
+  try { localStorage.setItem('pincho_challenges_seen_at', String(Date.now())); } catch (e) { /* ignorieren */ }
+  setChallengeUnseenCount(0);
+}
+
+/* ================================================================
    SHELL + ROUTER
    ================================================================= */
 const NAV_ITEMS = [
@@ -236,7 +282,7 @@ function renderShell(contentHtml) {
     </div>
     <div class="shell">${contentHtml}</div>
     <nav class="bottomnav">
-      ${NAV_ITEMS.map((n) => `<a href="#${n.route}" class="${state.route === n.route ? 'active' : ''}">${n.label}</a>`).join('')}
+      ${NAV_ITEMS.map((n) => `<a href="#${n.route}" class="${state.route === n.route ? 'active' : ''}">${n.label}${n.route === 'challenges' ? `<span class="nav-dot" id="nav-challenge-dot" ${challengeUnseenCount ? '' : 'hidden'}></span>` : ''}</a>`).join('')}
       <span class="nav-indicator" id="nav-indicator"></span>
     </nav>
   `;
@@ -325,6 +371,7 @@ async function renderPlan() {
 /* ================================================================
    LOG
    ================================================================= */
+const LOG_TYPE_LABEL = { klettern: 'Klettern', gym: 'Gym', fingerboard: 'Fingerboard', mobility: 'Mobility', sonstiges: 'Sonstiges' };
 let logBuilder = { exercises: loadDraft('log_exercises') || [] };
 let logMode = 'planned'; // 'planned' | 'freestyle'
 let logPickerExerciseId = EXERCISE_LIBRARY[0].id;
@@ -365,11 +412,7 @@ async function renderLog() {
         <div class="field"><label>Datum</label><input type="date" id="log-date" value="${todayKey()}"></div>
         <div class="field"><label>Typ</label>
           <select id="log-type">
-            <option value="klettern">Klettern</option>
-            <option value="gym" selected>Gym</option>
-            <option value="fingerboard">Fingerboard</option>
-            <option value="mobility">Mobility</option>
-            <option value="sonstiges">Sonstiges</option>
+            ${Object.entries(LOG_TYPE_LABEL).map(([v, label]) => `<option value="${v}" ${v === 'gym' ? 'selected' : ''}>${label}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -437,8 +480,19 @@ async function renderLog() {
         <div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>
       `).join('')}</div>` : ''}
       ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
+      <button type="button" class="btn ghost small" data-share-log="${id}" style="margin-top:10px;">Als Challenge teilen (72h)</button>
     </div>
   `).join('') : '<div class="list-empty">Noch keine Einträge.</div>';
+
+  list.querySelectorAll('[data-share-log]').forEach((btn) => {
+    btn.onclick = async () => {
+      const found = entries.find(([id2]) => id2 === btn.dataset.shareLog);
+      if (!found) return;
+      btn.disabled = true;
+      await shareLogEntryAsChallenge(found[1]);
+      btn.disabled = false;
+    };
+  });
 }
 
 /* Kompakte Satz-Anzeige fürs Verlauf: geplante Einträge (fester Wert für
@@ -2490,23 +2544,32 @@ async function finishAblauf() {
   releaseWakeLock();
   beep(1568, 400);
 
+  const board = fb.board;
+  const blocks = fb.blocks;
+
   const el = ensureFbOverlay();
   el.innerHTML = `
     <div class="fb-overlay-inner fb-overlay-done">
       <div class="fb-done-emoji">🎉</div>
       <div class="fb-stage-title">Ablauf geschafft!</div>
-      <div class="fb-stage-sub mono">${fb.blocks.length} Sätze · ${fmtMinSec(fbEstimateSeconds())} Trainingszeit</div>
+      <div class="fb-stage-sub mono">${blocks.length} Sätze · ${fmtMinSec(fbEstimateSeconds())} Trainingszeit</div>
+      <button class="btn fb-stage-btn ghost" id="fb-overlay-share">Als Challenge teilen (72h)</button>
       <button class="btn fb-stage-btn" id="fb-overlay-finish">Schliessen</button>
     </div>
   `;
   document.getElementById('fb-overlay-finish').onclick = () => { closeFbOverlay(); renderFbRuntime(); };
+  document.getElementById('fb-overlay-share').onclick = async (e) => {
+    e.target.disabled = true;
+    await shareFingerboardAsChallenge(board, blocks);
+    e.target.textContent = 'Geteilt ✓';
+  };
   spawnConfetti(document.querySelector('.fb-overlay-done'));
 
   const session = {
     date: todayKey(),
-    board: fb.board,
+    board,
     weight: fb.weight || 0,
-    blocks: fb.blocks,
+    blocks,
     createdAt: Date.now(),
   };
   await fbPush(`fingerboardSessions/${state.member.id}`, session);
@@ -2515,43 +2578,60 @@ async function finishAblauf() {
 
 /* ================================================================
    CHALLENGES
+   Keine eigene "Challenge bauen"-Maske mehr mit Griff/Protokoll/Übungen —
+   eine Challenge ist ein bereits gemachtes (Fingerboard-Ablauf, s.
+   finishAblauf) oder geplantes/Freestyle-Training (Log-Verlauf, s.
+   renderLog), das man mit einem Tap für die Crew freigibt. Absichtlich
+   kein Punkte-, Zeit- oder Gewichtsvergleich zwischen den Mitgliedern —
+   es zählt nur "mitgemacht oder nicht", die Challenge soll Anreiz zum
+   Training sein, kein Wettkampf um besser/schlechter.
    ================================================================= */
 const HOUR_MS = 60 * 60 * 1000;
-const CHALLENGE_WINDOW_H = 48;
+const CHALLENGE_WINDOW_H = 72;
 
-function getSharedGripIds() {
-  if (Object.keys(state.members).length === 0) return []; // Mitgliederliste noch nicht geladen
-  const boardIds = Object.values(state.members).map((m) => m.board || 'bm2000');
-  const uniqueBoards = [...new Set(boardIds)];
-  const gripSets = uniqueBoards.map((b) => new Set(BOARDS[b].grips.map((g) => g.id)));
-  const allGrips = new Set(BOARDS.bm2000.grips.concat(BOARDS.bm1000.grips).map((g) => g.id));
-  return [...allGrips].filter((id) => gripSets.every((s) => s.has(id)));
+async function pushChallenge(fields) {
+  const now = Date.now();
+  const participants = {};
+  for (const id of Object.keys(state.members)) {
+    participants[id] = id === state.member.id ? { status: 'done', completedAt: now } : { status: 'pending' };
+  }
+  const challenge = {
+    createdBy: state.member.id,
+    createdByName: state.member.name,
+    createdAt: now,
+    expiresAt: now + CHALLENGE_WINDOW_H * HOUR_MS,
+    participants,
+    ...fields,
+  };
+  const id = await fbPush('challenges', challenge);
+  if (id) toast(`Challenge raus an die Crew (${CHALLENGE_WINDOW_H}h Zeit)!`, 'ok');
+  else toast('Konnte Challenge nicht senden.', 'err');
+  return id;
 }
 
-let newChallengeState = null;
+function shareFingerboardAsChallenge(board, blocks) {
+  return pushChallenge({ kind: 'fingerboard', board, blocks });
+}
 
-function openNewChallengeForm() {
-  newChallengeState = { grip: null, protocolId: 'max_hang', params: { ...PROTOCOLS.max_hang.defaults }, exercises: [] };
-  renderChallenges();
+function shareLogEntryAsChallenge(entry) {
+  return pushChallenge({
+    kind: 'session',
+    sessionType: entry.type,
+    exercises: entry.exercises,
+    note: entry.note || '',
+  });
 }
 
 async function renderChallenges() {
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Challenges</h2><div class="sec-rule"></div></div>
-    <button class="btn ghost" id="new-challenge-btn" style="margin-bottom:16px;">${newChallengeState ? 'ABBRECHEN' : '+ NEUE CHALLENGE'}</button>
-    <div id="new-challenge-form"></div>
+    <p class="login-hint" style="margin:0 0 16px;text-align:left;">Ein Training fertig gemacht? Im Fingerboard (nach "Ablauf geschafft") oder im Log-Verlauf kannst du es der Crew als Challenge vorschlagen — ${CHALLENGE_WINDOW_H}h Zeit zum Mitmachen.</p>
     <div class="list" id="challenge-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
   `);
 
-  document.getElementById('new-challenge-btn').onclick = () => {
-    newChallengeState = newChallengeState ? null : { grip: null, protocolId: 'max_hang', params: { ...PROTOCOLS.max_hang.defaults }, exercises: [] };
-    renderChallenges();
-  };
-
-  if (newChallengeState) renderNewChallengeForm();
-
   const raw = await fbGet('challenges');
   state.challenges = raw || {};
+  markChallengesSeenNow();
   const now = Date.now();
 
   // Abgelaufene, unbestätigte Teilnahmen als "expired" markieren (lazy).
@@ -2569,12 +2649,20 @@ async function renderChallenges() {
   const entries = Object.entries(state.challenges).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
   const list = document.getElementById('challenge-list');
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
-  list.innerHTML = entries.length ? entries.map(([id, c]) => renderChallengeCard(id, c, now)).join('') : '<div class="list-empty">Noch keine Challenges — leg die erste an!</div>';
+  list.innerHTML = entries.length ? entries.map(([id, c]) => renderChallengeCard(id, c, now)).join('') : '<div class="list-empty">Noch keine Challenges — teile ein fertiges Training, um die erste zu starten.</div>';
 
   list.querySelectorAll('[data-confirm]').forEach((btn) => {
     btn.onclick = async () => {
       await fbPatch(`challenges/${btn.dataset.confirm}/participants/${state.member.id}`, { status: 'done', completedAt: Date.now() });
-      toast('Bestätigt — gut gemacht!', 'ok');
+      toast('Mitgemacht — stark!', 'ok');
+      renderChallenges();
+    };
+  });
+  list.querySelectorAll('[data-delete]').forEach((btn) => {
+    btn.onclick = async () => {
+      if (!confirm('Diese Challenge wirklich löschen?')) return;
+      await fbDelete(`challenges/${btn.dataset.delete}`);
+      toast('Challenge gelöscht.', 'ok');
       renderChallenges();
     };
   });
@@ -2585,87 +2673,35 @@ function renderChallengeCard(id, c, now) {
   const hoursLeft = Math.max(0, Math.ceil((c.expiresAt - now) / HOUR_MS));
   const my = c.participants && c.participants[state.member.id];
   const myDone = my && my.status === 'done';
+  const isMine = c.createdBy === state.member.id;
+
+  let title, detail;
+  if (c.kind === 'fingerboard') {
+    title = `Fingerboard · ${esc(BOARDS[c.board].label)}`;
+    detail = (c.blocks || []).map((b) => b.type === 'hang'
+      ? `<div class="ex core">Hang @ ${esc(gripLabel(b.board || c.board, b.grip))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`
+      : `<div class="ex core">${esc(exerciseName(b.exerciseId))} · ${b.workSec || 40}s × ${esc(String(b.reps))}</div>`
+    ).join('');
+  } else {
+    title = LOG_TYPE_LABEL[c.sessionType] || esc(c.sessionType || 'Training');
+    detail = (c.exercises || []).map((ex) => `<div class="ex core">${esc(exerciseName(ex.exerciseId))} · ${esc(fbExerciseSetsText(ex))}</div>`).join('');
+  }
+
   return `
     <div class="challenge-card ${expired ? 'expired' : ''}">
       <span class="stamp ${myDone ? 'done' : ''}">${expired ? 'VORBEI' : hoursLeft + 'H'}</span>
-      <p class="chal-from">Von <b>${esc(c.createdByName)}</b> · ${esc(gripLabel(c.board, c.grip))} · ${esc(PROTOCOLS[c.protocolId].label)}</p>
-      <div class="exlist">
-        <div class="ex"><b>${esc(PROTOCOLS[c.protocolId].label)}</b> auf ${esc(BOARDS[c.board].label)}</div>
-        ${(c.exercises || []).map((ex) => `<div class="ex core">${esc(ex)}</div>`).join('')}
-      </div>
+      <p class="chal-from">Von <b>${esc(c.createdByName)}</b> · ${title}</p>
+      <div class="exlist">${detail || '<div class="ex">Keine Details.</div>'}</div>
+      ${c.note ? `<div class="note">${esc(c.note)}</div>` : ''}
       <div class="crew">
         ${Object.entries(c.participants || {}).map(([pid, p]) => `<span class="p ${p.status}">${esc((state.members[pid] || {}).name || '?')}</span>`).join('')}
       </div>
-      ${(!expired && my && my.status === 'pending') ? `<button class="btn small" data-confirm="${id}">TRAINING BESTÄTIGEN</button>` : ''}
+      <div class="chal-actions">
+        ${(!expired && my && my.status === 'pending') ? `<button class="btn small" data-confirm="${id}">MITGEMACHT</button>` : ''}
+        ${isMine ? `<button class="btn ghost small" data-delete="${id}">LÖSCHEN</button>` : ''}
+      </div>
     </div>
   `;
-}
-
-function renderNewChallengeForm() {
-  const holder = document.getElementById('new-challenge-form');
-  const sharedGrips = getSharedGripIds();
-  const boardForLabels = currentMemberBoard();
-
-  holder.innerHTML = `
-    <div class="new-challenge-form">
-      <p class="card-title" style="margin-bottom:10px;">Nur Griffe, die auf allen Boards der Crew existieren</p>
-      <div class="chip-row">
-        ${sharedGrips.map((id) => `<button type="button" class="chip ${newChallengeState.grip === id ? 'active' : ''}" data-grip="${id}">${esc(gripLabel(boardForLabels, id))}</button>`).join('') || '<span class="mono" style="font-size:12px;color:var(--ink-faint);">Keine gemeinsamen Griffe (unterschiedliche Boards?)</span>'}
-      </div>
-      <div class="chip-row">
-        ${Object.keys(PROTOCOLS).map((p) => `<button type="button" class="chip ${newChallengeState.protocolId === p ? 'active' : ''}" data-proto="${p}">${PROTOCOLS[p].label}</button>`).join('')}
-      </div>
-      ${Object.entries(EXERCISE_CATEGORY_LABEL).filter(([cat]) => ACCESSORY_EXERCISES.some((e) => e.category === cat)).map(([cat, label]) => `
-        <div class="ex-cat-label">${label} — in den Pausen</div>
-        <div class="ex-check-grid">
-          ${ACCESSORY_EXERCISES.filter((e) => e.category === cat).map((e) => `
-            <label class="ex-check"><input type="checkbox" value="${e.name}" ${newChallengeState.exercises.includes(e.name) ? 'checked' : ''}> ${esc(e.name)}</label>
-          `).join('')}
-        </div>
-      `).join('')}
-      <button class="btn" id="send-challenge-btn" style="margin-top:6px;">CHALLENGE SENDEN (48H)</button>
-    </div>
-  `;
-
-  holder.querySelectorAll('[data-grip]').forEach((btn) => {
-    btn.onclick = () => { newChallengeState.grip = btn.dataset.grip; renderNewChallengeForm(); };
-  });
-  holder.querySelectorAll('[data-proto]').forEach((btn) => {
-    btn.onclick = () => { newChallengeState.protocolId = btn.dataset.proto; newChallengeState.params = { ...PROTOCOLS[btn.dataset.proto].defaults }; renderNewChallengeForm(); };
-  });
-  holder.querySelectorAll('.ex-check input').forEach((cb) => {
-    cb.onchange = () => {
-      if (cb.checked) newChallengeState.exercises.push(cb.value);
-      else newChallengeState.exercises = newChallengeState.exercises.filter((v) => v !== cb.value);
-    };
-  });
-  document.getElementById('send-challenge-btn').onclick = sendNewChallenge;
-}
-
-async function sendNewChallenge() {
-  if (!newChallengeState.grip) { toast('Bitte einen Griff wählen.', 'err'); return; }
-  const now = Date.now();
-  const participants = {};
-  for (const id of Object.keys(state.members)) {
-    participants[id] = id === state.member.id
-      ? { status: 'done', completedAt: now }
-      : { status: 'pending' };
-  }
-  const challenge = {
-    createdBy: state.member.id,
-    createdByName: state.member.name,
-    createdAt: now,
-    expiresAt: now + CHALLENGE_WINDOW_H * HOUR_MS,
-    board: currentMemberBoard(),
-    grip: newChallengeState.grip,
-    protocolId: newChallengeState.protocolId,
-    params: newChallengeState.params,
-    exercises: newChallengeState.exercises,
-    participants,
-  };
-  const id = await fbPush('challenges', challenge);
-  if (id) { toast('Challenge raus an die Crew!', 'ok'); newChallengeState = null; renderChallenges(); }
-  else toast('Konnte Challenge nicht senden.', 'err');
 }
 
 /* ---------- Start ---------- */

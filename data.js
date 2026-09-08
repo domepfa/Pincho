@@ -5,11 +5,8 @@
 
 /* ---------- Beastmaker-Boards ----------
    Griffe sind bewusst als KATEGORIEN modelliert, nicht als exakte mm-Werte:
-   so bleiben Challenges zwischen BM1000 und BM2000 fair vergleichbar, auch
-   wenn die beiden Boards nicht identische Kantentiefen haben. Bei der
-   Challenge-Erstellung wird automatisch nur die Schnittmenge der Kategorien
-   angeboten, die auf ALLEN beteiligten Boards existieren (siehe app.js,
-   getSharedGripIds()).
+   so bleibt der Vergleich zwischen BM1000 und BM2000 sinnvoll, auch wenn
+   die beiden Boards nicht identische Kantentiefen haben.
 
    BM1000- und BM2000-Kanten/Taschen sind reale Herstellerangaben (bestätigt
    anhand beschrifteter Referenzgrafiken, September 2026). Jug- und
@@ -147,25 +144,6 @@ function gripArmNote(boardId, gripId) {
   return count >= 2 ? 'beidarmig' : '';
 }
 
-/* ---------- Fingerboard-Protokolle ---------- */
-const PROTOCOLS = {
-  max_hang: {
-    label: 'Max Hang',
-    defaults: { hangSec: 10, restSec: 180, sets: 5 },
-    fields: ['hangSec', 'restSec', 'sets'],
-  },
-  repeater: {
-    label: 'Repeater (7/3)',
-    defaults: { hangSec: 7, restSec: 3, reps: 6, sets: 4, restBetweenSec: 180 },
-    fields: ['hangSec', 'restSec', 'reps', 'sets', 'restBetweenSec'],
-  },
-  custom: {
-    label: 'Frei',
-    defaults: { hangSec: 10, restSec: 60, sets: 5 },
-    fields: ['hangSec', 'restSec', 'sets'],
-  },
-};
-
 /* Baut eine flache Liste von Phasen ({phase, seconds}) aus einem Protokoll +
    den (ggf. angepassten) Parametern. Der Timer selbst kennt nur diese Liste,
    nicht die Protokoll-Logik dahinter. */
@@ -195,9 +173,9 @@ function buildSequence(protocolId, opts) {
 
 /* ---------- Übungsdatenbank ----------
    Eine Liste für alles: Log-Einträge, Trainingsplan-Vorlagen UND die
-   Zubehör-Auswahl bei Challenges. `pauseFriendly: true` markiert Übungen,
-   die sich in Fingerboard-Pausen machen lassen (kein Langhantel-Rack nötig)
-   — genau diese Teilmenge wird bei Challenges angeboten
+   Übungs-Blöcke im Fingerboard-Ablauf. `pauseFriendly: true` markiert
+   Übungen, die sich in Fingerboard-Pausen machen lassen (kein
+   Langhantel-Rack nötig) — genau diese Teilmenge steht dort zur Auswahl
    (siehe ACCESSORY_EXERCISES unten). */
 /* `muscles` (primary/secondary) sind allgemeines Trainingswissen, keine
    erfundenen Produktdaten — welche Muskelgruppe eine Standardübung wie
@@ -330,9 +308,9 @@ const ROUTINE_TEMPLATES = [
 /* ---------- Fingerboard-Ablauf-Vorlagen ----------
    Vorgefertigte Abläufe (Hang- + Übungs-Sätze), die im Fingerboard-Tab
    geladen werden können — siehe ROUTINE_TEMPLATES oben fürs Log-Pendant.
-   `grip` verwendet bewusst nur Kategorien, die auf BEIDEN Boards existieren
-   (siehe getSharedGripIds() in app.js), damit die Vorlage unabhängig vom
-   eigenen Board funktioniert; `board` fehlt hier deshalb absichtlich und
+   `grip` verwendet bewusst nur Kategorien, die auf BEIDEN Boards existieren,
+   damit die Vorlage unabhängig vom eigenen Board funktioniert; `board`
+   fehlt hier deshalb absichtlich und
    wird beim Laden auf das aktuell gewählte Board des Mitglieds gesetzt.
    Exercise-Sätze tragen zusätzlich `restSec` (Pause NACH der Übung, bevor
    der nächste Satz startet) — bei Hang-Sätzen mit nur 1 Wiederholung dient
