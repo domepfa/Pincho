@@ -480,16 +480,18 @@ async function renderLog() {
         <div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>
       `).join('')}</div>` : ''}
       ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
-      <button type="button" class="btn ghost small" data-share-log="${id}" style="margin-top:10px;">Als Challenge teilen (72h)</button>
+      ${challengeDurationChipsHtml(`log-share-${id}`, CHALLENGE_WINDOW_H)}
+      <button type="button" class="btn ghost small" data-share-log="${id}" style="margin-top:6px;">Als Challenge teilen</button>
     </div>
   `).join('') : '<div class="list-empty">Noch keine Einträge.</div>';
 
+  entries.forEach(([id]) => wireChallengeDurationChips(`log-share-${id}`));
   list.querySelectorAll('[data-share-log]').forEach((btn) => {
     btn.onclick = async () => {
       const found = entries.find(([id2]) => id2 === btn.dataset.shareLog);
       if (!found) return;
       btn.disabled = true;
-      await shareLogEntryAsChallenge(found[1]);
+      await shareLogEntryAsChallenge(found[1], selectedChallengeHours(`log-share-${btn.dataset.shareLog}`));
       btn.disabled = false;
     };
   });
@@ -680,6 +682,7 @@ function renderLogExerciseRows() {
    FINGERBOARD
    ================================================================= */
 let fbQuickstartOpen = false; // Schnelltraining-Karten sind standardmässig eingeklappt
+let fbCheckinTyping = false; // während der Wdh./Gewicht-Eingabe im Check-in steht der Countdown still
 let fbImportOpen = false; // JSON-Import-Panel ist standardmässig eingeklappt
 
 /* Ablauf aus JSON importieren — z. B. von einer anderen KI generiert (siehe
@@ -705,10 +708,12 @@ function parseImportedAblauf(text) {
       const reps = Number(b.reps);
       const hangSec = Number(b.hangSec);
       const restSec = Number(b.restSec);
+      const blockRestSec = b.blockRestSec != null ? Number(b.blockRestSec) : null;
       if (!(reps > 0)) { errors.push(`Satz ${n}: reps muss eine Zahl > 0 sein.`); return; }
       if (!(hangSec > 0)) { errors.push(`Satz ${n}: hangSec muss eine Zahl > 0 sein.`); return; }
       if (!(restSec >= 0)) { errors.push(`Satz ${n}: restSec muss eine Zahl >= 0 sein.`); return; }
-      blocks.push({ type: 'hang', board: b.board, grip: b.grip, reps, hangSec, restSec });
+      if (blockRestSec != null && !(blockRestSec >= 0)) { errors.push(`Satz ${n}: blockRestSec muss eine Zahl >= 0 sein.`); return; }
+      blocks.push({ type: 'hang', board: b.board, grip: b.grip, reps, hangSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}) });
     } else if (b.type === 'exercise') {
       if (!EXERCISE_LIBRARY.some((e) => e.id === b.exerciseId)) { errors.push(`Satz ${n}: unbekannte exerciseId "${b.exerciseId}".`); return; }
       const reps = Number(b.reps);
@@ -731,9 +736,9 @@ const fb = {
   board: null,
   selectedGrip: null,   // am grafischen Board gewählter Griff, fürs Hinzufügen eines Hang-Satzes
   addType: 'hang',       // 'hang' | 'exercise' — welches Add-Panel gerade offen ist
-  newHang: { reps: 3, hangSec: 7, restSec: 30 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
+  newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
-  blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec} | {type:'exercise', exerciseId, reps, workSec, restSec}
+  blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec, blockRestSec} | {type:'exercise', exerciseId, reps, workSec, restSec}
   templates: [],         // eigene, in Firebase gespeicherte Abläufe (zusätzlich zu FINGERBOARD_TEMPLATES)
   weight: '',
   blockIndex: 0,
@@ -836,7 +841,10 @@ function renderFbAddPanel() {
       <div class="field-row">
         <div class="field"><label>Sätze</label><input type="number" id="fb-new-reps" value="${fb.newHang.reps}" min="1"></div>
         <div class="field"><label>Hang (s)</label><input type="number" id="fb-new-hangsec" value="${fb.newHang.hangSec}" min="1"></div>
-        <div class="field"><label>Pause (s)</label><input type="number" id="fb-new-restsec" value="${fb.newHang.restSec}" min="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Pause zw. Sätzen (s)</label><input type="number" id="fb-new-restsec" value="${fb.newHang.restSec}" min="0"></div>
+        <div class="field"><label>Pause danach (s)</label><input type="number" id="fb-new-blockrestsec" value="${fb.newHang.blockRestSec}" min="0"></div>
       </div>
       <button type="button" class="btn" id="fb-add-hang" style="width:100%;">+ Hang-Satz hinzufügen</button>
     `;
@@ -857,6 +865,7 @@ function renderFbAddPanel() {
     document.getElementById('fb-new-reps').oninput = (e) => { fb.newHang.reps = Number(e.target.value) || 1; };
     document.getElementById('fb-new-hangsec').oninput = (e) => { fb.newHang.hangSec = Number(e.target.value) || 1; };
     document.getElementById('fb-new-restsec').oninput = (e) => { fb.newHang.restSec = Number(e.target.value) || 0; };
+    document.getElementById('fb-new-blockrestsec').oninput = (e) => { fb.newHang.blockRestSec = Number(e.target.value) || 0; };
     document.getElementById('fb-add-hang').onclick = () => {
       if (!fb.selectedGrip) { toast('Zuerst einen Griff wählen.', 'err'); return; }
       fb.blocks.push({ type: 'hang', board: fb.board, grip: fb.selectedGrip, ...fb.newHang });
@@ -1092,17 +1101,39 @@ function wireFbTemplatePicker() {
   };
 }
 
-/* Phasenliste EINES Blocks — Hang-Sätze über buildSequence() (Hang/Pause je
-   Wiederholung), Übungs-Sätze als ein "Work"-Schritt (feste Dauer statt
-   Wiederholungszahl, damit der Timer automatisch weiterlaufen kann) plus
-   optionaler "Pause" danach. Treibt sowohl die Zeitschätzung als auch den
-   echten Timer im Ablauf-Vollbild — beides nutzt dieselbe Liste, damit sie
-   nie auseinanderlaufen. */
+/* Phasenliste EINES Blocks — Hang-Sätze als Hang/Pause je Wiederholung,
+   Übungs-Sätze als ein "Work"-Schritt (feste Dauer statt Wiederholungszahl,
+   damit der Timer automatisch weiterlaufen kann) plus "Pause" danach.
+   Treibt sowohl die Zeitschätzung als auch den echten Timer im
+   Ablauf-Vollbild — beides nutzt dieselbe Liste, damit sie nie
+   auseinanderlaufen.
+   Pause zwischen Sätzen (restSec) und Pause danach/vor dem nächsten Block
+   (blockRestSec) sind bewusst getrennt — die kurze Pause zwischen zwei
+   Hang-Wiederholungen eines Repeater-Protokolls (z. B. 3s) taugt nicht als
+   Erholung vor einem ganz anderen Satz. blockRestSec fehlt bei älteren,
+   vor dieser Trennung gebauten Abläufen — fällt dann auf restSec zurück.
+   Der letzte Block-Übergang bekommt IMMER mindestens 10s: das ist die
+   einzige Zeit fürs Check-in (s. openBlockCheckin) — bei "0" konfigurierter
+   Pause wird trotzdem kurz Zeit zum Loggen eingeräumt, statt sie ganz
+   wegzulassen. */
 function buildBlockSequence(b) {
-  if (b.type === 'hang') return buildSequence('custom', { hangSec: b.hangSec, restSec: b.restSec, sets: b.reps });
-  const seq = [{ phase: 'Work', seconds: b.workSec || 40 }];
-  if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec });
-  return seq;
+  if (b.type === 'hang') {
+    const seq = [];
+    for (let s = 0; s < b.reps; s++) {
+      seq.push({ phase: 'Hang', seconds: b.hangSec });
+      if (s < b.reps - 1) {
+        if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec });
+      } else {
+        const trailingRest = b.blockRestSec != null ? b.blockRestSec : b.restSec;
+        seq.push({ phase: trailingRest > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(trailingRest, 10) });
+      }
+    }
+    return seq;
+  }
+  return [
+    { phase: 'Work', seconds: b.workSec || 40 },
+    { phase: b.restSec > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(b.restSec, 10) },
+  ];
 }
 function isWorkPhase(step) {
   return !step || step.phase === 'Hang' || step.phase === 'Work';
@@ -1935,7 +1966,10 @@ function miniBoardThumb(boardId, gripId) {
 }
 
 function fbBlockSub(b) {
-  if (b.type === 'hang') return `${b.hangSec}s Hang · ${b.restSec}s Pause · ×${b.reps}`;
+  if (b.type === 'hang') {
+    const blockRestSec = b.blockRestSec != null ? b.blockRestSec : b.restSec;
+    return `${b.hangSec}s Hang · ${b.restSec}s zw. Sätzen · ${blockRestSec}s danach · ×${b.reps}`;
+  }
   return `${b.workSec || 40}s Ausführung · Ziel ${b.reps}×${b.restSec ? ' · ' + b.restSec + 's Pause danach' : ''}`;
 }
 
@@ -1965,7 +1999,8 @@ function renderFbBlocksList() {
         <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">
         <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzliche Wiederholung">+</button>
         <input type="number" data-i="${i}" data-f="hangSec" value="${b.hangSec}" class="ex-row-input" title="Hang (s)">
-        <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec}" class="ex-row-input" title="Pause (s)">
+        <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec}" class="ex-row-input" title="Pause zwischen Sätzen (s)">
+        <input type="number" data-i="${i}" data-f="blockRestSec" value="${b.blockRestSec != null ? b.blockRestSec : b.restSec}" class="ex-row-input" title="Pause danach, vor dem nächsten Satz (s)">
       ` : `
         <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Ziel-Wiederholungen">
         <input type="number" data-i="${i}" data-f="workSec" value="${b.workSec || 40}" class="ex-row-input" title="Dauer (s)">
@@ -2398,6 +2433,7 @@ function startAblauf() {
   fb.awaitingNext = true;
   fb.preCount = null;
   fb.runResults = [];
+  fbCheckinTyping = false;
   openFbOverlay();
 }
 
@@ -2457,8 +2493,16 @@ function wireCheckinPanel(index) {
       };
     });
   } else {
-    document.getElementById('fb-checkin-reps').oninput = (e) => { result.reps = e.target.value; };
-    document.getElementById('fb-checkin-weight').oninput = (e) => { result.weight = e.target.value === '' ? '' : Number(e.target.value); };
+    const repsEl = document.getElementById('fb-checkin-reps');
+    const weightEl = document.getElementById('fb-checkin-weight');
+    repsEl.oninput = (e) => { result.reps = e.target.value; };
+    weightEl.oninput = (e) => { result.weight = e.target.value === '' ? '' : Number(e.target.value); };
+    // Zeit anhalten, solange getippt wird — sonst reisst der Countdown
+    // mitten in der Eingabe ab, bevor man fertig ist.
+    [repsEl, weightEl].forEach((el) => {
+      el.onfocus = () => { fbCheckinTyping = true; };
+      el.onblur = () => { fbCheckinTyping = false; };
+    });
   }
 }
 /* Öffnet das Check-in fürs gerade beendete Set — wird genau beim Eintritt
@@ -2532,6 +2576,7 @@ function startSequence() {
 }
 
 function tickBlock() {
+  if (fbCheckinTyping) return; // Zeit angehalten, solange man im Check-in tippt
   fb.secondsLeft--;
   const step = fb.sequence[fb.stepIndex];
   if (fb.secondsLeft <= 0) {
@@ -2621,6 +2666,7 @@ function cancelAblauf() {
   fb.awaitingNext = false;
   fb.preCount = null;
   fb.blockIndex = 0;
+  fbCheckinTyping = false;
   closeFbOverlay();
   renderFbRuntime();
 }
@@ -2665,14 +2711,16 @@ async function finishAblauf() {
       <div class="fb-stage-title">Ablauf geschafft!</div>
       <div class="fb-stage-sub mono">${blocks.length} Sätze · ${fmtMinSec(fbEstimateSeconds())} Trainingszeit</div>
       ${fbResultsSummaryHtml(blocks, results)}
-      <button class="btn fb-stage-btn ghost" id="fb-overlay-share">Als Challenge teilen (72h)</button>
+      ${challengeDurationChipsHtml('fb-share', CHALLENGE_WINDOW_H)}
+      <button class="btn fb-stage-btn ghost" id="fb-overlay-share">Als Challenge teilen</button>
       <button class="btn fb-stage-btn" id="fb-overlay-finish">Schliessen</button>
     </div>
   `;
+  wireChallengeDurationChips('fb-share');
   document.getElementById('fb-overlay-finish').onclick = () => { closeFbOverlay(); renderFbRuntime(); };
   document.getElementById('fb-overlay-share').onclick = async (e) => {
     e.target.disabled = true;
-    await shareFingerboardAsChallenge(board, blocks);
+    await shareFingerboardAsChallenge(board, blocks, selectedChallengeHours('fb-share'));
     e.target.textContent = 'Geteilt ✓';
   };
   spawnConfetti(document.querySelector('.fb-overlay-done'));
@@ -2700,10 +2748,37 @@ async function finishAblauf() {
    Training sein, kein Wettkampf um besser/schlechter.
    ================================================================= */
 const HOUR_MS = 60 * 60 * 1000;
-const CHALLENGE_WINDOW_H = 72;
+const CHALLENGE_WINDOW_H = 72; // Vorbelegung beim Teilen, frei wählbar (s. CHALLENGE_DURATIONS)
+/* Schichtarbeiter schaffen ein Training nicht immer innerhalb von 72h —
+   deshalb frei wählbar statt fest, mit 1 Woche als Obergrenze (mehr würde
+   "Challenge" als kurzfristigen Anreiz zu sehr verwässern). */
+const CHALLENGE_DURATIONS = [
+  { hours: 24, label: '24H' },
+  { hours: 72, label: '72H' },
+  { hours: 168, label: '1 WOCHE' },
+];
 
-async function pushChallenge(fields) {
+function challengeDurationChipsHtml(prefix, selectedHours) {
+  return `<div class="chip-row chal-duration-row" id="${prefix}-duration">
+    ${CHALLENGE_DURATIONS.map((d) => `<button type="button" class="chip ${d.hours === selectedHours ? 'active' : ''}" data-hours="${d.hours}">${d.label}</button>`).join('')}
+  </div>`;
+}
+function wireChallengeDurationChips(prefix) {
+  const holder = document.getElementById(`${prefix}-duration`);
+  if (!holder) return;
+  holder.querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => holder.querySelectorAll('.chip').forEach((b) => b.classList.toggle('active', b === btn));
+  });
+}
+function selectedChallengeHours(prefix) {
+  const holder = document.getElementById(`${prefix}-duration`);
+  const active = holder && holder.querySelector('.chip.active');
+  return active ? Number(active.dataset.hours) : CHALLENGE_WINDOW_H;
+}
+
+async function pushChallenge(fields, hours) {
   const now = Date.now();
+  const windowH = hours || CHALLENGE_WINDOW_H;
   const participants = {};
   for (const id of Object.keys(state.members)) {
     participants[id] = id === state.member.id ? { status: 'done', completedAt: now } : { status: 'pending' };
@@ -2712,33 +2787,33 @@ async function pushChallenge(fields) {
     createdBy: state.member.id,
     createdByName: state.member.name,
     createdAt: now,
-    expiresAt: now + CHALLENGE_WINDOW_H * HOUR_MS,
+    expiresAt: now + windowH * HOUR_MS,
     participants,
     ...fields,
   };
   const id = await fbPush('challenges', challenge);
-  if (id) toast(`Challenge raus an die Crew (${CHALLENGE_WINDOW_H}h Zeit)!`, 'ok');
+  if (id) toast(`Challenge raus an die Crew (${windowH}h Zeit)!`, 'ok');
   else toast('Konnte Challenge nicht senden.', 'err');
   return id;
 }
 
-function shareFingerboardAsChallenge(board, blocks) {
-  return pushChallenge({ kind: 'fingerboard', board, blocks });
+function shareFingerboardAsChallenge(board, blocks, hours) {
+  return pushChallenge({ kind: 'fingerboard', board, blocks }, hours);
 }
 
-function shareLogEntryAsChallenge(entry) {
+function shareLogEntryAsChallenge(entry, hours) {
   return pushChallenge({
     kind: 'session',
     sessionType: entry.type,
     exercises: entry.exercises,
     note: entry.note || '',
-  });
+  }, hours);
 }
 
 async function renderChallenges() {
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Challenges</h2><div class="sec-rule"></div></div>
-    <p class="login-hint" style="margin:0 0 16px;text-align:left;">Ein Training fertig gemacht? Im Fingerboard (nach "Ablauf geschafft") oder im Log-Verlauf kannst du es der Crew als Challenge vorschlagen — ${CHALLENGE_WINDOW_H}h Zeit zum Mitmachen.</p>
+    <p class="login-hint" style="margin:0 0 16px;text-align:left;">Ein Training fertig gemacht? Im Fingerboard (nach "Ablauf geschafft") oder im Log-Verlauf kannst du es der Crew als Challenge vorschlagen — Zeitfenster beim Teilen wählbar (24h bis 1 Woche).</p>
     <div class="list" id="challenge-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
   `);
 

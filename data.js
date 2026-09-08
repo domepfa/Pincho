@@ -144,33 +144,6 @@ function gripArmNote(boardId, gripId) {
   return count >= 2 ? 'beidarmig' : '';
 }
 
-/* Baut eine flache Liste von Phasen ({phase, seconds}) aus einem Protokoll +
-   den (ggf. angepassten) Parametern. Der Timer selbst kennt nur diese Liste,
-   nicht die Protokoll-Logik dahinter. */
-function buildSequence(protocolId, opts) {
-  const seq = [];
-  if (protocolId === 'repeater') {
-    const { hangSec, restSec, reps, sets, restBetweenSec } = opts;
-    for (let s = 0; s < sets; s++) {
-      for (let r = 0; r < reps; r++) {
-        seq.push({ phase: 'Hang', seconds: hangSec });
-        if (r < reps - 1) seq.push({ phase: 'Pause', seconds: restSec });
-      }
-      if (s < sets - 1) seq.push({ phase: 'Satzpause', seconds: restBetweenSec });
-    }
-  } else {
-    // Pause auch nach dem letzten Hang anhängen (nicht nur zwischen den
-    // Wiederholungen): der Ablauf läuft jetzt block-übergreifend automatisch
-    // durch, diese Pause ist die einzige Erholung vor dem nächsten Satz.
-    const { hangSec, restSec, sets } = opts;
-    for (let s = 0; s < sets; s++) {
-      seq.push({ phase: 'Hang', seconds: hangSec });
-      if (restSec > 0) seq.push({ phase: 'Pause', seconds: restSec });
-    }
-  }
-  return seq;
-}
-
 /* ---------- Übungsdatenbank ----------
    Eine Liste für alles: Log-Einträge, Trainingsplan-Vorlagen UND die
    Übungs-Blöcke im Fingerboard-Ablauf. `pauseFriendly: true` markiert

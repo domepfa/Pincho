@@ -311,6 +311,8 @@ button, input, select, textarea { font-family: inherit; }
 .crew .p.expired { border-color: var(--ink-faint); color: var(--ink-faint); text-decoration: line-through; }
 .chal-actions { display: flex; gap: 8px; }
 .chal-actions .btn { flex: 1; }
+.chal-duration-row { margin: 8px 0 0; }
+.chal-duration-row .chip { font-size: 10px; padding: 5px 9px; }
 
 .ex-cat-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); margin: 10px 0 6px; }
 
