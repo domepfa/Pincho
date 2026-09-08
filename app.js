@@ -5,12 +5,56 @@
 
 const APP_ROOT = document.getElementById('app');
 const TOAST_ROOT = document.getElementById('toast-root');
+const APP_TAGLINE = 'Kraft, die an der Wand ankommt.';
+let appTaglineTyped = false; // Buchstabe-für-Buchstabe-Effekt läuft nur einmal pro App-Öffnung, nicht bei jeder Navigation
+
+/* Buchstaben-für-Buchstaben-Aufploppen, schnell statt gemächlich — reine
+   textContent-Updates, kein Re-Render, damit es nicht mit dem sonstigen
+   Rendering kollidiert. */
+function typeTagline(el) {
+  if (!el) return;
+  let i = 0;
+  const step = () => {
+    el.textContent = APP_TAGLINE.slice(0, i);
+    i++;
+    if (i <= APP_TAGLINE.length) setTimeout(step, 16);
+  };
+  step();
+}
 
 /* ---------- Helfer ---------- */
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+}
+
+/* Tippbares Übungs-Raster statt <select>-Dropdown — bei Dutzenden Übungen
+   ist ein natives Dropdown auf dem Handy ein langes, unübersichtliches
+   Scrollen; ein Raster lässt sich auf einen Blick überfliegen (gleiche
+   Idee wie schon bei der Challenge-Übungsauswahl, hier aber Einzelauswahl
+   statt Checkbox-Liste). */
+function exercisePickerGridHtml(list, selectedId) {
+  return Object.entries(EXERCISE_CATEGORY_LABEL)
+    .filter(([cat]) => list.some((e) => e.category === cat))
+    .map(([cat, label]) => `
+      <div class="ex-cat-label">${label}</div>
+      <div class="ex-pick-grid">
+        ${list.filter((e) => e.category === cat).map((e) => `
+          <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">${esc(e.name)}</button>
+        `).join('')}
+      </div>
+    `).join('');
+}
+function wireExercisePickerGrid(containerId, onSelect) {
+  const holder = document.getElementById(containerId);
+  if (!holder) return;
+  holder.querySelectorAll('.ex-pick-btn').forEach((btn) => {
+    btn.onclick = () => {
+      holder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
+      onSelect(btn.dataset.exercise);
+    };
+  });
 }
 function toast(message, kind) {
   const el = document.createElement('div');
@@ -71,7 +115,7 @@ function renderPasswordGate() {
   APP_ROOT.innerHTML = `
     <div class="login-shell">
       <h1 class="login-word">PIN<em>CHO</em></h1>
-      <p class="login-tag">Kraft, die an der Wand ankommt.</p>
+      <p class="login-tag">${APP_TAGLINE}</p>
       <div class="field">
         <label>Team-Code</label>
         <input type="password" id="login-password" placeholder="••••" autofocus>
@@ -163,7 +207,10 @@ function renderShell(contentHtml) {
   const memberName = state.member ? esc(state.member.name) : '';
   APP_ROOT.innerHTML = `
     <div class="topbar">
-      <span class="mark">PIN<em>CHO</em></span>
+      <div class="brand">
+        <span class="mark">PIN<em>CHO</em></span>
+        <p class="app-tagline mono" id="app-tagline">${appTaglineTyped ? esc(APP_TAGLINE) : ''}</p>
+      </div>
       <div class="who">
         <span class="name mono">${memberName}</span>
         <button class="logout" id="logout-btn">RAUS</button>
@@ -177,6 +224,10 @@ function renderShell(contentHtml) {
   `;
   document.getElementById('logout-btn').onclick = logout;
   positionNavIndicator();
+  if (!appTaglineTyped) {
+    appTaglineTyped = true;
+    typeTagline(document.getElementById('app-tagline'));
+  }
 }
 
 /* Schiebt die kleine Leuchtleiste unter dem aktiven Tab an die richtige
@@ -258,12 +309,13 @@ async function renderPlan() {
    ================================================================= */
 let logBuilder = { exercises: [] };
 let logMode = 'planned'; // 'planned' | 'freestyle'
+let logPickerExerciseId = EXERCISE_LIBRARY[0].id;
 /* Freestyle: kein fester Plan — Übung wählen, Satz für Satz mit Gewicht/Wdh
    erfassen (auch mehrfach dieselbe Übung, z. B. Aufwärm- vs. Arbeitssätze),
    erst beim Speichern wird daraus ein Log-Eintrag. exercises: Liste von
    {exerciseId, sets: [{weight, reps}, ...]} in der Reihenfolge, in der die
    Übungen zum ersten Mal gewählt wurden. */
-let freestyleBuilder = { exercises: [], activeIndex: -1 };
+let freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id };
 
 /* Letzter bekannter Wert für eine Übung — über die komplette Session-
    Historie (state.logs, neueste zuerst), egal ob geplant oder freestyle
@@ -347,7 +399,7 @@ async function renderLog() {
     if (id) {
       toast('Session gespeichert.', 'ok');
       logBuilder = { exercises: [] };
-      freestyleBuilder = { exercises: [], activeIndex: -1 };
+      freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id };
       renderLog();
     } else toast('Konnte nicht speichern.', 'err');
   };
@@ -387,22 +439,15 @@ function renderLogBuilderPanel() {
     holder.innerHTML = `
       <div class="field">
         <label>Übung</label>
-        <div class="field-row">
-          <select id="fs-exercise-picker" style="flex:2;">
-            ${Object.entries(EXERCISE_CATEGORY_LABEL).map(([cat, label]) => `
-              <optgroup label="${label}">
-                ${EXERCISE_LIBRARY.filter((e) => e.category === cat).map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join('')}
-              </optgroup>
-            `).join('')}
-          </select>
-          <button type="button" class="btn small" id="fs-add-exercise" style="flex:0 0 auto;">+ Übung</button>
-        </div>
+        <div id="fs-exercise-grid">${exercisePickerGridHtml(EXERCISE_LIBRARY, freestyleBuilder.pickerExerciseId)}</div>
       </div>
+      <button type="button" class="btn" id="fs-add-exercise" style="width:100%;margin-bottom:14px;">+ Übung</button>
       <div id="fs-active"></div>
       <div id="fs-entries"></div>
     `;
+    wireExercisePickerGrid('fs-exercise-grid', (id) => { freestyleBuilder.pickerExerciseId = id; });
     document.getElementById('fs-add-exercise').onclick = () => {
-      const exerciseId = document.getElementById('fs-exercise-picker').value;
+      const exerciseId = freestyleBuilder.pickerExerciseId;
       let idx = freestyleBuilder.exercises.findIndex((g) => g.exerciseId === exerciseId);
       if (idx === -1) {
         freestyleBuilder.exercises.push({ exerciseId, sets: [] });
@@ -428,27 +473,19 @@ function renderLogBuilderPanel() {
 
       <div class="field">
         <label>Übung hinzufügen</label>
-        <div class="field-row">
-          <select id="log-exercise-picker" style="flex:2;">
-            ${Object.entries(EXERCISE_CATEGORY_LABEL).map(([cat, label]) => `
-              <optgroup label="${label}">
-                ${EXERCISE_LIBRARY.filter((e) => e.category === cat).map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join('')}
-              </optgroup>
-            `).join('')}
-          </select>
-          <button type="button" class="btn small" id="log-exercise-add" style="flex:0 0 auto;">+ Hinzufügen</button>
-        </div>
+        <div id="log-exercise-grid">${exercisePickerGridHtml(EXERCISE_LIBRARY, logPickerExerciseId)}</div>
+        <button type="button" class="btn" id="log-exercise-add" style="width:100%;margin-top:8px;">+ Hinzufügen</button>
       </div>
     `;
     renderLogExerciseRows();
+    wireExercisePickerGrid('log-exercise-grid', (id) => { logPickerExerciseId = id; });
     document.getElementById('log-template').onchange = (e) => {
       const t = ROUTINE_TEMPLATES.find((r) => r.id === e.target.value);
       logBuilder.exercises = t ? t.exercises.map((ex) => ({ ...ex, weight: '' })) : [];
       renderLogExerciseRows();
     };
     document.getElementById('log-exercise-add').onclick = () => {
-      const id = document.getElementById('log-exercise-picker').value;
-      logBuilder.exercises.push({ exerciseId: id, sets: 3, reps: '', weight: '' });
+      logBuilder.exercises.push({ exerciseId: logPickerExerciseId, sets: 3, reps: '', weight: '' });
       renderLogExerciseRows();
     };
   }
@@ -620,7 +657,7 @@ const fb = {
   selectedGrip: null,   // am grafischen Board gewählter Griff, fürs Hinzufügen eines Hang-Satzes
   addType: 'hang',       // 'hang' | 'exercise' — welches Add-Panel gerade offen ist
   newHang: { reps: 3, hangSec: 7, restSec: 30 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
-  newExercise: { reps: 15, workSec: 40, restSec: 30 },
+  newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
   blocks: [],            // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec} | {type:'exercise', exerciseId, reps, workSec, restSec}
   templates: [],         // eigene, in Firebase gespeicherte Abläufe (zusätzlich zu FINGERBOARD_TEMPLATES)
   weight: '',
@@ -753,13 +790,7 @@ function renderFbAddPanel() {
     holder.innerHTML = `
       <div class="field">
         <label>Übung</label>
-        <select id="fb-exercise-picker">
-          ${Object.entries(EXERCISE_CATEGORY_LABEL).filter(([cat]) => ACCESSORY_EXERCISES.some((e) => e.category === cat)).map(([cat, label]) => `
-            <optgroup label="${label}">
-              ${ACCESSORY_EXERCISES.filter((e) => e.category === cat).map((e) => `<option value="${e.id}">${esc(e.name)}</option>`).join('')}
-            </optgroup>
-          `).join('')}
-        </select>
+        <div id="fb-exercise-grid">${exercisePickerGridHtml(ACCESSORY_EXERCISES, fb.newExercise.exerciseId)}</div>
       </div>
       <div class="field-row">
         <div class="field"><label>Ziel-Wdh.</label><input type="number" id="fb-new-exreps" value="${fb.newExercise.reps}" min="1"></div>
@@ -768,12 +799,12 @@ function renderFbAddPanel() {
       </div>
       <button type="button" class="btn" id="fb-add-exercise" style="width:100%;">+ Übung hinzufügen</button>
     `;
+    wireExercisePickerGrid('fb-exercise-grid', (id) => { fb.newExercise.exerciseId = id; });
     document.getElementById('fb-new-exreps').oninput = (e) => { fb.newExercise.reps = Number(e.target.value) || 1; };
     document.getElementById('fb-new-exwork').oninput = (e) => { fb.newExercise.workSec = Number(e.target.value) || 5; };
     document.getElementById('fb-new-exrest').oninput = (e) => { fb.newExercise.restSec = Number(e.target.value) || 0; };
     document.getElementById('fb-add-exercise').onclick = () => {
-      const exerciseId = document.getElementById('fb-exercise-picker').value;
-      fb.blocks.push({ type: 'exercise', exerciseId, ...fb.newExercise });
+      fb.blocks.push({ type: 'exercise', ...fb.newExercise });
       renderFbBlocksList();
     };
   }
