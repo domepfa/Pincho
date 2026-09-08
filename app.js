@@ -404,7 +404,7 @@ let planExecution = null;
 /* Der für den aktuellen logMode "aktive" Satz-Builder — Freestyle und
    Plan-Ausführung sehen UI-seitig identisch aus (Übung wählen/aktivieren,
    Satz für Satz erfassen), deshalb teilen sie sich dieselben Render-
-   Funktionen (renderFsActive/renderFsEntries) statt doppelten Code. */
+   Funktion (renderFsPanel) statt doppelten Code. */
 function activeSetBuilder() {
   return logMode === 'execute' ? planExecution : freestyleBuilder;
 }
@@ -554,9 +554,11 @@ async function renderLog() {
     } else toast('Konnte nicht speichern.', 'err');
   };
 
-  if (logMode === 'freestyle' || logMode === 'execute') renderFsActive(); // Vergleichstabelle/"Letztes Mal" nachreichen, sobald state.logs unten geladen ist
   await renderLogHistory();
-  if (logMode === 'freestyle' || logMode === 'execute') renderFsActive(); // jetzt mit den frisch geladenen Logs neu befüllen
+  // Vergleichstabelle/"Letztes Mal" erst jetzt (nach)rendern, wenn state.logs
+  // aus renderLogHistory() frisch geladen ist — sonst wäre sie beim ersten
+  // Aufbau des Panels noch leer/veraltet.
+  if (logMode === 'freestyle' || logMode === 'execute') renderFsPanel();
 }
 
 /* Verlauf-Liste — eigene Funktion, weil sie sowohl vom normalen
@@ -864,8 +866,7 @@ function renderLogBuilderPanel() {
         <label>Übung</label>
         <div id="fs-exercise-grid">${exercisePickerGridHtml(EXERCISE_LIBRARY, freestyleBuilder.pickerExerciseId)}</div>
       </div>
-      <div id="fs-active"></div>
-      <div id="fs-entries"></div>
+      <div id="fs-panel"></div>
     `;
     wireExercisePickerGrid('fs-exercise-grid', (id) => {
       freestyleBuilder.pickerExerciseId = id;
@@ -875,20 +876,19 @@ function renderLogBuilderPanel() {
         idx = freestyleBuilder.exercises.length - 1;
       }
       freestyleBuilder.activeIndex = idx;
-      renderFsActive();
-      renderFsEntries();
-    }, 'fs-active');
-    renderFsActive();
-    renderFsEntries();
+      renderFsPanel();
+      // Zur aktiven Übung scrollen statt zu einer festen Stelle — das
+      // Eingabefeld steht jetzt direkt bei ihr, nicht mehr fest oben.
+      document.getElementById(`fs-group-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, null);
+    renderFsPanel();
   } else if (logMode === 'execute') {
     holder.innerHTML = `
       <div class="sec-head" style="margin-top:0;"><h2 class="sec-title" style="font-size:16px;">${esc(planExecution.planName)}</h2><div class="sec-rule"></div></div>
-      <div id="fs-active"></div>
-      <div id="fs-entries"></div>
+      <div id="fs-panel"></div>
       <button type="button" class="btn ghost small" id="plan-execute-cancel" style="width:100%;margin-top:8px;">Ausführung abbrechen</button>
     `;
-    renderFsActive();
-    renderFsEntries();
+    renderFsPanel();
     document.getElementById('plan-execute-cancel').onclick = () => {
       if (!confirm('Ausführung abbrechen? Noch nicht gespeicherte Sätze gehen verloren.')) return;
       planExecution = null;
@@ -992,62 +992,45 @@ function renderLogBuilderPanel() {
   }
 }
 
-/* Aktive Übung (Freestyle ODER Plan-Ausführung, siehe activeSetBuilder):
-   zeigt die Vergleichstabelle der letzten 3 Sessions plus (bei Plan-
-   Ausführung) das geplante Ziel direkt als Vorschlag in den Feldern an —
-   genau der "wo war ich stehen geblieben, wie war die Tendenz"-Hinweis.
-   Eigene Render-Funktion (statt renderLogBuilderPanel erneut aufzurufen),
-   damit ein Satz hinzufügen nicht das ganze Panel inkl. Übungs-Auswahl
-   neu aufbaut. */
-function renderFsActive() {
-  const holder = document.getElementById('fs-active');
+/* Übungsliste (Freestyle ODER Plan-Ausführung, siehe activeSetBuilder) mit
+   dem Eingabefeld DIREKT bei der gerade aktiven Übung eingebettet, statt
+   fest oben zu stehen — tippt man eine andere (bereits erfasste) Übung an,
+   wandert das Eingabefeld mit an ihre Stelle, statt dass man zwischen der
+   angetippten Übung weiter unten und dem Feld ganz oben hin- und
+   herscrollen muss. Zeigt bei der aktiven Übung die Vergleichstabelle der
+   letzten 3 Sessions plus (bei Plan-Ausführung) das geplante Ziel als
+   Vorschlag in den Feldern an. */
+function renderFsPanel() {
+  const holder = document.getElementById('fs-panel');
   if (!holder) return;
   const builder = activeSetBuilder();
-  const g = builder.exercises[builder.activeIndex];
-  if (!g) {
+  if (logMode === 'freestyle') saveDraft('freestyle', builder);
+
+  if (!builder.exercises.length) {
     holder.innerHTML = '<p class="login-hint">Übung wählen und "+ Übung" antippen, um Sätze zu erfassen.</p>';
     return;
   }
-  const last = lastValueForExercise(g.exerciseId);
-  const targetText = g.targetReps != null
-    ? `Ziel: ${g.targetSets}×${g.targetReps}${g.targetWeight ? ' @ ' + g.targetWeight + 'kg' : ''}`
-    : '';
-  holder.innerHTML = `
-    <div class="fs-active-card">
-      <div class="fs-active-name">${esc(exerciseName(g.exerciseId))}</div>
-      ${targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
-      ${exerciseHistoryTableHtml(g.exerciseId)}
-      <div class="field-row">
-        <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
-        <div class="field"><label>Wdh.</label><input type="text" inputmode="numeric" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
-      </div>
-      <button type="button" class="btn small" id="fs-add-set" style="width:100%;">+ Satz</button>
-    </div>
-  `;
-  // Beim Antippen sofort leeren statt den alten Wert erst löschen zu
-  // müssen — man tippt hier ja gerade rein, weil man ihn ändern will.
-  document.getElementById('fs-weight').onfocus = (e) => { e.target.value = ''; };
-  document.getElementById('fs-reps').onfocus = (e) => { e.target.value = ''; };
-  document.getElementById('fs-add-set').onclick = () => {
-    const reps = document.getElementById('fs-reps').value.trim();
-    if (!reps) { toast('Wiederholungen eingeben.', 'err'); return; }
-    const weightRaw = document.getElementById('fs-weight').value;
-    g.sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps });
-    renderFsEntries();
-  };
-}
 
-function renderFsEntries() {
-  const builder = activeSetBuilder();
-  if (logMode === 'freestyle') saveDraft('freestyle', builder);
-  const holder = document.getElementById('fs-entries');
-  if (!holder) return;
-  if (!builder.exercises.length) {
-    holder.innerHTML = '<div class="list-empty" style="margin:14px 0;">Noch keine Sätze — Übung wählen und loslegen.</div>';
-    return;
-  }
+  const activeCardHtml = (g) => {
+    const last = lastValueForExercise(g.exerciseId);
+    const targetText = g.targetReps != null
+      ? `Ziel: ${g.targetSets}×${g.targetReps}${g.targetWeight ? ' @ ' + g.targetWeight + 'kg' : ''}`
+      : '';
+    return `
+      <div class="fs-active-card">
+        ${targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
+        ${exerciseHistoryTableHtml(g.exerciseId)}
+        <div class="field-row">
+          <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
+          <div class="field"><label>Wdh.</label><input type="text" inputmode="numeric" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
+        </div>
+        <button type="button" class="btn small" id="fs-add-set" style="width:100%;">+ Satz</button>
+      </div>
+    `;
+  };
+
   holder.innerHTML = builder.exercises.map((g, gi) => `
-    <div class="fs-group ${gi === builder.activeIndex ? 'active' : ''}">
+    <div class="fs-group ${gi === builder.activeIndex ? 'active' : ''}" id="fs-group-${gi}">
       <div class="fs-group-head">
         <span data-activate="${gi}" style="cursor:pointer;">${esc(exerciseName(g.exerciseId))}</span>
         ${logMode === 'freestyle' ? `<button type="button" class="ex-row-remove" data-remove-group="${gi}" title="Übung entfernen">×</button>` : ''}
@@ -1059,13 +1042,14 @@ function renderFsEntries() {
           <button type="button" class="ex-row-remove" data-remove-set="${gi}:${si}" title="Satz entfernen">×</button>
         </div>
       `).join('') : '<div class="fs-set-row mono" style="color:var(--ink-faint);">noch keine Sätze</div>'}
+      ${gi === builder.activeIndex ? activeCardHtml(g) : ''}
     </div>
   `).join('');
+
   holder.querySelectorAll('[data-activate]').forEach((el) => {
     el.onclick = () => {
       builder.activeIndex = Number(el.dataset.activate);
-      renderFsActive();
-      renderFsEntries();
+      renderFsPanel();
     };
   });
   holder.querySelectorAll('[data-remove-group]').forEach((btn) => {
@@ -1073,17 +1057,31 @@ function renderFsEntries() {
       const gi = Number(btn.dataset.removeGroup);
       builder.exercises.splice(gi, 1);
       if (builder.activeIndex >= builder.exercises.length) builder.activeIndex = builder.exercises.length - 1;
-      renderFsActive();
-      renderFsEntries();
+      renderFsPanel();
     };
   });
   holder.querySelectorAll('[data-remove-set]').forEach((btn) => {
     btn.onclick = () => {
       const [gi, si] = btn.dataset.removeSet.split(':').map(Number);
       builder.exercises[gi].sets.splice(si, 1);
-      renderFsEntries();
+      renderFsPanel();
     };
   });
+  const weightEl = document.getElementById('fs-weight');
+  const repsEl = document.getElementById('fs-reps');
+  if (weightEl) {
+    // Beim Antippen sofort leeren statt den alten Wert erst löschen zu
+    // müssen — man tippt hier ja gerade rein, weil man ihn ändern will.
+    weightEl.onfocus = (e) => { e.target.value = ''; };
+    repsEl.onfocus = (e) => { e.target.value = ''; };
+    document.getElementById('fs-add-set').onclick = () => {
+      const reps = repsEl.value.trim();
+      if (!reps) { toast('Wiederholungen eingeben.', 'err'); return; }
+      const weightRaw = weightEl.value;
+      builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps });
+      renderFsPanel();
+    };
+  }
 }
 
 function renderLogExerciseRows() {
