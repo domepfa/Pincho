@@ -1501,10 +1501,12 @@ function renderCampusAddPanel(holder) {
       <div class="chip-row" id="campus-rung-toggle" style="margin-bottom:6px;">
         ${CAMPUS_RUNG_TYPES.map((t) => `<button type="button" class="chip ${c.rungType === t.id ? 'active' : ''}" data-rung="${t.id}">${esc(t.label)}</button>`).join('')}
       </div>
-      <div class="campus-ref">
+      <div class="campus-ref" id="campus-ref">
         <img src="${CAMPUS_BOARD_IMAGE}" alt="">
-        <div class="campus-ref-label">Zur Orientierung — nicht antippbar</div>
+        ${campusRefLinesHtml(c.rungType)}
+        <div class="campus-ref-label">Antippen zum Nachjustieren der Linie</div>
       </div>
+      <p class="mono" id="campus-ref-calib" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:4px 0 0;min-height:14px;"></p>
     </div>
 
     <div class="field">
@@ -1587,6 +1589,7 @@ function renderCampusAddPanel(holder) {
   document.getElementById('campus-rung-toggle').querySelectorAll('.chip').forEach((btn) => {
     btn.onclick = () => { c.rungType = btn.dataset.rung; renderFbAddPanel(); };
   });
+  wireCampusRefCalibration(c);
   document.getElementById('campus-mode-toggle').querySelectorAll('.chip').forEach((btn) => {
     btn.onclick = () => { c.moveMode = btn.dataset.mode; renderFbAddPanel(); };
   });
@@ -2761,6 +2764,36 @@ function campusLabel(b) {
 }
 function campusFigureSvg() {
   return `<div class="ex-figure-emoji">🤸</div>`;
+}
+
+/* Senkrechter Strich (zwei bei den Kugeln, da im Zickzack statt einer
+   geraden Spalte angeordnet) über dem Referenzbild — zeigt sofort, welche
+   Spalte im Bild dem gewählten Sprossen-Typ entspricht, ohne dass man
+   raten muss. Positionen kommen aus CAMPUS_RUNG_TYPES (lineX/lineX2, %
+   der Bildbreite) — grob geschätzt, über wireCampusRefCalibration direkt
+   am Bild nachjustierbar. */
+function campusRefLinesHtml(rungTypeId) {
+  const t = CAMPUS_RUNG_TYPES.find((r) => r.id === rungTypeId);
+  if (!t) return '';
+  const xs = [t.lineX, t.lineX2].filter((x) => x != null);
+  return xs.map((x) => `<div class="campus-ref-line" style="left:${x}%;"></div>`).join('');
+}
+
+/* Antippen des Referenzbilds loggt die %-Position (gleiches Muster wie
+   wireCalibration() fürs Hangboard) — falls die grob geschätzten
+   lineX-Werte in data.js für ein Board nicht genau passen, lässt sich das
+   hier schnell nachjustieren statt raten zu müssen. */
+function wireCampusRefCalibration(c) {
+  const wrap = document.getElementById('campus-ref');
+  const readout = document.getElementById('campus-ref-calib');
+  if (!wrap || !readout) return;
+  wrap.onclick = (e) => {
+    const rect = wrap.getBoundingClientRect();
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * 1000) / 10;
+    const line = `${campusRungLabel(c.rungType)}: lineX: ${x}`;
+    readout.textContent = line;
+    if (navigator.clipboard) navigator.clipboard.writeText(String(x)).catch(() => {});
+  };
 }
 
 function fbBlockSub(b) {

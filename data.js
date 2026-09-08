@@ -124,14 +124,20 @@ const BOARDS = {
    Sprossen-TYP (unterschiedliche Leisten-/Sprossengrössen = unterschiedlich
    schwer) plus die Bewegung als Zahlen (siehe app.js, Satz-Typ 'campus'). */
 const CAMPUS_BOARD_IMAGE = './assets/board-campus.jpg';
+/* lineX/lineX2 (% von Bildbreite, siehe assets/board-campus.jpg): markiert
+   im Referenzbild per Strich, welche Spalte gemeint ist — bei den Kugeln
+   zwei Striche, da deren Löcher im Zickzack (zwei versetzte Spalten) statt
+   einer geraden Reihe angeordnet sind. Grob per Augenmass am Bild
+   geschätzt, nicht pixelgenau vermessen — bei Bedarf über die Kalibrier-
+   Anzeige direkt am Referenzbild nachjustierbar. */
 const CAMPUS_RUNG_TYPES = [
-  { id: 'rundleiste_gross', label: 'Rundleiste gross' },
-  { id: 'kugel_gross', label: 'Kugel gross' },
-  { id: 'kugel_klein', label: 'Kugel klein' },
-  { id: 'leiste_35', label: 'Leiste 35' },
-  { id: 'leiste_27', label: 'Leiste 27' },
-  { id: 'leiste_19', label: 'Leiste 19' },
-  { id: 'leiste_gross', label: 'Leiste gross' },
+  { id: 'rundleiste_gross', label: 'Rundleiste gross', lineX: 7 },
+  { id: 'kugel_gross', label: 'Kugel gross', lineX: 19.5, lineX2: 23 },
+  { id: 'kugel_klein', label: 'Kugel klein', lineX: 28, lineX2: 31.5 },
+  { id: 'leiste_35', label: 'Leiste 35', lineX: 44 },
+  { id: 'leiste_27', label: 'Leiste 27', lineX: 60 },
+  { id: 'leiste_19', label: 'Leiste 19', lineX: 77 },
+  { id: 'leiste_gross', label: 'Leiste gross', lineX: 93.5 },
 ];
 function campusRungLabel(rungTypeId) {
   const t = CAMPUS_RUNG_TYPES.find((r) => r.id === rungTypeId);
