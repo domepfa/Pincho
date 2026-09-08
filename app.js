@@ -372,8 +372,11 @@ async function renderPlan() {
    LOG
    ================================================================= */
 const LOG_TYPE_LABEL = { klettern: 'Klettern', gym: 'Gym', fingerboard: 'Fingerboard', mobility: 'Mobility', yoga: 'Yoga', jogging: 'Jogging', pilates: 'Pilates', sonstiges: 'Sonstiges' };
+/* logBuilder ist jetzt der PLAN-EDITOR (Ziel-Sätze/Wdh./Gewicht, kein
+   Ergebnis) — siehe sessionPlans weiter unten fürs Speichern/Laden/
+   Ausführen. */
 let logBuilder = { exercises: loadDraft('log_exercises') || [] };
-let logMode = 'planned'; // 'planned' | 'freestyle'
+let logMode = 'planned'; // 'planned' | 'freestyle' | 'execute' | 'wall' — 'execute' nur über "Plan starten" erreichbar
 let logPickerExerciseId = EXERCISE_LIBRARY[0].id;
 /* Freestyle: kein fester Plan — Übung wählen, Satz für Satz mit Gewicht/Wdh
    erfassen (auch mehrfach dieselbe Übung, z. B. Aufwärm- vs. Arbeitssätze),
@@ -381,6 +384,30 @@ let logPickerExerciseId = EXERCISE_LIBRARY[0].id;
    {exerciseId, sets: [{weight, reps}, ...]} in der Reihenfolge, in der die
    Übungen zum ersten Mal gewählt wurden. */
 let freestyleBuilder = loadDraft('freestyle') || { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id };
+
+/* Eigene, in Firebase gespeicherte Trainingspläne (Name + Ziel-Übungen) —
+   dasselbe Vorlagen-Muster wie fb.templates beim Fingerboard: bleiben nach
+   dem Ausführen erhalten, damit man denselben Plan immer wieder starten
+   kann, statt ihn jedes Mal neu zusammenzustellen. */
+let sessionPlans = [];
+async function loadSessionPlans() {
+  const raw = await fbGet(`sessionPlans/${state.member.id}`);
+  sessionPlans = raw ? Object.entries(raw).map(([key, p]) => ({ ...p, id: key })) : [];
+}
+
+/* Laufende Ausführung eines Plans: gleiche Form wie freestyleBuilder
+   (exercises: [{exerciseId, sets:[...]}], activeIndex), zusätzlich die
+   Ziel-Werte aus dem Plan pro Übung fürs "Ziel: ..."-Label. Wird nur über
+   "Plan starten" gesetzt; null, solange keine Ausführung läuft. */
+let planExecution = null;
+
+/* Der für den aktuellen logMode "aktive" Satz-Builder — Freestyle und
+   Plan-Ausführung sehen UI-seitig identisch aus (Übung wählen/aktivieren,
+   Satz für Satz erfassen), deshalb teilen sie sich dieselben Render-
+   Funktionen (renderFsActive/renderFsEntries) statt doppelten Code. */
+function activeSetBuilder() {
+  return logMode === 'execute' ? planExecution : freestyleBuilder;
+}
 
 /* Letzter bekannter Wert für eine Übung — über die komplette Session-
    Historie (state.logs, neueste zuerst), egal ob geplant oder freestyle
@@ -404,12 +431,63 @@ function lastValueForExercise(exerciseId) {
   return null;
 }
 
+/* Kurzdatum für die Verlaufs-Tabelle (TT.MM.) statt des vollen Datums —
+   dort steht es als Spaltenkopf, da reicht Tag/Monat zur Unterscheidung. */
+function fmtShortDate(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.`;
+}
+
+/* Die letzten `limit` Sessions, in denen diese Übung mit echten Einzel-
+   sätzen (Array, nicht der alte feste Zielwert) vorkam — neueste zuerst,
+   da state.logs schon so sortiert ist. Grundlage für die Vergleichs-
+   tabelle: "was habe ich bei Satz 1/2/3 in den letzten Trainings gemacht". */
+function historyForExercise(exerciseId, limit) {
+  const sessions = [];
+  for (const entry of state.logs) {
+    if (!entry.exercises || sessions.length >= limit) break;
+    const ex = entry.exercises.find((e) => e.exerciseId === exerciseId && Array.isArray(e.sets) && e.sets.length);
+    if (ex) sessions.push({ date: entry.date, sets: ex.sets });
+  }
+  return sessions;
+}
+
+/* Vergleichstabelle über die letzten 3 Sessions: Zeilen = Satz 1/2/3...,
+   Spalten = Datum je Session (neuste links) — zeigt die Tendenz auf einen
+   Blick, nicht nur einen einzelnen "letzten Wert". */
+function exerciseHistoryTableHtml(exerciseId) {
+  const sessions = historyForExercise(exerciseId, 3);
+  if (!sessions.length) return '';
+  const maxSets = Math.max(...sessions.map((s) => s.sets.length));
+  let rows = '';
+  for (let i = 0; i < maxSets; i++) {
+    rows += `<tr><td class="hist-row-label mono">Satz ${i + 1}</td>${sessions.map((s) => {
+      const set = s.sets[i];
+      if (!set) return '<td class="mono">–</td>';
+      const w = set.weight !== '' && set.weight != null ? esc(String(set.weight)) + 'kg × ' : '';
+      return `<td class="mono">${w}${esc(String(set.reps))}</td>`;
+    }).join('')}</tr>`;
+  }
+  return `
+    <div class="hist-table-label mono">Letzte Trainings im Vergleich</div>
+    <table class="hist-table">
+      <thead><tr><th></th>${sessions.map((s) => `<th class="mono">${esc(fmtShortDate(s.date))}</th>`).join('')}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
 async function renderLog() {
-  const isWall = logMode === 'wall';
+  // "Geplant" ist jetzt reine Plan-Verwaltung (bauen/speichern/laden), keine
+  // direkte Session — Datum/Typ/Notiz/RPE/Speichern gehören erst zu einer
+  // tatsächlichen Session (Freestyle, Plan-Ausführung, Ausdauer).
+  const hideSessionFields = logMode === 'wall' || logMode === 'planned';
+  await loadSessionPlans();
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Neue Session</h2><div class="sec-rule"></div></div>
     <div class="card">
-      ${isWall ? '' : `
+      ${hideSessionFields ? '' : `
       <div class="field-row">
         <div class="field"><label>Datum</label><input type="date" id="log-date" value="${todayKey()}"></div>
         <div class="field"><label>Typ</label>
@@ -419,15 +497,16 @@ async function renderLog() {
         </div>
       </div>`}
 
+      ${logMode === 'execute' ? '' : `
       <div class="chip-row">
         <button type="button" class="chip ${logMode === 'planned' ? 'active' : ''}" data-log-mode="planned">Geplant</button>
         <button type="button" class="chip ${logMode === 'freestyle' ? 'active' : ''}" data-log-mode="freestyle">Freestyle</button>
         <button type="button" class="chip ${logMode === 'wall' ? 'active' : ''}" data-log-mode="wall">Ausdauer</button>
-      </div>
+      </div>`}
 
       <div id="log-builder-panel"></div>
 
-      ${isWall ? '' : `
+      ${hideSessionFields ? '' : `
       <div class="field"><label>Notiz (optional)</label><textarea id="log-note" placeholder="Befinden, Bedingungen, Sonstiges…"></textarea></div>
       <div class="field"><label>RPE (1–10, optional)</label><input type="number" id="log-rpe" min="1" max="10"></div>
       <button class="btn" id="log-save">SESSION SPEICHERN</button>`}
@@ -446,17 +525,15 @@ async function renderLog() {
     };
   });
 
-  if (isWall) { renderLogHistory(); return; }
+  if (hideSessionFields) { renderLogHistory(); return; }
 
   document.getElementById('log-save').onclick = async () => {
-    const exercises = logMode === 'freestyle'
-      ? freestyleBuilder.exercises.filter((g) => g.sets.length)
-      : logBuilder.exercises;
-    if (!exercises.length) { toast('Noch keine Übungen erfasst.', 'err'); return; }
+    const rawExercises = (logMode === 'execute' ? planExecution.exercises : freestyleBuilder.exercises).filter((g) => g.sets.length);
+    if (!rawExercises.length) { toast('Noch keine Sätze erfasst.', 'err'); return; }
     const entry = {
       date: document.getElementById('log-date').value || todayKey(),
       type: document.getElementById('log-type').value,
-      exercises,
+      exercises: rawExercises.map((g) => ({ exerciseId: g.exerciseId, sets: g.sets })),
       note: document.getElementById('log-note').value.trim(),
       rpe: document.getElementById('log-rpe').value || null,
       createdAt: Date.now(),
@@ -464,16 +541,22 @@ async function renderLog() {
     const id = await fbPush(`logs/${state.member.id}`, entry);
     if (id) {
       toast('Session gespeichert.', 'ok');
-      logBuilder = { exercises: [] };
-      freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id };
-      saveDraft('log_exercises', logBuilder.exercises);
-      saveDraft('freestyle', freestyleBuilder);
+      if (logMode === 'execute') {
+        // Der Plan selbst bleibt erhalten (wie eine Fingerboard-Vorlage) —
+        // nur die gerade laufende Ausführung wird zurückgesetzt.
+        planExecution = null;
+        logMode = 'planned';
+      } else {
+        freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id };
+        saveDraft('freestyle', freestyleBuilder);
+      }
       renderLog();
     } else toast('Konnte nicht speichern.', 'err');
   };
 
-  if (logMode === 'freestyle') renderFsActive(); // "Letztes Mal"-Hinweis nachreichen, falls schon eine Übung aktiv ist
+  if (logMode === 'freestyle' || logMode === 'execute') renderFsActive(); // Vergleichstabelle/"Letztes Mal" nachreichen, sobald state.logs unten geladen ist
   await renderLogHistory();
+  if (logMode === 'freestyle' || logMode === 'execute') renderFsActive(); // jetzt mit den frisch geladenen Logs neu befüllen
 }
 
 /* Verlauf-Liste — eigene Funktion, weil sie sowohl vom normalen
@@ -797,14 +880,36 @@ function renderLogBuilderPanel() {
     }, 'fs-active');
     renderFsActive();
     renderFsEntries();
+  } else if (logMode === 'execute') {
+    holder.innerHTML = `
+      <div class="sec-head" style="margin-top:0;"><h2 class="sec-title" style="font-size:16px;">${esc(planExecution.planName)}</h2><div class="sec-rule"></div></div>
+      <div id="fs-active"></div>
+      <div id="fs-entries"></div>
+      <button type="button" class="btn ghost small" id="plan-execute-cancel" style="width:100%;margin-top:8px;">Ausführung abbrechen</button>
+    `;
+    renderFsActive();
+    renderFsEntries();
+    document.getElementById('plan-execute-cancel').onclick = () => {
+      if (!confirm('Ausführung abbrechen? Noch nicht gespeicherte Sätze gehen verloren.')) return;
+      planExecution = null;
+      logMode = 'planned';
+      renderLog();
+    };
   } else {
+    const customOptions = sessionPlans.length ? `<optgroup label="Eigene Pläne">
+      ${sessionPlans.map((p) => `<option value="plan:${p.id}">${esc(p.name)}</option>`).join('')}
+    </optgroup>` : '';
     holder.innerHTML = `
       <div class="field">
-        <label>Vorlage laden</label>
-        <select id="log-template">
-          <option value="">— eigener Ablauf —</option>
-          ${ROUTINE_TEMPLATES.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
-        </select>
+        <label>Plan laden</label>
+        <div class="field-row">
+          <select id="log-template" style="flex:2;">
+            <option value="">— eigener Ablauf —</option>
+            ${ROUTINE_TEMPLATES.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
+            ${customOptions}
+          </select>
+          <button type="button" class="btn small ghost" id="plan-delete" style="flex:0 0 auto;" title="Eigenen Plan löschen">🗑</button>
+        </div>
       </div>
 
       <div class="field">
@@ -814,13 +919,28 @@ function renderLogBuilderPanel() {
       </div>
 
       <div id="log-exercise-rows"></div>
+
+      <div class="chip-row" style="margin-top:14px;">
+        <button type="button" class="chip" id="plan-save">Als Plan speichern</button>
+      </div>
+      <button type="button" class="btn" id="plan-start" ${logBuilder.exercises.length ? '' : 'disabled'} style="width:100%;">PLAN STARTEN</button>
     `;
     renderLogExerciseRows();
     wireExercisePickerGrid('log-exercise-grid', (id) => { logPickerExerciseId = id; }, 'log-exercise-add');
     document.getElementById('log-template').onchange = (e) => {
-      const t = ROUTINE_TEMPLATES.find((r) => r.id === e.target.value);
-      logBuilder.exercises = t ? t.exercises.map((ex) => ({ ...ex, weight: '' })) : [];
+      const val = e.target.value;
+      let exercises = null;
+      if (val.startsWith('plan:')) {
+        const p = sessionPlans.find((pl) => pl.id === val.slice(5));
+        if (p) exercises = p.exercises.map((ex) => ({ ...ex }));
+      } else {
+        const t = ROUTINE_TEMPLATES.find((r) => r.id === val);
+        if (t) exercises = t.exercises.map((ex) => ({ ...ex, weight: '' }));
+      }
+      logBuilder.exercises = exercises || [];
       renderLogExerciseRows();
+      const startBtn = document.getElementById('plan-start');
+      if (startBtn) startBtn.disabled = !logBuilder.exercises.length;
     };
     document.getElementById('log-exercise-add').onclick = () => {
       logBuilder.exercises.push({ exerciseId: logPickerExerciseId, sets: 3, reps: '', weight: '' });
@@ -829,28 +949,74 @@ function renderLogBuilderPanel() {
       // die Wiederholungen sofort eintragen kann, ohne zurückscrollen zu
       // müssen — die Zeile landet sonst ausserhalb des sichtbaren Bereichs.
       document.getElementById(`log-exercise-row-${logBuilder.exercises.length - 1}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const startBtn = document.getElementById('plan-start');
+      if (startBtn) startBtn.disabled = !logBuilder.exercises.length;
+    };
+    document.getElementById('plan-save').onclick = async () => {
+      if (!logBuilder.exercises.length) { toast('Erst Übungen zusammenstellen.', 'err'); return; }
+      const name = prompt('Name für diesen Plan:');
+      if (!name) return;
+      const key = await fbPush(`sessionPlans/${state.member.id}`, { name, exercises: logBuilder.exercises, createdAt: Date.now() });
+      if (!key) { toast('Speichern fehlgeschlagen.', 'err'); return; }
+      await loadSessionPlans();
+      renderLogBuilderPanel();
+      document.getElementById('log-template').value = `plan:${key}`;
+      toast('Plan gespeichert.', 'ok');
+    };
+    document.getElementById('plan-delete').onclick = async () => {
+      const val = document.getElementById('log-template').value;
+      const p = val.startsWith('plan:') && sessionPlans.find((pl) => pl.id === val.slice(5));
+      if (!p) { toast('Nur eigene Pläne lassen sich löschen.', 'err'); return; }
+      if (!confirm('Plan "' + p.name + '" löschen?')) return;
+      await fbDelete(`sessionPlans/${state.member.id}/${p.id}`);
+      await loadSessionPlans();
+      logBuilder.exercises = [];
+      renderLogBuilderPanel();
+      toast('Plan gelöscht.', 'ok');
+    };
+    document.getElementById('plan-start').onclick = () => {
+      if (!logBuilder.exercises.length) return;
+      const currentVal = document.getElementById('log-template').value;
+      const loadedPlan = currentVal.startsWith('plan:') && sessionPlans.find((pl) => pl.id === currentVal.slice(5));
+      planExecution = {
+        planName: loadedPlan ? loadedPlan.name : 'Eigener Plan',
+        activeIndex: 0,
+        exercises: logBuilder.exercises.map((ex) => ({
+          exerciseId: ex.exerciseId, sets: [],
+          targetSets: ex.sets, targetReps: ex.reps, targetWeight: ex.weight,
+        })),
+      };
+      logMode = 'execute';
+      renderLog();
     };
   }
 }
 
-/* Aktive Freestyle-Übung: zeigt den letzten bekannten Wert (falls vorhanden)
-   direkt als Vorschlag in den Feldern an — genau der "wo war ich stehen
-   geblieben"-Hinweis. Eigene Render-Funktion (statt renderLogBuilderPanel
-   erneut aufzurufen), damit ein Satz hinzufügen nicht das ganze Panel inkl.
-   Übungs-Auswahl neu aufbaut. */
+/* Aktive Übung (Freestyle ODER Plan-Ausführung, siehe activeSetBuilder):
+   zeigt die Vergleichstabelle der letzten 3 Sessions plus (bei Plan-
+   Ausführung) das geplante Ziel direkt als Vorschlag in den Feldern an —
+   genau der "wo war ich stehen geblieben, wie war die Tendenz"-Hinweis.
+   Eigene Render-Funktion (statt renderLogBuilderPanel erneut aufzurufen),
+   damit ein Satz hinzufügen nicht das ganze Panel inkl. Übungs-Auswahl
+   neu aufbaut. */
 function renderFsActive() {
   const holder = document.getElementById('fs-active');
   if (!holder) return;
-  const g = freestyleBuilder.exercises[freestyleBuilder.activeIndex];
+  const builder = activeSetBuilder();
+  const g = builder.exercises[builder.activeIndex];
   if (!g) {
     holder.innerHTML = '<p class="login-hint">Übung wählen und "+ Übung" antippen, um Sätze zu erfassen.</p>';
     return;
   }
   const last = lastValueForExercise(g.exerciseId);
+  const targetText = g.targetReps != null
+    ? `Ziel: ${g.targetSets}×${g.targetReps}${g.targetWeight ? ' @ ' + g.targetWeight + 'kg' : ''}`
+    : '';
   holder.innerHTML = `
     <div class="fs-active-card">
       <div class="fs-active-name">${esc(exerciseName(g.exerciseId))}</div>
-      ${last ? `<div class="fs-last-value mono">Letztes Mal: ${last.weight !== '' && last.weight != null ? esc(String(last.weight)) + 'kg × ' : ''}${esc(String(last.reps))}</div>` : ''}
+      ${targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
+      ${exerciseHistoryTableHtml(g.exerciseId)}
       <div class="field-row">
         <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
         <div class="field"><label>Wdh.</label><input type="text" inputmode="numeric" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
@@ -872,18 +1038,19 @@ function renderFsActive() {
 }
 
 function renderFsEntries() {
-  saveDraft('freestyle', freestyleBuilder);
+  const builder = activeSetBuilder();
+  if (logMode === 'freestyle') saveDraft('freestyle', builder);
   const holder = document.getElementById('fs-entries');
   if (!holder) return;
-  if (!freestyleBuilder.exercises.length) {
+  if (!builder.exercises.length) {
     holder.innerHTML = '<div class="list-empty" style="margin:14px 0;">Noch keine Sätze — Übung wählen und loslegen.</div>';
     return;
   }
-  holder.innerHTML = freestyleBuilder.exercises.map((g, gi) => `
-    <div class="fs-group ${gi === freestyleBuilder.activeIndex ? 'active' : ''}">
+  holder.innerHTML = builder.exercises.map((g, gi) => `
+    <div class="fs-group ${gi === builder.activeIndex ? 'active' : ''}">
       <div class="fs-group-head">
-        <span>${esc(exerciseName(g.exerciseId))}</span>
-        <button type="button" class="ex-row-remove" data-remove-group="${gi}" title="Übung entfernen">×</button>
+        <span data-activate="${gi}" style="cursor:pointer;">${esc(exerciseName(g.exerciseId))}</span>
+        ${logMode === 'freestyle' ? `<button type="button" class="ex-row-remove" data-remove-group="${gi}" title="Übung entfernen">×</button>` : ''}
       </div>
       ${g.sets.length ? g.sets.map((s, si) => `
         <div class="fs-set-row mono">
@@ -894,11 +1061,18 @@ function renderFsEntries() {
       `).join('') : '<div class="fs-set-row mono" style="color:var(--ink-faint);">noch keine Sätze</div>'}
     </div>
   `).join('');
+  holder.querySelectorAll('[data-activate]').forEach((el) => {
+    el.onclick = () => {
+      builder.activeIndex = Number(el.dataset.activate);
+      renderFsActive();
+      renderFsEntries();
+    };
+  });
   holder.querySelectorAll('[data-remove-group]').forEach((btn) => {
     btn.onclick = () => {
       const gi = Number(btn.dataset.removeGroup);
-      freestyleBuilder.exercises.splice(gi, 1);
-      if (freestyleBuilder.activeIndex >= freestyleBuilder.exercises.length) freestyleBuilder.activeIndex = freestyleBuilder.exercises.length - 1;
+      builder.exercises.splice(gi, 1);
+      if (builder.activeIndex >= builder.exercises.length) builder.activeIndex = builder.exercises.length - 1;
       renderFsActive();
       renderFsEntries();
     };
@@ -906,7 +1080,7 @@ function renderFsEntries() {
   holder.querySelectorAll('[data-remove-set]').forEach((btn) => {
     btn.onclick = () => {
       const [gi, si] = btn.dataset.removeSet.split(':').map(Number);
-      freestyleBuilder.exercises[gi].sets.splice(si, 1);
+      builder.exercises[gi].sets.splice(si, 1);
       renderFsEntries();
     };
   });
@@ -946,6 +1120,8 @@ function renderLogExerciseRows() {
     btn.onclick = () => {
       logBuilder.exercises.splice(Number(btn.dataset.remove), 1);
       renderLogExerciseRows();
+      const startBtn = document.getElementById('plan-start');
+      if (startBtn) startBtn.disabled = !logBuilder.exercises.length;
     };
   });
 }
