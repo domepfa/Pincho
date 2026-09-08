@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pincho-shell-v42';
+const CACHE_NAME = 'pincho-shell-v43';
 const SHELL_ASSETS = [
   './', './index.html', './styles.css', './data.js', './firebase.js', './app.js',
   './manifest.json', './assets/icon-512-any.png',
@@ -32,7 +32,7 @@ self.addEventListener('fetch', (e) => {
   // "Netzwerk zuerst": neueste Version laden, wenn online; nur offline auf
   // den Zwischenspeicher zurückfallen.
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-store' })
       .then((networkResponse) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(e.request, networkResponse.clone()));
         return networkResponse;

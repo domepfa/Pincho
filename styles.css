@@ -207,6 +207,7 @@ button, input, select, textarea { font-family: inherit; }
 .chip.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .1); }
 .chip[disabled] { opacity: .3; cursor: not-allowed; }
 .chip:not([disabled]):active { transform: scale(.95); }
+.chip .emoji { font-size: 15px; margin-right: 5px; vertical-align: -3px; }
 
 /* ---------- Login ---------- */
 .login-shell { max-width: 560px; margin: 0 auto; padding: 12px 12px 40px; text-align: center; }

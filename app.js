@@ -996,7 +996,11 @@ function parseImportedAblauf(text) {
       if (!(workSec > 0)) { errors.push(`Satz ${n}: workSec muss eine Zahl > 0 sein.`); return; }
       if (!(restSec >= 0)) { errors.push(`Satz ${n}: restSec muss eine Zahl >= 0 sein.`); return; }
       if (blockRestSec != null && !(blockRestSec >= 0)) { errors.push(`Satz ${n}: blockRestSec muss eine Zahl >= 0 sein.`); return; }
-      const common = { type: 'campus', rungType: b.rungType, moveMode: b.moveMode, reps, workSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}) };
+      const armMode = b.armMode != null ? b.armMode : 'both';
+      if (armMode !== 'both' && armMode !== 'match' && armMode !== 'skip') { errors.push(`Satz ${n}: armMode muss "both", "match" oder "skip" sein.`); return; }
+      const startHand = b.startHand != null ? b.startHand : 'left';
+      if (startHand !== 'left' && startHand !== 'right') { errors.push(`Satz ${n}: startHand muss "left" oder "right" sein.`); return; }
+      const common = { type: 'campus', rungType: b.rungType, moveMode: b.moveMode, reps, workSec, restSec, armMode, ...(armMode !== 'both' ? { startHand } : {}), ...(blockRestSec != null ? { blockRestSec } : {}) };
       if (b.moveMode === 'direct') {
         const fromRung = Number(b.fromRung);
         const toRung = Number(b.toRung);
@@ -1039,9 +1043,10 @@ const fb = {
     rungType: CAMPUS_RUNG_TYPES[0].id, moveMode: 'direct',
     fromRung: 1, toRung: 4, startRung: 1, pattern: [],
     reps: 4, workSec: 3, restSec: 15, blockRestSec: 90,
+    armMode: 'both', startHand: 'left', // armMode: 'both' | 'match' | 'skip' — 'match'/'skip' zeigen zusätzlich startHand
   },
   newPause: { seconds: 60 },
-  blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec, blockRestSec} | {type:'exercise', exerciseId, reps, workSec, restSec} | {type:'campus', rungType, moveMode, reps, workSec, restSec, blockRestSec, fromRung/toRung ODER startRung/pattern} | {type:'pause', seconds}
+  blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec, blockRestSec} | {type:'exercise', exerciseId, reps, workSec, restSec} | {type:'campus', rungType, moveMode, reps, workSec, restSec, blockRestSec, fromRung/toRung ODER startRung/pattern, armMode, startHand} | {type:'pause', seconds}
   templates: [],         // eigene, in Firebase gespeicherte Abläufe (zusätzlich zu FINGERBOARD_TEMPLATES)
   weight: '',
   blockIndex: 0,
@@ -1359,6 +1364,22 @@ function renderCampusAddPanel(holder) {
       `}
     </div>
 
+    <div class="field">
+      <label>Bewegungsart</label>
+      <div class="chip-row" id="campus-armmode-toggle" style="margin-bottom:${c.armMode === 'both' ? '0' : '10px'};">
+        <button type="button" class="chip ${c.armMode === 'both' ? 'active' : ''}" data-arm="both"><span class="emoji">🙌</span>Beidarmig</button>
+        <button type="button" class="chip ${c.armMode === 'match' ? 'active' : ''}" data-arm="match"><span class="emoji">🔄</span>Nachziehen</button>
+        <button type="button" class="chip ${c.armMode === 'skip' ? 'active' : ''}" data-arm="skip"><span class="emoji">🔃</span>Überspringen</button>
+      </div>
+      ${c.armMode !== 'both' ? `
+        <div class="fb-checkin-label" style="text-align:left;margin-bottom:6px;">Starthand</div>
+        <div class="chip-row" id="campus-starthand-toggle" style="margin-bottom:0;">
+          <button type="button" class="chip ${c.startHand === 'left' ? 'active' : ''}" data-hand="left"><span class="emoji">🫲</span>Links zuerst</button>
+          <button type="button" class="chip ${c.startHand === 'right' ? 'active' : ''}" data-hand="right"><span class="emoji">🫱</span>Rechts zuerst</button>
+        </div>
+      ` : ''}
+    </div>
+
     <div class="field-row">
       <div class="field"><label>${c.moveMode === 'pattern' ? 'Wdh. des Musters' : 'Sätze'}</label><input type="number" id="campus-reps" value="${c.reps}" min="1"></div>
       <div class="field"><label>Ausführung (s)</label><input type="number" id="campus-worksec" value="${c.workSec}" min="1"></div>
@@ -1376,6 +1397,15 @@ function renderCampusAddPanel(holder) {
   document.getElementById('campus-mode-toggle').querySelectorAll('.chip').forEach((btn) => {
     btn.onclick = () => { c.moveMode = btn.dataset.mode; renderFbAddPanel(); };
   });
+  document.getElementById('campus-armmode-toggle').querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => { c.armMode = btn.dataset.arm; renderFbAddPanel(); };
+  });
+  const startHandToggle = document.getElementById('campus-starthand-toggle');
+  if (startHandToggle) {
+    startHandToggle.querySelectorAll('.chip').forEach((btn) => {
+      btn.onclick = () => { c.startHand = btn.dataset.hand; renderFbAddPanel(); };
+    });
+  }
   holder.querySelectorAll('[data-step]').forEach((btn) => {
     btn.onclick = () => {
       const field = btn.dataset.step;
@@ -2521,8 +2551,20 @@ function campusMoveText(b) {
     ? `Start ${b.startRung} · Muster ${b.pattern.map((p) => (p > 0 ? '+' + p : String(p))).join('/')}`
     : `Sprosse ${b.fromRung}→${b.toRung}`;
 }
+/* Bewegungsart als Symbol statt Text, damit man's mitten im Training auf
+   einen Blick erkennt, ohne lesen zu müssen: 🙌 beide Hände gleichzeitig,
+   🔄/🔃 wechselseitig (nachziehen bzw. überspringen) mit 🫲/🫱 für die
+   Starthand. Fehlt armMode (ältere Sätze/Importe), gilt "beidarmig" als
+   neutraler Standard, der dem alten Verhalten am nächsten kommt. */
+function campusArmIcons(b) {
+  const armMode = b.armMode || 'both';
+  if (armMode === 'both') return '🙌';
+  const armIcon = armMode === 'skip' ? '🔃' : '🔄';
+  const handIcon = b.startHand === 'right' ? '🫱' : '🫲';
+  return `${armIcon}${handIcon}`;
+}
 function campusLabel(b) {
-  return `Campus (${esc(campusRungLabel(b.rungType))}) · ${esc(campusMoveText(b))}`;
+  return `${campusArmIcons(b)} Campus (${esc(campusRungLabel(b.rungType))}) · ${esc(campusMoveText(b))}`;
 }
 function campusFigureSvg() {
   return `<div class="ex-figure-emoji">🤸</div>`;
