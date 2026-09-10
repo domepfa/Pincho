@@ -44,29 +44,55 @@ function loadDraft(key) {
   } catch (e) { return null; }
 }
 
-/* Tippbares Übungs-Raster statt <select>-Dropdown — bei Dutzenden Übungen
-   ist ein natives Dropdown auf dem Handy ein langes, unübersichtliches
-   Scrollen; ein Raster lässt sich auf einen Blick überfliegen (gleiche
-   Idee wie schon bei der Challenge-Übungsauswahl, hier aber Einzelauswahl
-   statt Checkbox-Liste). */
-function exercisePickerGridHtml(list, selectedId) {
-  return Object.entries(EXERCISE_CATEGORY_LABEL)
-    .filter(([cat]) => list.some((e) => e.category === cat))
-    .map(([cat, label]) => `
-      <div class="ex-cat-label">${label}</div>
-      <div class="ex-pick-grid">
-        ${list.filter((e) => e.category === cat).sort((a, b) => a.name.localeCompare(b.name, 'de')).map((e) => {
-          const muscles = exerciseMuscles(e.id);
-          const sub = muscles.primary.map((id) => MUSCLE_ZONE_LABEL[id] || id).join(', ');
-          return `
-          <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">
-            ${esc(e.name)}
-            ${sub ? `<span class="ex-pick-sub">${esc(sub)}</span>` : ''}
-          </button>
-        `;
-        }).join('')}
-      </div>
-    `).join('');
+/* Übungsraster als Körperbild statt langer, nach Trainingskategorie
+   sortierter Liste: erst eine grobe Körperregion antippen (am Bild oder als
+   Chip), dann erst erscheinen die Übungen dafür — kürzer als die alte Liste
+   mit 6 Trainingskategorien. Ordnet jede Übung anhand ihres primären
+   Zielmuskels (siehe MUSCLE_ZONES_SVG) automatisch einer von 5 Ober-
+   gruppen zu, keine separate Pflege pro Übung nötig. */
+const EX_SUPERGROUP_LABEL = { arm: 'Arm', brust: 'Brust', ruecken: 'Rücken', rumpf: 'Rumpf', huefte_beine: 'Hüfte/Beine' };
+const MUSCLE_SUPERGROUP = {
+  shoulders: 'arm', biceps: 'arm', forearms_front: 'arm', triceps: 'arm', forearms_back: 'arm',
+  chest: 'brust',
+  neck_traps: 'ruecken', traps: 'ruecken', rear_delts: 'ruecken', lats: 'ruecken', lower_back: 'ruecken',
+  abs: 'rumpf', obliques: 'rumpf',
+  quads: 'huefte_beine', shins: 'huefte_beine', glutes: 'huefte_beine', hamstrings: 'huefte_beine', calves: 'huefte_beine',
+};
+function exerciseSupergroup(ex) {
+  return MUSCLE_SUPERGROUP[ex.muscles.primary[0]] || 'rumpf';
+}
+
+/* Dasselbe Körper-Umriss-SVG wie bei der Zielmuskel-Anzeige (bodyMapSvg),
+   hier aber pro Körperregion antippbar statt nur zur Anzeige. */
+function clickableBodyMapSvg(activeSupergroup) {
+  const zoneEl = (id, shape) => {
+    const sg = MUSCLE_SUPERGROUP[id];
+    return `<g class="body-zone ${sg === activeSupergroup ? 'active' : ''}" data-supergroup="${sg}">${shape}</g>`;
+  };
+  const zones = Object.entries(MUSCLE_ZONES_SVG).map(([id, shape]) => zoneEl(id, shape)).join('');
+  return `
+    <svg viewBox="0 0 190 160" class="muscle-map ex-body-map">
+      <circle class="muscle-head" cx="45" cy="13" r="9"/>
+      <circle class="muscle-head" cx="145" cy="13" r="9"/>
+      ${zones}
+    </svg>
+  `;
+}
+
+function exercisePickerBodyHtml(list, selectedId, sg) {
+  return `
+    ${clickableBodyMapSvg(sg)}
+    <div class="chip-row ex-supergroup-row">
+      ${Object.entries(EX_SUPERGROUP_LABEL).filter(([key]) => list.some((e) => exerciseSupergroup(e) === key)).map(([key, label]) => `
+        <button type="button" class="chip ${key === sg ? 'active' : ''}" data-supergroup-btn="${key}">${esc(label)}</button>
+      `).join('')}
+    </div>
+    <div class="ex-pick-grid">
+      ${sg ? list.filter((e) => exerciseSupergroup(e) === sg).sort((a, b) => a.name.localeCompare(b.name, 'de')).map((e) => `
+        <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">${esc(e.name)}</button>
+      `).join('') : '<p class="login-hint">Körperbereich oben antippen, um Übungen zu sehen.</p>'}
+    </div>
+  `;
 }
 /* Lang drücken statt tippen zeigt Infos zur Übung (Ausführung, Zielmuskeln),
    ohne sie schon auszuwählen — bei uneindeutigen Namen ("Rudern Kabel" vs.
@@ -113,20 +139,38 @@ function showExerciseInfoSheet(exerciseId) {
   document.getElementById('info-sheet-close').onclick = () => el.classList.add('hidden');
 }
 
-function wireExercisePickerGrid(containerId, onSelect, scrollTargetId) {
+/* Rendert das Übungsraster IN den Container UND verdrahtet es — anders als
+   früher (getrennte HTML-Erzeugung + Verdrahtung) muss diese Funktion beim
+   Wechsel der Körperregion sich selbst neu aufrufen können, da sich dabei
+   die sichtbare Übungsliste komplett ändert. */
+function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, scrollTargetId) {
   const holder = document.getElementById(containerId);
   if (!holder) return;
-  holder.querySelectorAll('.ex-pick-btn').forEach((btn) => {
-    wireLongPress(btn, () => showExerciseInfoSheet(btn.dataset.exercise));
-    btn.onclick = () => {
-      if (btn.dataset.longPressed === '1') { btn.dataset.longPressed = ''; return; }
-      holder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
-      onSelect(btn.dataset.exercise);
-      if (scrollTargetId) {
-        document.getElementById(scrollTargetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    };
-  });
+  let selectedId = initialSelectedId;
+  // Bewusst immer geschlossen starten, statt anhand von initialSelectedId
+  // (das ist oft nur ein nie benutzter Default-Wert, kein echter Vorwahl)
+  // schon eine Körperregion aufzuklappen — man soll erst bewusst antippen.
+  let sg = '';
+
+  const render = () => {
+    holder.innerHTML = exercisePickerBodyHtml(list, selectedId, sg);
+    holder.querySelectorAll('[data-supergroup-btn], .body-zone').forEach((el) => {
+      el.onclick = () => { sg = el.dataset.supergroup || el.dataset.supergroupBtn; render(); };
+    });
+    holder.querySelectorAll('.ex-pick-btn').forEach((btn) => {
+      wireLongPress(btn, () => showExerciseInfoSheet(btn.dataset.exercise));
+      btn.onclick = () => {
+        if (btn.dataset.longPressed === '1') { btn.dataset.longPressed = ''; return; }
+        selectedId = btn.dataset.exercise;
+        holder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
+        onSelect(selectedId);
+        if (scrollTargetId) {
+          document.getElementById(scrollTargetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      };
+    });
+  };
+  render();
 }
 function toast(message, kind) {
   const el = document.createElement('div');
@@ -1142,12 +1186,12 @@ function renderLogBuilderPanel() {
     holder.innerHTML = `
       <div class="field">
         <label>Übung</label>
-        <div id="fs-exercise-grid">${exercisePickerGridHtml(EXERCISE_LIBRARY, freestyleBuilder.pickerExerciseId)}</div>
+        <div id="fs-exercise-grid"></div>
       </div>
       <div id="fs-panel"></div>
       <div id="fs-discard-holder"></div>
     `;
-    wireExercisePickerGrid('fs-exercise-grid', (id) => {
+    wireExercisePickerGrid('fs-exercise-grid', EXERCISE_LIBRARY, freestyleBuilder.pickerExerciseId, (id) => {
       freestyleBuilder.pickerExerciseId = id;
       let idx = freestyleBuilder.exercises.findIndex((g) => g.exerciseId === id);
       if (idx === -1) {
@@ -1198,7 +1242,7 @@ function renderLogBuilderPanel() {
 
       <div class="field">
         <label>Übung hinzufügen</label>
-        <div id="log-exercise-grid">${exercisePickerGridHtml(EXERCISE_LIBRARY, logPickerExerciseId)}</div>
+        <div id="log-exercise-grid"></div>
         <button type="button" class="btn" id="log-exercise-add" style="width:100%;margin-top:8px;">+ Hinzufügen</button>
       </div>
 
@@ -1210,7 +1254,7 @@ function renderLogBuilderPanel() {
       <button type="button" class="btn" id="plan-start" ${logBuilder.exercises.length ? '' : 'disabled'} style="width:100%;">PLAN STARTEN</button>
     `;
     renderLogExerciseRows();
-    wireExercisePickerGrid('log-exercise-grid', (id) => { logPickerExerciseId = id; }, 'log-exercise-add');
+    wireExercisePickerGrid('log-exercise-grid', EXERCISE_LIBRARY, logPickerExerciseId, (id) => { logPickerExerciseId = id; }, 'log-exercise-add');
     document.getElementById('log-template').onchange = (e) => {
       const val = e.target.value;
       let exercises = null;
@@ -1889,7 +1933,7 @@ function renderFbAddPanel() {
     holder.innerHTML = `
       <div class="field">
         <label>Übung</label>
-        <div id="fb-exercise-grid">${exercisePickerGridHtml(ACCESSORY_EXERCISES, fb.newExercise.exerciseId)}</div>
+        <div id="fb-exercise-grid"></div>
       </div>
       <div class="field-row">
         <div class="field"><label>Ziel-Wdh.</label><input type="number" id="fb-new-exreps" value="${fb.newExercise.reps}" min="1"></div>
@@ -1898,7 +1942,7 @@ function renderFbAddPanel() {
       </div>
       <button type="button" class="btn" id="fb-add-exercise" style="width:100%;">+ Übung hinzufügen</button>
     `;
-    wireExercisePickerGrid('fb-exercise-grid', (id) => { fb.newExercise.exerciseId = id; }, 'fb-add-exercise');
+    wireExercisePickerGrid('fb-exercise-grid', ACCESSORY_EXERCISES, fb.newExercise.exerciseId, (id) => { fb.newExercise.exerciseId = id; }, 'fb-add-exercise');
     document.getElementById('fb-new-exreps').oninput = (e) => { fb.newExercise.reps = Number(e.target.value) || 1; };
     document.getElementById('fb-new-exwork').oninput = (e) => { fb.newExercise.workSec = Number(e.target.value) || 5; };
     document.getElementById('fb-new-exrest').oninput = (e) => { fb.newExercise.restSec = Number(e.target.value) || 0; };

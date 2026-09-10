@@ -250,15 +250,6 @@ const EXERCISE_LIBRARY = [
 
 const ACCESSORY_EXERCISES = EXERCISE_LIBRARY.filter((e) => e.pauseFriendly);
 
-const EXERCISE_CATEGORY_LABEL = {
-  zug: 'Zug',
-  antagonist: 'Antagonisten',
-  push: 'Push',
-  beine: 'Beine',
-  rumpf: 'Rumpf',
-  mobility: 'Mobilität',
-};
-
 function exerciseName(id) {
   const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
   return ex ? ex.name : id;

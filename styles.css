@@ -395,11 +395,16 @@ button, input, select, textarea { font-family: inherit; }
 .chal-duration-row { margin: 8px 0 0; }
 .chal-duration-row .chip { font-size: 10px; padding: 5px 9px; }
 
-.ex-cat-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); margin: 10px 0 6px; }
-
 /* Übungs-Raster (Einzelauswahl) — Ersatz für ein langes <select>-Dropdown
-   in Fingerboard/Log/Freestyle: alle Optionen auf einen Blick, antippen
-   statt scrollen. */
+   in Fingerboard/Log/Freestyle: erst Körperregion am Bild oder als Chip
+   antippen, dann erscheinen nur die Übungen dafür (siehe
+   clickableBodyMapSvg/exercisePickerBodyHtml in app.js). */
+.ex-body-map { width: clamp(100px, 17vh, 200px); margin: 4px auto 10px; display: block; }
+.body-zone { cursor: pointer; }
+.body-zone rect, .body-zone ellipse { fill: var(--ink-faint); opacity: .35; transition: fill .15s, opacity .15s; }
+.body-zone:active rect, .body-zone:active ellipse { opacity: .6; }
+.body-zone.active rect, .body-zone.active ellipse { fill: var(--accent); opacity: .9; }
+.ex-supergroup-row { margin-bottom: 12px; }
 .ex-pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px; }
 .ex-pick-btn {
   font-family: 'IBM Plex Mono', monospace; font-size: 12px; line-height: 1.3; padding: 9px 8px;
@@ -407,8 +412,6 @@ button, input, select, textarea { font-family: inherit; }
   text-align: left; white-space: normal; transition: border-color .13s, color .13s, background .13s;
 }
 .ex-pick-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .1); }
-.ex-pick-sub { display: block; font-size: 10px; color: var(--ink-faint); margin-top: 2px; font-weight: 400; }
-.ex-pick-btn.active .ex-pick-sub { color: var(--accent); opacity: .75; }
 
 /* ---------- Toast ---------- */
 #toast-root { position: fixed; bottom: calc(76px + var(--safe-bottom)); left: 16px; right: 16px; z-index: 20; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
