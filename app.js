@@ -1423,7 +1423,7 @@ function renderFsPanel() {
       ${g.infoOpen ? fsExerciseInfoHtml(g.exerciseId) : ''}
       ${gi === builder.activeIndex && targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
       ${gi === builder.activeIndex ? exerciseHistoryTableHtml(g.exerciseId) : ''}
-      ${g.sets.length ? g.sets.map((s, si) => `
+      ${g.sets.length ? g.sets.map((s, si) => ({ s, si })).reverse().map(({ s, si }) => `
         <div class="fs-set-row mono">
           <span>Satz ${si + 1}</span>
           <input type="number" inputmode="decimal" step="0.5" class="ex-row-input" data-edit="${gi}:${si}:weight" value="${s.weight !== '' && s.weight != null ? esc(String(s.weight)) : ''}" placeholder="kg" title="Gewicht">
