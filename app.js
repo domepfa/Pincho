@@ -1432,8 +1432,8 @@ function renderFsPanel() {
     const last = g.sets.length ? g.sets[g.sets.length - 1] : lastValueForExercise(g.exerciseId);
     return `
       <div class="field-row">
-        <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
-        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
+        <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" enterkeyhint="next" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
+        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
       </div>
       ${isHold ? `<button type="button" class="btn ghost small" id="fs-hold-timer" style="width:100%;margin-bottom:8px;">⏱ Timer starten</button>` : ''}
       <button type="button" class="btn small" id="fs-add-set" style="width:100%;">+ Satz</button>
@@ -1451,7 +1451,7 @@ function renderFsPanel() {
       ${floatingInputHtml(activeGroup)}
     </div>` : ''}
     <div class="fs-rest-timer mono" id="fs-rest-timer" hidden></div>
-    ${builder.exercises.map((g, gi) => {
+    ${builder.exercises.map((g, gi) => ({ g, gi })).reverse().map(({ g, gi }) => {
       const targetText = g.targetReps != null
         ? `Ziel: ${g.targetSets}×${g.targetReps}${g.targetWeight ? ' @ ' + g.targetWeight + 'kg' : ''}`
         : '';
@@ -1549,16 +1549,21 @@ function renderFsPanel() {
       // Feld VOR dem Neu-Rendern aktiv verlassen (Tastatur zu) — sonst
       // entscheidet auf Android manchmal die virtuelle Tastatur selbst,
       // wohin der Fokus springt, sobald das fokussierte Element beim
-      // Re-Render verschwindet (z. B. zurück auf einen älteren Satz).
+      // Re-Render verschwindet (z. B. zurück auf einen älteren Satz). Das
+      // Neu-Rendern (das den Fokus zerstört) erst einen Tick später, damit
+      // der Blur zuverlässig zuerst durchläuft, bevor Android reagiert.
       weightEl.blur();
       repsEl.blur();
-      builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps });
-      startFsRestTimer();
-      renderFsPanel();
+      setTimeout(() => {
+        builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps });
+        startFsRestTimer();
+        renderFsPanel();
+      }, 0);
     };
-    // Enter auf dem Handy-Keyboard loggt den Satz direkt, ohne dass man
-    // extra den Button antippen muss.
-    weightEl.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submitSet(); } };
+    // Enter im Gewicht-Feld springt nur weiter zu Wdh. (wie Tab) — Enter im
+    // Wdh.-Feld loggt den Satz direkt und schliesst die Tastatur, ohne dass
+    // man extra den Button antippen muss.
+    weightEl.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); repsEl.focus(); } };
     repsEl.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submitSet(); } };
     document.getElementById('fs-add-set').onclick = submitSet;
     const holdBtn = document.getElementById('fs-hold-timer');
