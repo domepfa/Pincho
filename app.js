@@ -2762,8 +2762,17 @@ function campusArmIcons(b) {
 function campusLabel(b) {
   return `${campusArmIcons(b)} Campus (${esc(campusRungLabel(b.rungType))}) · ${esc(campusMoveText(b))}`;
 }
-function campusFigureSvg() {
-  return `<div class="ex-figure-emoji">🤸</div>`;
+/* Ersetzt das reine Deko-Strichmännchen während des Campus-Arbeitssatzes:
+   wichtiger als eine generische Figur ist, dass Bewegungsart/Starthand
+   (Symbole) und die eigentliche Bewegung (welche Sprossen/welches Muster)
+   auch aus einiger Distanz sofort erkennbar sind — deshalb gross und mit
+   Pfeilen statt kleinem Fliesstext. */
+function campusWorkFigureSvg(b) {
+  const moveHtml = b.moveMode === 'pattern'
+    ? `<div class="campus-work-pattern">${b.pattern.map((p) => `<span class="campus-work-chip ${p < 0 ? 'down' : 'up'}">${Math.abs(p)}${p > 0 ? '↑' : '↓'}</span>`).join('')}</div>
+       <div class="campus-work-sub mono">AB SPROSSE ${b.startRung}</div>`
+    : `<div class="campus-work-move mono">${b.fromRung}<span class="campus-work-arrow">→</span>${b.toRung}</div>`;
+  return `<div class="campus-work-figure"><div class="campus-work-icons">${campusArmIcons(b)}</div>${moveHtml}</div>`;
 }
 
 /* Senkrechter Strich (zwei bei den Kugeln, da im Zickzack statt einer
@@ -3216,7 +3225,7 @@ function renderFbOverlay() {
     const nextArmNote = isHang ? hangArmNote(next) : '';
     stage = `
       <div class="fb-stage-label mono">NÄCHSTER SATZ (${fb.blockIndex + 1}/${fb.blocks.length})</div>
-      <div class="fb-stage-figure">${isPause ? FB_REST_FIGURE_SVG : isHang ? hangBoardThumb(next) : isCampus ? campusFigureSvg() : exerciseFigureSvg(next.exerciseId)}</div>
+      <div class="fb-stage-figure">${isPause ? FB_REST_FIGURE_SVG : isHang ? hangBoardThumb(next) : isCampus ? campusWorkFigureSvg(next) : exerciseFigureSvg(next.exerciseId)}</div>
       <div class="fb-stage-title">${isPause ? 'Pause' : isHang ? 'Hang @ ' + esc(hangGripLabel(next)) : isCampus ? campusLabel(next) : esc(exerciseName(next.exerciseId))}</div>
       <div class="fb-stage-sub mono">${esc(fbBlockSub(next))}${nextArmNote ? ' · ' + nextArmNote : ''}</div>
       ${fbTransportRow()}
@@ -3272,7 +3281,7 @@ function renderFbOverlay() {
                <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
              </div>
            </div>`
-        : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}">${working ? (isCampus ? campusFigureSvg() : exerciseFigureSvg(block.exerciseId)) : FB_REST_FIGURE_SVG}</div>
+        : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}">${working ? (isCampus ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId)) : FB_REST_FIGURE_SVG}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
              <div class="fb-timer-ring">
                <svg viewBox="0 0 120 120">
@@ -3624,7 +3633,7 @@ function updateTimerUI() {
   const kind = working ? 'work' : 'rest';
   if (figureHolder && figureHolder.dataset.kind !== kind) {
     figureHolder.innerHTML = working
-      ? (block.type === 'hang' ? FB_HANG_FIGURE_SVG : block.type === 'campus' ? campusFigureSvg() : exerciseFigureSvg(block.exerciseId))
+      ? (block.type === 'hang' ? FB_HANG_FIGURE_SVG : block.type === 'campus' ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId))
       : FB_REST_FIGURE_SVG;
     figureHolder.dataset.kind = kind;
   }

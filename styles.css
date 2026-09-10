@@ -547,6 +547,25 @@ button, input, select, textarea { font-family: inherit; }
 .fb-stage-figure .ex-figure { width: auto; max-width: 100%; height: auto; max-height: 19vh; display: block; }
 .fb-stage-figure .ex-figure-emoji { font-size: clamp(48px, 10vh, 96px); text-align: center; line-height: 1.2; }
 
+/* Campus-Arbeitssatz: statt einer generischen Deko-Figur zeigt dieser
+   Block gross, was gerade zählt — Bewegungsart/Starthand als Symbol,
+   plus welche Sprossen bzw. welches Muster dran ist. Muss auch aus
+   einiger Distanz (Handy liegt am Boden) sofort erkennbar sein. */
+.campus-work-figure { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.campus-work-icons { font-size: clamp(40px, 9vh, 80px); line-height: 1; }
+.campus-work-move {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(40px, 9vh, 76px); line-height: 1;
+  color: var(--accent); display: flex; align-items: center; gap: 10px;
+}
+.campus-work-arrow { color: var(--ink-dim); font-size: .7em; }
+.campus-work-pattern { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.campus-work-chip {
+  font-family: 'Bebas Neue', sans-serif; font-size: clamp(26px, 6vh, 44px); line-height: 1;
+  padding: 4px 14px; border: 3px solid var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .1);
+}
+.campus-work-chip.down { border-color: var(--accent2); color: var(--accent2); background: rgba(255, 107, 71, .1); }
+.campus-work-sub { font-size: 12px; letter-spacing: .08em; color: var(--ink-faint); }
+
 /* Zielmuskeln-Übersicht: ein Körper-Umriss (vorne links, hinten rechts),
    Zonen werden je Übung ein-/ausgeblendet statt neu gezeichnet. */
 .fb-muscle-block { margin-top: 0; text-align: center; }
