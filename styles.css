@@ -12,7 +12,7 @@
   --line-soft: #2a3140;
   --ink: #f2efe6;
   --ink-dim: #96a0ae;
-  --ink-faint: #5c6473;
+  --ink-faint: #8f97a5;
   --accent: #4fc3ff;
   --accent-rgb: 79, 195, 255;
   --accent-ink: #06202f;
@@ -271,8 +271,9 @@ button, input, select, textarea { font-family: inherit; }
 .fs-group-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--ink); margin-bottom: 4px; }
 .fs-set-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-dim); padding: 4px 0; }
 .fs-set-row span:first-child { flex: 0 0 52px; color: var(--ink-faint); }
-.fs-set-row span:nth-child(2) {
-  flex: 1; color: var(--accent); font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: .02em;
+.fs-rest-timer {
+  text-align: center; font-size: 13px; font-weight: 700; letter-spacing: .06em; color: var(--accent2);
+  background: rgba(255, 107, 71, .1); border: 1px solid var(--accent2); padding: 8px; margin-bottom: 12px;
 }
 /* Gewicht/Wdh: die Beschriftung (was trage ich hier ein) soll auffallen,
    nicht primär die Zahl selbst — Label darum hell statt im sonst üblichen

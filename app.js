@@ -371,7 +371,7 @@ async function renderPlan() {
 /* ================================================================
    LOG
    ================================================================= */
-const LOG_TYPE_LABEL = { klettern: 'Klettern', gym: 'Gym', fingerboard: 'Fingerboard', mobility: 'Mobility', yoga: 'Yoga', jogging: 'Jogging', pilates: 'Pilates', sonstiges: 'Sonstiges' };
+const LOG_TYPE_LABEL = { klettern: 'Klettern', gym: 'Gym', fingerboard: 'Fingerboard', mobility: 'Mobility', yoga: 'Yoga', jogging: 'Jogging', pilates: 'Pilates', warmup: 'Warm-up', sonstiges: 'Sonstiges' };
 /* logBuilder ist jetzt der PLAN-EDITOR (Ziel-Sätze/Wdh./Gewicht, kein
    Ergebnis) — siehe sessionPlans weiter unten fürs Speichern/Laden/
    Ausführen. */
@@ -460,13 +460,14 @@ function exerciseHistoryTableHtml(exerciseId) {
   const sessions = historyForExercise(exerciseId, 3);
   if (!sessions.length) return '';
   const maxSets = Math.max(...sessions.map((s) => s.sets.length));
+  const suffix = exerciseIsHold(exerciseId) ? 's' : '';
   let rows = '';
   for (let i = 0; i < maxSets; i++) {
     rows += `<tr><td class="hist-row-label mono">Satz ${i + 1}</td>${sessions.map((s) => {
       const set = s.sets[i];
       if (!set) return '<td class="mono">–</td>';
       const w = set.weight !== '' && set.weight != null ? esc(String(set.weight)) + 'kg × ' : '';
-      return `<td class="mono">${w}${esc(String(set.reps))}</td>`;
+      return `<td class="mono">${w}${esc(String(set.reps))}${suffix}</td>`;
     }).join('')}</tr>`;
   }
   return `
@@ -482,7 +483,7 @@ async function renderLog() {
   // "Geplant" ist jetzt reine Plan-Verwaltung (bauen/speichern/laden), keine
   // direkte Session — Datum/Typ/Notiz/RPE/Speichern gehören erst zu einer
   // tatsächlichen Session (Freestyle, Plan-Ausführung, Ausdauer).
-  const hideSessionFields = logMode === 'wall' || logMode === 'planned';
+  const hideSessionFields = logMode === 'wall' || logMode === 'planned' || logMode === 'warmup';
   await loadSessionPlans();
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Neue Session</h2><div class="sec-rule"></div></div>
@@ -502,6 +503,7 @@ async function renderLog() {
         <button type="button" class="chip ${logMode === 'planned' ? 'active' : ''}" data-log-mode="planned">Geplant</button>
         <button type="button" class="chip ${logMode === 'freestyle' ? 'active' : ''}" data-log-mode="freestyle">Freestyle</button>
         <button type="button" class="chip ${logMode === 'wall' ? 'active' : ''}" data-log-mode="wall">Ausdauer</button>
+        <button type="button" class="chip ${logMode === 'warmup' ? 'active' : ''}" data-log-mode="warmup">Warm-up</button>
       </div>`}
 
       <div id="log-builder-panel"></div>
@@ -573,7 +575,7 @@ async function renderLogHistory() {
   list.innerHTML = entries.length ? entries.map(([id, e]) => `
     <div class="log-item">
       <div class="top"><span>${esc(e.date)}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
-      ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>🧗 Ausdauer</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
+      ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>${e.type === 'warmup' ? '🔥 Warm-up' : '🧗 Ausdauer'}</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
       ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => `
         <div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>
       `).join('')}</div>` : ''}
@@ -844,14 +846,67 @@ async function finishWallSession() {
   };
 }
 
+/* ================================================================
+   WARM-UP (kein Timer/Sätze — nur Start/Stopp + optionaler Freitext, was
+   man gemacht hat. Bewusst so simpel wie möglich, da ein Aufwärmen keine
+   strukturierte Erfassung braucht. Speichert wie "An die Wand" direkt in
+   logs/{member}, sobald man nach dem Stopp auf Speichern tippt. */
+let warmup = { running: false, seconds: 0, intervalId: null, note: '' };
+
+function renderWarmupBuilder(holder) {
+  const canSave = !warmup.running && warmup.seconds > 0;
+  holder.innerHTML = `
+    <div class="timer-box">
+      <div class="big" id="warmup-big">${fmtMinSec(warmup.seconds)}</div>
+    </div>
+    <button type="button" class="btn" id="warmup-toggle" style="width:100%;margin-bottom:14px;">${warmup.running ? 'STOPP' : 'START'}</button>
+    ${canSave ? `
+      <div class="field"><label>Was hast du gemacht? (optional)</label><textarea id="warmup-note" placeholder="z. B. Rudergerät, Schulter-Mobilisation…">${esc(warmup.note)}</textarea></div>
+      <button type="button" class="btn" id="warmup-save" style="width:100%;">SPEICHERN</button>
+    ` : ''}
+  `;
+  document.getElementById('warmup-toggle').onclick = () => {
+    if (warmup.running) {
+      clearInterval(warmup.intervalId);
+      warmup.intervalId = null;
+      warmup.running = false;
+    } else {
+      warmup.running = true;
+      warmup.seconds = 0;
+      warmup.intervalId = setInterval(() => {
+        warmup.seconds++;
+        const big = document.getElementById('warmup-big');
+        if (big) big.textContent = fmtMinSec(warmup.seconds);
+      }, 1000);
+    }
+    renderWarmupBuilder(holder);
+  };
+  const noteEl = document.getElementById('warmup-note');
+  if (noteEl) noteEl.oninput = (e) => { warmup.note = e.target.value; };
+  const saveBtn = document.getElementById('warmup-save');
+  if (saveBtn) {
+    saveBtn.onclick = async () => {
+      const elapsedMin = Math.max(1, Math.round(warmup.seconds / 60));
+      const entry = { date: todayKey(), type: 'warmup', durationMin: elapsedMin, exercises: [], note: warmup.note.trim(), rpe: null, createdAt: Date.now() };
+      const id = await fbPush(`logs/${state.member.id}`, entry);
+      if (id) {
+        toast('Warm-up gespeichert.', 'ok');
+        warmup = { running: false, seconds: 0, intervalId: null, note: '' };
+        renderLog();
+      } else toast('Konnte nicht speichern.', 'err');
+    };
+  }
+}
+
 /* Kompakte Satz-Anzeige fürs Verlauf: geplante Einträge (fester Wert für
    alle Sätze) und Freestyle-Einträge (jeder Satz einzeln erfasst) sehen
    unterschiedlich aus, laufen aber in derselben Liste zusammen. */
 function fbExerciseSetsText(ex) {
+  const suffix = exerciseIsHold(ex.exerciseId) ? 's' : '';
   if (Array.isArray(ex.sets)) {
-    return ex.sets.map((s) => (s.weight !== '' && s.weight != null ? `${s.weight}kg×${s.reps}` : String(s.reps))).join(', ');
+    return ex.sets.map((s) => (s.weight !== '' && s.weight != null ? `${s.weight}kg×${s.reps}${suffix}` : `${s.reps}${suffix}`)).join(', ');
   }
-  return `${ex.sets}×${ex.reps}${ex.weight ? ' @ ' + ex.weight + 'kg' : ''}`;
+  return `${ex.sets}×${ex.reps}${suffix}${ex.weight ? ' @ ' + ex.weight + 'kg' : ''}`;
 }
 
 function renderLogBuilderPanel() {
@@ -860,6 +915,8 @@ function renderLogBuilderPanel() {
 
   if (logMode === 'wall') {
     renderWallBuilder(holder);
+  } else if (logMode === 'warmup') {
+    renderWarmupBuilder(holder);
   } else if (logMode === 'freestyle') {
     holder.innerHTML = `
       <div class="field">
@@ -1000,6 +1057,53 @@ function renderLogBuilderPanel() {
    herscrollen muss. Zeigt bei der aktiven Übung die Vergleichstabelle der
    letzten 3 Sessions plus (bei Plan-Ausführung) das geplante Ziel als
    Vorschlag in den Feldern an. */
+/* Pause-Timer zwischen Sätzen: startet automatisch, sobald der erste Satz
+   der Session geloggt wird, läuft aufwärts weiter und piepst alle 30s —
+   Hinweis, wie lange die Pause schon dauert, ohne dass man selbst die Zeit
+   im Auge behalten muss. Läuft unabhängig von der gerade aktiven Übung
+   (eine einzige, globale Pausenuhr), da die Pause zwischen Sätzen egal
+   welcher Übung dieselbe ist. */
+let fsRestTimer = { seconds: 0, intervalId: null };
+function updateFsRestTimerUI() {
+  const el = document.getElementById('fs-rest-timer');
+  if (!el) return;
+  el.hidden = false;
+  el.textContent = `PAUSE ${fmtMinSec(fsRestTimer.seconds)}`;
+}
+function startFsRestTimer() {
+  clearInterval(fsRestTimer.intervalId);
+  fsRestTimer.seconds = 0;
+  updateFsRestTimerUI();
+  fsRestTimer.intervalId = setInterval(() => {
+    fsRestTimer.seconds++;
+    updateFsRestTimerUI();
+    if (fsRestTimer.seconds % 30 === 0) beepStart();
+  }, 1000);
+}
+
+/* Halte-Timer für isometrische Übungen (Plank, Wall Sit, ...) — Start/
+   Stopp füllt die Haltedauer direkt als Sekunden ins Wdh.-Feld statt sie
+   erraten/mitzählen zu müssen. Eine einzige, modul-globale Uhr reicht, da
+   jeweils nur eine Übung gleichzeitig aktiv gehalten wird. */
+let fsHoldTimer = { seconds: 0, intervalId: null };
+function wireHoldTimerButton(btn, repsEl) {
+  btn.onclick = () => {
+    if (fsHoldTimer.intervalId) {
+      clearInterval(fsHoldTimer.intervalId);
+      fsHoldTimer.intervalId = null;
+      repsEl.value = String(fsHoldTimer.seconds);
+      btn.textContent = '⏱ Timer starten';
+    } else {
+      fsHoldTimer.seconds = 0;
+      btn.textContent = '⏱ 0:00 · Stopp';
+      fsHoldTimer.intervalId = setInterval(() => {
+        fsHoldTimer.seconds++;
+        btn.textContent = `⏱ ${fmtMinSec(fsHoldTimer.seconds)} · Stopp`;
+      }, 1000);
+    }
+  };
+}
+
 function renderFsPanel() {
   const holder = document.getElementById('fs-panel');
   if (!holder) return;
@@ -1012,7 +1116,12 @@ function renderFsPanel() {
   }
 
   const activeCardHtml = (g) => {
-    const last = lastValueForExercise(g.exerciseId);
+    const isHold = exerciseIsHold(g.exerciseId);
+    // Vorschlag fürs Feld: zuerst der zuletzt in DIESER Session geloggte
+    // Satz (damit ein zweiter, dritter... Satz nicht wieder den alten
+    // Session-übergreifenden Wert zeigt), erst wenn noch keiner erfasst
+    // wurde die Historie als Ausgangspunkt.
+    const last = g.sets.length ? g.sets[g.sets.length - 1] : lastValueForExercise(g.exerciseId);
     const targetText = g.targetReps != null
       ? `Ziel: ${g.targetSets}×${g.targetReps}${g.targetWeight ? ' @ ' + g.targetWeight + 'kg' : ''}`
       : '';
@@ -1022,33 +1131,49 @@ function renderFsPanel() {
         ${exerciseHistoryTableHtml(g.exerciseId)}
         <div class="field-row">
           <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
-          <div class="field"><label>Wdh.</label><input type="text" inputmode="numeric" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
+          <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
         </div>
+        ${isHold ? `<button type="button" class="btn ghost small" id="fs-hold-timer" style="width:100%;margin-bottom:8px;">⏱ Timer starten</button>` : ''}
         <button type="button" class="btn small" id="fs-add-set" style="width:100%;">+ Satz</button>
       </div>
     `;
   };
 
-  holder.innerHTML = builder.exercises.map((g, gi) => `
+  holder.innerHTML = `
+    <div class="fs-rest-timer mono" id="fs-rest-timer" hidden></div>
+    ${builder.exercises.map((g, gi) => `
     <div class="fs-group ${gi === builder.activeIndex ? 'active' : ''}" id="fs-group-${gi}">
       <div class="fs-group-head">
         <span data-activate="${gi}" style="cursor:pointer;">${esc(exerciseName(g.exerciseId))}</span>
-        ${logMode === 'freestyle' ? `<button type="button" class="ex-row-remove" data-remove-group="${gi}" title="Übung entfernen">×</button>` : ''}
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button type="button" class="ex-row-remove" data-info="${gi}" title="Info zur Übung">ℹ</button>
+          ${logMode === 'freestyle' ? `<button type="button" class="ex-row-remove" data-remove-group="${gi}" title="Übung entfernen">×</button>` : ''}
+        </div>
       </div>
+      ${g.infoOpen ? fsExerciseInfoHtml(g.exerciseId) : ''}
       ${g.sets.length ? g.sets.map((s, si) => `
         <div class="fs-set-row mono">
           <span>Satz ${si + 1}</span>
-          <span>${s.weight !== '' && s.weight != null ? esc(String(s.weight)) + 'kg × ' : ''}${esc(String(s.reps))}</span>
+          <input type="number" inputmode="decimal" step="0.5" class="ex-row-input" data-edit="${gi}:${si}:weight" value="${s.weight !== '' && s.weight != null ? esc(String(s.weight)) : ''}" placeholder="kg" title="Gewicht">
+          <input type="text" inputmode="numeric" class="ex-row-input" data-edit="${gi}:${si}:reps" value="${esc(String(s.reps))}" placeholder="${exerciseIsHold(g.exerciseId) ? 's' : 'Wdh'}" title="${exerciseIsHold(g.exerciseId) ? 'Dauer (s)' : 'Wiederholungen'}">
           <button type="button" class="ex-row-remove" data-remove-set="${gi}:${si}" title="Satz entfernen">×</button>
         </div>
       `).join('') : '<div class="fs-set-row mono" style="color:var(--ink-faint);">noch keine Sätze</div>'}
       ${gi === builder.activeIndex ? activeCardHtml(g) : ''}
     </div>
-  `).join('');
+  `).join('')}`;
+  updateFsRestTimerUI();
 
   holder.querySelectorAll('[data-activate]').forEach((el) => {
     el.onclick = () => {
       builder.activeIndex = Number(el.dataset.activate);
+      renderFsPanel();
+    };
+  });
+  holder.querySelectorAll('[data-info]').forEach((btn) => {
+    btn.onclick = () => {
+      const g = builder.exercises[Number(btn.dataset.info)];
+      g.infoOpen = !g.infoOpen;
       renderFsPanel();
     };
   });
@@ -1067,6 +1192,14 @@ function renderFsPanel() {
       renderFsPanel();
     };
   });
+  holder.querySelectorAll('[data-edit]').forEach((inp) => {
+    inp.oninput = () => {
+      const [gi, si, f] = inp.dataset.edit.split(':');
+      const set = builder.exercises[Number(gi)].sets[Number(si)];
+      set[f] = f === 'weight' ? (inp.value === '' ? '' : Number(inp.value)) : inp.value;
+      if (logMode === 'freestyle') saveDraft('freestyle', builder);
+    };
+  });
   const weightEl = document.getElementById('fs-weight');
   const repsEl = document.getElementById('fs-reps');
   if (weightEl) {
@@ -1074,13 +1207,21 @@ function renderFsPanel() {
     // müssen — man tippt hier ja gerade rein, weil man ihn ändern will.
     weightEl.onfocus = (e) => { e.target.value = ''; };
     repsEl.onfocus = (e) => { e.target.value = ''; };
-    document.getElementById('fs-add-set').onclick = () => {
+    const submitSet = () => {
       const reps = repsEl.value.trim();
       if (!reps) { toast('Wiederholungen eingeben.', 'err'); return; }
       const weightRaw = weightEl.value;
       builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps });
+      startFsRestTimer();
       renderFsPanel();
     };
+    // Enter auf dem Handy-Keyboard loggt den Satz direkt, ohne dass man
+    // extra den Button antippen muss.
+    weightEl.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submitSet(); } };
+    repsEl.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submitSet(); } };
+    document.getElementById('fs-add-set').onclick = submitSet;
+    const holdBtn = document.getElementById('fs-hold-timer');
+    if (holdBtn) wireHoldTimerButton(holdBtn, repsEl);
   }
 }
 
@@ -2702,6 +2843,22 @@ function muscleLabelsText(primary, secondary) {
   return s.length ? `${p.join(', ')} (+ ${s.join(', ')})` : p.join(', ');
 }
 
+/* "Info"-Aufklapper bei Freestyle/Plan-Ausführung: zeigt, was bei dieser
+   Übung wirklich zuverlässig bekannt ist (Zielmuskeln, gleicher Körper-
+   Umriss wie beim Fingerboard-Checkin) — bewusst keine selbst erfundenen
+   Ausführungshinweise, die im Zweifel falsch/gefährlich wären. */
+function fsExerciseInfoHtml(exerciseId) {
+  const muscles = exerciseMuscles(exerciseId);
+  const text = muscleLabelsText(muscles.primary, muscles.secondary);
+  if (!text) return '';
+  return `
+    <div class="fb-muscle-block">
+      ${bodyMapSvg(muscles.primary, muscles.secondary)}
+      <div class="fb-muscle-label mono">${esc(text)}</div>
+    </div>
+  `;
+}
+
 /* Kleines, unverzerrtes Board-Abbild mit einem Punkt an der Griffposition —
    zeigt auf einen Blick, welcher Griff für diesen Hang-Satz gemeint ist. */
 function miniBoardThumb(boardId, gripId, gripId2) {
@@ -3866,7 +4023,7 @@ function renderChallengeCard(id, c, now) {
   } else {
     title = LOG_TYPE_LABEL[c.sessionType] || esc(c.sessionType || 'Training');
     detail = c.durationMin
-      ? `<div class="ex core">🧗 Ausdauer · ${c.durationMin} Min.</div>`
+      ? `<div class="ex core">${c.sessionType === 'warmup' ? '🔥 Warm-up' : '🧗 Ausdauer'} · ${c.durationMin} Min.</div>`
       : (c.exercises || []).map((ex) => `<div class="ex core">${esc(exerciseName(ex.exerciseId))} · ${esc(fbExerciseSetsText(ex))}</div>`).join('');
   }
 

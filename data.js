@@ -202,12 +202,12 @@ const EXERCISE_LIBRARY = [
   { id: 'pallof', name: 'Pallof Press', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['obliques', 'abs'], secondary: [] } },
   { id: 'crunches', name: 'Crunches', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['abs'], secondary: [] } },
   { id: 'hanging_leg_raise', name: 'Hanging Leg Raise', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['abs'], secondary: ['obliques', 'forearms_front'] } },
-  { id: 'front_lever_prog', name: 'Front-Lever-Progression', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['lats', 'abs'], secondary: ['shoulders', 'forearms_front'] } },
+  { id: 'front_lever_prog', name: 'Front-Lever-Progression', category: 'rumpf', pauseFriendly: true, isHold: true, muscles: { primary: ['lats', 'abs'], secondary: ['shoulders', 'forearms_front'] } },
   { id: 'toes_to_bar', name: 'Toes-to-Bar', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['abs'], secondary: ['lats', 'forearms_front'] } },
-  { id: 'plank', name: 'Unterarmstütz (Plank)', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['abs'], secondary: ['obliques', 'shoulders'] } },
-  { id: 'side_plank', name: 'Seitstütz', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['obliques'], secondary: ['abs'] } },
+  { id: 'plank', name: 'Unterarmstütz (Plank)', category: 'rumpf', pauseFriendly: true, isHold: true, muscles: { primary: ['abs'], secondary: ['obliques', 'shoulders'] } },
+  { id: 'side_plank', name: 'Seitstütz', category: 'rumpf', pauseFriendly: true, isHold: true, muscles: { primary: ['obliques'], secondary: ['abs'] } },
   { id: 'russian_twist', name: 'Russian Twist', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['obliques'], secondary: ['abs'] } },
-  { id: 'hollow_hold', name: 'Hollow Body Hold', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['abs'], secondary: ['obliques'] } },
+  { id: 'hollow_hold', name: 'Hollow Body Hold', category: 'rumpf', pauseFriendly: true, isHold: true, muscles: { primary: ['abs'], secondary: ['obliques'] } },
   { id: 'superman', name: 'Superman', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['lower_back'], secondary: ['glutes'] } },
   { id: 'bird_dog', name: 'Bird Dog', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['lower_back', 'abs'], secondary: ['glutes'] } },
   { id: 'swimmer', name: 'Schwimmer', category: 'rumpf', pauseFriendly: true, muscles: { primary: ['lower_back'], secondary: ['glutes', 'shoulders'] } },
@@ -233,7 +233,7 @@ const EXERCISE_LIBRARY = [
   { id: 'calf_raise_machine', name: 'Wadenheben Maschine', category: 'beine', muscles: { primary: ['calves'], secondary: [] } },
   { id: 'calf_raise_seated', name: 'Wadenheben sitzend', category: 'beine', muscles: { primary: ['calves'], secondary: [] } },
   { id: 'tibialis_raise', name: 'Tibialis Raise', category: 'beine', pauseFriendly: true, muscles: { primary: ['shins'], secondary: [] } },
-  { id: 'wall_sit', name: 'Wall Sit', category: 'beine', pauseFriendly: true, muscles: { primary: ['quads'], secondary: [] } },
+  { id: 'wall_sit', name: 'Wall Sit', category: 'beine', pauseFriendly: true, isHold: true, muscles: { primary: ['quads'], secondary: [] } },
   { id: 'glute_bridge', name: 'Glute Bridge', category: 'beine', pauseFriendly: true, muscles: { primary: ['glutes'], secondary: ['hamstrings'] } },
   // Mobilität
   { id: 'cat_cow', name: 'Katze-Kuh', category: 'mobility', pauseFriendly: true, muscles: { primary: ['lower_back'], secondary: ['abs'] } },
@@ -267,6 +267,14 @@ function exerciseName(id) {
 function exerciseMuscles(id) {
   const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
   return (ex && ex.muscles) || { primary: [], secondary: [] };
+}
+
+/* Isometrische Halte-Übungen (Plank, Wall Sit, ...) — dort ist die Wdh.-
+   Zahl in Wirklichkeit eine Haltedauer in Sekunden, deshalb bekommen sie
+   im Log einen Timer statt eines reinen Zahlenfelds. */
+function exerciseIsHold(id) {
+  const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
+  return !!(ex && ex.isHold);
 }
 
 /* ---------- Trainingsplan-Vorlagen ----------
