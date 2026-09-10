@@ -405,6 +405,8 @@ button, input, select, textarea { font-family: inherit; }
   text-align: left; white-space: normal; transition: border-color .13s, color .13s, background .13s;
 }
 .ex-pick-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .1); }
+.ex-pick-sub { display: block; font-size: 10px; color: var(--ink-faint); margin-top: 2px; font-weight: 400; }
+.ex-pick-btn.active .ex-pick-sub { color: var(--accent); opacity: .75; }
 
 /* ---------- Toast ---------- */
 #toast-root { position: fixed; bottom: calc(76px + var(--safe-bottom)); left: 16px; right: 16px; z-index: 20; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
