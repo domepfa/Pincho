@@ -68,11 +68,58 @@ function exercisePickerGridHtml(list, selectedId) {
       </div>
     `).join('');
 }
+/* Lang drücken statt tippen zeigt Infos zur Übung (Ausführung, Zielmuskeln),
+   ohne sie schon auszuwählen — bei uneindeutigen Namen ("Rudern Kabel" vs.
+   "Rudern Langhantel") kann man so erst nachschauen, bevor man committet.
+   Setzt bei ausgelöstem Long-Press ein Flag, das der nachfolgende Klick
+   (der auf Touch-Geräten nach dem Loslassen trotzdem feuert) prüft, um die
+   normale Auswahl für DIESEN einen Tap zu überspringen. */
+function wireLongPress(el, onLongPress, holdMs = 480) {
+  let timer = null;
+  const start = () => { timer = setTimeout(() => { timer = null; el.dataset.longPressed = '1'; onLongPress(); }, holdMs); };
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  el.addEventListener('pointerdown', start);
+  el.addEventListener('pointerup', cancel);
+  el.addEventListener('pointercancel', cancel);
+  el.addEventListener('pointermove', cancel);
+}
+
+function ensureExerciseInfoSheet() {
+  let el = document.getElementById('exercise-info-sheet');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'exercise-info-sheet';
+    el.className = 'info-sheet-backdrop hidden';
+    document.body.appendChild(el);
+    el.onclick = (e) => { if (e.target === el) el.classList.add('hidden'); };
+  }
+  return el;
+}
+
+function showExerciseInfoSheet(exerciseId) {
+  const el = ensureExerciseInfoSheet();
+  const muscles = exerciseMuscles(exerciseId);
+  const muscleText = muscleLabelsText(muscles.primary, muscles.secondary);
+  const howTo = exerciseHowTo(exerciseId);
+  el.innerHTML = `
+    <div class="info-sheet-card">
+      <button type="button" class="info-sheet-close" id="info-sheet-close">✕</button>
+      <div class="info-sheet-title">${esc(exerciseName(exerciseId))}</div>
+      ${howTo ? `<div class="ex-howto">${esc(howTo)}</div>` : ''}
+      ${muscleText ? `<div class="fb-muscle-block">${bodyMapSvg(muscles.primary, muscles.secondary)}<div class="fb-muscle-label mono">${esc(muscleText)}</div></div>` : ''}
+    </div>
+  `;
+  el.classList.remove('hidden');
+  document.getElementById('info-sheet-close').onclick = () => el.classList.add('hidden');
+}
+
 function wireExercisePickerGrid(containerId, onSelect, scrollTargetId) {
   const holder = document.getElementById(containerId);
   if (!holder) return;
   holder.querySelectorAll('.ex-pick-btn').forEach((btn) => {
+    wireLongPress(btn, () => showExerciseInfoSheet(btn.dataset.exercise));
     btn.onclick = () => {
+      if (btn.dataset.longPressed === '1') { btn.dataset.longPressed = ''; return; }
       holder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
       onSelect(btn.dataset.exercise);
       if (scrollTargetId) {
@@ -1327,39 +1374,44 @@ function renderFsPanel() {
     return;
   }
 
-  const activeCardHtml = (g) => {
+  // Das Eingabefeld (Gewicht/Wdh. + Satz-Knopf) schwebt jetzt fest oben,
+  // statt in der Karte der jeweiligen Übung mitzuscrollen — sonst musste
+  // man bei einer langen Übungsliste (oder offener Tastatur, die den
+  // unteren Bildschirmteil frisst) erst zur richtigen Stelle zurück-
+  // scrollen, um überhaupt einen Satz eintragen zu können.
+  const floatingInputHtml = (g) => {
     const isHold = exerciseIsHold(g.exerciseId);
     // Vorschlag fürs Feld: zuerst der zuletzt in DIESER Session geloggte
     // Satz (damit ein zweiter, dritter... Satz nicht wieder den alten
     // Session-übergreifenden Wert zeigt), erst wenn noch keiner erfasst
     // wurde die Historie als Ausgangspunkt.
     const last = g.sets.length ? g.sets[g.sets.length - 1] : lastValueForExercise(g.exerciseId);
-    const targetText = g.targetReps != null
-      ? `Ziel: ${g.targetSets}×${g.targetReps}${g.targetWeight ? ' @ ' + g.targetWeight + 'kg' : ''}`
-      : '';
     return `
-      <div class="fs-active-card">
-        ${targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
-        ${exerciseHistoryTableHtml(g.exerciseId)}
-        <div class="field-row">
-          <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
-          <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
-        </div>
-        ${isHold ? `<button type="button" class="btn ghost small" id="fs-hold-timer" style="width:100%;margin-bottom:8px;">⏱ Timer starten</button>` : ''}
-        <button type="button" class="btn small" id="fs-add-set" style="width:100%;">+ Satz</button>
+      <div class="field-row">
+        <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
+        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
       </div>
+      ${isHold ? `<button type="button" class="btn ghost small" id="fs-hold-timer" style="width:100%;margin-bottom:8px;">⏱ Timer starten</button>` : ''}
+      <button type="button" class="btn small" id="fs-add-set" style="width:100%;">+ Satz</button>
     `;
   };
 
   const activeGroup = builder.exercises[builder.activeIndex];
   holder.innerHTML = `
     ${activeGroup ? `
-    <div class="fs-sticky-bar mono" id="fs-sticky-bar">
-      <span>▸ ${esc(exerciseName(activeGroup.exerciseId))}</span>
-      ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-sticky-add" style="flex-shrink:0;">+ Übung</button>` : ''}
+    <div class="fs-sticky-bar fs-sticky-input" id="fs-sticky-bar">
+      <div class="fs-sticky-head mono">
+        <span>▸ ${esc(exerciseName(activeGroup.exerciseId))}</span>
+        ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-sticky-add" style="flex-shrink:0;">+ Übung</button>` : ''}
+      </div>
+      ${floatingInputHtml(activeGroup)}
     </div>` : ''}
     <div class="fs-rest-timer mono" id="fs-rest-timer" hidden></div>
-    ${builder.exercises.map((g, gi) => `
+    ${builder.exercises.map((g, gi) => {
+      const targetText = g.targetReps != null
+        ? `Ziel: ${g.targetSets}×${g.targetReps}${g.targetWeight ? ' @ ' + g.targetWeight + 'kg' : ''}`
+        : '';
+      return `
     <div class="fs-group ${gi === builder.activeIndex ? 'active' : ''}" id="fs-group-${gi}">
       <div class="fs-group-head">
         <span data-activate="${gi}" style="cursor:pointer;">${esc(exerciseName(g.exerciseId))}</span>
@@ -1369,7 +1421,8 @@ function renderFsPanel() {
         </div>
       </div>
       ${g.infoOpen ? fsExerciseInfoHtml(g.exerciseId) : ''}
-      ${gi === builder.activeIndex ? activeCardHtml(g) : ''}
+      ${gi === builder.activeIndex && targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
+      ${gi === builder.activeIndex ? exerciseHistoryTableHtml(g.exerciseId) : ''}
       ${g.sets.length ? g.sets.map((s, si) => `
         <div class="fs-set-row mono">
           <span>Satz ${si + 1}</span>
@@ -1379,7 +1432,8 @@ function renderFsPanel() {
         </div>
       `).join('') : '<div class="fs-set-row mono" style="color:var(--ink-faint);">noch keine Sätze</div>'}
     </div>
-  `).join('')}`;
+  `;
+    }).join('')}`;
   updateFsRestTimerUI();
 
   const stickyBar = document.getElementById('fs-sticky-bar');
@@ -1448,6 +1502,12 @@ function renderFsPanel() {
       const reps = repsEl.value.trim();
       if (!reps) { toast('Wiederholungen eingeben.', 'err'); return; }
       const weightRaw = weightEl.value;
+      // Feld VOR dem Neu-Rendern aktiv verlassen (Tastatur zu) — sonst
+      // entscheidet auf Android manchmal die virtuelle Tastatur selbst,
+      // wohin der Fokus springt, sobald das fokussierte Element beim
+      // Re-Render verschwindet (z. B. zurück auf einen älteren Satz).
+      weightEl.blur();
+      repsEl.blur();
       builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps });
       startFsRestTimer();
       renderFsPanel();
@@ -3101,9 +3161,11 @@ function muscleLabelsText(primary, secondary) {
 function fsExerciseInfoHtml(exerciseId) {
   const muscles = exerciseMuscles(exerciseId);
   const text = muscleLabelsText(muscles.primary, muscles.secondary);
+  const howTo = exerciseHowTo(exerciseId);
   const note = exerciseSettings[exerciseId] || '';
   return `
     <div class="fb-muscle-block">
+      ${howTo ? `<div class="ex-howto">${esc(howTo)}</div>` : ''}
       ${text ? bodyMapSvg(muscles.primary, muscles.secondary) : ''}
       ${text ? `<div class="fb-muscle-label mono">${esc(text)}</div>` : ''}
       <div class="field" style="margin-top:8px;">

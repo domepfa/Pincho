@@ -255,7 +255,6 @@ button, input, select, textarea { font-family: inherit; }
 .ex-row-step { flex-shrink: 0; background: none; border: 1px solid var(--accent); color: var(--accent); width: 22px; height: 22px; line-height: 1; cursor: pointer; font-size: 13px; }
 
 /* ---------- Log: Freestyle (Übung wählen, Satz für Satz erfassen) ---------- */
-.fs-active-card { background: var(--surface-2); border: 1px solid var(--line); padding: 12px; margin-bottom: 14px; }
 .fs-last-value { font-size: 11.5px; color: var(--accent); margin: 2px 0 10px; }
 .fs-target-value { font-size: 11.5px; color: var(--ink-dim); margin: 2px 0 6px; }
 .hist-table-label { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 6px; }
@@ -268,11 +267,15 @@ button, input, select, textarea { font-family: inherit; }
 .hist-table td:nth-child(2), .hist-table th:nth-child(2) { color: var(--accent); }
 .fs-sticky-bar {
   position: sticky; z-index: 4;
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  background: var(--surface-2); border: 1px solid var(--accent); padding: 8px 12px;
-  margin-bottom: 12px; font-size: 12.5px; color: var(--ink); font-weight: 600;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, .35);
+  background: var(--surface-2); border: 1px solid var(--accent); padding: 10px 12px 12px;
+  margin-bottom: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
 }
+.fs-sticky-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: 12.5px; color: var(--ink); font-weight: 600; margin-bottom: 8px;
+}
+.fs-sticky-input .field label { color: var(--ink); font-weight: 600; }
+.fs-sticky-input #fs-add-set { margin-top: 2px; }
 .fs-group { border: 1px solid var(--line); padding: 8px 10px; margin-bottom: 8px; }
 .fs-group.active { border-color: var(--accent); }
 .fs-group-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--ink); margin-bottom: 4px; }
@@ -285,7 +288,6 @@ button, input, select, textarea { font-family: inherit; }
 /* Gewicht/Wdh: die Beschriftung (was trage ich hier ein) soll auffallen,
    nicht primär die Zahl selbst — Label darum hell statt im sonst üblichen
    gedämpften Feld-Label-Grau, Zahl bewusst kleiner als vorher. */
-.fs-active-card .field label { color: var(--ink); font-weight: 600; }
 #fs-weight, #fs-reps {
   font-family: 'Bebas Neue', sans-serif; font-size: 19px; letter-spacing: .02em;
   color: var(--ink); text-align: center;
@@ -434,6 +436,28 @@ button, input, select, textarea { font-family: inherit; }
   overflow: hidden;
 }
 .fb-overlay.hidden { display: none; }
+
+/* ---------- Übungsinfo-Sheet (lang drücken auf eine Übung im Raster) ---------- */
+.info-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(0, 0, 0, .6);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.info-sheet-backdrop.hidden { display: none; }
+.info-sheet-card {
+  position: relative; width: 100%; max-width: 480px;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding: 20px 18px calc(20px + var(--safe-bottom));
+  max-height: 80vh; overflow-y: auto;
+  animation: riseIn .22s ease both;
+}
+.info-sheet-close {
+  position: absolute; top: 12px; right: 12px;
+  background: none; border: 1px solid var(--line); color: var(--ink-faint);
+  width: 30px; height: 30px; font-size: 14px; line-height: 1; cursor: pointer;
+}
+.info-sheet-title { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: .02em; margin-bottom: 10px; padding-right: 36px; }
+.ex-howto { font-size: 13px; color: var(--ink-dim); line-height: 1.5; margin-bottom: 12px; }
 .fb-overlay-close {
   position: absolute; top: calc(14px + var(--safe-top)); right: 16px; z-index: 2;
   background: none; border: 1px solid var(--line); color: var(--ink-faint);
