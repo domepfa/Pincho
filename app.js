@@ -708,20 +708,25 @@ async function renderLog() {
     const builder = logMode === 'execute' ? planExecution : freestyleBuilder;
     const rawExercises = builder.exercises.filter((g) => g.sets.length);
     if (!rawExercises.length) { toast('Noch keine Sätze erfasst.', 'err'); return; }
+    // Gesamtdauer/Arbeitszeit werden auf dem Eintrag selbst gespeichert
+    // (nicht nur kurz als Toast gezeigt), damit sie später auch auf der
+    // Verlaufskarte sichtbar bleiben.
+    const totalWorkSec = rawExercises.reduce((sum, g) => sum + g.sets.reduce((s, set) => s + (set.elapsedSec || 0), 0), 0);
+    const totalSessionSec = builder.sessionStartedAt ? Math.round((Date.now() - builder.sessionStartedAt) / 1000) : totalWorkSec;
     const entry = {
       date: document.getElementById('log-date').value || todayKey(),
       type: hideTypeField ? 'gym' : document.getElementById('log-type').value,
       exercises: rawExercises.map((g) => ({ exerciseId: g.exerciseId, sets: g.sets })),
       note: document.getElementById('log-note').value.trim(),
       rpe: document.getElementById('log-rpe').value || null,
+      totalWorkSec,
+      totalSessionSec,
       createdAt: Date.now(),
     };
     const id = await fbPush(`logs/${state.member.id}`, entry);
     if (id) {
       stopAllFsTimers();
-      const totalWorkSec = rawExercises.reduce((sum, g) => sum + g.sets.reduce((s, set) => s + (set.elapsedSec || 0), 0), 0);
-      const totalSessionSec = builder.sessionStartedAt ? Math.round((Date.now() - builder.sessionStartedAt) / 1000) : totalWorkSec;
-      toast(`Session gespeichert · ${fmtMinSec(totalSessionSec)} gesamt, ${fmtMinSec(totalWorkSec)} Arbeitszeit.`, 'ok');
+      toast('Session gespeichert.', 'ok');
       if (logMode === 'execute') {
         // Der Plan selbst bleibt erhalten (wie eine Fingerboard-Vorlage) —
         // nur die gerade laufende Ausführung wird zurückgesetzt.
@@ -755,6 +760,7 @@ async function renderLogHistory() {
     <div class="log-item">
       <div class="top"><span>${esc(e.date)}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
       ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>${sessionTypeIconLabel(e.type)}</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
+      ${e.totalSessionSec ? `<div class="ex-log-list"><div class="ex-log-row"><span>⏱ Zeit</span><span class="mono">${fmtMinSec(e.totalSessionSec)} gesamt · ${fmtMinSec(e.totalWorkSec || 0)} Arbeit</span></div></div>` : ''}
       ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => `
         <div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>
       `).join('')}</div>` : ''}
@@ -1377,9 +1383,9 @@ function renderLogBuilderPanel() {
         })),
       };
       logMode = 'execute';
-      fsPhase = 'working';
+      fsPhase = 'idle';
       stopFsRestTimer();
-      startFsWorkTimer();
+      stopFsWorkTimer();
       renderLog();
     };
   }
@@ -1396,12 +1402,17 @@ function renderLogBuilderPanel() {
 /* Satz-Ablauf als kleine Phasenmaschine, für JEDE Übung gleich (nicht nur
    Isoholds — auch ein normaler Reps-Satz hat eine Dauer, die man
    nebenbei sehen kann; bei Halte-Übungen IST die gestoppte Zeit direkt
-   der Wdh.-Wert):
+   der Wdh.-Wert, nicht extra einzutippen):
+   'idle' → Übung ist gewählt, Uhr steht noch — erst "Start" antippen
+            startet die Arbeits-Stoppuhr (Zeit zum Einrichten an der
+            Übung, bevor die Zeit mitläuft).
    'working' → Arbeits-Stoppuhr läuft, "Satz beenden" stoppt sie
-   'entering' → Gewicht/Wdh. eintragen (gestoppte Dauer wird angezeigt,
-                per Knopf optional als Wdh. übernehmbar), "Satz speichern"
+   'entering' → Gewicht/Wdh. eintragen (gestoppte Dauer wird angezeigt und
+                bei Halte-Übungen direkt als Wdh.-Wert vorausgefüllt),
+                "Satz speichern"
    'resting' → Pausenstoppuhr läuft (30s-Piepton), "Nächster Satz" startet
-               wieder die Arbeits-Stoppuhr für den nächsten Durchgang.
+               direkt wieder die Arbeits-Stoppuhr (kein erneuter Start-
+               Knopf nötig, man bleibt ja an derselben Übung).
    Eine einzige, modul-globale Phase/Uhr reicht, da jeweils nur eine
    Übung gleichzeitig aktiv ist. */
 let fsPhase = 'working';
@@ -1454,15 +1465,15 @@ function stopAllFsTimers() {
   stopFsRestTimer();
 }
 
-/* Eine neue oder bereits vorhandene Übung wird aktiv: Phase & Arbeits-
-   Stoppuhr starten immer bei null neu — ein Wechsel bedeutet "ich arbeite
-   jetzt an dieser Übung", unabhängig davon, in welcher Phase die vorher
-   aktive Übung gerade war. */
+/* Eine neue oder bereits vorhandene Übung wird aktiv: erstmal nur die
+   Phase auf 'idle' setzen (Stoppuhr steht still) — die Uhr läuft nicht
+   automatisch los, sondern erst nachdem man bewusst "Start" antippt. So
+   bleibt Zeit, sich an der Übung einzurichten, bevor die Zeit mitläuft. */
 function activateFsGroup(builder, idx) {
   builder.activeIndex = idx;
-  fsPhase = 'working';
+  fsPhase = 'idle';
   stopFsRestTimer();
-  startFsWorkTimer();
+  stopFsWorkTimer();
   renderFsPanel();
 }
 
@@ -1514,6 +1525,9 @@ function renderFsPanel() {
   // zu 'working' für den nächsten Satz.
   const floatingInputHtml = (g) => {
     const isHold = exerciseIsHold(g.exerciseId);
+    if (fsPhase === 'idle') {
+      return `<button type="button" class="btn small" id="fs-start-set" style="width:100%;">▶ Start</button>`;
+    }
     if (fsPhase === 'working') {
       return `
         <div class="fs-work-timer mono" id="fs-work-timer">${fmtMinSec(fsWorkTimer.seconds)}</div>
@@ -1533,13 +1547,16 @@ function renderFsPanel() {
     // bewusst leer — der Vorschlag käme sonst von einem alten Satz, der
     // mit der gerade gestoppten Dauer nichts zu tun hat.
     const last = g.sets.length ? g.sets[g.sets.length - 1] : lastValueForExercise(g.exerciseId);
+    // Bei Isohold-Übungen IST die gestoppte Dauer die Angabe — die wird
+    // direkt übernommen statt sie erst manuell als "Wiederholung" abtippen
+    // oder per Extra-Knopf umdeuten zu müssen. Sekunden sind eine Zeit,
+    // keine Wiederholung.
     return `
       <div class="fs-captured-duration mono">Dauer: ${fmtMinSec(fsCapturedElapsed)}</div>
       <div class="field-row">
         <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" enterkeyhint="next" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
-        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" value=""></div>
+        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" value="${isHold ? fsCapturedElapsed : ''}"></div>
       </div>
-      <button type="button" class="btn ghost small" id="fs-use-duration" style="width:100%;margin-bottom:8px;">Als Wdh. übernehmen</button>
       <button type="button" class="btn small" id="fs-add-set" style="width:100%;">Satz speichern</button>
     `;
   };
@@ -1594,6 +1611,14 @@ function renderFsPanel() {
         document.getElementById('fs-exercise-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       };
     }
+  }
+  const startSetBtn = document.getElementById('fs-start-set');
+  if (startSetBtn) {
+    startSetBtn.onclick = () => {
+      fsPhase = 'working';
+      startFsWorkTimer();
+      renderFsPanel();
+    };
   }
   const endSetBtn = document.getElementById('fs-end-set');
   if (endSetBtn) {
@@ -1690,8 +1715,6 @@ function renderFsPanel() {
     weightEl.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); repsEl.focus(); } };
     repsEl.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submitSet(); } };
     document.getElementById('fs-add-set').onclick = submitSet;
-    const useDurationBtn = document.getElementById('fs-use-duration');
-    if (useDurationBtn) useDurationBtn.onclick = () => { repsEl.value = String(fsCapturedElapsed); };
   }
 }
 
