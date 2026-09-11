@@ -1048,6 +1048,17 @@ function tickWall() {
     beep(1318, 300);
     wall.blockIndex++;
     if (wall.blockIndex >= wallBlocks.length) { finishWallSession(); return; }
+    // Ring der EBEN beendeten Phase soll sich noch sichtbar ganz schliessen,
+    // statt (wie bisher) direkt vom nächsten Block mit frischem, offenem
+    // Ring überschrieben zu werden — zwei Animationsframes Vorlauf geben
+    // dem Browser die Chance, den geschlossenen Ring tatsächlich zu malen,
+    // bevor renderWallOverlay() alles neu aufbaut.
+    const ring = document.getElementById('wall-ring-fg');
+    if (ring) {
+      ring.style.strokeDashoffset = '0';
+      requestAnimationFrame(() => requestAnimationFrame(beginWallBlock));
+      return;
+    }
     beginWallBlock();
     return;
   }
@@ -4053,16 +4064,18 @@ function beep(freq, duration) {
      Countdown (letzte 3 von 5 Sekunden) als auch am Ende einer Pause
      (letzte 3 Sekunden), damit man auch ohne hinzuschauen merkt, dass es
      gleich weitergeht.
-   - beepStart()/beepEnd(): ein einzelner, langer Ton für den tatsächlichen
-     Wechsel Hang↔Pause. Bewusst derselbe Klang für beide — der Kontext
-     (Countdown davor bzw. laufender Hang) macht schon eindeutig, was
-     gerade passiert, und ein einheitliches "Bing" wirkt klarer als zwei
-     ähnlich lange Töne, die man ohnehin kaum unterscheiden könnte. */
+   - beepStart()/beepEnd(): der Wechsel Hang↔Pause. "Start" ist der
+     wichtigste Moment (jetzt sofort losgreifen/loslegen) und bekam bisher
+     denselben Ton wie "Ende" — im Trainingslärm/ohne hinzuschauen kaum
+     auseinanderzuhalten. Start ist jetzt ein höherer, aufsteigender
+     Doppelton (klar als "Los!" erkennbar), Ende bleibt der bisherige
+     einzelne, tiefere Ton (bewusst "ruhiger" für die Pause). */
 function beepTick() {
   beep(1400, 90);
 }
 function beepStart() {
-  beep(1046, 380);
+  beep(1568, 110);
+  setTimeout(() => beep(1976, 170), 130);
 }
 function beepEnd() {
   beep(1046, 380);
@@ -4250,6 +4263,20 @@ function tickBlock() {
     // ist Zeit fürs Check-in, ohne den Ablauf zu unterbrechen: es läuft
     // nebenher während der ohnehin schon geplanten Erholung.
     if (!isWorkPhase(newStep) && fb.stepIndex === fb.sequence.length - 1) openBlockCheckin();
+    // Ring der EBEN beendeten Phase soll sich noch sichtbar ganz schliessen,
+    // statt (wie bisher) direkt auf den offenen Ring der neuen Phase zu
+    // springen — Zustand (Sekunden, Schritt, Signalton, Check-in) bleibt
+    // bewusst synchron/sofort wie eh und je, u. a. weil Tests und Zurück/
+    // Weiter/Pause auf sofortige, deterministische Übergänge angewiesen
+    // sind. Nur der abschliessende Render-Aufruf bekommt zwei Animations-
+    // frames Vorlauf, in denen der Browser den geschlossenen Ring wirklich
+    // zeichnen kann, bevor er auf den offenen Ring der neuen Phase springt.
+    const ring = document.getElementById('fb-ring-fg');
+    if (ring) {
+      ring.style.strokeDashoffset = '0';
+      requestAnimationFrame(() => requestAnimationFrame(updateTimerUI));
+      return;
+    }
   } else if (step && !isWorkPhase(step) && fb.secondsLeft <= 3) {
     // Letzte 3 Sekunden einer Pause: kurzer Tick pro Sekunde als
     // akustische Vorwarnung, dass der nächste Satz gleich losgeht.
