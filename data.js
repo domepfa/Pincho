@@ -246,6 +246,42 @@ const EXERCISE_LIBRARY = [
   { id: 'ankle_rocks', name: 'Sprunggelenk-Mobilisation', category: 'mobility', pauseFriendly: true, howTo: 'Im Ausfallschritt das vordere Knie kontrolliert über die Fussspitze nach vorne bewegen.', muscles: { primary: ['calves'], secondary: [] } },
   { id: 'neck_mobility', name: 'Nacken-Mobilisation', category: 'mobility', pauseFriendly: true, howTo: 'Kopf langsam nicken, drehen und seitlich neigen, keine ruckartigen Bewegungen.', muscles: { primary: ['neck_traps'], secondary: [] } },
   { id: 'doorway_pec_stretch', name: 'Türrahmen-Dehnung Brust', category: 'mobility', pauseFriendly: true, howTo: 'Unterarm am Türrahmen, Oberkörper leicht nach vorne drehen, bis eine Dehnung in der Brust spürbar ist.', muscles: { primary: ['chest'], secondary: ['shoulders'] } },
+  // Arm
+  { id: 'bicep_curl_dumbbell', name: 'Bizeps-Curl Kurzhantel', category: 'arm', howTo: 'Oberarme fixiert am Körper, Hanteln zur Schulter hochcurlen, kontrolliert absenken.', muscles: { primary: ['biceps'], secondary: ['forearms_front'] } },
+  { id: 'bicep_curl_barbell', name: 'Bizeps-Curl Langhantel', category: 'arm', howTo: 'Schulterbreiter Griff, Stange kontrolliert hochcurlen, Ellbogen bleiben am Körper.', muscles: { primary: ['biceps'], secondary: ['forearms_front'] } },
+  { id: 'hammer_curl', name: 'Hammer-Curl', category: 'arm', howTo: 'Neutraler Griff (Handflächen zueinander), Hanteln hochcurlen, kontrolliert absenken.', muscles: { primary: ['biceps'], secondary: ['forearms_front'] } },
+  { id: 'cable_curl', name: 'Bizeps-Curl Kabel', category: 'arm', howTo: 'Am Kabelzug stehend, Stange/Griff kontrolliert hochcurlen, Ellbogen fixiert.', muscles: { primary: ['biceps'], secondary: ['forearms_front'] } },
+  { id: 'close_grip_bench_press', name: 'Enges Bankdrücken', category: 'arm', howTo: 'Schulterbreiter oder engerer Griff, Stange zur unteren Brust absenken, Ellbogen nah am Körper drücken.', muscles: { primary: ['triceps'], secondary: ['chest'] } },
+  { id: 'skull_crusher', name: 'French Press (Skullcrusher)', category: 'arm', howTo: 'Rückenlage, Stange/Kurzhanteln Richtung Stirn absenken, nur im Ellbogen beugen, dann strecken.', muscles: { primary: ['triceps'], secondary: [] } },
+  { id: 'lateral_raise', name: 'Seitheben', category: 'arm', howTo: 'Leicht gebeugte Arme seitlich bis Schulterhöhe anheben, kontrolliert absenken.', muscles: { primary: ['shoulders'], secondary: [] } },
+  { id: 'front_raise', name: 'Frontheben', category: 'arm', howTo: 'Hantel(n) mit leicht gebeugten Armen nach vorne bis Schulterhöhe anheben, kontrolliert absenken.', muscles: { primary: ['shoulders'], secondary: [] } },
+  { id: 'wrist_curl', name: 'Handgelenk-Curl', category: 'arm', howTo: 'Unterarm aufgelegt, Handfläche nach oben, Handgelenk beugen und strecken.', muscles: { primary: ['forearms_front'], secondary: [] } },
+  // Brust
+  { id: 'decline_bench_press', name: 'Negativ-Bankdrücken', category: 'push', howTo: 'Bank nach unten geneigt, Stange zur unteren Brust absenken, kontrolliert nach oben drücken.', muscles: { primary: ['chest'], secondary: ['triceps', 'shoulders'] } },
+  { id: 'dumbbell_bench_press', name: 'Kurzhantel-Bankdrücken', category: 'push', howTo: 'Rückenlage, Kurzhanteln zur Brust absenken, kontrolliert nach oben drücken.', muscles: { primary: ['chest'], secondary: ['triceps', 'shoulders'] } },
+  { id: 'dumbbell_flyes', name: 'Kurzhantel-Fliegende', category: 'push', howTo: 'Rückenlage, Arme leicht gebeugt seitlich absenken, dann in einem Bogen über der Brust zusammenführen.', muscles: { primary: ['chest'], secondary: ['shoulders'] } },
+  { id: 'cable_crossover', name: 'Kabelzug Crossover', category: 'push', howTo: 'Kabel von oben/aussen kommend vor dem Körper zusammenführen, Bewegung kontrolliert zurückführen.', muscles: { primary: ['chest'], secondary: ['shoulders'] } },
+  { id: 'dumbbell_pullover', name: 'Kurzhantel-Pullover', category: 'push', howTo: 'Rückenlage quer zur Bank, Hantel mit gestreckten Armen hinter den Kopf absenken, zur Brust zurückführen.', muscles: { primary: ['chest'], secondary: ['lats', 'triceps'] } },
+  // Rücken
+  { id: 'pullup_close_grip', name: 'Klimmzug enger Griff', category: 'zug', howTo: 'Enger Untergriff, Körper ruhig, bis Kinn über die Stange ziehen, kontrolliert ablassen.', muscles: { primary: ['lats'], secondary: ['biceps', 'forearms_front'] } },
+  { id: 'deadlift_sumo', name: 'Kreuzheben Sumo', category: 'beine', howTo: 'Breiter Stand, Hände innerhalb der Beine, Rücken gerade, aus Hüfte und Beinen aufrichten.', muscles: { primary: ['hamstrings', 'glutes'], secondary: ['lower_back'] } },
+  { id: 't_bar_row', name: 'T-Bar Rudern', category: 'zug', howTo: 'Oberkörper vorgebeugt, Griff zum Bauch ziehen, Rücken bleibt gerade.', muscles: { primary: ['lats', 'traps'], secondary: ['biceps', 'lower_back'] } },
+  { id: 'lat_pulldown_wide', name: 'Latzug weiter Griff', category: 'zug', howTo: 'Sehr breiter Obergriff, Stange kontrolliert zur oberen Brust ziehen, Schulterblätter nach unten.', muscles: { primary: ['lats'], secondary: ['biceps', 'rear_delts'] } },
+  { id: 'straight_arm_pulldown', name: 'Latzug gestreckte Arme', category: 'zug', howTo: 'Gestreckte Arme, Stange aus Schulterhöhe kontrolliert zu den Oberschenkeln drücken.', muscles: { primary: ['lats'], secondary: ['abs'] } },
+  // Rumpf
+  { id: 'ab_wheel_rollout', name: 'Ab-Roller', category: 'rumpf', howTo: 'Kniend, Rad kontrolliert nach vorne rollen bis kurz vor die Streckgrenze, dann zurückziehen.', muscles: { primary: ['abs'], secondary: ['obliques', 'shoulders'] } },
+  { id: 'cable_woodchop', name: 'Cable Woodchop', category: 'rumpf', howTo: 'Seitlich zum Kabelzug, Griff diagonal von oben nach unten (oder umgekehrt) über den Körper ziehen.', muscles: { primary: ['obliques'], secondary: ['abs'] } },
+  { id: 'dead_bug', name: 'Dead Bug', category: 'rumpf', pauseFriendly: true, howTo: 'Rückenlage, Arme und Beine angewinkelt, gegenüberliegenden Arm und Bein langsam ausstrecken.', muscles: { primary: ['abs'], secondary: ['lower_back'] } },
+  { id: 'mountain_climbers', name: 'Mountain Climbers', category: 'rumpf', pauseFriendly: true, howTo: 'Liegestütz-Position, Knie abwechselnd zügig Richtung Brust ziehen.', muscles: { primary: ['abs'], secondary: ['shoulders'] } },
+  { id: 'sit_up', name: 'Sit-up', category: 'rumpf', pauseFriendly: true, howTo: 'Rückenlage, Füsse fixiert, Oberkörper mit angespanntem Bauch komplett aufrichten.', muscles: { primary: ['abs'], secondary: [] } },
+  // Hüfte/Beine
+  { id: 'hip_thrust', name: 'Hüftstoss (Hip Thrust)', category: 'beine', howTo: 'Oberer Rücken auf einer Bank abgestützt, Hüfte mit Gewicht auf dem Becken nach oben drücken, Gesäss oben anspannen.', muscles: { primary: ['glutes'], secondary: ['hamstrings'] } },
+  { id: 'leg_press', name: 'Beinpresse', category: 'beine', howTo: 'Füsse schulterbreit auf der Platte, Beine beugen bis ca. 90°, dann kontrolliert strecken.', muscles: { primary: ['quads'], secondary: ['glutes', 'hamstrings'] } },
+  { id: 'lunge_dumbbell', name: 'Ausfallschritte Kurzhantel', category: 'beine', howTo: 'Grosser Schritt nach vorne, hinteres Knie Richtung Boden absenken, zurück in den Stand drücken.', muscles: { primary: ['quads'], secondary: ['glutes'] } },
+  { id: 'goblet_squat', name: 'Goblet Squat', category: 'beine', howTo: 'Gewicht vor der Brust gehalten, Kniebeuge bis Oberschenkel mindestens parallel zum Boden.', muscles: { primary: ['quads'], secondary: ['glutes'] } },
+  { id: 'sumo_squat', name: 'Sumo-Kniebeuge', category: 'beine', howTo: 'Breiter Stand, Fussspitzen nach aussen, Hüfte gerade nach unten absenken, Knie in Fussrichtung.', muscles: { primary: ['quads'], secondary: ['glutes', 'hamstrings'] } },
+  { id: 'step_up', name: 'Step-ups', category: 'beine', howTo: 'Auf eine erhöhte Fläche steigen, oben durchstrecken, kontrolliert zurück nach unten.', muscles: { primary: ['quads'], secondary: ['glutes'] } },
+  { id: 'nordic_hamstring_curl', name: 'Nordic Hamstring Curl', category: 'beine', howTo: 'Knieend, Füsse fixiert, Oberkörper so weit wie möglich kontrolliert nach vorne absenken, mit den Beinen abbremsen.', muscles: { primary: ['hamstrings'], secondary: ['glutes'] } },
 ];
 
 const ACCESSORY_EXERCISES = EXERCISE_LIBRARY.filter((e) => e.pauseFriendly);

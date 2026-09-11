@@ -79,7 +79,40 @@ function clickableBodyMapSvg(activeSupergroup) {
   `;
 }
 
-function exercisePickerBodyHtml(list, selectedId, sg) {
+/* Die letzten 10 TATSÄCHLICH geloggten Übungen dieser Körperregion (aus
+   state.logs, das ist schon neueste zuerst sortiert), ohne Duplikate —
+   Grundlage für die kompakte Vorauswahl unter dem Körperbild. */
+function recentExerciseIdsForSupergroup(sg, limit) {
+  const seen = new Set();
+  const ids = [];
+  for (const entry of state.logs) {
+    if (!entry.exercises) continue;
+    for (const ex of entry.exercises) {
+      if (seen.has(ex.exerciseId)) continue;
+      const libEx = EXERCISE_LIBRARY.find((e) => e.id === ex.exerciseId);
+      if (!libEx || exerciseSupergroup(libEx) !== sg) continue;
+      seen.add(ex.exerciseId);
+      ids.push(ex.exerciseId);
+      if (ids.length >= limit) return ids;
+    }
+  }
+  return ids;
+}
+
+function exercisePickerBodyHtml(list, selectedId, sg, useRecents, showAll) {
+  const groupList = sg ? list.filter((e) => exerciseSupergroup(e) === sg) : [];
+  let visibleList = groupList;
+  let showAllToggle = false;
+  if (sg && useRecents && !showAll) {
+    const recentIds = recentExerciseIdsForSupergroup(sg, 10);
+    if (recentIds.length) {
+      visibleList = groupList.filter((e) => recentIds.includes(e.id));
+      showAllToggle = groupList.length > visibleList.length;
+    }
+    // Noch keine geloggte Übung dieser Region — dann direkt die volle
+    // Liste zeigen, sonst stünde man vor einer leeren Auswahl.
+  }
+  visibleList = visibleList.slice().sort((a, b) => a.name.localeCompare(b.name, 'de'));
   return `
     ${clickableBodyMapSvg(sg)}
     <div class="chip-row ex-supergroup-row">
@@ -88,10 +121,11 @@ function exercisePickerBodyHtml(list, selectedId, sg) {
       `).join('')}
     </div>
     <div class="ex-pick-grid">
-      ${sg ? list.filter((e) => exerciseSupergroup(e) === sg).sort((a, b) => a.name.localeCompare(b.name, 'de')).map((e) => `
+      ${sg ? visibleList.map((e) => `
         <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">${esc(e.name)}</button>
       `).join('') : '<p class="login-hint">Körperbereich oben antippen, um Übungen zu sehen.</p>'}
     </div>
+    ${showAllToggle ? `<button type="button" class="btn ghost small" id="ex-show-all" style="width:100%;margin-top:6px;">Alle anzeigen (${groupList.length})</button>` : ''}
   `;
 }
 /* Lang drücken statt tippen zeigt Infos zur Übung (Ausführung, Zielmuskeln),
@@ -143,7 +177,7 @@ function showExerciseInfoSheet(exerciseId) {
    früher (getrennte HTML-Erzeugung + Verdrahtung) muss diese Funktion beim
    Wechsel der Körperregion sich selbst neu aufrufen können, da sich dabei
    die sichtbare Übungsliste komplett ändert. */
-function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, scrollTargetId) {
+function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, scrollTargetId, useRecents = true) {
   const holder = document.getElementById(containerId);
   if (!holder) return;
   let selectedId = initialSelectedId;
@@ -151,12 +185,15 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
   // (das ist oft nur ein nie benutzter Default-Wert, kein echter Vorwahl)
   // schon eine Körperregion aufzuklappen — man soll erst bewusst antippen.
   let sg = '';
+  let showAll = false;
 
   const render = () => {
-    holder.innerHTML = exercisePickerBodyHtml(list, selectedId, sg);
+    holder.innerHTML = exercisePickerBodyHtml(list, selectedId, sg, useRecents, showAll);
     holder.querySelectorAll('[data-supergroup-btn], .body-zone').forEach((el) => {
-      el.onclick = () => { sg = el.dataset.supergroup || el.dataset.supergroupBtn; render(); };
+      el.onclick = () => { sg = el.dataset.supergroup || el.dataset.supergroupBtn; showAll = false; render(); };
     });
+    const showAllBtn = document.getElementById('ex-show-all');
+    if (showAllBtn) showAllBtn.onclick = () => { showAll = true; render(); };
     holder.querySelectorAll('.ex-pick-btn').forEach((btn) => {
       wireLongPress(btn, () => showExerciseInfoSheet(btn.dataset.exercise));
       btn.onclick = () => {
@@ -481,7 +518,7 @@ let logPickerExerciseId = EXERCISE_LIBRARY[0].id;
    erst beim Speichern wird daraus ein Log-Eintrag. exercises: Liste von
    {exerciseId, sets: [{weight, reps}, ...]} in der Reihenfolge, in der die
    Übungen zum ersten Mal gewählt wurden. */
-let freestyleBuilder = loadDraft('freestyle') || { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id };
+let freestyleBuilder = loadDraft('freestyle') || { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id, sessionStartedAt: null };
 
 /* Eigene, in Firebase gespeicherte Trainingspläne (Name + Ziel-Übungen) —
    dasselbe Vorlagen-Muster wie fb.templates beim Fingerboard: bleiben nach
@@ -615,11 +652,17 @@ async function renderLog() {
   // direkte Session — Datum/Typ/Notiz/RPE/Speichern gehören erst zu einer
   // tatsächlichen Session (Freestyle, Plan-Ausführung, Ausdauer).
   const hideSessionFields = logMode === 'wall' || logMode === 'planned' || logMode === 'warmup';
+  // Freestyle/Plan-Ausführung sind als Gym-Session gedacht — die Typ-Auswahl
+  // (Klettern/Fingerboard/Jogging/...) ergibt dort keinen Sinn, ist immer
+  // "Gym". Datum bleibt trotzdem sichtbar, nur Typ fällt weg.
+  const hideTypeField = logMode === 'freestyle' || logMode === 'execute';
   await Promise.all([loadSessionPlans(), loadExerciseSettings(), loadSharedTemplates(), loadWallTemplates()]);
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Neue Session</h2><div class="sec-rule"></div></div>
     <div class="card">
-      ${hideSessionFields ? '' : `
+      ${hideSessionFields ? '' : hideTypeField ? `
+      <div class="field"><label>Datum</label><input type="date" id="log-date" value="${todayKey()}"></div>
+      ` : `
       <div class="field-row">
         <div class="field"><label>Datum</label><input type="date" id="log-date" value="${todayKey()}"></div>
         <div class="field"><label>Typ</label>
@@ -653,6 +696,7 @@ async function renderLog() {
 
   document.querySelectorAll('[data-log-mode]').forEach((btn) => {
     btn.onclick = () => {
+      if (logMode === 'freestyle' || logMode === 'execute') stopAllFsTimers();
       logMode = btn.dataset.logMode;
       renderLog();
     };
@@ -661,11 +705,12 @@ async function renderLog() {
   if (hideSessionFields) { renderLogHistory(); return; }
 
   document.getElementById('log-save').onclick = async () => {
-    const rawExercises = (logMode === 'execute' ? planExecution.exercises : freestyleBuilder.exercises).filter((g) => g.sets.length);
+    const builder = logMode === 'execute' ? planExecution : freestyleBuilder;
+    const rawExercises = builder.exercises.filter((g) => g.sets.length);
     if (!rawExercises.length) { toast('Noch keine Sätze erfasst.', 'err'); return; }
     const entry = {
       date: document.getElementById('log-date').value || todayKey(),
-      type: document.getElementById('log-type').value,
+      type: hideTypeField ? 'gym' : document.getElementById('log-type').value,
       exercises: rawExercises.map((g) => ({ exerciseId: g.exerciseId, sets: g.sets })),
       note: document.getElementById('log-note').value.trim(),
       rpe: document.getElementById('log-rpe').value || null,
@@ -673,14 +718,17 @@ async function renderLog() {
     };
     const id = await fbPush(`logs/${state.member.id}`, entry);
     if (id) {
-      toast('Session gespeichert.', 'ok');
+      stopAllFsTimers();
+      const totalWorkSec = rawExercises.reduce((sum, g) => sum + g.sets.reduce((s, set) => s + (set.elapsedSec || 0), 0), 0);
+      const totalSessionSec = builder.sessionStartedAt ? Math.round((Date.now() - builder.sessionStartedAt) / 1000) : totalWorkSec;
+      toast(`Session gespeichert · ${fmtMinSec(totalSessionSec)} gesamt, ${fmtMinSec(totalWorkSec)} Arbeitszeit.`, 'ok');
       if (logMode === 'execute') {
         // Der Plan selbst bleibt erhalten (wie eine Fingerboard-Vorlage) —
         // nur die gerade laufende Ausführung wird zurückgesetzt.
         planExecution = null;
         logMode = 'planned';
       } else {
-        freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id };
+        freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id, sessionStartedAt: null };
         saveDraft('freestyle', freestyleBuilder);
       }
       renderLog();
@@ -1193,13 +1241,14 @@ function renderLogBuilderPanel() {
     `;
     wireExercisePickerGrid('fs-exercise-grid', EXERCISE_LIBRARY, freestyleBuilder.pickerExerciseId, (id) => {
       freestyleBuilder.pickerExerciseId = id;
+      if (!freestyleBuilder.exercises.length) freestyleBuilder.sessionStartedAt = Date.now();
       let idx = freestyleBuilder.exercises.findIndex((g) => g.exerciseId === id);
       if (idx === -1) {
         freestyleBuilder.exercises.push({ exerciseId: id, sets: [] });
         idx = freestyleBuilder.exercises.length - 1;
       }
-      freestyleBuilder.activeIndex = idx;
-      renderFsPanel();
+      if (idx === freestyleBuilder.activeIndex) { renderFsPanel(); }
+      else activateFsGroup(freestyleBuilder, idx);
       // Zur aktiven Übung scrollen statt zu einer festen Stelle — das
       // Eingabefeld steht jetzt direkt bei ihr, nicht mehr fest oben.
       document.getElementById(`fs-group-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1214,6 +1263,7 @@ function renderLogBuilderPanel() {
     renderFsPanel();
     document.getElementById('plan-execute-cancel').onclick = () => {
       if (!confirm('Ausführung abbrechen? Noch nicht gespeicherte Sätze gehen verloren.')) return;
+      stopAllFsTimers();
       planExecution = null;
       logMode = 'planned';
       renderLog();
@@ -1320,12 +1370,16 @@ function renderLogBuilderPanel() {
       planExecution = {
         planName: loadedPlan ? loadedPlan.name : 'Eigener Plan',
         activeIndex: 0,
+        sessionStartedAt: Date.now(),
         exercises: logBuilder.exercises.map((ex) => ({
           exerciseId: ex.exerciseId, sets: [],
           targetSets: ex.sets, targetReps: ex.reps, targetWeight: ex.weight,
         })),
       };
       logMode = 'execute';
+      fsPhase = 'working';
+      stopFsRestTimer();
+      startFsWorkTimer();
       renderLog();
     };
   }
@@ -1339,17 +1393,43 @@ function renderLogBuilderPanel() {
    herscrollen muss. Zeigt bei der aktiven Übung die Vergleichstabelle der
    letzten 3 Sessions plus (bei Plan-Ausführung) das geplante Ziel als
    Vorschlag in den Feldern an. */
-/* Pause-Timer zwischen Sätzen: startet automatisch, sobald der erste Satz
-   der Session geloggt wird, läuft aufwärts weiter und piepst alle 30s —
-   Hinweis, wie lange die Pause schon dauert, ohne dass man selbst die Zeit
-   im Auge behalten muss. Läuft unabhängig von der gerade aktiven Übung
-   (eine einzige, globale Pausenuhr), da die Pause zwischen Sätzen egal
-   welcher Übung dieselbe ist. */
+/* Satz-Ablauf als kleine Phasenmaschine, für JEDE Übung gleich (nicht nur
+   Isoholds — auch ein normaler Reps-Satz hat eine Dauer, die man
+   nebenbei sehen kann; bei Halte-Übungen IST die gestoppte Zeit direkt
+   der Wdh.-Wert):
+   'working' → Arbeits-Stoppuhr läuft, "Satz beenden" stoppt sie
+   'entering' → Gewicht/Wdh. eintragen (gestoppte Dauer wird angezeigt,
+                per Knopf optional als Wdh. übernehmbar), "Satz speichern"
+   'resting' → Pausenstoppuhr läuft (30s-Piepton), "Nächster Satz" startet
+               wieder die Arbeits-Stoppuhr für den nächsten Durchgang.
+   Eine einzige, modul-globale Phase/Uhr reicht, da jeweils nur eine
+   Übung gleichzeitig aktiv ist. */
+let fsPhase = 'working';
+let fsWorkTimer = { seconds: 0, intervalId: null };
 let fsRestTimer = { seconds: 0, intervalId: null };
+let fsCapturedElapsed = 0;
+
+function updateFsWorkTimerUI() {
+  const el = document.getElementById('fs-work-timer');
+  if (el) el.textContent = fmtMinSec(fsWorkTimer.seconds);
+}
+function startFsWorkTimer() {
+  clearInterval(fsWorkTimer.intervalId);
+  fsWorkTimer.seconds = 0;
+  updateFsWorkTimerUI();
+  fsWorkTimer.intervalId = setInterval(() => {
+    fsWorkTimer.seconds++;
+    updateFsWorkTimerUI();
+  }, 1000);
+}
+function stopFsWorkTimer() {
+  clearInterval(fsWorkTimer.intervalId);
+  fsWorkTimer.intervalId = null;
+}
+
 function updateFsRestTimerUI() {
   const el = document.getElementById('fs-rest-timer');
   if (!el) return;
-  el.hidden = false;
   el.textContent = `PAUSE ${fmtMinSec(fsRestTimer.seconds)}`;
 }
 function startFsRestTimer() {
@@ -1362,28 +1442,28 @@ function startFsRestTimer() {
     if (fsRestTimer.seconds % 30 === 0) beepStart();
   }, 1000);
 }
+// Ohne explizites Stoppen lief die Pausenuhr bisher im Hintergrund einfach
+// weiter (auch nach dem Speichern/Verlassen der Session) — piepste also
+// munter weiter, obwohl gar keine Pause mehr lief.
+function stopFsRestTimer() {
+  clearInterval(fsRestTimer.intervalId);
+  fsRestTimer.intervalId = null;
+}
+function stopAllFsTimers() {
+  stopFsWorkTimer();
+  stopFsRestTimer();
+}
 
-/* Halte-Timer für isometrische Übungen (Plank, Wall Sit, ...) — Start/
-   Stopp füllt die Haltedauer direkt als Sekunden ins Wdh.-Feld statt sie
-   erraten/mitzählen zu müssen. Eine einzige, modul-globale Uhr reicht, da
-   jeweils nur eine Übung gleichzeitig aktiv gehalten wird. */
-let fsHoldTimer = { seconds: 0, intervalId: null };
-function wireHoldTimerButton(btn, repsEl) {
-  btn.onclick = () => {
-    if (fsHoldTimer.intervalId) {
-      clearInterval(fsHoldTimer.intervalId);
-      fsHoldTimer.intervalId = null;
-      repsEl.value = String(fsHoldTimer.seconds);
-      btn.textContent = '⏱ Timer starten';
-    } else {
-      fsHoldTimer.seconds = 0;
-      btn.textContent = '⏱ 0:00 · Stopp';
-      fsHoldTimer.intervalId = setInterval(() => {
-        fsHoldTimer.seconds++;
-        btn.textContent = `⏱ ${fmtMinSec(fsHoldTimer.seconds)} · Stopp`;
-      }, 1000);
-    }
-  };
+/* Eine neue oder bereits vorhandene Übung wird aktiv: Phase & Arbeits-
+   Stoppuhr starten immer bei null neu — ein Wechsel bedeutet "ich arbeite
+   jetzt an dieser Übung", unabhängig davon, in welcher Phase die vorher
+   aktive Übung gerade war. */
+function activateFsGroup(builder, idx) {
+  builder.activeIndex = idx;
+  fsPhase = 'working';
+  stopFsRestTimer();
+  startFsWorkTimer();
+  renderFsPanel();
 }
 
 /* Sichtbar sobald mindestens eine Übung im Freestyle-Aufbau steckt — ohne
@@ -1400,7 +1480,8 @@ function renderFsDiscardButton() {
   holder.innerHTML = `<button type="button" class="btn ghost small" id="fs-discard" style="width:100%;margin-top:10px;">🗑 Freestyle verwerfen</button>`;
   document.getElementById('fs-discard').onclick = () => {
     if (!confirm('Freestyle-Session verwerfen? Alle noch nicht gespeicherten Sätze gehen verloren.')) return;
-    freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id };
+    stopAllFsTimers();
+    freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id, sessionStartedAt: null };
     saveDraft('freestyle', freestyleBuilder);
     renderLog();
   };
@@ -1418,25 +1499,48 @@ function renderFsPanel() {
     return;
   }
 
-  // Das Eingabefeld (Gewicht/Wdh. + Satz-Knopf) schwebt jetzt fest oben,
-  // statt in der Karte der jeweiligen Übung mitzuscrollen — sonst musste
-  // man bei einer langen Übungsliste (oder offener Tastatur, die den
-  // unteren Bildschirmteil frisst) erst zur richtigen Stelle zurück-
-  // scrollen, um überhaupt einen Satz eintragen zu können.
+  // Nach einem frischen Seitenladen (Navigation zurück zu einem Entwurf mit
+  // bereits aktiver Übung) tickt noch kein Intervall — Arbeits-Stoppuhr
+  // dann hier einmalig nachstarten, statt bei "0:00" stehen zu bleiben.
+  if (fsPhase === 'working' && !fsWorkTimer.intervalId) startFsWorkTimer();
+
+  // Das Eingabefeld schwebt fest oben, statt in der Karte der jeweiligen
+  // Übung mitzuscrollen — sonst musste man bei einer langen Übungsliste
+  // (oder offener Tastatur, die den unteren Bildschirmteil frisst) erst
+  // zur richtigen Stelle zurückscrollen. Läuft für JEDE Übung als kleine
+  // Phasenmaschine (siehe activateFsGroup/fsPhase weiter oben):
+  // 'working' (Arbeits-Stoppuhr) → 'entering' (Gewicht/Wdh. eintragen,
+  // gestoppte Dauer als Kontext) → 'resting' (Pausenstoppuhr) → zurück
+  // zu 'working' für den nächsten Satz.
   const floatingInputHtml = (g) => {
     const isHold = exerciseIsHold(g.exerciseId);
-    // Vorschlag fürs Feld: zuerst der zuletzt in DIESER Session geloggte
-    // Satz (damit ein zweiter, dritter... Satz nicht wieder den alten
-    // Session-übergreifenden Wert zeigt), erst wenn noch keiner erfasst
-    // wurde die Historie als Ausgangspunkt.
+    if (fsPhase === 'working') {
+      return `
+        <div class="fs-work-timer mono" id="fs-work-timer">${fmtMinSec(fsWorkTimer.seconds)}</div>
+        <button type="button" class="btn small" id="fs-end-set" style="width:100%;">Satz beenden</button>
+      `;
+    }
+    if (fsPhase === 'resting') {
+      return `
+        <div class="fs-rest-timer mono" id="fs-rest-timer">PAUSE ${fmtMinSec(fsRestTimer.seconds)}</div>
+        <button type="button" class="btn small" id="fs-next-set" style="width:100%;">Nächster Satz</button>
+      `;
+    }
+    // 'entering': Vorschlag fürs Gewicht-Feld zuerst der zuletzt in DIESER
+    // Session geloggte Satz (damit ein zweiter, dritter... Satz nicht
+    // wieder den alten Session-übergreifenden Wert zeigt), erst wenn noch
+    // keiner erfasst wurde die Historie als Ausgangspunkt. Wdh. bleibt
+    // bewusst leer — der Vorschlag käme sonst von einem alten Satz, der
+    // mit der gerade gestoppten Dauer nichts zu tun hat.
     const last = g.sets.length ? g.sets[g.sets.length - 1] : lastValueForExercise(g.exerciseId);
     return `
+      <div class="fs-captured-duration mono">Dauer: ${fmtMinSec(fsCapturedElapsed)}</div>
       <div class="field-row">
         <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" enterkeyhint="next" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
-        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" value="${last ? esc(String(last.reps)) : ''}"></div>
+        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" value=""></div>
       </div>
-      ${isHold ? `<button type="button" class="btn ghost small" id="fs-hold-timer" style="width:100%;margin-bottom:8px;">⏱ Timer starten</button>` : ''}
-      <button type="button" class="btn small" id="fs-add-set" style="width:100%;">+ Satz</button>
+      <button type="button" class="btn ghost small" id="fs-use-duration" style="width:100%;margin-bottom:8px;">Als Wdh. übernehmen</button>
+      <button type="button" class="btn small" id="fs-add-set" style="width:100%;">Satz speichern</button>
     `;
   };
 
@@ -1450,7 +1554,6 @@ function renderFsPanel() {
       </div>
       ${floatingInputHtml(activeGroup)}
     </div>` : ''}
-    <div class="fs-rest-timer mono" id="fs-rest-timer" hidden></div>
     ${builder.exercises.map((g, gi) => ({ g, gi })).reverse().map(({ g, gi }) => {
       const targetText = g.targetReps != null
         ? `Ziel: ${g.targetSets}×${g.targetReps}${g.targetWeight ? ' @ ' + g.targetWeight + 'kg' : ''}`
@@ -1478,6 +1581,7 @@ function renderFsPanel() {
     </div>
   `;
     }).join('')}`;
+  updateFsWorkTimerUI();
   updateFsRestTimerUI();
 
   const stickyBar = document.getElementById('fs-sticky-bar');
@@ -1491,11 +1595,30 @@ function renderFsPanel() {
       };
     }
   }
+  const endSetBtn = document.getElementById('fs-end-set');
+  if (endSetBtn) {
+    endSetBtn.onclick = () => {
+      stopFsWorkTimer();
+      fsCapturedElapsed = fsWorkTimer.seconds;
+      fsPhase = 'entering';
+      renderFsPanel();
+    };
+  }
+  const nextSetBtn = document.getElementById('fs-next-set');
+  if (nextSetBtn) {
+    nextSetBtn.onclick = () => {
+      stopFsRestTimer();
+      fsPhase = 'working';
+      startFsWorkTimer();
+      renderFsPanel();
+    };
+  }
 
   holder.querySelectorAll('[data-activate]').forEach((el) => {
     el.onclick = () => {
-      builder.activeIndex = Number(el.dataset.activate);
-      renderFsPanel();
+      const idx = Number(el.dataset.activate);
+      if (idx === builder.activeIndex) return;
+      activateFsGroup(builder, idx);
     };
   });
   holder.querySelectorAll('[data-info]').forEach((btn) => {
@@ -1555,7 +1678,8 @@ function renderFsPanel() {
       weightEl.blur();
       repsEl.blur();
       setTimeout(() => {
-        builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps });
+        builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps, elapsedSec: fsCapturedElapsed });
+        fsPhase = 'resting';
         startFsRestTimer();
         renderFsPanel();
       }, 0);
@@ -1566,8 +1690,8 @@ function renderFsPanel() {
     weightEl.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); repsEl.focus(); } };
     repsEl.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submitSet(); } };
     document.getElementById('fs-add-set').onclick = submitSet;
-    const holdBtn = document.getElementById('fs-hold-timer');
-    if (holdBtn) wireHoldTimerButton(holdBtn, repsEl);
+    const useDurationBtn = document.getElementById('fs-use-duration');
+    if (useDurationBtn) useDurationBtn.onclick = () => { repsEl.value = String(fsCapturedElapsed); };
   }
 }
 
@@ -1947,7 +2071,7 @@ function renderFbAddPanel() {
       </div>
       <button type="button" class="btn" id="fb-add-exercise" style="width:100%;">+ Übung hinzufügen</button>
     `;
-    wireExercisePickerGrid('fb-exercise-grid', ACCESSORY_EXERCISES, fb.newExercise.exerciseId, (id) => { fb.newExercise.exerciseId = id; }, 'fb-add-exercise');
+    wireExercisePickerGrid('fb-exercise-grid', ACCESSORY_EXERCISES, fb.newExercise.exerciseId, (id) => { fb.newExercise.exerciseId = id; }, 'fb-add-exercise', false);
     document.getElementById('fb-new-exreps').oninput = (e) => { fb.newExercise.reps = Number(e.target.value) || 1; };
     document.getElementById('fb-new-exwork').oninput = (e) => { fb.newExercise.workSec = Number(e.target.value) || 5; };
     document.getElementById('fb-new-exrest').oninput = (e) => { fb.newExercise.restSec = Number(e.target.value) || 0; };

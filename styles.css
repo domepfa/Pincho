@@ -285,6 +285,11 @@ button, input, select, textarea { font-family: inherit; }
   text-align: center; font-size: 13px; font-weight: 700; letter-spacing: .06em; color: var(--accent2);
   background: rgba(255, 107, 71, .1); border: 1px solid var(--accent2); padding: 8px; margin-bottom: 12px;
 }
+.fs-work-timer {
+  text-align: center; font-family: 'Bebas Neue', sans-serif; font-size: 40px; line-height: 1;
+  color: var(--accent); margin-bottom: 10px;
+}
+.fs-captured-duration { text-align: center; font-size: 12px; color: var(--ink-dim); margin-bottom: 8px; }
 /* Gewicht/Wdh: die Beschriftung (was trage ich hier ein) soll auffallen,
    nicht primär die Zahl selbst — Label darum hell statt im sonst üblichen
    gedämpften Feld-Label-Grau, Zahl bewusst kleiner als vorher. */
