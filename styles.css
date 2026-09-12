@@ -174,7 +174,7 @@ button, input, select, textarea { font-family: inherit; }
   flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 26px; font-weight: 700;
   color: var(--ink); background: var(--surface-2); border: 2px solid var(--line); padding: 8px 0;
 }
-.campus-ref { width: 100%; height: 130px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); margin: 10px 0 4px; position: relative; }
+.campus-ref { width: 100%; height: 130px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); margin: 10px 0 4px; position: relative; cursor: pointer; }
 .campus-ref img { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; display: block; }
 .campus-ref-label {
   position: absolute; bottom: 0; left: 0; right: 0; background: rgba(12, 14, 18, .75); color: var(--ink-dim);

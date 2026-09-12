@@ -2149,7 +2149,7 @@ function renderCampusAddPanel(holder) {
       <div class="campus-ref" id="campus-ref">
         <img src="${CAMPUS_BOARD_IMAGE}" alt="">
         ${campusRefLinesHtml(c.rungType)}
-        <div class="campus-ref-label">Antippen zum Nachjustieren der Linie</div>
+        <div class="campus-ref-label">Antippen wählt den passenden Sprossen-Typ</div>
       </div>
       <p class="mono" id="campus-ref-calib" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:4px 0 0;min-height:14px;"></p>
     </div>
@@ -3469,10 +3469,32 @@ function campusRefLinesHtml(rungTypeId) {
   return xs.map((x) => `<div class="campus-ref-line" style="left:${x}%;"></div>`).join('');
 }
 
-/* Antippen des Referenzbilds loggt die %-Position (gleiches Muster wie
-   wireCalibration() fürs Hangboard) — falls die grob geschätzten
-   lineX-Werte in data.js für ein Board nicht genau passen, lässt sich das
-   hier schnell nachjustieren statt raten zu müssen. */
+/* Welcher Sprossen-Typ liegt an dieser %-Position im Referenzbild? Jeder
+   Typ hat 1-2 kalibrierte Linien (lineX/lineX2) — Antippen wählt einfach
+   den Typ mit der NÄCHSTEN Linie. Das funktioniert auch dort, wo sich
+   Zonen nicht sauber links-nach-rechts sortieren lassen (die Kugel-Typen
+   liegen mit ihren zwei Zickzack-Spalten ineinander verschachtelt): jede
+   einzelne Linie zieht eigenständig ihre eigene Zone bis zur Mitte zur
+   nächsten Nachbarlinie, unabhängig davon, welchem Typ diese gehört. */
+function campusRungTypeAtX(xPercent) {
+  let best = null;
+  let bestDist = Infinity;
+  CAMPUS_RUNG_TYPES.forEach((t) => {
+    [t.lineX, t.lineX2].filter((x) => x != null).forEach((x) => {
+      const dist = Math.abs(x - xPercent);
+      if (dist < bestDist) { bestDist = dist; best = t.id; }
+    });
+  });
+  return best;
+}
+
+/* Antippen des Referenzbilds wählt direkt den passenden Sprossen-Typ
+   (campusRungTypeAtX) — die Linie war ja als Bestätigung schon da, jetzt
+   entscheidet sie auch wirklich mit, statt nur zur Kontrolle dazustehen.
+   Der Klartext-Readout bleibt als kurze Bestätigung, welcher Typ getroffen
+   wurde. Sollten die lineX/lineX2-Werte für ein Board mal nicht genau
+   passen, zeigt der Readout zusätzlich die getippte %-Position an — damit
+   lässt sich falsch kalibrierten Typen weiterhin schnell nachhelfen. */
 function wireCampusRefCalibration(c) {
   const wrap = document.getElementById('campus-ref');
   const readout = document.getElementById('campus-ref-calib');
@@ -3480,9 +3502,13 @@ function wireCampusRefCalibration(c) {
   wrap.onclick = (e) => {
     const rect = wrap.getBoundingClientRect();
     const x = Math.round(((e.clientX - rect.left) / rect.width) * 1000) / 10;
-    const line = `${campusRungLabel(c.rungType)}: lineX: ${x}`;
-    readout.textContent = line;
-    if (navigator.clipboard) navigator.clipboard.writeText(String(x)).catch(() => {});
+    const matched = campusRungTypeAtX(x);
+    if (matched && matched !== c.rungType) {
+      c.rungType = matched;
+      renderFbAddPanel();
+      return;
+    }
+    readout.textContent = `${campusRungLabel(matched)} (getippt bei ${x}%)`;
   };
 }
 
