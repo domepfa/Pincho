@@ -1879,7 +1879,13 @@ const fb = {
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
   newCampus: {
     rungType: CAMPUS_RUNG_TYPES[0].id, moveMode: 'direct',
-    fromRung: 1, toRung: 4, startRung: 1, pattern: [],
+    fromRung: 1, toRung: 4, stepSize: 3, startRung: 1, pattern: [],
+    // stepSize: Schrittweite für "Von → Zu" — Default = volle Distanz (ein
+    // einziger Sprung, wie bisher); kleiner ergibt Zwischenstopps
+    // (Leiter mit Sprossen überspringen, z. B. Von 1/Zu 9/Schrittweite 2
+    // -> 1-3-5-7-9). Wird beim Ändern von Von/Zu automatisch auf die neue
+    // volle Distanz zurückgesetzt (siehe data-step-Handler), bleibt aber
+    // erhalten, solange nur die Schrittweite selbst geändert wird.
     reps: 4, workSec: 3, restSec: 15, blockRestSec: 90,
     armMode: 'both', startHand: 'left', // armMode: 'both' | 'match' | 'skip' — 'match'/'skip' zeigen zusätzlich startHand
   },
@@ -2134,10 +2140,29 @@ function renderPauseAddPanel(holder) {
   };
 }
 
+/* Rechnet Von/Zu/Schrittweite in die konkreten Zwischenstopps um (z. B.
+   Von 1, Zu 9, Schrittweite 2 -> 1,3,5,7,9) — reine Vorschau-Anzeige im
+   Baukasten; die tatsächliche Umwandlung in ein 'direct'- oder
+   'pattern'-Muster-Objekt passiert erst beim Hinzufügen (siehe
+   fb-add-campus-Handler), damit sich an den bestehenden zwei
+   Bewegungs-Datentypen nichts ändert. */
+function campusStepPreview(fromRung, toRung, stepSize) {
+  const distance = toRung - fromRung;
+  if (distance === 0) return { error: '"Von" und "Zu" dürfen nicht gleich sein.' };
+  const dist = Math.abs(distance);
+  const steps = dist / stepSize;
+  if (!Number.isInteger(steps)) return { error: `Schrittweite muss ${dist} ohne Rest teilen.` };
+  const dir = distance > 0 ? 1 : -1;
+  const stops = [fromRung];
+  for (let i = 0; i < steps; i++) stops.push(stops[stops.length - 1] + dir * stepSize);
+  return { stops, steps };
+}
+
 /* Campus-Board: keine Foto-Hotspots wie beim Hangboard (Sprossen sind
    durchnummeriert, immer in einer Spalte) — stattdessen Sprossen-TYP per
    Chip + die Bewegung rein über Zahlen/Stepper, entweder als direkter
-   Sprung ("Von → Zu") oder als sich wiederholendes Muster ("+2/-1 usw."). */
+   Sprung ("Von → Zu", optional mit Zwischenstopps über die Schrittweite)
+   oder als sich wiederholendes Muster ("+2/-1 usw."). */
 function renderCampusAddPanel(holder) {
   const c = fb.newCampus;
   holder.innerHTML = `
@@ -2180,6 +2205,19 @@ function renderCampusAddPanel(holder) {
             </div>
           </div>
         </div>
+        <div class="fb-checkin-label" style="text-align:left;margin:14px 0 6px;">Schrittweite</div>
+        <div class="stepper-row">
+          <button type="button" class="stepper-btn" data-step="stepSize" data-dir="-1">−</button>
+          <div class="stepper-num">${c.stepSize}</div>
+          <button type="button" class="stepper-btn" data-step="stepSize" data-dir="1">+</button>
+        </div>
+        <div class="campus-step-hint">Schrittweite = Distanz: ein einziger Sprung, wie ein normaler Von→Zu-Satz. Kleiner: mehrere Zwischenstopps (z. B. Sprossen überspringen).</div>
+        ${(() => {
+          const preview = campusStepPreview(c.fromRung, c.toRung, c.stepSize);
+          return preview.error
+            ? `<div class="campus-step-preview error">${esc(preview.error)}</div>`
+            : `<div class="campus-step-preview"><span class="label">Ergibt</span><span class="route">${preview.stops.join(' → ')}</span></div>`;
+        })()}
       ` : `
         <div class="fb-checkin-label" style="text-align:left;margin-bottom:6px;">Start-Sprosse</div>
         <div class="stepper-row" style="margin-bottom:14px;">
@@ -2207,9 +2245,9 @@ function renderCampusAddPanel(holder) {
     <div class="field">
       <label>Bewegungsart</label>
       <div class="chip-row" id="campus-armmode-toggle" style="margin-bottom:${c.armMode === 'both' ? '0' : '10px'};">
-        <button type="button" class="chip ${c.armMode === 'both' ? 'active' : ''}" data-arm="both"><span class="emoji">🙌</span>Beidarmig</button>
-        <button type="button" class="chip ${c.armMode === 'match' ? 'active' : ''}" data-arm="match"><span class="emoji">🔄</span>Nachziehen</button>
-        <button type="button" class="chip ${c.armMode === 'skip' ? 'active' : ''}" data-arm="skip"><span class="emoji">🔃</span>Überspringen</button>
+        <button type="button" class="chip ${c.armMode === 'both' ? 'active' : ''}" data-arm="both"><span class="emoji">🙌</span>${campusArmModeLabel('both')}</button>
+        <button type="button" class="chip ${c.armMode === 'match' ? 'active' : ''}" data-arm="match"><span class="emoji">🔄</span>${campusArmModeLabel('match')}</button>
+        <button type="button" class="chip ${c.armMode === 'skip' ? 'active' : ''}" data-arm="skip"><span class="emoji">🔃</span>${campusArmModeLabel('skip')}</button>
       </div>
       ${c.armMode !== 'both' ? `
         <div class="fb-checkin-label" style="text-align:left;margin-bottom:6px;">Starthand</div>
@@ -2251,6 +2289,12 @@ function renderCampusAddPanel(holder) {
     btn.onclick = () => {
       const field = btn.dataset.step;
       c[field] = Math.max(1, c[field] + Number(btn.dataset.dir));
+      // Von/Zu geändert -> Schrittweite auf die neue volle Distanz
+      // zurücksetzen (= ein einziger Sprung, wie bisher), sonst bliebe
+      // nach einer Bereichsänderung eine Schrittweite stehen, die nicht
+      // mehr zur neuen Distanz passt. Wird nur die Schrittweite selbst
+      // angetippt, bleibt sie unangetastet.
+      if (field === 'fromRung' || field === 'toRung') c.stepSize = Math.max(1, Math.abs(c.toRung - c.fromRung));
       renderFbAddPanel();
     };
   });
@@ -2265,6 +2309,20 @@ function renderCampusAddPanel(holder) {
   document.getElementById('campus-blockrestsec').oninput = (e) => { c.blockRestSec = Number(e.target.value) || 0; };
   document.getElementById('fb-add-campus').onclick = () => {
     if (c.moveMode === 'pattern' && !c.pattern.length) { toast('Zuerst ein Muster antippen.', 'err'); return; }
+    if (c.moveMode === 'direct') {
+      const preview = campusStepPreview(c.fromRung, c.toRung, c.stepSize);
+      if (preview.error) { toast(preview.error, 'err'); return; }
+      if (preview.steps > 1) {
+        // Schrittweite < volle Distanz -> mit Zwischenstopps: intern als
+        // 'pattern'-Satz gespeichert (kein neuer Datentyp nötig, exakt
+        // dieselbe Struktur wie ein von Hand gebautes Muster).
+        const dir = c.toRung > c.fromRung ? 1 : -1;
+        const pattern = Array(preview.steps).fill(dir * c.stepSize);
+        fb.blocks.push({ type: 'campus', ...c, moveMode: 'pattern', startRung: c.fromRung, pattern });
+        renderFbBlocksList();
+        return;
+      }
+    }
     fb.blocks.push({ type: 'campus', ...c, pattern: c.pattern.slice() });
     renderFbBlocksList();
   };
@@ -3443,17 +3501,133 @@ function campusArmIcons(b) {
 function campusLabel(b) {
   return `${campusArmIcons(b)} Campus (${esc(campusRungLabel(b.rungType))}) · ${esc(campusMoveText(b))}`;
 }
-/* Ersetzt das reine Deko-Strichmännchen während des Campus-Arbeitssatzes:
-   wichtiger als eine generische Figur ist, dass Bewegungsart/Starthand
-   (Symbole) und die eigentliche Bewegung (welche Sprossen/welches Muster)
-   auch aus einiger Distanz sofort erkennbar sind — deshalb gross und mit
-   Pfeilen statt kleinem Fliesstext. */
+/* Bewegungsart als Klartext statt reiner Symbol-Kombo ("🔃🫲") — musste man
+   erst entschlüsseln, "Übergreifen · Links zuerst" liest sich von selbst.
+   Dieselben drei Begriffe wie die Chips im Baukasten (campusArmModeLabel),
+   damit Aufbau und Ausführung dieselbe Sprache sprechen. */
+function campusArmModeLabel(armMode) {
+  if (armMode === 'match') return 'Nachziehen';
+  if (armMode === 'skip') return 'Übergreifen';
+  return 'Gleichzeitig';
+}
+function campusArmLabelHtml(b) {
+  const armMode = b.armMode || 'both';
+  const handText = armMode !== 'both' ? (b.startHand === 'right' ? 'Rechts zuerst' : 'Links zuerst') : '';
+  return `<div class="campus-armline"><span class="campus-armline-mode">${esc(campusArmModeLabel(armMode))}</span>${handText ? `<span class="campus-armline-hand">${esc(handText)}</span>` : ''}</div>`;
+}
+
+/* Wegpunkte einer Muster-Bewegung: Start, Ende, und jede Stelle, an der
+   sich die Richtung ändert ODER ein einzelner Schritt mehr als eine
+   Sprosse überspringt — genau dort ist die konkrete Sprossen-Nummer
+   wichtig. Eine reine "+1"-Kette ohne Richtungswechsel braucht dazwischen
+   keine eigene Markierung (die Gerade sagt "jede Sprosse" von selbst). */
+function campusPatternWaypoints(b) {
+  const positions = [b.startRung];
+  b.pattern.forEach((step) => positions.push(positions[positions.length - 1] + step));
+  const waypoints = [{ rung: positions[0] }];
+  for (let i = 1; i < positions.length - 1; i++) {
+    const stepIn = positions[i] - positions[i - 1];
+    const stepOut = positions[i + 1] - positions[i];
+    if (Math.sign(stepIn) !== Math.sign(stepOut) || Math.abs(stepIn) > 1) waypoints.push({ rung: positions[i] });
+  }
+  waypoints.push({ rung: positions[positions.length - 1] });
+  return { positions, waypoints };
+}
+
+/* Kurzer Wegtext unter der Leiter: bei gleichmässigem Schrittmuster
+   (z. B. immer +2) reicht "Start 1 · Schritte von 2 · Bis 9" — bei
+   wechselnder Richtung (z. B. rauf/runter) lieber jeden Wegpunkt einzeln
+   ("Start 1 · Rauf bis 9 · Runter bis 4"), sonst würde die "gleichmässig"-
+   Kurzform an der falschen Stelle wieder lang. */
+function campusRouteStepsHtml(b) {
+  const { waypoints } = campusPatternWaypoints(b);
+  const uniform = b.pattern.every((s) => s === b.pattern[0]);
+  const first = waypoints[0].rung;
+  const last = waypoints[waypoints.length - 1].rung;
+  const firstDir = waypoints.length > 1 && waypoints[1].rung < first ? 'down' : 'up';
+  const rows = [];
+  if (uniform && waypoints.length > 2) {
+    rows.push({ dir: firstDir, html: `Start <b>Sprosse ${first}</b>` });
+    rows.push({ dir: firstDir, html: `Schritte von <b>${Math.abs(b.pattern[0])}</b>` });
+    rows.push({ dir: firstDir, html: `Bis <b>Sprosse ${last}</b>` });
+  } else {
+    waypoints.forEach((w, i) => {
+      if (i === 0) { rows.push({ dir: firstDir, html: `Start <b>Sprosse ${w.rung}</b>` }); return; }
+      const dir = w.rung > waypoints[i - 1].rung ? 'up' : 'down';
+      rows.push({ dir, html: `${dir === 'up' ? 'Rauf' : 'Runter'} bis <b>Sprosse ${w.rung}</b>` });
+    });
+  }
+  return rows.map((r) => `<div class="campus-route-step"><span class="campus-route-dot ${r.dir}"></span>${r.html}</div>`).join('');
+}
+
+/* Leiter-Grafik statt Zahlen-Kacheln: bildet den tatsächlichen Weg am
+   Board ab (welche Sprossen, in welcher Reihenfolge), nicht nur
+   abstrakte Vorzeichen — leichter in den paar Sekunden vor dem Satz zu
+   merken, wenn man eh schon zum Board läuft statt aufs Handy zu schauen.
+   Läufe gleicher Richtung (z. B. die ganze Aufwärtsstrecke einer Kette
+   aus mehreren +2-Schritten) werden zu EINER Linie mit einer Pfeilspitze
+   zusammengefasst statt einer pro Einzelschritt. Bei nur einem Lauf
+   (keine Richtungsumkehr) läuft die Linie mittig, bei Richtungswechseln
+   bekommt "rauf" die rechte und "runter" die linke Spur, damit sich
+   überlappende Sprossen-Bereiche nicht gegenseitig verdecken. */
+function campusLadderSvgMarkup(b) {
+  const { positions, waypoints } = campusPatternWaypoints(b);
+  const minRung = Math.min(...positions);
+  const maxRung = Math.max(...positions);
+  const span = maxRung - minRung;
+  const topY = 24, bottomY = 196;
+  const yFor = (rung) => (span === 0 ? (topY + bottomY) / 2 : bottomY - ((rung - minRung) / span) * (bottomY - topY));
+
+  const waypointRungs = new Set(waypoints.map((w) => w.rung));
+  let svg = '';
+  for (let r = minRung; r <= maxRung; r++) {
+    if (waypointRungs.has(r)) continue;
+    const y = yFor(r).toFixed(1);
+    svg += `<line x1="28" y1="${y}" x2="62" y2="${y}" stroke="var(--line)" stroke-width="2"/>`;
+  }
+
+  const runs = [];
+  for (let i = 1; i < waypoints.length; i++) {
+    const dir = waypoints[i].rung > waypoints[i - 1].rung ? 1 : -1;
+    const last = runs[runs.length - 1];
+    if (last && last.dir === dir) last.toRung = waypoints[i].rung;
+    else runs.push({ dir, fromRung: waypoints[i - 1].rung, toRung: waypoints[i].rung });
+  }
+  const single = runs.length <= 1;
+  runs.forEach((run) => {
+    const x = single ? 45 : (run.dir > 0 ? 76 : 14);
+    const color = run.dir > 0 ? 'var(--accent)' : 'var(--accent2)';
+    const fromY = yFor(run.fromRung), toY = yFor(run.toRung);
+    const lineStartY = fromY - run.dir * 4;
+    const lineEndY = toY + run.dir * 8;
+    const tipY = toY - run.dir * 4;
+    svg += `<line x1="${x}" y1="${lineStartY.toFixed(1)}" x2="${x}" y2="${lineEndY.toFixed(1)}" stroke="${color}" stroke-width="3"/>`;
+    svg += `<polygon points="${x},${tipY.toFixed(1)} ${x - 6},${lineEndY.toFixed(1)} ${x + 6},${lineEndY.toFixed(1)}" fill="${color}"/>`;
+  });
+
+  const r = waypoints.length > 6 ? 9 : 11;
+  waypoints.forEach((w, i) => {
+    const outDir = i < waypoints.length - 1
+      ? (waypoints[i + 1].rung > w.rung ? 1 : -1)
+      : (waypoints[i - 1] && waypoints[i - 1].rung > w.rung ? -1 : 1);
+    const color = outDir > 0 ? 'var(--accent)' : 'var(--accent2)';
+    const textColor = outDir > 0 ? '#04141c' : '#2b0a02';
+    const y = yFor(w.rung).toFixed(1);
+    svg += `<circle cx="45" cy="${y}" r="${r}" fill="${color}"/>`;
+    svg += `<text x="45" y="${(yFor(w.rung) + r * 0.35).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="${r + 1}" font-weight="700" fill="${textColor}">${w.rung}</text>`;
+  });
+
+  return `<svg viewBox="0 0 90 220" class="campus-ladder-svg">${svg}</svg>`;
+}
+
+/* Ersetzt das reine Deko-Strichmännchen während des Campus-Arbeitssatzes.
+   Direkt-Sätze bleiben ein kompakter Pfeil ("1→4"), Muster-Sätze bekommen
+   die Leiter-Grafik + den Wegtext statt der Zahlen-Kacheln von früher. */
 function campusWorkFigureSvg(b) {
   const moveHtml = b.moveMode === 'pattern'
-    ? `<div class="campus-work-pattern">${b.pattern.map((p) => `<span class="campus-work-chip ${p < 0 ? 'down' : 'up'}">${Math.abs(p)}${p > 0 ? '↑' : '↓'}</span>`).join('')}</div>
-       <div class="campus-work-sub mono">AB SPROSSE ${b.startRung}</div>`
+    ? `<div class="campus-ladder-row">${campusLadderSvgMarkup(b)}<div class="campus-route">${campusRouteStepsHtml(b)}</div></div>`
     : `<div class="campus-work-move mono">${b.fromRung}<span class="campus-work-arrow">→</span>${b.toRung}</div>`;
-  return `<div class="campus-work-figure"><div class="campus-work-icons">${campusArmIcons(b)}</div>${moveHtml}</div>`;
+  return `<div class="campus-work-figure">${campusArmLabelHtml(b)}${moveHtml}</div>`;
 }
 
 /* Senkrechter Strich (zwei bei den Kugeln, da im Zickzack statt einer
