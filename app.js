@@ -1896,6 +1896,11 @@ const fb = {
     // -> 1-3-5-7-9). Wird beim Ändern von Von/Zu automatisch auf die neue
     // volle Distanz zurückgesetzt (siehe data-step-Handler), bleibt aber
     // erhalten, solange nur die Schrittweite selbst geändert wird.
+    returnEnabled: false, returnTo: 1, returnStepSize: 3,
+    // returnEnabled: optionaler Rückweg nach "Zu Sprosse" (z. B. Von 1,
+    // Zu 9, dann zurück zu Sprosse 4 — der klassische "1→9→4"-Satz).
+    // returnStepSize eigenständig, nicht an stepSize gekoppelt: rauf in
+    // 2er-Schritten, aber einzeln wieder runter soll möglich sein.
     reps: 4, workSec: 3, restSec: 15, blockRestSec: 90,
     armMode: 'both', startHand: 'left', // armMode: 'both' | 'match' | 'skip' — 'match'/'skip' zeigen zusätzlich startHand
   },
@@ -2168,6 +2173,25 @@ function campusStepPreview(fromRung, toRung, stepSize) {
   return { stops, steps };
 }
 
+/* Hin- plus optionaler Rückweg zu EINER Vorschau + fertigem Pattern
+   kombiniert — der Rückweg nutzt seine eigene Schrittweite (rauf in
+   2er-Schritten, aber einzeln zurück soll möglich sein). Liefert immer
+   ein `pattern`-Array, auch ohne Rückweg (dann nur der Hinweg), damit
+   der fb-add-campus-Handler nicht zwischen beiden Fällen unterscheiden
+   muss. */
+function campusRoundTripPreview(c) {
+  const out = campusStepPreview(c.fromRung, c.toRung, c.stepSize);
+  if (out.error) return out;
+  const dirOut = c.toRung > c.fromRung ? 1 : -1;
+  const pattern = Array(out.steps).fill(dirOut * c.stepSize);
+  if (!c.returnEnabled) return { stops: out.stops, pattern };
+  const back = campusStepPreview(c.toRung, c.returnTo, c.returnStepSize);
+  if (back.error) return { error: `Rückweg: ${back.error}` };
+  const dirBack = c.returnTo > c.toRung ? 1 : -1;
+  pattern.push(...Array(back.steps).fill(dirBack * c.returnStepSize));
+  return { stops: [...out.stops, ...back.stops.slice(1)], pattern };
+}
+
 /* Campus-Board: keine Foto-Hotspots wie beim Hangboard (Sprossen sind
    durchnummeriert, immer in einer Spalte) — stattdessen Sprossen-TYP per
    Chip + die Bewegung rein über Zahlen/Stepper, entweder als direkter
@@ -2222,8 +2246,25 @@ function renderCampusAddPanel(holder) {
           <button type="button" class="stepper-btn" data-step="stepSize" data-dir="1">+</button>
         </div>
         <div class="campus-step-hint">Schrittweite = Distanz: ein einziger Sprung, wie ein normaler Von→Zu-Satz. Kleiner: mehrere Zwischenstopps (z. B. Sprossen überspringen).</div>
+        <div class="chip-row" id="campus-return-toggle" style="margin:10px 0 ${c.returnEnabled ? '10px' : '0'};">
+          <button type="button" class="chip ${c.returnEnabled ? 'active' : ''}" data-toggle-return="1">↩ Und wieder zurück</button>
+        </div>
+        ${c.returnEnabled ? `
+          <div class="fb-checkin-label" style="text-align:left;margin-bottom:6px;">Zurück zu Sprosse</div>
+          <div class="stepper-row">
+            <button type="button" class="stepper-btn" data-step="returnTo" data-dir="-1">−</button>
+            <div class="stepper-num">${c.returnTo}</div>
+            <button type="button" class="stepper-btn" data-step="returnTo" data-dir="1">+</button>
+          </div>
+          <div class="fb-checkin-label" style="text-align:left;margin:14px 0 6px;">Rückweg-Schrittweite</div>
+          <div class="stepper-row">
+            <button type="button" class="stepper-btn" data-step="returnStepSize" data-dir="-1">−</button>
+            <div class="stepper-num">${c.returnStepSize}</div>
+            <button type="button" class="stepper-btn" data-step="returnStepSize" data-dir="1">+</button>
+          </div>
+        ` : ''}
         ${(() => {
-          const preview = campusStepPreview(c.fromRung, c.toRung, c.stepSize);
+          const preview = campusRoundTripPreview(c);
           return preview.error
             ? `<div class="campus-step-preview error">${esc(preview.error)}</div>`
             : `<div class="campus-step-preview"><span class="label">Ergibt</span><span class="route">${preview.stops.join(' → ')}</span></div>`;
@@ -2295,6 +2336,17 @@ function renderCampusAddPanel(holder) {
       btn.onclick = () => { c.startHand = btn.dataset.hand; renderFbAddPanel(); };
     });
   }
+  const returnToggle = document.getElementById('campus-return-toggle');
+  if (returnToggle) {
+    returnToggle.querySelector('.chip').onclick = () => {
+      c.returnEnabled = !c.returnEnabled;
+      // Beim Einschalten sinnvolle Defaults setzen: zurück zum Start,
+      // gleiche Schrittweite wie der Hinweg (deckt den häufigsten Fall —
+      // ganz zurück — ab, ohne dass man erst alles selbst eintippen muss).
+      if (c.returnEnabled) { c.returnTo = c.fromRung; c.returnStepSize = c.stepSize; }
+      renderFbAddPanel();
+    };
+  }
   holder.querySelectorAll('[data-step]').forEach((btn) => {
     btn.onclick = () => {
       const field = btn.dataset.step;
@@ -2303,8 +2355,12 @@ function renderCampusAddPanel(holder) {
       // zurücksetzen (= ein einziger Sprung, wie bisher), sonst bliebe
       // nach einer Bereichsänderung eine Schrittweite stehen, die nicht
       // mehr zur neuen Distanz passt. Wird nur die Schrittweite selbst
-      // angetippt, bleibt sie unangetastet.
+      // angetippt, bleibt sie unangetastet. Rückweg-Schrittweite genauso,
+      // sobald sich Zu oder das Rückweg-Ziel ändert.
       if (field === 'fromRung' || field === 'toRung') c.stepSize = Math.max(1, Math.abs(c.toRung - c.fromRung));
+      if ((field === 'toRung' || field === 'returnTo') && c.returnEnabled) {
+        c.returnStepSize = Math.max(1, Math.abs(c.returnTo - c.toRung));
+      }
       renderFbAddPanel();
     };
   });
@@ -2320,15 +2376,14 @@ function renderCampusAddPanel(holder) {
   document.getElementById('fb-add-campus').onclick = () => {
     if (c.moveMode === 'pattern' && !c.pattern.length) { toast('Zuerst ein Muster antippen.', 'err'); return; }
     if (c.moveMode === 'direct') {
-      const preview = campusStepPreview(c.fromRung, c.toRung, c.stepSize);
+      const preview = campusRoundTripPreview(c);
       if (preview.error) { toast(preview.error, 'err'); return; }
-      if (preview.steps > 1) {
-        // Schrittweite < volle Distanz -> mit Zwischenstopps: intern als
-        // 'pattern'-Satz gespeichert (kein neuer Datentyp nötig, exakt
-        // dieselbe Struktur wie ein von Hand gebautes Muster).
-        const dir = c.toRung > c.fromRung ? 1 : -1;
-        const pattern = Array(preview.steps).fill(dir * c.stepSize);
-        fb.blocks.push({ type: 'campus', ...c, moveMode: 'pattern', startRung: c.fromRung, pattern });
+      if (preview.pattern.length > 1) {
+        // Schrittweite < volle Distanz und/oder ein Rückweg dazu -> mit
+        // Zwischenstopps: intern als 'pattern'-Satz gespeichert (kein
+        // neuer Datentyp nötig, exakt dieselbe Struktur wie ein von Hand
+        // gebautes Muster).
+        fb.blocks.push({ type: 'campus', ...c, moveMode: 'pattern', startRung: c.fromRung, pattern: preview.pattern });
         renderFbBlocksList();
         return;
       }
