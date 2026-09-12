@@ -1638,6 +1638,12 @@ function renderFsPanel() {
       fsCapturedElapsed = fsWorkTimer.seconds;
       fsPhase = 'entering';
       renderFsPanel();
+      // Direkt in die Zahleneingabe springen, Ziffern-Tastatur gleich
+      // offen — sonst müsste man nach "Satz beenden" erst nochmal aufs
+      // Gewicht-Feld tippen, obwohl man da eh sofort hinwill. Funktioniert
+      // nur zuverlässig, weil das noch im selben Klick-Handler (also
+      // innerhalb der Nutzer-Geste) passiert.
+      document.getElementById('fs-weight')?.focus();
     };
   }
   const nextSetBtn = document.getElementById('fs-next-set');
@@ -1697,10 +1703,14 @@ function renderFsPanel() {
   const weightEl = document.getElementById('fs-weight');
   const repsEl = document.getElementById('fs-reps');
   if (weightEl) {
-    // Beim Antippen sofort leeren statt den alten Wert erst löschen zu
-    // müssen — man tippt hier ja gerade rein, weil man ihn ändern will.
-    weightEl.onfocus = (e) => { e.target.value = ''; };
-    repsEl.onfocus = (e) => { e.target.value = ''; };
+    // Beim Fokussieren den Wert markieren statt zu löschen — Tippen
+    // ersetzt eine markierte Auswahl automatisch, aber man sieht den
+    // vorgeschlagenen Wert noch kurz, bevor man drüberschreibt. Wichtig
+    // seit "Satz beenden" das Feld selbst fokussiert (siehe fs-end-set):
+    // ein Leeren beim Fokus hätte den hilfreichen Vorschlag sofort wieder
+    // gelöscht, bevor man ihn überhaupt sieht.
+    weightEl.onfocus = (e) => { e.target.select(); };
+    repsEl.onfocus = (e) => { e.target.select(); };
     const submitSet = () => {
       const reps = repsEl.value.trim();
       if (!reps) { toast('Wiederholungen eingeben.', 'err'); return; }
@@ -4114,13 +4124,15 @@ function renderFbOverlay() {
     `;
   } else if (fb.preCount != null) {
     const block = fb.blocks[fb.blockIndex];
-    const armNote = hangArmNote(block);
+    const isHang = block.type === 'hang';
+    const armNote = isHang ? hangArmNote(block) : '';
     const tense = fb.preCount <= 3;
     stage = `
-      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${esc(hangGripLabel(block))}${armNote ? ' · ' + armNote : ''}</div>
-      <div class="fb-stage-figure">${hangBoardThumb(block)}</div>
+      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${isHang ? esc(hangGripLabel(block)) : campusLabel(block)}${armNote ? ' · ' + armNote : ''}</div>
+      <div class="fb-stage-figure">${isHang ? hangBoardThumb(block) : campusWorkFigureSvg(block)}</div>
       <div class="fb-precount ${tense ? 'fb-precount-tense' : ''}" id="fb-precount">${fb.preCount}</div>
-      <div class="fb-stage-sub mono">Hände ans Board — gleich geht's los!</div>
+      <div class="fb-stage-sub mono">Hände ans Board — Zeit zum Vorbereiten!</div>
+      <button class="btn fb-stage-btn" id="fb-precount-skip">Jetzt starten</button>
       <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
     `;
   } else {
@@ -4205,6 +4217,7 @@ function renderFbOverlay() {
   if (fb.awaitingNext) {
     document.getElementById('fb-continue').onclick = startCurrentBlock;
   } else if (fb.preCount != null) {
+    document.getElementById('fb-precount-skip').onclick = finishPreCountdown;
     document.getElementById('fb-cancel').onclick = cancelAblauf;
   } else {
     document.getElementById('fb-cancel').onclick = cancelAblauf;
@@ -4399,18 +4412,19 @@ function startCurrentBlock() {
   beginBlock();
 }
 
-/* Startet fb.blockIndex: bei Hang-Sätzen erst der 5-Sekunden-Countdown zum
-   Hände-ans-Board-Bekommen, danach automatisch der Timer; bei Übungs-Sätzen
-   direkt der Timer (kein Board, das man greifen müsste). Wird sowohl beim
-   allerersten Satz als auch bei jedem automatischen Weiterschalten sowie
-   bei Zurück/Weiter aufgerufen — ein einziger Einstiegspunkt statt
-   Sonderfällen pro Aufrufer. */
+/* Startet fb.blockIndex: bei Hang- UND Campus-Sätzen erst ein Countdown
+   zum Hinlaufen/Hände-ans-Board-Bekommen, danach automatisch der Timer;
+   bei Fixübungen direkt der Timer (kein Board, zu dem man erst hinmuss).
+   Wird sowohl beim allerersten Satz als auch bei jedem automatischen
+   Weiterschalten sowie bei Zurück/Weiter aufgerufen — ein einziger
+   Einstiegspunkt statt Sonderfällen pro Aufrufer. */
+const FB_PRECOUNT_SECONDS = 15;
 function beginBlock() {
   const block = fb.blocks[fb.blockIndex];
   if (!block) { finishAblauf(); return; }
   requestWakeLock();
-  if (block.type === 'hang') {
-    fb.preCount = 5;
+  if (block.type === 'hang' || block.type === 'campus') {
+    fb.preCount = FB_PRECOUNT_SECONDS;
     renderFbOverlay();
     fb.intervalId = setInterval(tickPreCountdown, 1000);
   } else {
@@ -4418,15 +4432,19 @@ function beginBlock() {
   }
 }
 
+/* Countdown vorzeitig beenden (Zeit reicht schon) ODER weil er abgelaufen
+   ist — beides landet in derselben Übergabe an startSequence(), damit
+   "Jetzt starten" und "Countdown fertig" exakt denselben Weg nehmen. */
+function finishPreCountdown() {
+  clearInterval(fb.intervalId);
+  fb.intervalId = null;
+  fb.preCount = null;
+  startSequence();
+}
+
 function tickPreCountdown() {
   fb.preCount--;
-  if (fb.preCount <= 0) {
-    clearInterval(fb.intervalId);
-    fb.intervalId = null;
-    fb.preCount = null;
-    startSequence();
-    return;
-  }
+  if (fb.preCount <= 0) { finishPreCountdown(); return; }
   if (fb.preCount <= 3) beepTick();
   renderFbOverlay();
 }
