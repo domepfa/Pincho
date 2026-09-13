@@ -3872,6 +3872,7 @@ function renderFbBlocksList() {
             <div class="timeline-edit">${edit}</div>
           </div>
           <div class="timeline-move">
+            ${(!isHang && !isCampus && !isPause) ? `<button type="button" class="timeline-move-btn" data-fb-info="${i}" title="Info zur Übung">ℹ</button>` : ''}
             <button type="button" class="timeline-move-btn" data-move-up="${i}" ${i === 0 ? 'disabled' : ''} title="Nach oben verschieben">▲</button>
             <button type="button" class="timeline-move-btn" data-move-down="${i}" ${i === fb.blocks.length - 1 ? 'disabled' : ''} title="Nach unten verschieben">▼</button>
           </div>
@@ -3906,6 +3907,9 @@ function renderFbBlocksList() {
       fb.blocks.splice(Number(btn.dataset.remove), 1);
       renderFbBlocksList();
     };
+  });
+  holder.querySelectorAll('[data-fb-info]').forEach((btn) => {
+    btn.onclick = () => showExerciseInfoSheet(fb.blocks[Number(btn.dataset.fbInfo)].exerciseId);
   });
   holder.querySelectorAll('[data-move-up]').forEach((btn) => {
     btn.onclick = () => {
