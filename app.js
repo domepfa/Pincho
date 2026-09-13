@@ -2171,7 +2171,7 @@ function renderFbAddPanel() {
       </div>
       <button type="button" class="btn" id="fb-add-exercise" style="width:100%;">+ Übung hinzufügen</button>
     `;
-    wireExercisePickerGrid('fb-exercise-grid', ACCESSORY_EXERCISES, fb.newExercise.exerciseId, (id) => { fb.newExercise.exerciseId = id; }, 'fb-add-exercise', false);
+    wireExercisePickerGrid('fb-exercise-grid', EXERCISE_LIBRARY, fb.newExercise.exerciseId, (id) => { fb.newExercise.exerciseId = id; }, 'fb-add-exercise', false);
     document.getElementById('fb-new-exreps').oninput = (e) => { fb.newExercise.reps = Number(e.target.value) || 1; };
     document.getElementById('fb-new-exwork').oninput = (e) => { fb.newExercise.workSec = Number(e.target.value) || 5; };
     document.getElementById('fb-new-exrest').oninput = (e) => { fb.newExercise.restSec = Number(e.target.value) || 0; };
