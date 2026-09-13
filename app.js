@@ -539,6 +539,35 @@ async function loadExerciseSettings() {
   exerciseSettings = raw || {};
 }
 
+/* Wdh./Zeit-Wahl pro Übung — standardmässig entscheidet die feste
+   isHold-Eigenschaft aus der Übungsbibliothek (Plank, Wall Sit, ...), aber
+   jede Übung soll umschaltbar sein (z. B. Schulterkreisen zeitbasiert
+   loggen). Einmal umgeschaltet bleibt das dauerhaft gemerkt (pro Mitglied
+   und Übung), bis man es wieder ändert — bereits geloggte Sätze tragen ihr
+   Zeit/Wdh.-Merkmal aber direkt am Satz selbst (siehe set.unit), damit ein
+   späteres Umschalten der Übungs-Voreinstellung alte Sätze NIE rückwirkend
+   umdeutet. */
+let exerciseUnitPrefs = {};
+async function loadExerciseUnitPrefs() {
+  const raw = await fbGet(`exerciseUnitPrefs/${state.member.id}`);
+  exerciseUnitPrefs = raw || {};
+}
+function exerciseUnit(id) {
+  return exerciseUnitPrefs[id] || (exerciseIsHold(id) ? 'time' : 'reps');
+}
+function setExerciseUnit(id, unit) {
+  exerciseUnitPrefs[id] = unit;
+  fbPut(`exerciseUnitPrefs/${state.member.id}/${id}`, unit);
+}
+/* Anzeige-Einheit EINES bereits geloggten Satzes: der Satz selbst entscheidet
+   (set.unit), falls vorhanden — nur bei älteren, vor diesem Feature
+   geloggten Sätzen (kein set.unit gespeichert) fällt es auf die feste
+   isHold-Eigenschaft zurück, damit die Anzeige für die identisch bleibt. */
+function setUnitSuffix(exerciseId, set) {
+  const unit = (set && set.unit) || (exerciseIsHold(exerciseId) ? 'time' : 'reps');
+  return unit === 'time' ? 's' : '';
+}
+
 /* Geteilte Vorlagen — EINE flache, member-übergreifende Liste (statt eigener
    Collection pro Feature), sichtbar für die ganze Crew, nicht nur den, der
    sie gespeichert hat (anders als fingerboardTemplates/sessionPlans/
@@ -628,14 +657,13 @@ function exerciseHistoryTableHtml(exerciseId) {
   const sessions = historyForExercise(exerciseId, 3);
   if (!sessions.length) return '';
   const maxSets = Math.max(...sessions.map((s) => s.sets.length));
-  const suffix = exerciseIsHold(exerciseId) ? 's' : '';
   let rows = '';
   for (let i = 0; i < maxSets; i++) {
     rows += `<tr><td class="hist-row-label mono">Satz ${i + 1}</td>${sessions.map((s) => {
       const set = s.sets[i];
       if (!set) return '<td class="mono">–</td>';
       const w = set.weight !== '' && set.weight != null ? esc(String(set.weight)) + 'kg × ' : '';
-      return `<td class="mono">${w}${esc(String(set.reps))}${suffix}</td>`;
+      return `<td class="mono">${w}${esc(String(set.reps))}${setUnitSuffix(exerciseId, set)}</td>`;
     }).join('')}</tr>`;
   }
   return `
@@ -656,7 +684,7 @@ async function renderLog() {
   // (Klettern/Fingerboard/Jogging/...) ergibt dort keinen Sinn, ist immer
   // "Gym". Datum bleibt trotzdem sichtbar, nur Typ fällt weg.
   const hideTypeField = logMode === 'freestyle' || logMode === 'execute';
-  await Promise.all([loadSessionPlans(), loadExerciseSettings(), loadSharedTemplates(), loadWallTemplates()]);
+  await Promise.all([loadSessionPlans(), loadExerciseSettings(), loadExerciseUnitPrefs(), loadSharedTemplates(), loadWallTemplates()]);
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Neue Session</h2><div class="sec-rule"></div></div>
     <div class="card">
@@ -1232,10 +1260,13 @@ function renderWarmupBuilder(holder) {
    alle Sätze) und Freestyle-Einträge (jeder Satz einzeln erfasst) sehen
    unterschiedlich aus, laufen aber in derselben Liste zusammen. */
 function fbExerciseSetsText(ex) {
-  const suffix = exerciseIsHold(ex.exerciseId) ? 's' : '';
   if (Array.isArray(ex.sets)) {
-    return ex.sets.map((s) => (s.weight !== '' && s.weight != null ? `${s.weight}kg×${s.reps}${suffix}` : `${s.reps}${suffix}`)).join(', ');
+    return ex.sets.map((s) => {
+      const suffix = setUnitSuffix(ex.exerciseId, s);
+      return s.weight !== '' && s.weight != null ? `${s.weight}kg×${s.reps}${suffix}` : `${s.reps}${suffix}`;
+    }).join(', ');
   }
+  const suffix = exerciseIsHold(ex.exerciseId) ? 's' : '';
   return `${ex.sets}×${ex.reps}${suffix}${ex.weight ? ' @ ' + ex.weight + 'kg' : ''}`;
 }
 
@@ -1535,7 +1566,8 @@ function renderFsPanel() {
   // gestoppte Dauer als Kontext) → 'resting' (Pausenstoppuhr) → zurück
   // zu 'working' für den nächsten Satz.
   const floatingInputHtml = (g) => {
-    const isHold = exerciseIsHold(g.exerciseId);
+    const unit = exerciseUnit(g.exerciseId);
+    const isHold = unit === 'time';
     if (fsPhase === 'idle') {
       return `<button type="button" class="btn small" id="fs-start-set" style="width:100%;">▶ Start</button>`;
     }
@@ -1564,6 +1596,10 @@ function renderFsPanel() {
     // keine Wiederholung.
     return `
       <div class="fs-captured-duration mono">Dauer: ${fmtMinSec(fsCapturedElapsed)}</div>
+      <div class="chip-row" id="fs-unit-toggle" style="margin-bottom:8px;">
+        <button type="button" class="chip ${!isHold ? 'active' : ''}" data-unit="reps">Wdh.</button>
+        <button type="button" class="chip ${isHold ? 'active' : ''}" data-unit="time">Zeit</button>
+      </div>
       <div class="field-row">
         <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" enterkeyhint="next" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
         <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" value="${isHold ? fsCapturedElapsed : ''}"></div>
@@ -1598,14 +1634,17 @@ function renderFsPanel() {
       ${g.infoOpen ? fsExerciseInfoHtml(g.exerciseId) : ''}
       ${gi === builder.activeIndex && targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
       ${gi === builder.activeIndex ? exerciseHistoryTableHtml(g.exerciseId) : ''}
-      ${g.sets.length ? g.sets.map((s, si) => ({ s, si })).reverse().map(({ s, si }) => `
+      ${g.sets.length ? g.sets.map((s, si) => ({ s, si })).reverse().map(({ s, si }) => {
+        const setIsHold = setUnitSuffix(g.exerciseId, s) === 's';
+        return `
         <div class="fs-set-row mono">
           <span>Satz ${si + 1}</span>
           <input type="number" inputmode="decimal" step="0.5" class="ex-row-input" data-edit="${gi}:${si}:weight" value="${s.weight !== '' && s.weight != null ? esc(String(s.weight)) : ''}" placeholder="kg" title="Gewicht">
-          <input type="text" inputmode="numeric" class="ex-row-input" data-edit="${gi}:${si}:reps" value="${esc(String(s.reps))}" placeholder="${exerciseIsHold(g.exerciseId) ? 's' : 'Wdh'}" title="${exerciseIsHold(g.exerciseId) ? 'Dauer (s)' : 'Wiederholungen'}">
+          <input type="text" inputmode="numeric" class="ex-row-input" data-edit="${gi}:${si}:reps" value="${esc(String(s.reps))}" placeholder="${setIsHold ? 's' : 'Wdh'}" title="${setIsHold ? 'Dauer (s)' : 'Wiederholungen'}">
           <button type="button" class="ex-row-remove" data-remove-set="${gi}:${si}" title="Satz entfernen">×</button>
         </div>
-      `).join('') : '<div class="fs-set-row mono" style="color:var(--ink-faint);">noch keine Sätze</div>'}
+      `;
+      }).join('') : '<div class="fs-set-row mono" style="color:var(--ink-faint);">noch keine Sätze</div>'}
     </div>
   `;
     }).join('')}`;
@@ -1700,6 +1739,12 @@ function renderFsPanel() {
       fbPut(`exerciseSettings/${state.member.id}/${id}`, ta.value);
     };
   });
+  holder.querySelectorAll('#fs-unit-toggle .chip').forEach((btn) => {
+    btn.onclick = () => {
+      setExerciseUnit(activeGroup.exerciseId, btn.dataset.unit);
+      renderFsPanel();
+    };
+  });
   const weightEl = document.getElementById('fs-weight');
   const repsEl = document.getElementById('fs-reps');
   if (weightEl) {
@@ -1724,7 +1769,8 @@ function renderFsPanel() {
       weightEl.blur();
       repsEl.blur();
       setTimeout(() => {
-        builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps, elapsedSec: fsCapturedElapsed });
+        const unit = exerciseUnit(builder.exercises[builder.activeIndex].exerciseId);
+        builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps, elapsedSec: fsCapturedElapsed, unit });
         fsPhase = 'resting';
         startFsRestTimer();
         renderFsPanel();

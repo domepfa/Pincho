@@ -409,11 +409,16 @@ button, input, select, textarea { font-family: inherit; }
 .body-zone rect, .body-zone ellipse { fill: var(--ink-faint); opacity: .35; transition: fill .15s, opacity .15s; }
 .body-zone:active rect, .body-zone:active ellipse { opacity: .6; }
 .body-zone.active rect, .body-zone.active ellipse { fill: var(--accent); opacity: .9; }
-.ex-supergroup-row { margin-bottom: 12px; }
+.ex-supergroup-row {
+  margin-bottom: 12px; flex-wrap: nowrap; gap: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.ex-supergroup-row::-webkit-scrollbar { display: none; }
+.ex-supergroup-row .chip { padding: 6px 8px; font-size: 10.5px; white-space: nowrap; flex-shrink: 0; }
 .ex-pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px; }
 .ex-pick-btn {
   font-family: 'IBM Plex Mono', monospace; font-size: 12px; line-height: 1.3; padding: 9px 8px;
-  border: 1px solid var(--line); color: var(--ink-dim); background: none; cursor: pointer;
+  border: 1px solid var(--line); color: var(--ink); background: none; cursor: pointer;
   text-align: left; white-space: normal; transition: border-color .13s, color .13s, background .13s;
 }
 .ex-pick-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .1); }
