@@ -397,8 +397,8 @@ function markChallengesSeenNow() {
    ================================================================= */
 const NAV_ITEMS = [
   { route: 'fingerboard', label: 'Board' },
-  { route: 'log', label: 'Log' },
-  { route: 'plan', label: 'Plan' },
+  { route: 'log', label: 'Gym' },
+  { route: 'plan', label: 'Agenda' },
   { route: 'challenges', label: 'Challenges' },
 ];
 
@@ -679,7 +679,7 @@ async function renderLog() {
   // "Geplant" ist jetzt reine Plan-Verwaltung (bauen/speichern/laden), keine
   // direkte Session — Datum/Typ/Notiz/RPE/Speichern gehören erst zu einer
   // tatsächlichen Session (Freestyle, Plan-Ausführung, Ausdauer).
-  const hideSessionFields = logMode === 'wall' || logMode === 'planned' || logMode === 'warmup';
+  const hideSessionFields = logMode === 'wall' || logMode === 'planned';
   // Freestyle/Plan-Ausführung sind als Gym-Session gedacht — die Typ-Auswahl
   // (Klettern/Fingerboard/Jogging/...) ergibt dort keinen Sinn, ist immer
   // "Gym". Datum bleibt trotzdem sichtbar, nur Typ fällt weg.
@@ -702,10 +702,9 @@ async function renderLog() {
 
       ${logMode === 'execute' ? '' : `
       <div class="chip-row log-mode-row">
-        <button type="button" class="chip ${logMode === 'planned' ? 'active' : ''}" data-log-mode="planned">Geplant</button>
+        <button type="button" class="chip ${logMode === 'planned' ? 'active' : ''}" data-log-mode="planned">Plan</button>
         <button type="button" class="chip ${logMode === 'freestyle' ? 'active' : ''}" data-log-mode="freestyle">Freestyle</button>
         <button type="button" class="chip ${logMode === 'wall' ? 'active' : ''}" data-log-mode="wall">Ausdauer</button>
-        <button type="button" class="chip ${logMode === 'warmup' ? 'active' : ''}" data-log-mode="warmup">Warm-up</button>
       </div>`}
 
       <div id="log-builder-panel"></div>
@@ -793,6 +792,7 @@ async function renderLogHistory() {
         <div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>
       `).join('')}</div>` : ''}
       ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
+      ${(e.exercises && e.exercises.length) ? `<button type="button" class="btn ghost small" data-save-plan="${id}" style="width:100%;margin-top:6px;">Als Plan speichern</button>` : ''}
       ${challengeDurationChipsHtml(`log-share-${id}`, CHALLENGE_WINDOW_H)}
       <div class="field-row" style="margin-top:6px;">
         <button type="button" class="btn ghost small" data-share-log="${id}">Als Challenge teilen</button>
@@ -802,6 +802,41 @@ async function renderLogHistory() {
   `).join('') : '<div class="list-empty">Noch keine Einträge.</div>';
 
   entries.forEach(([id]) => wireChallengeDurationChips(`log-share-${id}`));
+  list.querySelectorAll('[data-save-plan]').forEach((btn) => {
+    btn.onclick = async () => {
+      const found = entries.find(([id2]) => id2 === btn.dataset.savePlan);
+      if (!found) return;
+      const entry = found[1];
+      // Warm-up ist eine Aufwärm-Pseudoübung, kein trainingswirksamer Satz —
+      // gehört nicht in eine wiederverwendbare Plan-Vorlage.
+      const exercises = entry.exercises
+        .filter((ex) => Array.isArray(ex.sets) && ex.sets.length && ex.exerciseId !== 'warmup_general')
+        .map((ex) => {
+          // Ein Plan kennt pro Übung nur EINEN Zielwert (Sätze × Wdh. @ Gewicht),
+          // ein geloggter Satz aber oft unterschiedliche Werte je Satz (z. B.
+          // absteigende Pyramide) — der letzte Satz ist meist der, auf den man
+          // hingearbeitet hat, und dient hier als sinnvoller Startwert.
+          const last = ex.sets[ex.sets.length - 1];
+          return {
+            exerciseId: ex.exerciseId,
+            sets: ex.sets.length,
+            reps: String(last.reps),
+            weight: last.weight !== '' && last.weight != null ? last.weight : '',
+          };
+        });
+      if (!exercises.length) { toast('Keine Übungen zum Speichern gefunden.', 'err'); return; }
+      const name = prompt('Name für diesen Plan:', entry.date);
+      if (!name) return;
+      const key = await fbPush(`sessionPlans/${state.member.id}`, { name, exercises, createdAt: Date.now() });
+      if (!key) { toast('Speichern fehlgeschlagen.', 'err'); return; }
+      await loadSessionPlans();
+      if (confirm('Plan auch mit der Crew teilen?')) {
+        const shared = await shareTemplate('plan', name, { exercises });
+        if (shared) await loadSharedTemplates();
+      }
+      toast('Plan gespeichert.', 'ok');
+    };
+  });
   list.querySelectorAll('[data-share-log]').forEach((btn) => {
     btn.onclick = async () => {
       const found = entries.find(([id2]) => id2 === btn.dataset.shareLog);
@@ -1204,58 +1239,6 @@ async function finishWallSession() {
   };
 }
 
-/* ================================================================
-   WARM-UP (kein Timer/Sätze — nur Start/Stopp + optionaler Freitext, was
-   man gemacht hat. Bewusst so simpel wie möglich, da ein Aufwärmen keine
-   strukturierte Erfassung braucht. Speichert wie "An die Wand" direkt in
-   logs/{member}, sobald man nach dem Stopp auf Speichern tippt. */
-let warmup = { running: false, seconds: 0, intervalId: null, note: '' };
-
-function renderWarmupBuilder(holder) {
-  const canSave = !warmup.running && warmup.seconds > 0;
-  holder.innerHTML = `
-    <div class="timer-box">
-      <div class="big" id="warmup-big">${fmtMinSec(warmup.seconds)}</div>
-    </div>
-    <button type="button" class="btn" id="warmup-toggle" style="width:100%;margin-bottom:14px;">${warmup.running ? 'STOPP' : 'START'}</button>
-    ${canSave ? `
-      <div class="field"><label>Was hast du gemacht? (optional)</label><textarea id="warmup-note" placeholder="z. B. Rudergerät, Schulter-Mobilisation…">${esc(warmup.note)}</textarea></div>
-      <button type="button" class="btn" id="warmup-save" style="width:100%;">SPEICHERN</button>
-    ` : ''}
-  `;
-  document.getElementById('warmup-toggle').onclick = () => {
-    if (warmup.running) {
-      clearInterval(warmup.intervalId);
-      warmup.intervalId = null;
-      warmup.running = false;
-    } else {
-      warmup.running = true;
-      warmup.seconds = 0;
-      warmup.intervalId = setInterval(() => {
-        warmup.seconds++;
-        const big = document.getElementById('warmup-big');
-        if (big) big.textContent = fmtMinSec(warmup.seconds);
-      }, 1000);
-    }
-    renderWarmupBuilder(holder);
-  };
-  const noteEl = document.getElementById('warmup-note');
-  if (noteEl) noteEl.oninput = (e) => { warmup.note = e.target.value; };
-  const saveBtn = document.getElementById('warmup-save');
-  if (saveBtn) {
-    saveBtn.onclick = async () => {
-      const elapsedMin = Math.max(1, Math.round(warmup.seconds / 60));
-      const entry = { date: todayKey(), type: 'warmup', durationMin: elapsedMin, exercises: [], note: warmup.note.trim(), rpe: null, createdAt: Date.now() };
-      const id = await fbPush(`logs/${state.member.id}`, entry);
-      if (id) {
-        toast('Warm-up gespeichert.', 'ok');
-        warmup = { running: false, seconds: 0, intervalId: null, note: '' };
-        renderLog();
-      } else toast('Konnte nicht speichern.', 'err');
-    };
-  }
-}
-
 /* Kompakte Satz-Anzeige fürs Verlauf: geplante Einträge (fester Wert für
    alle Sätze) und Freestyle-Einträge (jeder Satz einzeln erfasst) sehen
    unterschiedlich aus, laufen aber in derselben Liste zusammen. */
@@ -1276,10 +1259,14 @@ function renderLogBuilderPanel() {
 
   if (logMode === 'wall') {
     renderWallBuilder(holder);
-  } else if (logMode === 'warmup') {
-    renderWarmupBuilder(holder);
   } else if (logMode === 'freestyle') {
+    // Warm-up ist keine eigene Kategorie mehr, sondern eine zeitbasierte
+    // Pseudo-Übung innerhalb von Freestyle (siehe exerciseIsHold in data.js)
+    // — landet dadurch automatisch in derselben Session/demselben
+    // Verlaufseintrag wie die Übungen danach, statt in einem eigenen.
+    const hasWarmup = freestyleBuilder.exercises.some((g) => g.exerciseId === 'warmup_general');
     holder.innerHTML = `
+      ${hasWarmup ? '' : `<button type="button" class="btn ghost small" id="fs-add-warmup" style="width:100%;margin-bottom:12px;">🔥 Warm-up hinzufügen</button>`}
       <div class="field">
         <label>Übung</label>
         <div id="fs-exercise-grid"></div>
@@ -1287,6 +1274,18 @@ function renderLogBuilderPanel() {
       <div id="fs-panel"></div>
       <div id="fs-discard-holder"></div>
     `;
+    const addWarmupBtn = document.getElementById('fs-add-warmup');
+    if (addWarmupBtn) {
+      addWarmupBtn.onclick = () => {
+        if (!freestyleBuilder.exercises.length) freestyleBuilder.sessionStartedAt = Date.now();
+        freestyleBuilder.exercises.push({ exerciseId: 'warmup_general', sets: [] });
+        freestyleBuilder.activeIndex = freestyleBuilder.exercises.length - 1;
+        fsPhase = 'idle';
+        stopFsRestTimer();
+        stopFsWorkTimer();
+        renderLogBuilderPanel();
+      };
+    }
     wireExercisePickerGrid('fs-exercise-grid', EXERCISE_LIBRARY, freestyleBuilder.pickerExerciseId, (id) => {
       freestyleBuilder.pickerExerciseId = id;
       if (!freestyleBuilder.exercises.length) freestyleBuilder.sessionStartedAt = Date.now();

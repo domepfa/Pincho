@@ -210,11 +210,8 @@ button, input, select, textarea { font-family: inherit; }
   transition: border-color .15s, color .15s, background .15s, transform .12s;
 }
 .chip.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .1); }
-.log-mode-row {
-  flex-wrap: nowrap; gap: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
-}
-.log-mode-row::-webkit-scrollbar { display: none; }
-.log-mode-row .chip { color: var(--ink); padding: 8px 10px; font-size: 11px; white-space: nowrap; flex-shrink: 0; }
+.log-mode-row { flex-wrap: nowrap; gap: 8px; }
+.log-mode-row .chip { flex: 1; color: var(--ink); padding: 10px 8px; font-size: 13px; white-space: nowrap; text-align: center; }
 .log-mode-row .chip.active { color: var(--accent); }
 .chip[disabled] { opacity: .3; cursor: not-allowed; }
 .chip:not([disabled]):active { transform: scale(.95); }

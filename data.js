@@ -287,6 +287,7 @@ const EXERCISE_LIBRARY = [
 const ACCESSORY_EXERCISES = EXERCISE_LIBRARY.filter((e) => e.pauseFriendly);
 
 function exerciseName(id) {
+  if (id === 'warmup_general') return 'Warm-up';
   const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
   return ex ? ex.name : id;
 }
@@ -305,6 +306,9 @@ function exerciseHowTo(id) {
    Zahl in Wirklichkeit eine Haltedauer in Sekunden, deshalb bekommen sie
    im Log einen Timer statt eines reinen Zahlenfelds. */
 function exerciseIsHold(id) {
+  // Warm-up ist eine zeitbasierte Pseudo-Übung (siehe app.js) statt eines
+  // echten Bibliothekseintrags — daher der Sonderfall statt eines Lookups.
+  if (id === 'warmup_general') return true;
   const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
   return !!(ex && ex.isHold);
 }
