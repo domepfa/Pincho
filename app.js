@@ -2481,6 +2481,7 @@ async function renderFingerboard() {
       <span class="sec-chevron" id="fb-import-chevron">${fbImportOpen ? '▾' : '▸'}</span>
     </div>
     <div id="fb-import-panel" ${fbImportOpen ? '' : 'hidden'} style="margin-bottom:16px;">
+      <a href="./assets/ki-anleitung-json.md" download class="btn ghost small" style="width:100%;margin-bottom:10px;text-decoration:none;box-sizing:border-box;">📄 Anleitung für KI herunterladen</a>
       <div class="field">
         <label>JSON einfügen</label>
         <textarea id="fb-import-textarea" rows="6" placeholder='[{"type":"exercise","exerciseId":"face_pull","reps":15,"workSec":40,"restSec":30}]'></textarea>
