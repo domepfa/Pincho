@@ -701,7 +701,7 @@ async function renderLog() {
       </div>`}
 
       ${logMode === 'execute' ? '' : `
-      <div class="chip-row">
+      <div class="chip-row log-mode-row">
         <button type="button" class="chip ${logMode === 'planned' ? 'active' : ''}" data-log-mode="planned">Geplant</button>
         <button type="button" class="chip ${logMode === 'freestyle' ? 'active' : ''}" data-log-mode="freestyle">Freestyle</button>
         <button type="button" class="chip ${logMode === 'wall' ? 'active' : ''}" data-log-mode="wall">Ausdauer</button>
