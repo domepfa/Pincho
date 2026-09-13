@@ -122,28 +122,15 @@ function exercisePickerBodyHtml(list, selectedId, sg, useRecents, showAll) {
     </div>
     <div class="ex-pick-grid">
       ${sg ? visibleList.map((e) => `
-        <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">${esc(e.name)}</button>
+        <div class="ex-pick-cell">
+          <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">${esc(e.name)}</button>
+          <button type="button" class="ex-pick-info" data-info-exercise="${e.id}" title="Info zur Übung">ℹ</button>
+        </div>
       `).join('') : '<p class="login-hint ex-pick-hint">Körperbereich oben antippen, um Übungen zu sehen.</p>'}
     </div>
     ${showAllToggle ? `<button type="button" class="btn ghost small" id="ex-show-all" style="width:100%;margin-top:6px;">Alle anzeigen (${groupList.length})</button>` : ''}
   `;
 }
-/* Lang drücken statt tippen zeigt Infos zur Übung (Ausführung, Zielmuskeln),
-   ohne sie schon auszuwählen — bei uneindeutigen Namen ("Rudern Kabel" vs.
-   "Rudern Langhantel") kann man so erst nachschauen, bevor man committet.
-   Setzt bei ausgelöstem Long-Press ein Flag, das der nachfolgende Klick
-   (der auf Touch-Geräten nach dem Loslassen trotzdem feuert) prüft, um die
-   normale Auswahl für DIESEN einen Tap zu überspringen. */
-function wireLongPress(el, onLongPress, holdMs = 480) {
-  let timer = null;
-  const start = () => { timer = setTimeout(() => { timer = null; el.dataset.longPressed = '1'; onLongPress(); }, holdMs); };
-  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
-  el.addEventListener('pointerdown', start);
-  el.addEventListener('pointerup', cancel);
-  el.addEventListener('pointercancel', cancel);
-  el.addEventListener('pointermove', cancel);
-}
-
 function ensureExerciseInfoSheet() {
   let el = document.getElementById('exercise-info-sheet');
   if (!el) {
@@ -195,9 +182,7 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
     const showAllBtn = document.getElementById('ex-show-all');
     if (showAllBtn) showAllBtn.onclick = () => { showAll = true; render(); };
     holder.querySelectorAll('.ex-pick-btn').forEach((btn) => {
-      wireLongPress(btn, () => showExerciseInfoSheet(btn.dataset.exercise));
       btn.onclick = () => {
-        if (btn.dataset.longPressed === '1') { btn.dataset.longPressed = ''; return; }
         selectedId = btn.dataset.exercise;
         holder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
         onSelect(selectedId);
@@ -205,6 +190,13 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
           document.getElementById(scrollTargetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       };
+    });
+    // Info-Button NEBEN der Übung, nicht Teil ihres Auswahl-Buttons — so
+    // kann man die Ausführung/Zielmuskeln nachschauen, ohne die Übung schon
+    // auszuwählen (wichtig bei uneindeutigen Namen wie "Rudern Kabel" vs.
+    // "Rudern Langhantel").
+    holder.querySelectorAll('.ex-pick-info').forEach((btn) => {
+      btn.onclick = () => showExerciseInfoSheet(btn.dataset.infoExercise);
     });
   };
   render();
@@ -1511,15 +1503,19 @@ function stopAllFsTimers() {
   stopFsRestTimer();
 }
 
-/* Eine neue oder bereits vorhandene Übung wird aktiv: erstmal nur die
-   Phase auf 'idle' setzen (Stoppuhr steht still) — die Uhr läuft nicht
-   automatisch los, sondern erst nachdem man bewusst "Start" antippt. So
-   bleibt Zeit, sich an der Übung einzurichten, bevor die Zeit mitläuft. */
+/* Eine neue oder bereits vorhandene Übung wird aktiv: normalerweise erstmal
+   nur die Phase auf 'idle' setzen (Stoppuhr steht still) — die Uhr läuft
+   nicht automatisch los, sondern erst nachdem man bewusst "Start" antippt.
+   Läuft aber gerade die Pause zwischen zwei Sätzen, soll die über einen
+   Übungswechsel hinweg WEITERLAUFEN (die Erholung pausiert ja nicht, nur
+   weil man sich eine andere Übung anschaut) — erst ein bewusstes "Start"
+   für die neue Übung beendet sie dann wirklich. */
 function activateFsGroup(builder, idx) {
   builder.activeIndex = idx;
-  fsPhase = 'idle';
-  stopFsRestTimer();
-  stopFsWorkTimer();
+  if (fsPhase !== 'resting') {
+    fsPhase = 'idle';
+    stopFsWorkTimer();
+  }
   renderFsPanel();
 }
 
@@ -1577,9 +1573,13 @@ function renderFsPanel() {
       `;
     }
     if (fsPhase === 'resting') {
+      // Während der Pause zur Übung gewechselt (siehe activateFsGroup) —
+      // für die noch satzlose neue Übung ist es der ERSTE Satz, nicht der
+      // "nächste" einer schon begonnenen.
+      const label = g.sets.length ? 'Nächster Satz' : '▶ Start';
       return `
         <div class="fs-rest-timer mono" id="fs-rest-timer">PAUSE ${fmtMinSec(fsRestTimer.seconds)}</div>
-        <button type="button" class="btn small" id="fs-next-set" style="width:100%;">Nächster Satz</button>
+        <button type="button" class="btn small" id="fs-next-set" style="width:100%;">${label}</button>
       `;
     }
     // 'entering': Vorschlag fürs Gewicht-Feld zuerst der zuletzt in DIESER
@@ -1631,6 +1631,7 @@ function renderFsPanel() {
         </div>
       </div>
       ${g.infoOpen ? fsExerciseInfoHtml(g.exerciseId) : ''}
+      ${gi === builder.activeIndex ? fsMachineNoteHtml(g.exerciseId) : ''}
       ${gi === builder.activeIndex && targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
       ${gi === builder.activeIndex ? exerciseHistoryTableHtml(g.exerciseId) : ''}
       ${g.sets.length ? g.sets.map((s, si) => ({ s, si })).reverse().map(({ s, si }) => {
@@ -3538,16 +3539,26 @@ function fsExerciseInfoHtml(exerciseId) {
   const muscles = exerciseMuscles(exerciseId);
   const text = muscleLabelsText(muscles.primary, muscles.secondary);
   const howTo = exerciseHowTo(exerciseId);
-  const note = exerciseSettings[exerciseId] || '';
   return `
     <div class="fb-muscle-block">
       ${howTo ? `<div class="ex-howto">${esc(howTo)}</div>` : ''}
       ${text ? bodyMapSvg(muscles.primary, muscles.secondary) : ''}
       ${text ? `<div class="fb-muscle-label mono">${esc(text)}</div>` : ''}
-      <div class="field" style="margin-top:8px;">
-        <label>Maschineneinstellungen (optional)</label>
-        <textarea data-machine-note="${exerciseId}" placeholder="z. B. Sitz Stufe 4, ROM oben eingeschränkt…">${esc(note)}</textarea>
-      </div>
+    </div>
+  `;
+}
+
+/* Maschineneinstellungen (Sitzhöhe, ROM, Pin-Position...) braucht man JEDES
+   Mal an derselben Maschine wieder — anders als Ausführung/Zielmuskeln (die
+   man höchstens einmal nachschaut) gehört das direkt sichtbar zur aktiven
+   Übung, nicht hinter dem ℹ-Umschalter versteckt. Wert kommt automatisch
+   vom letzten Mal, da er dauerhaft pro Übung in exerciseSettings liegt. */
+function fsMachineNoteHtml(exerciseId) {
+  const note = exerciseSettings[exerciseId] || '';
+  return `
+    <div class="field fs-machine-note">
+      <label>Maschineneinstellungen (optional)</label>
+      <textarea data-machine-note="${exerciseId}" placeholder="z. B. Sitz Stufe 4, ROM oben eingeschränkt…">${esc(note)}</textarea>
     </div>
   `;
 }
