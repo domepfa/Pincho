@@ -723,7 +723,12 @@ async function renderLog() {
 
   document.querySelectorAll('[data-log-mode]').forEach((btn) => {
     btn.onclick = () => {
-      if (logMode === 'freestyle' || logMode === 'execute') stopAllFsTimers();
+      // fsPhase bewusst mit zurücksetzen, nicht nur die Stoppuhr stoppen —
+      // sonst dachte der Screen beim nächsten Öffnen von Freestyle noch
+      // "läuft gerade" (fsPhase blieb 'working'), obwohl kein Intervall mehr
+      // lief, und startete die Arbeits-Stoppuhr der zuletzt aktiven Übung
+      // von selbst neu, ohne dass "Start" gedrückt wurde.
+      if (logMode === 'freestyle' || logMode === 'execute') { stopAllFsTimers(); fsPhase = 'idle'; }
       logMode = btn.dataset.logMode;
       renderLog();
     };
@@ -1456,7 +1461,7 @@ function renderLogBuilderPanel() {
                Knopf nötig, man bleibt ja an derselben Übung).
    Eine einzige, modul-globale Phase/Uhr reicht, da jeweils nur eine
    Übung gleichzeitig aktiv ist. */
-let fsPhase = 'working';
+let fsPhase = 'idle';
 let fsWorkTimer = { seconds: 0, intervalId: null };
 let fsRestTimer = { seconds: 0, intervalId: null };
 let fsCapturedElapsed = 0;
@@ -1550,11 +1555,6 @@ function renderFsPanel() {
     holder.innerHTML = '<p class="login-hint">Übung wählen und "+ Übung" antippen, um Sätze zu erfassen.</p>';
     return;
   }
-
-  // Nach einem frischen Seitenladen (Navigation zurück zu einem Entwurf mit
-  // bereits aktiver Übung) tickt noch kein Intervall — Arbeits-Stoppuhr
-  // dann hier einmalig nachstarten, statt bei "0:00" stehen zu bleiben.
-  if (fsPhase === 'working' && !fsWorkTimer.intervalId) startFsWorkTimer();
 
   // Das Eingabefeld schwebt fest oben, statt in der Karte der jeweiligen
   // Übung mitzuscrollen — sonst musste man bei einer langen Übungsliste
