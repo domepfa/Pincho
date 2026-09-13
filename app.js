@@ -123,7 +123,7 @@ function exercisePickerBodyHtml(list, selectedId, sg, useRecents, showAll) {
     <div class="ex-pick-grid">
       ${sg ? visibleList.map((e) => `
         <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">${esc(e.name)}</button>
-      `).join('') : '<p class="login-hint">Körperbereich oben antippen, um Übungen zu sehen.</p>'}
+      `).join('') : '<p class="login-hint ex-pick-hint">Körperbereich oben antippen, um Übungen zu sehen.</p>'}
     </div>
     ${showAllToggle ? `<button type="button" class="btn ghost small" id="ex-show-all" style="width:100%;margin-top:6px;">Alle anzeigen (${groupList.length})</button>` : ''}
   `;
