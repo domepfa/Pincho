@@ -1576,7 +1576,23 @@ function renderFsPanel() {
       // Während der Pause zur Übung gewechselt (siehe activateFsGroup) —
       // für die noch satzlose neue Übung ist es der ERSTE Satz, nicht der
       // "nächste" einer schon begonnenen.
-      const label = g.sets.length ? 'Nächster Satz' : '▶ Start';
+      const isExecute = logMode === 'execute';
+      const reachedTarget = isExecute && g.targetSets != null && g.sets.length >= g.targetSets;
+      const hasNextExercise = isExecute && builder.activeIndex < builder.exercises.length - 1;
+      if (reachedTarget && hasNextExercise) {
+        // Plan-Ziel für diese Übung erreicht (z. B. nur 1 Satz vorgesehen) —
+        // automatisch zur nächsten Übung vorschlagen statt weiter Sätze an
+        // dieser zu sammeln. Ein Extra-Satz bleibt trotzdem manuell möglich
+        // (z. B. wenn man mehr schaffen will) — das ändert nur DIESE
+        // Ausführung, nicht den gespeicherten Plan selbst, der nächstes Mal
+        // wieder mit der ursprünglichen Satzzahl startet.
+        return `
+          <div class="fs-rest-timer mono" id="fs-rest-timer">PAUSE ${fmtMinSec(fsRestTimer.seconds)}</div>
+          <button type="button" class="btn small" id="fs-next-exercise" style="width:100%;">▶ Nächste Übung</button>
+          <button type="button" class="btn ghost small" id="fs-next-set" style="width:100%;margin-top:6px;">+ Extra-Satz</button>
+        `;
+      }
+      const label = g.sets.length ? (reachedTarget ? '+ Extra-Satz' : 'Nächster Satz') : '▶ Start';
       return `
         <div class="fs-rest-timer mono" id="fs-rest-timer">PAUSE ${fmtMinSec(fsRestTimer.seconds)}</div>
         <button type="button" class="btn small" id="fs-next-set" style="width:100%;">${label}</button>
@@ -1607,9 +1623,20 @@ function renderFsPanel() {
     `;
   };
 
+  // Plan-Ausführung hat eine FESTE Reihenfolge (der Plan gibt sie vor) und
+  // ein anderes Eingabe-System als Freestyle: statt einer fix am
+  // Bildschirmrand klebenden Leiste (die bei einem langen Plan weit von der
+  // gerade aktiven Übung entfernt sein kann) wandert das Eingabefeld direkt
+  // MIT in die Karte der aktiven Übung, an ihrer Stelle in der Liste — dort
+  // wo man ohnehin gerade hinschaut. Freestyle behält die klebende Leiste
+  // (Übungen kommen dort nach und nach dazu, die neueste soll ganz oben
+  // erscheinen, nicht in fester Reihenfolge).
+  const isExecute = logMode === 'execute';
   const activeGroup = builder.exercises[builder.activeIndex];
+  const orderedExercises = builder.exercises.map((g, gi) => ({ g, gi }));
+  if (!isExecute) orderedExercises.reverse();
   holder.innerHTML = `
-    ${activeGroup ? `
+    ${activeGroup && !isExecute ? `
     <div class="fs-sticky-bar fs-sticky-input" id="fs-sticky-bar">
       <div class="fs-sticky-head mono">
         <span>▸ ${esc(exerciseName(activeGroup.exerciseId))}</span>
@@ -1617,12 +1644,13 @@ function renderFsPanel() {
       </div>
       ${floatingInputHtml(activeGroup)}
     </div>` : ''}
-    ${builder.exercises.map((g, gi) => ({ g, gi })).reverse().map(({ g, gi }) => {
+    ${orderedExercises.map(({ g, gi }) => {
+      const isActive = gi === builder.activeIndex;
       const targetText = g.targetReps != null
         ? `Ziel: ${g.targetSets}×${g.targetReps}${g.targetWeight ? ' @ ' + g.targetWeight + 'kg' : ''}`
         : '';
       return `
-    <div class="fs-group ${gi === builder.activeIndex ? 'active' : ''}" id="fs-group-${gi}">
+    <div class="fs-group ${isActive ? 'active' : ''}" id="fs-group-${gi}">
       <div class="fs-group-head">
         <span data-activate="${gi}" style="cursor:pointer;">${esc(exerciseName(g.exerciseId))}</span>
         <div style="display:flex;gap:6px;flex-shrink:0;">
@@ -1630,10 +1658,11 @@ function renderFsPanel() {
           ${logMode === 'freestyle' ? `<button type="button" class="ex-row-remove" data-remove-group="${gi}" title="Übung entfernen">×</button>` : ''}
         </div>
       </div>
+      ${isActive && isExecute ? `<div class="fs-inline-input">${floatingInputHtml(g)}</div>` : ''}
       ${g.infoOpen ? fsExerciseInfoHtml(g.exerciseId) : ''}
-      ${gi === builder.activeIndex ? fsMachineNoteHtml(g.exerciseId) : ''}
-      ${gi === builder.activeIndex && targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
-      ${gi === builder.activeIndex ? exerciseHistoryTableHtml(g.exerciseId) : ''}
+      ${isActive ? fsMachineNoteHtml(g.exerciseId) : ''}
+      ${isActive && targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
+      ${isActive ? exerciseHistoryTableHtml(g.exerciseId) : ''}
       ${g.sets.length ? g.sets.map((s, si) => ({ s, si })).reverse().map(({ s, si }) => {
         const setIsHold = setUnitSuffix(g.exerciseId, s) === 's';
         return `
@@ -1658,7 +1687,17 @@ function renderFsPanel() {
     const stickyAdd = document.getElementById('fs-sticky-add');
     if (stickyAdd) {
       stickyAdd.onclick = () => {
-        document.getElementById('fs-exercise-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Einfaches scrollIntoView({block:'start'}) reicht nicht: die
+        // klebende Eingabeleiste (position:sticky) legt sich danach über
+        // den oberen Teil des Ziels (Körperbild + Regionen-Chips wären
+        // darunter versteckt) — deshalb hier die Höhe von Topbar UND
+        // Eingabeleiste selbst mit einrechnen, damit wirklich alles
+        // darunter sichtbar bleibt.
+        const grid = document.getElementById('fs-exercise-grid');
+        if (!grid) return;
+        const barH = stickyBar.getBoundingClientRect().height || 0;
+        const targetTop = grid.getBoundingClientRect().top + window.scrollY - topbarH - barH - 8;
+        window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
       };
     }
   }
@@ -1693,6 +1732,13 @@ function renderFsPanel() {
       startFsWorkTimer();
       renderFsPanel();
     };
+  }
+  const nextExerciseBtn = document.getElementById('fs-next-exercise');
+  if (nextExerciseBtn) {
+    // Pause läuft bewusst weiter (siehe activateFsGroup) — die nächste
+    // Übung im Plan zeigt dann direkt "▶ Start", die Pausenuhr tickt dabei
+    // unverändert weiter.
+    nextExerciseBtn.onclick = () => activateFsGroup(builder, builder.activeIndex + 1);
   }
 
   holder.querySelectorAll('[data-activate]').forEach((el) => {

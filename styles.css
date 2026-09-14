@@ -279,6 +279,12 @@ button, input, select, textarea { font-family: inherit; }
 }
 .fs-sticky-input .field label { color: var(--ink); font-weight: 600; }
 .fs-sticky-input #fs-add-set { margin-top: 2px; }
+.fs-inline-input {
+  border: 1px solid var(--accent); background: var(--surface-2); padding: 10px 12px 12px;
+  margin: 4px 0 10px; box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
+}
+.fs-inline-input .field label { color: var(--ink); font-weight: 600; }
+.fs-inline-input #fs-add-set { margin-top: 2px; }
 .fs-group { border: 1px solid var(--line); padding: 8px 10px; margin-bottom: 8px; }
 .fs-group.active { border-color: var(--accent); }
 .fs-group-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--ink); margin-bottom: 4px; }
