@@ -642,11 +642,24 @@ function historyForExercise(exerciseId, limit) {
   return sessions;
 }
 
+/* "Volumen" eines Satzes (Gewicht × Wdh./Zeit) statt nur der reinen
+   Wiederholungszahl — sonst sähe mehr Gewicht bei bewusst weniger
+   Wiederholungen (ein schwererer, nicht schwächerer Satz!) fälschlich nach
+   einer Verschlechterung aus. Kein Gewicht hinterlegt (Bodyweight-Übungen
+   wie Klimmzug/Liegestütz) heisst Faktor 1 — dann zählt wieder einfach die
+   Wiederholungszahl selbst, es gibt ja nichts zum Multiplizieren. */
+function setVolume(s) {
+  const weight = (s.weight !== '' && s.weight != null) ? Number(s.weight) : 1;
+  const reps = Number(s.reps);
+  if (!Number.isFinite(weight) || !Number.isFinite(reps)) return null;
+  return weight * reps;
+}
+
 /* Trend-Pfeil pro Übung: vergleicht Satz für Satz (gleicher Index) mit der
-   Vorgänger-Session dieser Übung, summiert die Differenzen — Grundlage ist
-   dieselbe Wdh./Zeit-Logik wie beim einzelnen Satz-Delta (siehe
-   setUnitSuffix), nur pro Übung statt pro Satz aggregiert. `null`, wenn es
-   nichts Vergleichbares gibt (erstes Mal, oder nur Einheitswechsel). */
+   Vorgänger-Session dieser Übung, summiert die Volumen-Differenzen —
+   Grundlage ist dieselbe Wdh./Zeit-Logik wie beim einzelnen Satz-Delta
+   (siehe setUnitSuffix), nur pro Übung statt pro Satz aggregiert. `null`,
+   wenn es nichts Vergleichbares gibt (erstes Mal, oder nur Einheitswechsel). */
 function exerciseTrend(exerciseId, sets, priorSets) {
   if (!Array.isArray(sets) || !Array.isArray(priorSets) || !priorSets.length) return null;
   let sum = 0;
@@ -655,8 +668,9 @@ function exerciseTrend(exerciseId, sets, priorSets) {
     const prev = priorSets[i];
     if (!prev) return;
     if (setUnitSuffix(exerciseId, prev) !== setUnitSuffix(exerciseId, s)) return;
-    const diff = Number(s.reps) - Number(prev.reps);
-    if (Number.isFinite(diff)) { sum += diff; compared++; }
+    const curVol = setVolume(s);
+    const prevVol = setVolume(prev);
+    if (curVol != null && prevVol != null) { sum += curVol - prevVol; compared++; }
   });
   if (!compared) return null;
   if (sum > 0) return { symbol: '↑', cls: 'fs-trend-up' };
@@ -1729,16 +1743,24 @@ function renderFsPanel() {
         // mit dieser Übung — zeigt sofort, ob man sich gegenüber letztem
         // Mal gesteigert hat, statt das erst in der Verlaufstabelle
         // nachrechnen zu müssen. Nur bei gleicher Einheit (Wdh. vs. Zeit)
-        // vergleichbar — sonst stünden Sekunden gegen Wiederholungen.
+        // vergleichbar — sonst stünden Sekunden gegen Wiederholungen. Basis
+        // ist das Volumen (Gewicht × Wdh./Zeit), nicht die reine
+        // Wiederholungszahl — sonst hätte mehr Gewicht bei bewusst weniger
+        // Wiederholungen (ein schwererer, kein schwächerer Satz) fälschlich
+        // als Verschlechterung gegolten.
         const prevSession = historyForExercise(g.exerciseId, 1)[0];
         return g.sets.length ? g.sets.map((s, si) => ({ s, si })).reverse().map(({ s, si }) => {
           const setIsHold = setUnitSuffix(g.exerciseId, s) === 's';
           const prevSet = prevSession && prevSession.sets[si];
           let deltaHtml = '';
           if (prevSet && setUnitSuffix(g.exerciseId, prevSet) === (setIsHold ? 's' : '')) {
-            const diff = Number(s.reps) - Number(prevSet.reps);
-            if (Number.isFinite(diff) && diff !== 0) {
-              deltaHtml = `<span class="fs-set-delta ${diff > 0 ? 'fs-delta-up' : 'fs-delta-down'}">${diff > 0 ? '+' : ''}${diff}</span>`;
+            const curVol = setVolume(s);
+            const prevVol = setVolume(prevSet);
+            if (curVol != null && prevVol != null && prevVol > 0) {
+              const pct = Math.round(((curVol - prevVol) / prevVol) * 100);
+              if (pct !== 0) {
+                deltaHtml = `<span class="fs-set-delta ${pct > 0 ? 'fs-delta-up' : 'fs-delta-down'}">${pct > 0 ? '+' : ''}${pct}%</span>`;
+              }
             }
           }
           return `
@@ -1813,10 +1835,19 @@ function renderFsPanel() {
   }
   const nextExerciseBtn = document.getElementById('fs-next-exercise');
   if (nextExerciseBtn) {
-    // Pause läuft bewusst weiter (siehe activateFsGroup) — die nächste
-    // Übung im Plan zeigt dann direkt "▶ Start", die Pausenuhr tickt dabei
-    // unverändert weiter.
-    nextExerciseBtn.onclick = () => activateFsGroup(builder, builder.activeIndex + 1);
+    // Anders als ein blosser Übungswechsel (z. B. über den Picker mitten in
+    // der Pause, siehe activateFsGroup): "Nächste Übung" im Plan ist eine
+    // bewusste "ich bin bereit"-Entscheidung, kein zufälliges Hinschauen —
+    // deshalb hier direkt die Arbeits-Stoppuhr für die neue Übung starten,
+    // ohne nochmal "Start" verlangen zu müssen.
+    nextExerciseBtn.onclick = () => {
+      builder.activeIndex += 1;
+      fsNoteEditing = false;
+      stopFsRestTimer();
+      fsPhase = 'working';
+      startFsWorkTimer();
+      renderFsPanel();
+    };
   }
 
   holder.querySelectorAll('[data-activate]').forEach((el) => {
