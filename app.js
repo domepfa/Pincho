@@ -105,12 +105,17 @@ function exercisePickerBodyHtml(list, selectedId, sg, useRecents, showAll) {
   let showAllToggle = false;
   if (sg && useRecents && !showAll) {
     const recentIds = recentExerciseIdsForSupergroup(sg, 10);
-    if (recentIds.length) {
-      visibleList = groupList.filter((e) => recentIds.includes(e.id));
+    // Favoriten IMMER mit in die Kurzliste, auch ohne kürzlich geloggten
+    // Satz — sonst müsste man sie trotz Sternchen jedes Mal unter "Alle
+    // anzeigen" neu suchen, was den Zweck des Favorisierens untergräbt.
+    const favIds = groupList.filter((e) => isExerciseFavorite(e.id)).map((e) => e.id);
+    const shortlistIds = Array.from(new Set([...favIds, ...recentIds]));
+    if (shortlistIds.length) {
+      visibleList = groupList.filter((e) => shortlistIds.includes(e.id));
       showAllToggle = groupList.length > visibleList.length;
     }
-    // Noch keine geloggte Übung dieser Region — dann direkt die volle
-    // Liste zeigen, sonst stünde man vor einer leeren Auswahl.
+    // Noch keine geloggte/favorisierte Übung dieser Region — dann direkt
+    // die volle Liste zeigen, sonst stünde man vor einer leeren Auswahl.
   }
   visibleList = visibleList.slice().sort((a, b) => a.name.localeCompare(b.name, 'de'));
   return `
@@ -123,7 +128,7 @@ function exercisePickerBodyHtml(list, selectedId, sg, useRecents, showAll) {
     <div class="ex-pick-grid">
       ${sg ? visibleList.map((e) => `
         <div class="ex-pick-cell">
-          <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">${esc(e.name)}</button>
+          <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">${isExerciseFavorite(e.id) ? '★ ' : ''}${esc(e.name)}</button>
           <button type="button" class="ex-pick-info" data-info-exercise="${e.id}" title="Info zur Übung">ℹ</button>
         </div>
       `).join('') : '<p class="login-hint ex-pick-hint">Körperbereich oben antippen, um Übungen zu sehen.</p>'}
@@ -143,21 +148,28 @@ function ensureExerciseInfoSheet() {
   return el;
 }
 
-function showExerciseInfoSheet(exerciseId) {
+function showExerciseInfoSheet(exerciseId, onChange) {
   const el = ensureExerciseInfoSheet();
   const muscles = exerciseMuscles(exerciseId);
   const muscleText = muscleLabelsText(muscles.primary, muscles.secondary);
   const howTo = exerciseHowTo(exerciseId);
+  const isFav = isExerciseFavorite(exerciseId);
   el.innerHTML = `
     <div class="info-sheet-card">
       <button type="button" class="info-sheet-close" id="info-sheet-close">✕</button>
       <div class="info-sheet-title">${esc(exerciseName(exerciseId))}</div>
+      <button type="button" class="btn ghost small" id="info-sheet-fav" style="margin-bottom:10px;">${isFav ? '★ Favorit' : '☆ Zu Favoriten hinzufügen'}</button>
       ${howTo ? `<div class="ex-howto">${esc(howTo)}</div>` : ''}
       ${muscleText ? `<div class="fb-muscle-block">${bodyMapSvg(muscles.primary, muscles.secondary)}<div class="fb-muscle-label mono">${esc(muscleText)}</div></div>` : ''}
     </div>
   `;
   el.classList.remove('hidden');
   document.getElementById('info-sheet-close').onclick = () => el.classList.add('hidden');
+  document.getElementById('info-sheet-fav').onclick = () => {
+    toggleExerciseFavorite(exerciseId);
+    showExerciseInfoSheet(exerciseId, onChange);
+    if (onChange) onChange();
+  };
 }
 
 /* Rendert das Übungsraster IN den Container UND verdrahtet es — anders als
@@ -196,7 +208,10 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
     // auszuwählen (wichtig bei uneindeutigen Namen wie "Rudern Kabel" vs.
     // "Rudern Langhantel").
     holder.querySelectorAll('.ex-pick-info').forEach((btn) => {
-      btn.onclick = () => showExerciseInfoSheet(btn.dataset.infoExercise);
+      // render als Callback übergeben, damit ein Favoriten-Toggle in der
+      // Info-Ansicht sofort die dahinterliegende Kurzliste/Sternchen
+      // aktualisiert, statt erst beim nächsten Öffnen des Rasters.
+      btn.onclick = () => showExerciseInfoSheet(btn.dataset.infoExercise, render);
     });
   };
   render();
@@ -531,6 +546,28 @@ async function loadExerciseSettings() {
   exerciseSettings = raw || {};
 }
 
+/* Favoriten: per Sternchen in der Info-Ansicht markierbar, damit man
+   häufig gebrauchte Übungen (an mehreren Trainingsorten, unterschiedliche
+   Geräte) im Auswahlraster schnell wiederfindet, statt sie jedes Mal neu
+   unter "Alle anzeigen" zu suchen. Pro Mitglied, nicht pro Übungsliste. */
+let exerciseFavorites = {};
+async function loadExerciseFavorites() {
+  const raw = await fbGet(`exerciseFavorites/${state.member.id}`);
+  exerciseFavorites = raw || {};
+}
+function isExerciseFavorite(id) {
+  return !!exerciseFavorites[id];
+}
+function toggleExerciseFavorite(id) {
+  if (exerciseFavorites[id]) {
+    delete exerciseFavorites[id];
+    fbDelete(`exerciseFavorites/${state.member.id}/${id}`);
+  } else {
+    exerciseFavorites[id] = true;
+    fbPut(`exerciseFavorites/${state.member.id}/${id}`, true);
+  }
+}
+
 /* Wdh./Zeit-Wahl pro Übung — standardmässig entscheidet die feste
    isHold-Eigenschaft aus der Übungsbibliothek (Plank, Wall Sit, ...), aber
    jede Übung soll umschaltbar sein (z. B. Schulterkreisen zeitbasiert
@@ -716,7 +753,7 @@ async function renderLog() {
   // fsRecap) — Datum/Typ/Chips/Notiz/RPE wären in diesem Moment nur
   // ablenkende Reste einer bereits abgeschlossenen Session.
   const showingRecap = !!fsRecap;
-  await Promise.all([loadSessionPlans(), loadExerciseSettings(), loadExerciseUnitPrefs(), loadSharedTemplates(), loadWallTemplates()]);
+  await Promise.all([loadSessionPlans(), loadExerciseSettings(), loadExerciseUnitPrefs(), loadExerciseFavorites(), loadSharedTemplates(), loadWallTemplates()]);
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Neue Session</h2><div class="sec-rule"></div></div>
     <div class="card">
@@ -2745,8 +2782,13 @@ async function renderFingerboard() {
   };
 
   wireFbTemplatePicker();
-  Promise.all([loadFbTemplates(), loadSharedTemplates()]).then(() => {
-    if (state.route === 'fingerboard') { refreshFbTemplateOptions(); renderFbQuickstart(); }
+  Promise.all([loadFbTemplates(), loadSharedTemplates(), loadExerciseFavorites()]).then(() => {
+    if (state.route !== 'fingerboard') return;
+    refreshFbTemplateOptions();
+    renderFbQuickstart();
+    // Favoriten laden asynchron nach — Fixübungs-Raster ggf. neu rendern,
+    // damit Sternchen/Kurzliste ohne erneutes Antippen des Chips erscheinen.
+    if (fb.addType === 'exercise') renderFbAddPanel();
   });
 }
 
