@@ -323,6 +323,56 @@ function exerciseIsHold(id) {
   return !!(ex && ex.isHold);
 }
 
+/* ---------- Flow (Yoga/Pilates) ----------
+   Eigene, kleinere Bibliothek statt Wiederverwendung von EXERCISE_LIBRARY:
+   Posen haben andere Namen/Bewegungsqualität als Kraft-/Stretch-Übungen,
+   auch wenn sich einzelne technisch überschneiden (z. B. Katze-Kuh). Kein
+   Muskeldaten-Feld wie bei EXERCISE_LIBRARY — Flow ist als fliessende
+   Abfolge gedacht, nicht als gezieltes Muskeltraining. */
+const POSE_LIBRARY = [
+  // Yoga
+  { id: 'mountain_pose', name: 'Berghaltung (Tadasana)', category: 'yoga', howTo: 'Aufrechter Stand, Füsse hüftbreit, Gewicht gleichmässig verteilt, lang durch den Scheitel wachsen.' },
+  { id: 'downward_dog', name: 'Herabschauender Hund', category: 'yoga', howTo: 'Hände und Füsse am Boden, Hüfte nach oben schieben, Rücken lang, Fersen Richtung Boden.' },
+  { id: 'childs_pose', name: 'Kindshaltung', category: 'yoga', howTo: 'Fersensitz, Oberkörper nach vorne über die Knie ablegen, Arme nach vorne oder neben dem Körper.' },
+  { id: 'cat_cow_flow', name: 'Katze-Kuh', category: 'yoga', howTo: 'Vierfüsslerstand, im Atemrhythmus Rücken abwechselnd runden und durchhängen lassen.' },
+  { id: 'cobra_pose', name: 'Kobra', category: 'yoga', howTo: 'Bauchlage, Hände unter den Schultern, Oberkörper mit offener Brust nach oben drücken.' },
+  { id: 'warrior_1', name: 'Krieger I', category: 'yoga', howTo: 'Grosser Ausfallschritt, vorderes Knie über dem Knöchel gebeugt, Arme gestreckt nach oben.' },
+  { id: 'warrior_2', name: 'Krieger II', category: 'yoga', howTo: 'Breiter Stand, vorderes Knie gebeugt, Arme seitlich auf Schulterhöhe gestreckt, Blick über die vordere Hand.' },
+  { id: 'triangle_pose', name: 'Dreieck (Trikonasana)', category: 'yoga', howTo: 'Breiter Stand, Oberkörper zur vorderen Seite absenken, eine Hand zum Schienbein/Boden, andere Hand nach oben.' },
+  { id: 'extended_side_angle', name: 'Ausgestreckter Seitwinkel', category: 'yoga', howTo: 'Ausfallschritt, Unterarm auf dem vorderen Oberschenkel, anderer Arm gestreckt über den Kopf, eine lange Linie von der Ferse bis zur Hand.' },
+  { id: 'chair_pose', name: 'Stuhl (Utkatasana)', category: 'yoga', howTo: 'Stand mit gebeugten Knien wie beim Hinsetzen, Gewicht in den Fersen, Arme nach oben.' },
+  { id: 'tree_pose', name: 'Baum (Vrikshasana)', category: 'yoga', howTo: 'Einbeinstand, anderer Fuss an Innenschenkel oder Wade, Hände vor der Brust oder über dem Kopf.' },
+  { id: 'eagle_pose', name: 'Adler (Garudasana)', category: 'yoga', howTo: 'Einbeinstand, Beine und Arme umeinander verschränkt, leicht in die Knie gehen.' },
+  { id: 'low_lunge', name: 'Tiefer Ausfallschritt', category: 'yoga', howTo: 'Ausfallschritt, hinteres Knie am Boden, Hüfte nach vorne unten sinken lassen, Arme nach oben.' },
+  { id: 'pigeon_pose', name: 'Taube', category: 'yoga', howTo: 'Vorderes Knie angewinkelt vor dem Körper, hinteres Bein lang nach hinten gestreckt, Oberkörper aufrecht oder nach vorne abgelegt.' },
+  { id: 'bridge_pose', name: 'Brücke (Setu Bandha)', category: 'yoga', howTo: 'Rückenlage, Füsse aufgestellt, Hüfte nach oben heben, Hände können sich unter dem Rücken verschränken.' },
+  { id: 'camel_pose', name: 'Kamel (Ustrasana)', category: 'yoga', howTo: 'Kniestand, Hüfte nach vorne schieben, Oberkörper nach hinten öffnen, Hände zu den Fersen.' },
+  { id: 'seated_forward_fold_flow', name: 'Sitzende Vorbeuge', category: 'yoga', howTo: 'Sitzend, Beine gestreckt, aus der Hüfte nach vorne über die Beine falten, Rücken lang lassen.' },
+  { id: 'reclining_twist', name: 'Liegende Drehung', category: 'yoga', howTo: 'Rückenlage, ein Knie zur Gegenseite über den Körper legen, Schultern bleiben am Boden.' },
+  { id: 'happy_baby', name: 'Glückliches Baby', category: 'yoga', howTo: 'Rückenlage, Knie zur Brust, Aussenkanten der Füsse mit den Händen greifen, sanft hin und her wiegen.' },
+  { id: 'corpse_pose', name: 'Totenhaltung (Savasana)', category: 'yoga', howTo: 'Rückenlage, Arme und Beine leicht geöffnet, ganz entspannen und den Atem beobachten.' },
+  // Pilates
+  { id: 'pilates_hundred', name: 'The Hundred', category: 'pilates', howTo: 'Rückenlage, Beine angehoben, Oberkörper leicht eingerollt, Arme pumpen neben dem Körper im Atemrhythmus.' },
+  { id: 'roll_up', name: 'Roll-Up', category: 'pilates', howTo: 'Rückenlage, Arme über dem Kopf, langsam Wirbel für Wirbel zum Sitz aufrollen und wieder ablegen.' },
+  { id: 'leg_circles_pilates', name: 'Beinkreisen', category: 'pilates', howTo: 'Rückenlage, ein Bein gestreckt nach oben, kontrollierte Kreise in der Hüfte, Becken bleibt ruhig.' },
+  { id: 'spine_stretch_pilates', name: 'Wirbelsäulen-Dehnung sitzend', category: 'pilates', howTo: 'Sitzend, Beine leicht geöffnet, Wirbel für Wirbel nach vorne rollen, Arme bleiben nach vorne gestreckt.' },
+  { id: 'saw_pilates', name: 'Die Säge', category: 'pilates', howTo: 'Sitzend, Beine geöffnet, Oberkörper rotieren und zum gegenüberliegenden Fuss absägen.' },
+  { id: 'swan_pilates', name: 'Schwan', category: 'pilates', howTo: 'Bauchlage, Hände unter den Schultern, Oberkörper mit langer Wirbelsäule kontrolliert heben und senken.' },
+  { id: 'plank_pilates', name: 'Pilates Plank', category: 'pilates', howTo: 'Unterarmstütz, Körper bildet eine gerade Linie, Bauch und Gesäss aktiv angespannt.' },
+  { id: 'side_plank_pilates', name: 'Seitstütz', category: 'pilates', howTo: 'Seitliche Stützposition auf einem Unterarm, Körper bildet eine gerade Linie, Hüfte nach oben gehalten.' },
+  { id: 'shoulder_bridge_pilates', name: 'Schulterbrücke', category: 'pilates', howTo: 'Rückenlage, Füsse aufgestellt, Wirbel für Wirbel die Hüfte anheben, oben kurz halten, kontrolliert absenken.' },
+  { id: 'teaser_prep', name: 'Teaser-Vorbereitung', category: 'pilates', howTo: 'Rückenlage, Beine angewinkelt, Oberkörper und Beine gleichzeitig kontrolliert zu einer V-Position anheben.' },
+];
+function poseName(id) {
+  const p = POSE_LIBRARY.find((e) => e.id === id);
+  return p ? p.name : id;
+}
+function poseHowTo(id) {
+  const p = POSE_LIBRARY.find((e) => e.id === id);
+  return (p && p.howTo) || '';
+}
+const POSE_CATEGORY_LABEL = { yoga: 'Yoga', pilates: 'Pilates' };
+
 /* ---------- Trainingsplan-Vorlagen ----------
    Vorgefertigte Abläufe (Übung + Sätze + Wiederholungen), die im Log als
    Ausgangspunkt geladen und danach frei angepasst werden können. */
