@@ -1452,7 +1452,7 @@ function renderLogBuilderPanel() {
             ${customOptions}
             ${sharedOptions}
           </select>
-          <button type="button" class="btn small ghost" id="plan-delete" style="flex:0 0 auto;" title="Eigenen Plan löschen">🗑</button>
+          <button type="button" class="btn small ghost" id="plan-delete" style="flex:0 0 auto;" title="Eigenen Plan endgültig löschen" hidden>🗑 Löschen</button>
         </div>
       </div>
 
@@ -1488,6 +1488,13 @@ function renderLogBuilderPanel() {
       renderLogExerciseRows();
       const startBtn = document.getElementById('plan-start');
       if (startBtn) startBtn.disabled = !logBuilder.exercises.length;
+      // Löschen-Button nur zeigen, wenn wirklich ein EIGENER Plan geladen ist
+      // (nicht bei einer Fertig-Vorlage oder einem geteilten Plan der Crew,
+      // die man ohnehin nicht löschen kann) — sonst sieht der Button wie ein
+      // harmloser "Ablauf leeren"-Button aus, löscht aber die gespeicherte
+      // Vorlage unwiderruflich, nicht nur die aktuell angezeigten Übungen.
+      const deleteBtn = document.getElementById('plan-delete');
+      if (deleteBtn) deleteBtn.hidden = !val.startsWith('plan:');
     };
     document.getElementById('log-exercise-add').onclick = () => {
       logBuilder.exercises.push({ exerciseId: logPickerExerciseId, sets: 3, reps: '', weight: '' });
@@ -1512,13 +1519,17 @@ function renderLogBuilderPanel() {
       }
       renderLogBuilderPanel();
       document.getElementById('log-template').value = `plan:${key}`;
+      // .value direkt setzen löst kein change-Event aus — Löschen-Button
+      // hier explizit einblenden (siehe onchange-Handler oben).
+      const deleteBtnAfterSave = document.getElementById('plan-delete');
+      if (deleteBtnAfterSave) deleteBtnAfterSave.hidden = false;
       toast('Plan gespeichert.', 'ok');
     };
     document.getElementById('plan-delete').onclick = async () => {
       const val = document.getElementById('log-template').value;
       const p = val.startsWith('plan:') && sessionPlans.find((pl) => pl.id === val.slice(5));
       if (!p) { toast('Nur eigene Pläne lassen sich löschen.', 'err'); return; }
-      if (!confirm('Plan "' + p.name + '" löschen?')) return;
+      if (!confirm(`Gespeicherten Plan "${p.name}" unwiderruflich löschen? Das entfernt die Vorlage dauerhaft, nicht nur die aktuell angezeigten Übungen.`)) return;
       await fbDelete(`sessionPlans/${state.member.id}/${p.id}`);
       await loadSessionPlans();
       logBuilder.exercises = [];
@@ -2697,7 +2708,7 @@ async function renderFingerboard() {
       <label>Vorlage laden</label>
       <div class="field-row">
         <select id="fb-template-picker" style="flex:2;"></select>
-        <button type="button" class="btn small ghost" id="fb-template-delete" style="flex:0 0 auto;" title="Eigene Vorlage löschen">🗑</button>
+        <button type="button" class="btn small ghost" id="fb-template-delete" style="flex:0 0 auto;" title="Eigene Vorlage endgültig löschen" hidden>🗑 Löschen</button>
       </div>
     </div>
     <div class="chip-row" style="margin-bottom:16px;">
@@ -2913,16 +2924,29 @@ function refreshFbTemplateOptions() {
 
 function wireFbTemplatePicker() {
   refreshFbTemplateOptions();
+  // Löschen-Button nur zeigen, wenn wirklich eine EIGENE Vorlage geladen ist
+  // (nicht bei einer fest eingebauten oder geteilten Vorlage der Crew, die
+  // man ohnehin nicht löschen kann) — sonst sieht der Button direkt neben
+  // dem Lade-Dropdown wie ein harmloser "Ablauf leeren"-Button aus, löscht
+  // aber die gespeicherte Vorlage unwiderruflich, nicht nur den aktuell
+  // angezeigten Ablauf.
+  const updateFbDeleteBtnVisibility = () => {
+    const btn = document.getElementById('fb-template-delete');
+    if (btn) btn.hidden = !fb.templates.some((t) => t.id === document.getElementById('fb-template-picker').value);
+  };
+  updateFbDeleteBtnVisibility();
   document.getElementById('fb-template-picker').onchange = (e) => {
     const id = e.target.value;
     const t = findFbTemplateById(id);
-    if (!t) return;
+    if (!t) { updateFbDeleteBtnVisibility(); return; }
     if (fb.blocks.length && !confirm('Aktuellen Ablauf durch "' + t.name + '" ersetzen?')) {
       e.target.value = '';
+      updateFbDeleteBtnVisibility();
       return;
     }
     fb.blocks = t.blocks.map((b) => (b.type === 'hang' ? { ...b, board: fb.board } : { ...b }));
     renderFbBlocksList();
+    updateFbDeleteBtnVisibility();
   };
   document.getElementById('fb-template-save').onclick = async () => {
     if (!fb.blocks.length) { toast('Erst einen Ablauf zusammenstellen.', 'err'); return; }
@@ -2938,16 +2962,18 @@ function wireFbTemplatePicker() {
     refreshFbTemplateOptions();
     renderFbQuickstart();
     document.getElementById('fb-template-picker').value = key;
+    updateFbDeleteBtnVisibility();
     toast('Vorlage gespeichert.', 'ok');
   };
   document.getElementById('fb-template-delete').onclick = async () => {
     const select = document.getElementById('fb-template-picker');
     const t = fb.templates.find((r) => r.id === select.value);
     if (!t) { toast('Nur eigene Vorlagen lassen sich löschen.', 'err'); return; }
-    if (!confirm('Vorlage "' + t.name + '" löschen?')) return;
+    if (!confirm(`Gespeicherte Vorlage "${t.name}" unwiderruflich löschen? Das entfernt sie dauerhaft, nicht nur den aktuell angezeigten Ablauf.`)) return;
     await fbDelete(`fingerboardTemplates/${state.member.id}/${t.id}`);
     await loadFbTemplates();
     refreshFbTemplateOptions();
+    updateFbDeleteBtnVisibility();
     toast('Vorlage gelöscht.', 'ok');
   };
 }

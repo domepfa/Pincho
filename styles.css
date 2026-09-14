@@ -135,6 +135,12 @@ button, input, select, textarea { font-family: inherit; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 .list-empty { color: var(--ink-faint); font-size: 13px; padding: 18px 0; text-align: center; border: 1px dashed var(--line); }
 
+/* [hidden] muss IMMER gewinnen, auch gegen .btn/.btn.small (display:
+   block/inline-block) — sonst bleibt ein per hidden-Attribut versteckter
+   Button trotzdem sichtbar, weil die Selektor-Spezifität gleich ist und
+   die spätere Autoren-Regel die UA-Regel [hidden]{display:none} schlägt. */
+[hidden] { display: none !important; }
+
 /* ---------- Buttons ---------- */
 .btn {
   display: block; width: 100%; font-family: 'Bebas Neue', sans-serif; font-size: 17px; letter-spacing: .05em;
