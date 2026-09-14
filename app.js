@@ -49,8 +49,12 @@ function loadDraft(key) {
    Chip), dann erst erscheinen die Übungen dafür — kürzer als die alte Liste
    mit 6 Trainingskategorien. Ordnet jede Übung anhand ihres primären
    Zielmuskels (siehe MUSCLE_ZONES_SVG) automatisch einer von 5 Ober-
-   gruppen zu, keine separate Pflege pro Übung nötig. */
-const EX_SUPERGROUP_LABEL = { arm: 'Arm', brust: 'Brust', ruecken: 'Rücken', rumpf: 'Rumpf', huefte_beine: 'Hüfte/Beine' };
+   gruppen zu, keine separate Pflege pro Übung nötig. Mobilität/Stretch-
+   Übungen (category: 'mobility') bekommen stattdessen IMMER die eigene
+   "Stretch"-Gruppe, unabhängig vom Zielmuskel — sonst würden sie mit
+   Kraftübungen derselben Körperregion vermischt (z. B. Katze-Kuh unter
+   "Rücken" neben Rudern), was Kraft und Dehnen visuell nicht trennt. */
+const EX_SUPERGROUP_LABEL = { arm: 'Arm', brust: 'Brust', ruecken: 'Rücken', rumpf: 'Rumpf', huefte_beine: 'Hüfte/Beine', stretch: 'Stretch' };
 const MUSCLE_SUPERGROUP = {
   shoulders: 'arm', biceps: 'arm', forearms_front: 'arm', triceps: 'arm', forearms_back: 'arm',
   chest: 'brust',
@@ -59,6 +63,7 @@ const MUSCLE_SUPERGROUP = {
   quads: 'huefte_beine', shins: 'huefte_beine', glutes: 'huefte_beine', hamstrings: 'huefte_beine', calves: 'huefte_beine',
 };
 function exerciseSupergroup(ex) {
+  if (ex.category === 'mobility') return 'stretch';
   return MUSCLE_SUPERGROUP[ex.muscles.primary[0]] || 'rumpf';
 }
 
@@ -2719,11 +2724,15 @@ async function renderFingerboard() {
     <div id="fb-blocks-list"></div>
 
     <div id="fb-runtime"></div>
+
+    <div class="sec-head"><h2 class="sec-title">Verlauf</h2><div class="sec-rule"></div></div>
+    <div class="list" id="fb-history-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
   `);
 
   renderFbAddPanel();
   renderFbBlocksList(); // rendert am Ende auch renderFbRuntime() mit
   renderFbQuickstart();
+  renderFbHistory();
 
   document.getElementById('fb-quickstart-toggle').onclick = () => {
     fbQuickstartOpen = !fbQuickstartOpen;
@@ -2789,6 +2798,47 @@ async function renderFingerboard() {
     // Favoriten laden asynchron nach — Fixübungs-Raster ggf. neu rendern,
     // damit Sternchen/Kurzliste ohne erneutes Antippen des Chips erscheinen.
     if (fb.addType === 'exercise') renderFbAddPanel();
+  });
+}
+
+/* Verlauf am Ende des Board-Screens — bisher gab es hierfür (anders als
+   im Gym-Log) keine sichtbare Liste, fertig gemachte Abläufe landeten
+   "unsichtbar" nur in Firebase (fingerboardSessions). Gleiches Muster wie
+   renderLogHistory(): neueste zuerst, pro Eintrag teilen/löschen. */
+async function renderFbHistory() {
+  const raw = await fbGet(`fingerboardSessions/${state.member.id}`);
+  const entries = Object.entries(raw || {}).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+  const list = document.getElementById('fb-history-list');
+  if (!list) return; // Nutzer hat inzwischen weiternavigiert
+  list.innerHTML = entries.length ? entries.map(([id, s]) => `
+    <div class="log-item">
+      <div class="top"><span>${esc(s.date)}</span><span class="type">${esc((BOARDS[s.board] && BOARDS[s.board].label) || s.board)}${s.partial ? ' · UNVOLLSTÄNDIG' : ''}</span></div>
+      <div class="ex-log-list">${fbResultsSummaryHtml(s.blocks || [], s.results || [])}</div>
+      ${challengeDurationChipsHtml(`fb-history-share-${id}`, CHALLENGE_WINDOW_H)}
+      <div class="field-row" style="margin-top:6px;">
+        <button type="button" class="btn ghost small" data-share-fb-session="${id}">Als Challenge teilen</button>
+        <button type="button" class="btn ghost small" data-delete-fb-session="${id}">Löschen</button>
+      </div>
+    </div>
+  `).join('') : '<div class="list-empty">Noch keine Einträge.</div>';
+
+  entries.forEach(([id]) => wireChallengeDurationChips(`fb-history-share-${id}`));
+  list.querySelectorAll('[data-share-fb-session]').forEach((btn) => {
+    btn.onclick = async () => {
+      const found = entries.find(([id2]) => id2 === btn.dataset.shareFbSession);
+      if (!found) return;
+      btn.disabled = true;
+      await shareFingerboardAsChallenge(found[1].board, found[1].blocks, selectedChallengeHours(`fb-history-share-${btn.dataset.shareFbSession}`));
+      btn.disabled = false;
+    };
+  });
+  list.querySelectorAll('[data-delete-fb-session]').forEach((btn) => {
+    btn.onclick = async () => {
+      if (!confirm('Diesen Eintrag wirklich löschen?')) return;
+      await fbDelete(`fingerboardSessions/${state.member.id}/${btn.dataset.deleteFbSession}`);
+      toast('Eintrag gelöscht.', 'ok');
+      renderFbHistory();
+    };
   });
 }
 
@@ -4508,6 +4558,7 @@ function renderFbOverlay() {
       <div class="fb-precount ${tense ? 'fb-precount-tense' : ''}" id="fb-precount">${fb.preCount}</div>
       <div class="fb-stage-sub mono">Hände ans Board — Zeit zum Vorbereiten!</div>
       <button class="btn fb-stage-btn" id="fb-precount-skip">Jetzt starten</button>
+      ${fb.blockIndex > 0 ? '<button class="btn ghost fb-stage-btn" id="fb-finish-early">Vorzeitig beenden & speichern</button>' : ''}
       <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
     `;
   } else {
@@ -4570,6 +4621,7 @@ function renderFbOverlay() {
       <div class="fb-checkin" id="fb-checkin" ${fb.stepIndex === fb.sequence.length - 1 && !working ? '' : 'hidden'}>${fb.stepIndex === fb.sequence.length - 1 && !working ? checkinPanelHtml(fb.blockIndex) : ''}</div>
       ${isExercise ? `<button class="btn fb-stage-btn" id="fb-reps-done" ${working ? '' : 'hidden'}>Wiederholungen geschafft — weiter</button>` : ''}
       ${fbTransportRow()}
+      ${fb.blockIndex > 0 ? '<button class="btn ghost fb-stage-btn" id="fb-finish-early">Vorzeitig beenden & speichern</button>' : ''}
       <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
     `;
   }
@@ -4593,8 +4645,12 @@ function renderFbOverlay() {
     document.getElementById('fb-continue').onclick = startCurrentBlock;
   } else if (fb.preCount != null) {
     document.getElementById('fb-precount-skip').onclick = finishPreCountdown;
+    const finishEarlyBtn1 = document.getElementById('fb-finish-early');
+    if (finishEarlyBtn1) finishEarlyBtn1.onclick = finishAblaufEarly;
     document.getElementById('fb-cancel').onclick = cancelAblauf;
   } else {
+    const finishEarlyBtn2 = document.getElementById('fb-finish-early');
+    if (finishEarlyBtn2) finishEarlyBtn2.onclick = finishAblaufEarly;
     document.getElementById('fb-cancel').onclick = cancelAblauf;
     const repsDoneBtn = document.getElementById('fb-reps-done');
     if (repsDoneBtn) repsDoneBtn.onclick = fbSkipForward;
@@ -4946,6 +5002,24 @@ function cancelAblauf() {
   renderFbRuntime();
 }
 
+/* Vorzeitiges Beenden: z. B. nach 30 Min. reicht es, aber der bisherige
+   Fortschritt (schon fertig gemachte Blöcke) soll trotzdem gespeichert
+   und teilbar sein statt komplett zu verfallen wie bei cancelAblauf().
+   Nur wirklich ABGESCHLOSSENE Blöcke (Index < fb.blockIndex) zählen —
+   der gerade laufende, noch nicht fertige Block würde sonst fälschlich
+   als "alles geschafft" geloggt (initBlockResult-Vorbelegung). */
+async function finishAblaufEarly() {
+  if (fb.blockIndex <= 0) {
+    toast('Noch kein Satz abgeschlossen zum Speichern.', 'err');
+    return;
+  }
+  clearInterval(fb.intervalId);
+  fb.intervalId = null;
+  const doneBlocks = fb.blocks.slice(0, fb.blockIndex);
+  const doneResults = fb.runResults.slice(0, fb.blockIndex);
+  await finishAblauf(doneBlocks, doneResults, true);
+}
+
 /* Übersicht am Ende: pro Block, was tatsächlich geschafft wurde (nicht nur
    was geplant war) — Hang-Sätze als X/Y, Übungs-Sätze als geloggte
    Wdh.×kg. Headline zählt nur die Hang-Sätze (einzige Ja/Nein-Metrik). */
@@ -4974,7 +5048,10 @@ function fbResultsSummaryHtml(blocks, results) {
   return `${headline}<div class="fb-summary-list">${rows}</div>`;
 }
 
-async function finishAblauf() {
+/* blocksOverride/resultsOverride: nur beim vorzeitigen Beenden gesetzt
+   (siehe finishAblaufEarly) — dann zählen NUR die tatsächlich
+   abgeschlossenen Blöcke, nicht der volle geplante Ablauf. */
+async function finishAblauf(blocksOverride, resultsOverride, isPartial) {
   fb.running = false;
   fb.awaitingNext = false;
   fb.blockIndex = 0;
@@ -4982,15 +5059,16 @@ async function finishAblauf() {
   beep(1568, 400);
 
   const board = fb.board;
-  const blocks = fb.blocks;
-  const results = fb.runResults.slice();
+  const blocks = blocksOverride || fb.blocks;
+  const results = resultsOverride || fb.runResults.slice();
+  const estimateSeconds = blocks.reduce((total, b) => total + fbBlockSeconds(b), 0);
 
   const el = ensureFbOverlay();
   el.innerHTML = `
     <div class="fb-overlay-inner fb-overlay-done">
-      <div class="fb-done-emoji">🎉</div>
-      <div class="fb-stage-title">Ablauf geschafft!</div>
-      <div class="fb-stage-sub mono">${blocks.length} Sätze · ${fmtMinSec(fbEstimateSeconds())} Trainingszeit</div>
+      <div class="fb-done-emoji">${isPartial ? '💪' : '🎉'}</div>
+      <div class="fb-stage-title">${isPartial ? 'Vorzeitig beendet & gespeichert' : 'Ablauf geschafft!'}</div>
+      <div class="fb-stage-sub mono">${blocks.length} Sätze · ${fmtMinSec(estimateSeconds)} Trainingszeit</div>
       ${fbResultsSummaryHtml(blocks, results)}
       ${challengeDurationChipsHtml('fb-share', CHALLENGE_WINDOW_H)}
       <button class="btn fb-stage-btn ghost" id="fb-overlay-share">Als Challenge teilen</button>
@@ -4998,13 +5076,13 @@ async function finishAblauf() {
     </div>
   `;
   wireChallengeDurationChips('fb-share');
-  document.getElementById('fb-overlay-finish').onclick = () => { closeFbOverlay(); renderFbRuntime(); };
+  document.getElementById('fb-overlay-finish').onclick = () => { closeFbOverlay(); renderFbRuntime(); renderFbHistory(); };
   document.getElementById('fb-overlay-share').onclick = async (e) => {
     e.target.disabled = true;
     await shareFingerboardAsChallenge(board, blocks, selectedChallengeHours('fb-share'));
     e.target.textContent = 'Geteilt ✓';
   };
-  spawnConfetti(document.querySelector('.fb-overlay-done'));
+  if (!isPartial) spawnConfetti(document.querySelector('.fb-overlay-done'));
 
   const session = {
     date: todayKey(),
@@ -5013,6 +5091,7 @@ async function finishAblauf() {
     blocks,
     results,
     createdAt: Date.now(),
+    ...(isPartial ? { partial: true } : {}),
   };
   await fbPush(`fingerboardSessions/${state.member.id}`, session);
   toast('Ablauf gespeichert 💪', 'ok');
