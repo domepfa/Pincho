@@ -2099,6 +2099,21 @@ function parseImportedAblauf(text) {
       if (!(restSec >= 0)) { errors.push(`Satz ${n}: restSec muss eine Zahl >= 0 sein.`); return; }
       if (blockRestSec != null && !(blockRestSec >= 0)) { errors.push(`Satz ${n}: blockRestSec muss eine Zahl >= 0 sein.`); return; }
       blocks.push({ type: 'hang', board: b.board, ...gripFields, reps, hangSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}) });
+    } else if (b.type === 'block') {
+      if (typeof b.grip !== 'string' || !b.grip.trim()) { errors.push(`Satz ${n}: grip muss ein nicht-leerer Text sein (z. B. "Leiste 1" oder "Pinch").`); return; }
+      const fingers = Number(b.fingers);
+      if (![1, 2, 3, 4].includes(fingers)) { errors.push(`Satz ${n}: fingers muss 1, 2, 3 oder 4 sein.`); return; }
+      const weight = b.weight != null ? Number(b.weight) : 0;
+      if (!Number.isFinite(weight)) { errors.push(`Satz ${n}: weight muss eine Zahl sein.`); return; }
+      const reps = Number(b.reps);
+      const hangSec = Number(b.hangSec);
+      const restSec = Number(b.restSec);
+      const blockRestSec = b.blockRestSec != null ? Number(b.blockRestSec) : null;
+      if (!(reps > 0)) { errors.push(`Satz ${n}: reps muss eine Zahl > 0 sein.`); return; }
+      if (!(hangSec > 0)) { errors.push(`Satz ${n}: hangSec muss eine Zahl > 0 sein.`); return; }
+      if (!(restSec >= 0)) { errors.push(`Satz ${n}: restSec muss eine Zahl >= 0 sein.`); return; }
+      if (blockRestSec != null && !(blockRestSec >= 0)) { errors.push(`Satz ${n}: blockRestSec muss eine Zahl >= 0 sein.`); return; }
+      blocks.push({ type: 'block', grip: b.grip.trim(), fingers, weight, reps, hangSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}) });
     } else if (b.type === 'exercise') {
       const isPseudoExercise = b.exerciseId === 'warmup_general' || b.exerciseId === 'cooldown_general';
       if (!isPseudoExercise && !EXERCISE_LIBRARY.some((e) => e.id === b.exerciseId)) { errors.push(`Satz ${n}: unbekannte exerciseId "${b.exerciseId}".`); return; }
@@ -2145,7 +2160,7 @@ function parseImportedAblauf(text) {
       if (!(seconds > 0)) { errors.push(`Satz ${n}: seconds muss eine Zahl > 0 sein.`); return; }
       blocks.push({ type: 'pause', seconds });
     } else {
-      errors.push(`Satz ${n}: "type" muss "hang", "exercise", "campus" oder "pause" sein (war "${b.type}").`);
+      errors.push(`Satz ${n}: "type" muss "hang", "block", "exercise", "campus" oder "pause" sein (war "${b.type}").`);
     }
   });
 
@@ -2160,8 +2175,9 @@ const fb = {
   pickingHand: 'left',  // 'left' | 'right' — welche Hand gerade am Board gewählt wird, wenn gripMode==='different'
   selectedGripLeft: null,
   selectedGripRight: null,
-  addType: 'hang',       // 'hang' | 'exercise' | 'campus' | 'pause' — welches Add-Panel gerade offen ist
+  addType: 'hang',       // 'hang' | 'block' | 'exercise' | 'campus' | 'pause' — welches Add-Panel gerade offen ist
   newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
+  newBlock: { grip: '', fingers: 4, weight: 0, reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
   newCampus: {
     rungType: CAMPUS_RUNG_TYPES[0].id, moveMode: 'direct',
@@ -2181,7 +2197,7 @@ const fb = {
     armMode: 'both', startHand: 'left', // armMode: 'both' | 'match' | 'skip' — 'match'/'skip' zeigen zusätzlich startHand
   },
   newPause: { seconds: 60 },
-  blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec, blockRestSec} | {type:'exercise', exerciseId, reps, workSec, restSec} | {type:'campus', rungType, moveMode, reps, workSec, restSec, blockRestSec, fromRung/toRung ODER startRung/pattern, armMode, startHand} | {type:'pause', seconds}
+  blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec, blockRestSec} | {type:'block', grip, fingers, weight, reps, hangSec, restSec, blockRestSec} | {type:'exercise', exerciseId, reps, workSec, restSec} | {type:'campus', rungType, moveMode, reps, workSec, restSec, blockRestSec, fromRung/toRung ODER startRung/pattern, armMode, startHand} | {type:'pause', seconds}
   templates: [],         // eigene, in Firebase gespeicherte Abläufe (zusätzlich zu FINGERBOARD_TEMPLATES)
   weight: '',
   blockIndex: 0,
@@ -2389,6 +2405,8 @@ function renderFbAddPanel() {
       }
       renderFbBlocksList();
     };
+  } else if (fb.addType === 'block') {
+    renderBlockAddPanel(holder);
   } else if (fb.addType === 'exercise') {
     holder.innerHTML = `
       <div class="chip-row" id="fb-pseudo-exercise-row" style="margin-bottom:10px;">
@@ -2422,6 +2440,53 @@ function renderFbAddPanel() {
   } else {
     renderPauseAddPanel(holder);
   }
+}
+
+/* Griffblock: ein Trainingsblock mit mehreren Leisten, der über die
+   Querseite auch als Pinch nutzbar ist. Kein Foto/Hotspots wie beim
+   Fingerboard — Griff/Leiste ist deshalb freier Text (z. B. "Leiste 1"
+   oder "Pinch"), dazu Fingerzahl (1-4, gilt für Leisten UND Pinch) und
+   Zusatzgewicht. Immer einarmig (ein Griffblock wird nur mit einer Hand
+   gegriffen), deshalb kein Links/Rechts-Umschalter wie beim Hang-Satz.
+   Timer/Ablauf sonst identisch zum Hang-Satz (reps/hangSec/restSec/
+   blockRestSec, gleicher Sekundentimer). */
+function renderBlockAddPanel(holder) {
+  holder.innerHTML = `
+    <div class="field"><label>Griff/Leiste (frei, z. B. "Leiste 1" oder "Pinch")</label><input type="text" id="fb-block-grip" value="${esc(fb.newBlock.grip)}" placeholder="Leiste 1"></div>
+    <div class="field">
+      <label>Finger</label>
+      <div class="chip-row" id="fb-block-fingers-row">
+        ${[1, 2, 3, 4].map((n) => `<button type="button" class="chip ${fb.newBlock.fingers === n ? 'active' : ''}" data-fingers="${n}">${n}</button>`).join('')}
+      </div>
+    </div>
+    <div class="field"><label>Zusatzgewicht (kg)</label><div class="kg-field"><input type="number" inputmode="decimal" id="fb-block-weight" value="${fb.newBlock.weight}" step="0.5"><span class="mono">kg</span></div></div>
+    <div class="field-row">
+      <div class="field"><label>Sätze</label><input type="number" id="fb-block-reps" value="${fb.newBlock.reps}" min="1"></div>
+      <div class="field"><label>Halten (s)</label><input type="number" id="fb-block-hangsec" value="${fb.newBlock.hangSec}" min="1"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Pause zw. Sätzen (s)</label><input type="number" id="fb-block-restsec" value="${fb.newBlock.restSec}" min="0"></div>
+      <div class="field"><label>Pause danach (s)</label><input type="number" id="fb-block-blockrestsec" value="${fb.newBlock.blockRestSec}" min="0"></div>
+    </div>
+    <button type="button" class="btn" id="fb-add-block" style="width:100%;">+ Griffblock-Satz hinzufügen</button>
+  `;
+  document.getElementById('fb-block-grip').oninput = (e) => { fb.newBlock.grip = e.target.value; };
+  document.getElementById('fb-block-fingers-row').querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => {
+      fb.newBlock.fingers = Number(btn.dataset.fingers);
+      document.getElementById('fb-block-fingers-row').querySelectorAll('.chip').forEach((b) => b.classList.toggle('active', b === btn));
+    };
+  });
+  document.getElementById('fb-block-weight').oninput = (e) => { fb.newBlock.weight = e.target.value === '' ? 0 : Number(e.target.value); };
+  document.getElementById('fb-block-reps').oninput = (e) => { fb.newBlock.reps = Number(e.target.value) || 1; };
+  document.getElementById('fb-block-hangsec').oninput = (e) => { fb.newBlock.hangSec = Number(e.target.value) || 1; };
+  document.getElementById('fb-block-restsec').oninput = (e) => { fb.newBlock.restSec = Number(e.target.value) || 0; };
+  document.getElementById('fb-block-blockrestsec').oninput = (e) => { fb.newBlock.blockRestSec = Number(e.target.value) || 0; };
+  document.getElementById('fb-add-block').onclick = () => {
+    if (!fb.newBlock.grip.trim()) { toast('Zuerst Griff/Leiste benennen.', 'err'); return; }
+    fb.blocks.push({ type: 'block', ...fb.newBlock, grip: fb.newBlock.grip.trim() });
+    renderFbBlocksList();
+  };
 }
 
 /* Reine Pause zum freien Einfügen in den Ablauf — z. B. zwischen zwei
@@ -2694,6 +2759,7 @@ async function renderFingerboard() {
 
     <div class="chip-row">
       <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Hang-Satz</button>
+      <button class="chip ${fb.addType === 'block' ? 'active' : ''}" data-add-type="block">Griffblock</button>
       <button class="chip ${fb.addType === 'exercise' ? 'active' : ''}" data-add-type="exercise">Fixübung</button>
       <button class="chip ${fb.addType === 'campus' ? 'active' : ''}" data-add-type="campus">Campus</button>
       <button class="chip ${fb.addType === 'pause' ? 'active' : ''}" data-add-type="pause">Pause</button>
@@ -2994,10 +3060,11 @@ function wireFbTemplatePicker() {
    Pause wird trotzdem kurz Zeit zum Loggen eingeräumt, statt sie ganz
    wegzulassen. */
 function buildBlockSequence(b) {
-  if (b.type === 'hang') {
+  if (isHangLikeBlock(b)) {
     const seq = [];
+    const workPhase = b.type === 'block' ? 'Halten' : 'Hang';
     for (let s = 0; s < b.reps; s++) {
-      seq.push({ phase: 'Hang', seconds: b.hangSec });
+      seq.push({ phase: workPhase, seconds: b.hangSec });
       if (s < b.reps - 1) {
         if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec });
       } else {
@@ -3032,7 +3099,7 @@ function buildBlockSequence(b) {
   ];
 }
 function isWorkPhase(step) {
-  return !step || step.phase === 'Hang' || step.phase === 'Work';
+  return !step || step.phase === 'Hang' || step.phase === 'Work' || step.phase === 'Halten';
 }
 
 function fbEstimateSeconds() {
@@ -3934,6 +4001,36 @@ function hangBoardThumb(b) {
   return hangIsAsymmetric(b) ? miniBoardThumb(b.board, b.gripLeft, b.gripRight) : miniBoardThumb(b.board, b.grip);
 }
 
+/* Griffblock (auch als Pinch nutzbar, über die Querseite) — anders als
+   das Fingerboard kein Foto mit Hotspots, sondern ein frei benanntes
+   Leisten-/Pinch-Griffstück mit definierter Fingerzahl. Strukturell sonst
+   identisch zum Hang-Satz (reps/hangSec/restSec/blockRestSec, gleicher
+   Sekundentimer/Ring), deshalb dieselben drei Helferfunktionen im selben
+   Muster wie hangGripLabel/hangArmNote/hangBoardThumb — immer einarmig,
+   da ein Griffblock nur mit einer Hand gleichzeitig gegriffen wird. */
+function blockGripLabel(b) {
+  return `${b.grip || 'Griffblock'} · ${b.fingers}-Finger`;
+}
+function blockArmNote() {
+  return 'einarmig';
+}
+/* Kein Foto vorhanden (anders als beim Fingerboard) — die generische
+   Hänge-Figur reicht als Vorschau-"Thumb". */
+function blockThumb() {
+  return `<div class="timeline-thumb fb-block-thumb">${FB_HANG_FIGURE_SVG}</div>`;
+}
+/* Dispatcher: an den meisten Stellen sind Hang- und Griffblock-Sätze
+   austauschbar (gleicher Timer/gleiche Vorlaufzeit) — nur Titel/Figur
+   unterscheiden sich, da kein Board-Foto existiert. holdBlockTitle() gibt
+   bereits HTML-escapten Text zurück (Aufrufer müssen NICHT nochmal esc()
+   anwenden), anders als hangGripLabel/blockGripLabel selbst. */
+function isHangLikeBlock(b) { return b.type === 'hang' || b.type === 'block'; }
+function holdBlockArmNote(b) { return b.type === 'block' ? blockArmNote() : hangArmNote(b); }
+function holdBlockThumb(b) { return b.type === 'block' ? blockThumb() : hangBoardThumb(b); }
+function holdBlockTitle(b) {
+  return b.type === 'block' ? `Griffblock @ ${esc(blockGripLabel(b))}` : `Hang @ ${esc(hangGripLabel(b))}`;
+}
+
 /* Campus-Sätze brauchen keine Foto-Hotspots wie beim Hangboard — die
    Sprossen sind durchnummeriert, deshalb reicht die Bewegung als reiner
    Zahlen-Text ("Sprosse 1→4" bzw. "Start 1 · Muster +2/-1" fürs
@@ -4147,9 +4244,10 @@ function fbBlockSub(b) {
   if (b.type === 'pause') {
     return `${b.seconds}s Pause`;
   }
-  if (b.type === 'hang') {
+  if (isHangLikeBlock(b)) {
     const blockRestSec = b.blockRestSec != null ? b.blockRestSec : b.restSec;
-    return `${b.hangSec}s Hang · ${b.restSec}s zw. Sätzen · ${blockRestSec}s danach · ×${b.reps}`;
+    const prefix = b.type === 'block' ? 'Halten' : 'Hang';
+    return `${b.hangSec}s ${prefix} · ${b.restSec}s zw. Sätzen · ${blockRestSec}s danach · ×${b.reps}`;
   }
   if (b.type === 'campus') {
     const blockRestSec = b.blockRestSec != null ? b.blockRestSec : b.restSec;
@@ -4177,14 +4275,14 @@ function renderFbBlocksList() {
   `;
 
   const items = fb.blocks.map((b, i) => {
-    const isHang = b.type === 'hang';
+    const isHang = isHangLikeBlock(b);
     const isCampus = b.type === 'campus';
     const isPause = b.type === 'pause';
-    const title = isPause ? 'Pause' : isHang ? `Hang @ ${esc(hangGripLabel(b))}` : isCampus ? campusLabel(b) : esc(exerciseName(b.exerciseId));
+    const title = isPause ? 'Pause' : isHang ? holdBlockTitle(b) : isCampus ? campusLabel(b) : esc(exerciseName(b.exerciseId));
     const thumb = isPause
       ? `<div class="timeline-thumb timeline-thumb-emoji">⏸</div>`
       : isHang
-        ? hangBoardThumb(b)
+        ? holdBlockThumb(b)
         : isCampus
           ? `<div class="timeline-thumb"><img src="${CAMPUS_BOARD_IMAGE}" alt=""></div>`
           : `<div class="timeline-thumb timeline-thumb-emoji">💪</div>`;
@@ -4193,7 +4291,7 @@ function renderFbBlocksList() {
       ` : isHang ? `
         <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">
         <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzliche Wiederholung">+</button>
-        <input type="number" data-i="${i}" data-f="hangSec" value="${b.hangSec}" class="ex-row-input" title="Hang (s)">
+        <input type="number" data-i="${i}" data-f="hangSec" value="${b.hangSec}" class="ex-row-input" title="Halten (s)">
         <input type="number" data-i="${i}" data-f="restSec" value="${b.restSec}" class="ex-row-input" title="Pause zwischen Sätzen (s)">
         <input type="number" data-i="${i}" data-f="blockRestSec" value="${b.blockRestSec != null ? b.blockRestSec : b.restSec}" class="ex-row-input" title="Pause danach, vor dem nächsten Satz (s)">
       ` : isCampus ? `
@@ -4486,6 +4584,7 @@ function fbUpcomingLabel() {
   const nextBlock = fb.blocks[fb.blockIndex + 1];
   if (!nextBlock) return 'Letzter Satz — gleich geschafft!';
   if (nextBlock.type === 'hang') return 'Hang @ ' + hangGripLabel(nextBlock);
+  if (nextBlock.type === 'block') return 'Griffblock @ ' + blockGripLabel(nextBlock);
   if (nextBlock.type === 'campus') return campusLabel(nextBlock);
   if (nextBlock.type === 'pause') return 'Pause';
   return exerciseName(nextBlock.exerciseId);
@@ -4561,26 +4660,26 @@ function renderFbOverlay() {
   if (fb.awaitingNext) {
     const next = fb.blocks[fb.blockIndex];
     if (!next) { closeFbOverlay(); return; }
-    const isHang = next.type === 'hang';
+    const isHang = isHangLikeBlock(next);
     const isCampus = next.type === 'campus';
     const isPause = next.type === 'pause';
-    const nextArmNote = isHang ? hangArmNote(next) : '';
+    const nextArmNote = isHang ? holdBlockArmNote(next) : '';
     stage = `
       <div class="fb-stage-label mono">NÄCHSTER SATZ (${fb.blockIndex + 1}/${fb.blocks.length})</div>
-      <div class="fb-stage-figure">${isPause ? FB_REST_FIGURE_SVG : isHang ? hangBoardThumb(next) : isCampus ? campusWorkFigureSvg(next) : exerciseFigureSvg(next.exerciseId)}</div>
-      <div class="fb-stage-title">${isPause ? 'Pause' : isHang ? 'Hang @ ' + esc(hangGripLabel(next)) : isCampus ? campusLabel(next) : esc(exerciseName(next.exerciseId))}</div>
+      <div class="fb-stage-figure">${isPause ? FB_REST_FIGURE_SVG : isHang ? holdBlockThumb(next) : isCampus ? campusWorkFigureSvg(next) : exerciseFigureSvg(next.exerciseId)}</div>
+      <div class="fb-stage-title">${isPause ? 'Pause' : isHang ? holdBlockTitle(next) : isCampus ? campusLabel(next) : esc(exerciseName(next.exerciseId))}</div>
       <div class="fb-stage-sub mono">${esc(fbBlockSub(next))}${nextArmNote ? ' · ' + nextArmNote : ''}</div>
       ${fbTransportRow()}
       <button class="btn fb-stage-btn" id="fb-continue">LOS</button>
     `;
   } else if (fb.preCount != null) {
     const block = fb.blocks[fb.blockIndex];
-    const isHang = block.type === 'hang';
-    const armNote = isHang ? hangArmNote(block) : '';
+    const isHang = isHangLikeBlock(block);
+    const armNote = isHang ? holdBlockArmNote(block) : '';
     const tense = fb.preCount <= 3;
     stage = `
-      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${isHang ? esc(hangGripLabel(block)) : campusLabel(block)}${armNote ? ' · ' + armNote : ''}</div>
-      <div class="fb-stage-figure">${isHang ? hangBoardThumb(block) : campusWorkFigureSvg(block)}</div>
+      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${isHang ? holdBlockTitle(block) : campusLabel(block)}${armNote ? ' · ' + armNote : ''}</div>
+      <div class="fb-stage-figure">${isHang ? holdBlockThumb(block) : campusWorkFigureSvg(block)}</div>
       <div class="fb-precount ${tense ? 'fb-precount-tense' : ''}" id="fb-precount">${fb.preCount}</div>
       <div class="fb-stage-sub mono">Hände ans Board — Zeit zum Vorbereiten!</div>
       <button class="btn fb-stage-btn" id="fb-precount-skip">Jetzt starten</button>
@@ -4588,12 +4687,13 @@ function renderFbOverlay() {
       <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
     `;
   } else {
-    // Ein einziges Template für Hang-, Übungs- UND Campus-Sätze — alle
-    // laufen über dieselbe fb.sequence/tickBlock-Uhr, unterscheiden sich
-    // nur darin, was während "Work" gezeigt wird (Board-Punkt, animiertes
-    // Strichmännchen der Übung, oder das Campus-Symbol).
+    // Ein einziges Template für Hang-, Griffblock-, Übungs- UND Campus-
+    // Sätze — alle laufen über dieselbe fb.sequence/tickBlock-Uhr,
+    // unterscheiden sich nur darin, was während "Work" gezeigt wird
+    // (Board-Punkt, generische Hänge-Figur, animiertes Strichmännchen der
+    // Übung, oder das Campus-Symbol).
     const block = fb.blocks[fb.blockIndex];
-    const isHang = block.type === 'hang';
+    const isHang = isHangLikeBlock(block);
     const isExercise = block.type === 'exercise';
     const isCampus = block.type === 'campus';
     const isPause = block.type === 'pause';
@@ -4604,18 +4704,18 @@ function renderFbOverlay() {
     const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
     const isPausedNow = fb.running && !fb.intervalId;
     const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
-    const armNote = isHang ? hangArmNote(block) : '';
+    const armNote = isHang ? holdBlockArmNote(block) : '';
     const label = isPause
       ? 'Pause'
       : isHang
-        ? `Hang @ ${esc(hangGripLabel(block))}${armNote ? ' · ' + armNote : ''}`
+        ? `${holdBlockTitle(block)}${armNote ? ' · ' + armNote : ''}`
         : isCampus ? campusLabel(block) : esc(exerciseName(block.exerciseId));
     const muscles = isExercise ? exerciseMuscles(block.exerciseId) : null;
     const muscleText = muscles ? muscleLabelsText(muscles.primary, muscles.secondary) : '';
     stage = `
       <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${label}${isExercise ? ' · Ziel ' + esc(String(block.reps)) + '×' : ''}</div>
       ${isHang
-        ? `<div class="fb-stage-figure">${hangBoardThumb(block)}</div>
+        ? `<div class="fb-stage-figure">${holdBlockThumb(block)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
              <div class="fb-phase-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}">${working ? FB_HANG_FIGURE_SVG : FB_REST_FIGURE_SVG}</div>
              <div class="fb-timer-ring">
@@ -4783,9 +4883,10 @@ function initBlockResult(index) {
     fb.runResults[index] = { type: 'pause' };
     return;
   }
-  if (block.type === 'hang' || block.type === 'campus') {
-    // Campus-Züge sind wie Hang-Sätze binär "geschafft/nicht" pro
-    // Wiederholung, keine variable Wdh./Gewicht-Erfassung wie bei Übungen.
+  if (block.type === 'hang' || block.type === 'campus' || block.type === 'block') {
+    // Campus-Züge und Griffblock-Sätze sind wie Hang-Sätze binär
+    // "geschafft/nicht" pro Wiederholung, keine variable Wdh./Gewicht-
+    // Erfassung wie bei Übungen.
     fb.runResults[index] = { type: block.type, doneReps: new Array(block.reps).fill(true) };
   } else {
     const last = lastValueForExercise(block.exerciseId);
@@ -4880,7 +4981,7 @@ function beginBlock() {
   const block = fb.blocks[fb.blockIndex];
   if (!block) { finishAblauf(); return; }
   requestWakeLock();
-  if (block.type === 'hang' || block.type === 'campus') {
+  if (block.type === 'hang' || block.type === 'campus' || block.type === 'block') {
     fb.preCount = FB_PRECOUNT_SECONDS;
     renderFbOverlay();
     fb.intervalId = setInterval(tickPreCountdown, 1000);
@@ -5005,7 +5106,7 @@ function updateTimerUI() {
   const kind = working ? 'work' : 'rest';
   if (figureHolder && figureHolder.dataset.kind !== kind) {
     figureHolder.innerHTML = working
-      ? (block.type === 'hang' ? FB_HANG_FIGURE_SVG : block.type === 'campus' ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId))
+      ? (isHangLikeBlock(block) ? FB_HANG_FIGURE_SVG : block.type === 'campus' ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId))
       : FB_REST_FIGURE_SVG;
     figureHolder.dataset.kind = kind;
   }
@@ -5055,11 +5156,11 @@ function fbResultsSummaryHtml(blocks, results) {
   const rows = blocks.map((b, i) => {
     const r = results[i];
     if (!r || r.type === 'pause') return '';
-    if (r.type === 'hang') {
+    if (r.type === 'hang' || r.type === 'block') {
       const done = r.doneReps.filter(Boolean).length;
       totalReps += r.doneReps.length;
       doneReps += done;
-      return `<div class="fb-summary-row"><span>${esc(hangGripLabel(b))}</span><span class="mono">${done}/${r.doneReps.length}</span></div>`;
+      return `<div class="fb-summary-row"><span>${r.type === 'block' ? esc(blockGripLabel(b)) : esc(hangGripLabel(b))}</span><span class="mono">${done}/${r.doneReps.length}</span></div>`;
     }
     if (r.type === 'campus') {
       const done = r.doneReps.filter(Boolean).length;
@@ -5255,6 +5356,7 @@ function renderChallengeCard(id, c, now) {
     title = `Fingerboard · ${esc(BOARDS[c.board].label)}`;
     detail = (c.blocks || []).map((b) => {
       if (b.type === 'hang') return `<div class="ex core">Hang @ ${esc(hangGripLabel({ ...b, board: b.board || c.board }))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`;
+      if (b.type === 'block') return `<div class="ex core">Griffblock @ ${esc(blockGripLabel(b))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`;
       if (b.type === 'pause') return `<div class="ex core">⏸ Pause · ${b.seconds}s</div>`;
       return `<div class="ex core">${esc(exerciseName(b.exerciseId))} · ${b.workSec || 40}s × ${esc(String(b.reps))}</div>`;
     }).join('');

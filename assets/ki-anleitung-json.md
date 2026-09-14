@@ -28,7 +28,7 @@ JSON-Array zurück, ohne Erklärtext drumherum, ohne Markdown-Codeblock.
 ]
 ```
 
-`type` ist immer eines von: `"hang"`, `"exercise"`, `"campus"`, `"pause"`.
+`type` ist immer eines von: `"hang"`, `"block"`, `"exercise"`, `"campus"`, `"pause"`.
 
 ---
 
@@ -52,6 +52,36 @@ Beispiel (symmetrisch):
 Beispiel (asymmetrisch, pro Hand ein anderer Griff):
 ```json
 { "type": "hang", "board": "bm2000", "gripLeft": "edge_large", "gripRight": "edge_small", "reps": 5, "hangSec": 10, "restSec": 90 }
+```
+
+---
+
+### Block-Typ `block` (Griffblock, auch als Pinch nutzbar)
+
+Ein freistehender Griffblock mit mehreren Leisten, der über die Querseite
+auch als Pinch-Block genutzt werden kann — anders als beim Fingerboard
+gibt es dafür kein Foto mit Hotspots, `grip` ist deshalb freier Text.
+Immer einarmig (ein Griffblock wird nur mit einer Hand gleichzeitig
+gegriffen), deshalb gibt es hier — anders als bei `hang` — kein
+`gripLeft`/`gripRight`.
+
+| Feld | Typ | Pflicht | Beschreibung |
+|---|---|---|---|
+| `grip` | String | ja | Frei benannter Griff/Leiste, z. B. `"Leiste 1"` oder `"Pinch"` |
+| `fingers` | Zahl (1, 2, 3 oder 4) | ja | Wie viele Finger greifen dürfen — gilt für Leisten UND Pinch, weniger Finger = schwerer |
+| `weight` | Zahl | optional (Default 0) | Zusatzgewicht in kg, das am Block hängt |
+| `reps` | Zahl > 0 | ja | Anzahl Sätze/Griffe in diesem Block |
+| `hangSec` | Zahl > 0 | ja | Haltedauer pro Satz in Sekunden |
+| `restSec` | Zahl >= 0 | ja | Pause zwischen den Sätzen in Sekunden |
+| `blockRestSec` | Zahl >= 0 | optional | Pause NACH diesem ganzen Block, bevor der nächste beginnt |
+
+```json
+{ "type": "block", "grip": "Leiste 1", "fingers": 3, "weight": 10, "reps": 5, "hangSec": 7, "restSec": 45, "blockRestSec": 90 }
+```
+
+Pinch über die Querseite desselben Blocks:
+```json
+{ "type": "block", "grip": "Pinch", "fingers": 4, "weight": 5, "reps": 5, "hangSec": 10, "restSec": 60 }
 ```
 
 ---
