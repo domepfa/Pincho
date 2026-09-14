@@ -56,32 +56,55 @@ Beispiel (asymmetrisch, pro Hand ein anderer Griff):
 
 ---
 
-### Block-Typ `block` (Griffblock, auch als Pinch nutzbar)
+### Block-Typ `block` (Griffblock / Lifting Pin, auch als Pinch nutzbar)
 
-Ein freistehender Griffblock mit mehreren Leisten, der über die Querseite
-auch als Pinch-Block genutzt werden kann — anders als beim Fingerboard
-gibt es dafür kein Foto mit Hotspots, `grip` ist deshalb freier Text.
-Immer einarmig (ein Griffblock wird nur mit einer Hand gleichzeitig
-gegriffen), deshalb gibt es hier — anders als bei `hang` — kein
-`gripLeft`/`gripRight`.
+Ein freistehender Griffblock oder Lifting Pin mit mehreren Leisten, der
+über die Querseite auch als Pinch-Block genutzt werden kann — anders als
+beim Fingerboard gibt es dafür kein Foto mit Hotspots, `grip` ist deshalb
+freier Text. Immer einarmig (nur eine Hand gleichzeitig), deshalb gibt es
+hier — anders als bei `hang` — kein `gripLeft`/`gripRight`. `weight` ist
+das TATSÄCHLICHE geladene Gesamtgewicht (z. B. eine angesteckte Scheibe),
+kein Zusatzgewicht oben auf das Körpergewicht wie beim Hang-Satz.
+
+Zwei Modi über `mode`:
+- `"hold"` (Default): statisches Halten mit Sekundentimer, wie ein Hang-Satz.
+- `"reps"`: Wiederholungen zählen (heben/ablassen), wie eine Fixübung.
 
 | Feld | Typ | Pflicht | Beschreibung |
 |---|---|---|---|
 | `grip` | String | ja | Frei benannter Griff/Leiste, z. B. `"Leiste 1"` oder `"Pinch"` |
 | `fingers` | Zahl (1, 2, 3 oder 4) | ja | Wie viele Finger greifen dürfen — gilt für Leisten UND Pinch, weniger Finger = schwerer |
-| `weight` | Zahl | optional (Default 0) | Zusatzgewicht in kg, das am Block hängt |
-| `reps` | Zahl > 0 | ja | Anzahl Sätze/Griffe in diesem Block |
+| `weight` | Zahl | optional (Default 0) | Tatsächliches Gesamtgewicht in kg, das gehoben/gehalten wird |
+| `mode` | String | optional (Default `"hold"`) | `"hold"` oder `"reps"`, siehe oben |
+| `reps` | Zahl > 0 | ja | Bei `"hold"`: Anzahl Sätze/Griffe. Bei `"reps"`: Ziel-Wiederholungen pro Satz |
+| `restSec` | Zahl >= 0 | ja | Pause danach in Sekunden |
+
+Nur bei `mode: "hold"` zusätzlich:
+
+| Feld | Typ | Pflicht | Beschreibung |
+|---|---|---|---|
 | `hangSec` | Zahl > 0 | ja | Haltedauer pro Satz in Sekunden |
-| `restSec` | Zahl >= 0 | ja | Pause zwischen den Sätzen in Sekunden |
 | `blockRestSec` | Zahl >= 0 | optional | Pause NACH diesem ganzen Block, bevor der nächste beginnt |
 
+Nur bei `mode: "reps"` zusätzlich:
+
+| Feld | Typ | Pflicht | Beschreibung |
+|---|---|---|---|
+| `workSec` | Zahl > 0 | optional (Default 40) | Zeit für die Wiederholungen |
+
+Halten (z. B. Leiste 1, 3 Finger, 10kg):
 ```json
-{ "type": "block", "grip": "Leiste 1", "fingers": 3, "weight": 10, "reps": 5, "hangSec": 7, "restSec": 45, "blockRestSec": 90 }
+{ "type": "block", "grip": "Leiste 1", "fingers": 3, "weight": 10, "mode": "hold", "reps": 5, "hangSec": 7, "restSec": 45, "blockRestSec": 90 }
+```
+
+Wiederholungen (z. B. Lifting Pin heben/ablassen):
+```json
+{ "type": "block", "grip": "Lifting Pin", "fingers": 4, "weight": 20, "mode": "reps", "reps": 8, "workSec": 40, "restSec": 60 }
 ```
 
 Pinch über die Querseite desselben Blocks:
 ```json
-{ "type": "block", "grip": "Pinch", "fingers": 4, "weight": 5, "reps": 5, "hangSec": 10, "restSec": 60 }
+{ "type": "block", "grip": "Pinch", "fingers": 4, "weight": 5, "mode": "hold", "reps": 5, "hangSec": 10, "restSec": 60 }
 ```
 
 ---

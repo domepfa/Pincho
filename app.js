@@ -221,6 +221,14 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
   };
   render();
 }
+/* Beim Fokussieren eines Zahlenfelds den vorbelegten Wert markieren statt
+   den Cursor davor zu platzieren — sonst muss man beim Weiterspringen
+   übers Tastatur-"Weiter" (z. B. nach der Griff-Eingabe im Board) erst
+   manuell über die alte Zahl drüber navigieren, um sie zu ersetzen. */
+function selectOnFocus(id) {
+  const el = document.getElementById(id);
+  if (el) el.onfocus = (e) => e.target.select();
+}
 function toast(message, kind) {
   const el = document.createElement('div');
   el.className = 'toast' + (kind ? ' ' + kind : '');
@@ -2105,15 +2113,22 @@ function parseImportedAblauf(text) {
       if (![1, 2, 3, 4].includes(fingers)) { errors.push(`Satz ${n}: fingers muss 1, 2, 3 oder 4 sein.`); return; }
       const weight = b.weight != null ? Number(b.weight) : 0;
       if (!Number.isFinite(weight)) { errors.push(`Satz ${n}: weight muss eine Zahl sein.`); return; }
+      const mode = b.mode === 'reps' ? 'reps' : 'hold';
       const reps = Number(b.reps);
-      const hangSec = Number(b.hangSec);
       const restSec = Number(b.restSec);
-      const blockRestSec = b.blockRestSec != null ? Number(b.blockRestSec) : null;
       if (!(reps > 0)) { errors.push(`Satz ${n}: reps muss eine Zahl > 0 sein.`); return; }
-      if (!(hangSec > 0)) { errors.push(`Satz ${n}: hangSec muss eine Zahl > 0 sein.`); return; }
       if (!(restSec >= 0)) { errors.push(`Satz ${n}: restSec muss eine Zahl >= 0 sein.`); return; }
-      if (blockRestSec != null && !(blockRestSec >= 0)) { errors.push(`Satz ${n}: blockRestSec muss eine Zahl >= 0 sein.`); return; }
-      blocks.push({ type: 'block', grip: b.grip.trim(), fingers, weight, reps, hangSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}) });
+      if (mode === 'reps') {
+        const workSec = Number(b.workSec != null ? b.workSec : 40);
+        if (!(workSec > 0)) { errors.push(`Satz ${n}: workSec muss eine Zahl > 0 sein.`); return; }
+        blocks.push({ type: 'block', grip: b.grip.trim(), fingers, weight, mode, reps, workSec, restSec });
+      } else {
+        const hangSec = Number(b.hangSec);
+        const blockRestSec = b.blockRestSec != null ? Number(b.blockRestSec) : null;
+        if (!(hangSec > 0)) { errors.push(`Satz ${n}: hangSec muss eine Zahl > 0 sein.`); return; }
+        if (blockRestSec != null && !(blockRestSec >= 0)) { errors.push(`Satz ${n}: blockRestSec muss eine Zahl >= 0 sein.`); return; }
+        blocks.push({ type: 'block', grip: b.grip.trim(), fingers, weight, mode, reps, hangSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}) });
+      }
     } else if (b.type === 'exercise') {
       const isPseudoExercise = b.exerciseId === 'warmup_general' || b.exerciseId === 'cooldown_general';
       if (!isPseudoExercise && !EXERCISE_LIBRARY.some((e) => e.id === b.exerciseId)) { errors.push(`Satz ${n}: unbekannte exerciseId "${b.exerciseId}".`); return; }
@@ -2177,7 +2192,7 @@ const fb = {
   selectedGripRight: null,
   addType: 'hang',       // 'hang' | 'block' | 'exercise' | 'campus' | 'pause' — welches Add-Panel gerade offen ist
   newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
-  newBlock: { grip: '', fingers: 4, weight: 0, reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },
+  newBlock: { grip: '', fingers: 4, weight: 0, mode: 'hold', reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60, workSec: 40 },
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
   newCampus: {
     rungType: CAMPUS_RUNG_TYPES[0].id, moveMode: 'direct',
@@ -2395,6 +2410,7 @@ function renderFbAddPanel() {
     document.getElementById('fb-new-hangsec').oninput = (e) => { fb.newHang.hangSec = Number(e.target.value) || 1; };
     document.getElementById('fb-new-restsec').oninput = (e) => { fb.newHang.restSec = Number(e.target.value) || 0; };
     document.getElementById('fb-new-blockrestsec').oninput = (e) => { fb.newHang.blockRestSec = Number(e.target.value) || 0; };
+    ['fb-new-reps', 'fb-new-hangsec', 'fb-new-restsec', 'fb-new-blockrestsec'].forEach(selectOnFocus);
     document.getElementById('fb-add-hang').onclick = () => {
       if (fb.gripMode === 'different') {
         if (!fb.selectedGripLeft || !fb.selectedGripRight) { toast('Zuerst Griff für links UND rechts wählen.', 'err'); return; }
@@ -2431,6 +2447,7 @@ function renderFbAddPanel() {
     document.getElementById('fb-new-exreps').oninput = (e) => { fb.newExercise.reps = Number(e.target.value) || 1; };
     document.getElementById('fb-new-exwork').oninput = (e) => { fb.newExercise.workSec = Number(e.target.value) || 5; };
     document.getElementById('fb-new-exrest').oninput = (e) => { fb.newExercise.restSec = Number(e.target.value) || 0; };
+    ['fb-new-exreps', 'fb-new-exwork', 'fb-new-exrest'].forEach(selectOnFocus);
     document.getElementById('fb-add-exercise').onclick = () => {
       fb.blocks.push({ type: 'exercise', ...fb.newExercise });
       renderFbBlocksList();
@@ -2442,15 +2459,20 @@ function renderFbAddPanel() {
   }
 }
 
-/* Griffblock: ein Trainingsblock mit mehreren Leisten, der über die
-   Querseite auch als Pinch nutzbar ist. Kein Foto/Hotspots wie beim
-   Fingerboard — Griff/Leiste ist deshalb freier Text (z. B. "Leiste 1"
-   oder "Pinch"), dazu Fingerzahl (1-4, gilt für Leisten UND Pinch) und
-   Zusatzgewicht. Immer einarmig (ein Griffblock wird nur mit einer Hand
-   gegriffen), deshalb kein Links/Rechts-Umschalter wie beim Hang-Satz.
-   Timer/Ablauf sonst identisch zum Hang-Satz (reps/hangSec/restSec/
-   blockRestSec, gleicher Sekundentimer). */
+/* Griffblock/Lifting Pin: ein Trainingsblock mit mehreren Leisten (oder
+   ein Lifting Pin), der über die Querseite auch als Pinch nutzbar ist.
+   Kein Foto/Hotspots wie beim Fingerboard — Griff/Leiste ist deshalb
+   freier Text (z. B. "Leiste 1" oder "Pinch"), dazu Fingerzahl (1-4, gilt
+   für Leisten UND Pinch) und Gewicht. Anders als beim Hang-Satz ist das
+   Gewicht hier das TATSÄCHLICHE geladene Gesamtgewicht (z. B. eine
+   angesteckte Scheibe), kein "Zusatzgewicht" oben auf das Körpergewicht.
+   Immer einarmig (nur eine Hand gleichzeitig), deshalb kein Links/Rechts-
+   Umschalter wie beim Hang-Satz. Wahlweise als Halten (Sekundentimer wie
+   ein Hang-Satz) ODER als Wiederholungen (heben/ablassen zählen, wie eine
+   Fixübung) — ein Lifting Pin wird nicht nur statisch gehalten, sondern
+   auch für Wiederholungen genutzt. */
 function renderBlockAddPanel(holder) {
+  const isReps = fb.newBlock.mode === 'reps';
   holder.innerHTML = `
     <div class="field"><label>Griff/Leiste (frei, z. B. "Leiste 1" oder "Pinch")</label><input type="text" id="fb-block-grip" value="${esc(fb.newBlock.grip)}" placeholder="Leiste 1"></div>
     <div class="field">
@@ -2459,15 +2481,12 @@ function renderBlockAddPanel(holder) {
         ${[1, 2, 3, 4].map((n) => `<button type="button" class="chip ${fb.newBlock.fingers === n ? 'active' : ''}" data-fingers="${n}">${n}</button>`).join('')}
       </div>
     </div>
-    <div class="field"><label>Zusatzgewicht (kg)</label><div class="kg-field"><input type="number" inputmode="decimal" id="fb-block-weight" value="${fb.newBlock.weight}" step="0.5"><span class="mono">kg</span></div></div>
-    <div class="field-row">
-      <div class="field"><label>Sätze</label><input type="number" id="fb-block-reps" value="${fb.newBlock.reps}" min="1"></div>
-      <div class="field"><label>Halten (s)</label><input type="number" id="fb-block-hangsec" value="${fb.newBlock.hangSec}" min="1"></div>
+    <div class="field"><label>Gewicht (kg)</label><div class="kg-field"><input type="number" inputmode="decimal" id="fb-block-weight" value="${fb.newBlock.weight}" step="0.5"><span class="mono">kg</span></div></div>
+    <div class="chip-row" id="fb-block-mode-row">
+      <button type="button" class="chip ${!isReps ? 'active' : ''}" data-mode="hold">Halten</button>
+      <button type="button" class="chip ${isReps ? 'active' : ''}" data-mode="reps">Wiederholungen</button>
     </div>
-    <div class="field-row">
-      <div class="field"><label>Pause zw. Sätzen (s)</label><input type="number" id="fb-block-restsec" value="${fb.newBlock.restSec}" min="0"></div>
-      <div class="field"><label>Pause danach (s)</label><input type="number" id="fb-block-blockrestsec" value="${fb.newBlock.blockRestSec}" min="0"></div>
-    </div>
+    <div id="fb-block-mode-fields"></div>
     <button type="button" class="btn" id="fb-add-block" style="width:100%;">+ Griffblock-Satz hinzufügen</button>
   `;
   document.getElementById('fb-block-grip').oninput = (e) => { fb.newBlock.grip = e.target.value; };
@@ -2478,15 +2497,61 @@ function renderBlockAddPanel(holder) {
     };
   });
   document.getElementById('fb-block-weight').oninput = (e) => { fb.newBlock.weight = e.target.value === '' ? 0 : Number(e.target.value); };
-  document.getElementById('fb-block-reps').oninput = (e) => { fb.newBlock.reps = Number(e.target.value) || 1; };
-  document.getElementById('fb-block-hangsec').oninput = (e) => { fb.newBlock.hangSec = Number(e.target.value) || 1; };
-  document.getElementById('fb-block-restsec').oninput = (e) => { fb.newBlock.restSec = Number(e.target.value) || 0; };
-  document.getElementById('fb-block-blockrestsec').oninput = (e) => { fb.newBlock.blockRestSec = Number(e.target.value) || 0; };
+  selectOnFocus('fb-block-weight');
+  document.getElementById('fb-block-mode-row').querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => {
+      fb.newBlock.mode = btn.dataset.mode;
+      renderBlockAddPanel(holder);
+    };
+  });
+  renderBlockModeFields();
   document.getElementById('fb-add-block').onclick = () => {
     if (!fb.newBlock.grip.trim()) { toast('Zuerst Griff/Leiste benennen.', 'err'); return; }
-    fb.blocks.push({ type: 'block', ...fb.newBlock, grip: fb.newBlock.grip.trim() });
+    const b = { type: 'block', grip: fb.newBlock.grip.trim(), fingers: fb.newBlock.fingers, weight: fb.newBlock.weight, mode: fb.newBlock.mode };
+    if (fb.newBlock.mode === 'reps') {
+      Object.assign(b, { reps: fb.newBlock.reps, workSec: fb.newBlock.workSec, restSec: fb.newBlock.restSec });
+    } else {
+      Object.assign(b, { reps: fb.newBlock.reps, hangSec: fb.newBlock.hangSec, restSec: fb.newBlock.restSec, blockRestSec: fb.newBlock.blockRestSec });
+    }
+    fb.blocks.push(b);
     renderFbBlocksList();
   };
+}
+/* Die zweite Zeile Felder je nach Halten/Wiederholungen — separat, damit
+   der Moduswechsel nicht das ganze Panel (inkl. Griff/Finger/Gewicht)
+   neu aufbauen und den Tipp-Fokus verlieren muss. */
+function renderBlockModeFields() {
+  const holder = document.getElementById('fb-block-mode-fields');
+  if (!holder) return;
+  if (fb.newBlock.mode === 'reps') {
+    holder.innerHTML = `
+      <div class="field-row">
+        <div class="field"><label>Ziel-Wdh.</label><input type="number" id="fb-block-reps" value="${fb.newBlock.reps}" min="1"></div>
+        <div class="field"><label>Dauer (s)</label><input type="number" id="fb-block-worksec" value="${fb.newBlock.workSec}" min="5"></div>
+      </div>
+      <div class="field"><label>Pause danach (s)</label><input type="number" id="fb-block-restsec" value="${fb.newBlock.restSec}" min="0"></div>
+    `;
+    document.getElementById('fb-block-reps').oninput = (e) => { fb.newBlock.reps = Number(e.target.value) || 1; };
+    document.getElementById('fb-block-worksec').oninput = (e) => { fb.newBlock.workSec = Number(e.target.value) || 5; };
+    document.getElementById('fb-block-restsec').oninput = (e) => { fb.newBlock.restSec = Number(e.target.value) || 0; };
+    ['fb-block-reps', 'fb-block-worksec', 'fb-block-restsec'].forEach(selectOnFocus);
+  } else {
+    holder.innerHTML = `
+      <div class="field-row">
+        <div class="field"><label>Sätze</label><input type="number" id="fb-block-reps" value="${fb.newBlock.reps}" min="1"></div>
+        <div class="field"><label>Halten (s)</label><input type="number" id="fb-block-hangsec" value="${fb.newBlock.hangSec}" min="1"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Pause zw. Sätzen (s)</label><input type="number" id="fb-block-restsec" value="${fb.newBlock.restSec}" min="0"></div>
+        <div class="field"><label>Pause danach (s)</label><input type="number" id="fb-block-blockrestsec" value="${fb.newBlock.blockRestSec}" min="0"></div>
+      </div>
+    `;
+    document.getElementById('fb-block-reps').oninput = (e) => { fb.newBlock.reps = Number(e.target.value) || 1; };
+    document.getElementById('fb-block-hangsec').oninput = (e) => { fb.newBlock.hangSec = Number(e.target.value) || 1; };
+    document.getElementById('fb-block-restsec').oninput = (e) => { fb.newBlock.restSec = Number(e.target.value) || 0; };
+    document.getElementById('fb-block-blockrestsec').oninput = (e) => { fb.newBlock.blockRestSec = Number(e.target.value) || 0; };
+    ['fb-block-reps', 'fb-block-hangsec', 'fb-block-restsec', 'fb-block-blockrestsec'].forEach(selectOnFocus);
+  }
 }
 
 /* Reine Pause zum freien Einfügen in den Ablauf — z. B. zwischen zwei
@@ -2497,6 +2562,7 @@ function renderPauseAddPanel(holder) {
     <button type="button" class="btn" id="fb-add-pause" style="width:100%;">+ Pause hinzufügen</button>
   `;
   document.getElementById('fb-new-pause-seconds').oninput = (e) => { fb.newPause.seconds = Number(e.target.value) || 1; };
+  selectOnFocus('fb-new-pause-seconds');
   document.getElementById('fb-add-pause').onclick = () => {
     fb.blocks.push({ type: 'pause', seconds: fb.newPause.seconds });
     renderFbBlocksList();
@@ -3060,7 +3126,7 @@ function wireFbTemplatePicker() {
    Pause wird trotzdem kurz Zeit zum Loggen eingeräumt, statt sie ganz
    wegzulassen. */
 function buildBlockSequence(b) {
-  if (isHangLikeBlock(b)) {
+  if (isHoldModeBlock(b)) {
     const seq = [];
     const workPhase = b.type === 'block' ? 'Halten' : 'Hang';
     for (let s = 0; s < b.reps; s++) {
@@ -4025,6 +4091,13 @@ function blockThumb() {
    bereits HTML-escapten Text zurück (Aufrufer müssen NICHT nochmal esc()
    anwenden), anders als hangGripLabel/blockGripLabel selbst. */
 function isHangLikeBlock(b) { return b.type === 'hang' || b.type === 'block'; }
+/* Griffblock/Lifting Pin ist wahlweise Halten (Sekundentimer, wie Hang)
+   ODER Wiederholungen (heben/ablassen zählen, wie eine Fixübung) — dieser
+   Dispatcher entscheidet NUR die Ablaufform (Sequenz/Checkin-Form/Ziel-
+   Anzeige), unabhängig von holdBlockTitle/-Thumb/-ArmNote oben, die immer
+   den Griffblock-Look zeigen, egal in welchem Modus. */
+function isRepsStyleBlock(b) { return b.type === 'exercise' || (b.type === 'block' && b.mode === 'reps'); }
+function isHoldModeBlock(b) { return b.type === 'hang' || (b.type === 'block' && b.mode !== 'reps'); }
 function holdBlockArmNote(b) { return b.type === 'block' ? blockArmNote() : hangArmNote(b); }
 function holdBlockThumb(b) { return b.type === 'block' ? blockThumb() : hangBoardThumb(b); }
 function holdBlockTitle(b) {
@@ -4244,7 +4317,7 @@ function fbBlockSub(b) {
   if (b.type === 'pause') {
     return `${b.seconds}s Pause`;
   }
-  if (isHangLikeBlock(b)) {
+  if (isHoldModeBlock(b)) {
     const blockRestSec = b.blockRestSec != null ? b.blockRestSec : b.restSec;
     const prefix = b.type === 'block' ? 'Halten' : 'Hang';
     return `${b.hangSec}s ${prefix} · ${b.restSec}s zw. Sätzen · ${blockRestSec}s danach · ×${b.reps}`;
@@ -4288,7 +4361,7 @@ function renderFbBlocksList() {
           : `<div class="timeline-thumb timeline-thumb-emoji">💪</div>`;
     const edit = isPause ? `
         <input type="number" data-i="${i}" data-f="seconds" value="${b.seconds}" class="ex-row-input" title="Pause (s)">
-      ` : isHang ? `
+      ` : isHoldModeBlock(b) ? `
         <input type="number" data-i="${i}" data-f="reps" value="${b.reps}" class="ex-row-input" title="Wiederholungen">
         <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzliche Wiederholung">+</button>
         <input type="number" data-i="${i}" data-f="hangSec" value="${b.hangSec}" class="ex-row-input" title="Halten (s)">
@@ -4695,6 +4768,10 @@ function renderFbOverlay() {
     const block = fb.blocks[fb.blockIndex];
     const isHang = isHangLikeBlock(block);
     const isExercise = block.type === 'exercise';
+    // Wiederholungen-Griffblock zeigt wie eine Übung ein Ziel + den
+    // manuellen "geschafft"-Button, aber OHNE Zielmuskel-Anzeige (dafür
+    // bleibt isExercise oben strikt auf echte Übungen begrenzt).
+    const showTarget = isExercise || (block.type === 'block' && block.mode === 'reps');
     const isCampus = block.type === 'campus';
     const isPause = block.type === 'pause';
     const step = fb.sequence[fb.stepIndex];
@@ -4713,7 +4790,7 @@ function renderFbOverlay() {
     const muscles = isExercise ? exerciseMuscles(block.exerciseId) : null;
     const muscleText = muscles ? muscleLabelsText(muscles.primary, muscles.secondary) : '';
     stage = `
-      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${label}${isExercise ? ' · Ziel ' + esc(String(block.reps)) + '×' : ''}</div>
+      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${label}${showTarget ? ' · Ziel ' + esc(String(block.reps)) + '×' : ''}</div>
       ${isHang
         ? `<div class="fb-stage-figure">${holdBlockThumb(block)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
@@ -4745,7 +4822,7 @@ function renderFbOverlay() {
       ` : ''}
       <div class="fb-stage-next mono" id="fb-upcoming"></div>
       <div class="fb-checkin" id="fb-checkin" ${fb.stepIndex === fb.sequence.length - 1 && !working ? '' : 'hidden'}>${fb.stepIndex === fb.sequence.length - 1 && !working ? checkinPanelHtml(fb.blockIndex) : ''}</div>
-      ${isExercise ? `<button class="btn fb-stage-btn" id="fb-reps-done" ${working ? '' : 'hidden'}>Wiederholungen geschafft — weiter</button>` : ''}
+      ${showTarget ? `<button class="btn fb-stage-btn" id="fb-reps-done" ${working ? '' : 'hidden'}>Wiederholungen geschafft — weiter</button>` : ''}
       ${fbTransportRow()}
       ${fb.blockIndex > 0 ? '<button class="btn ghost fb-stage-btn" id="fb-finish-early">Vorzeitig beenden & speichern</button>' : ''}
       <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
@@ -4883,11 +4960,15 @@ function initBlockResult(index) {
     fb.runResults[index] = { type: 'pause' };
     return;
   }
-  if (block.type === 'hang' || block.type === 'campus' || block.type === 'block') {
-    // Campus-Züge und Griffblock-Sätze sind wie Hang-Sätze binär
+  if (block.type === 'campus' || isHoldModeBlock(block)) {
+    // Campus-Züge und Halten-Griffblock-Sätze sind wie Hang-Sätze binär
     // "geschafft/nicht" pro Wiederholung, keine variable Wdh./Gewicht-
     // Erfassung wie bei Übungen.
     fb.runResults[index] = { type: block.type, doneReps: new Array(block.reps).fill(true) };
+  } else if (block.type === 'block') {
+    // Wiederholungen-Griffblock: Gewicht ist bereits bekannt/eingestellt
+    // (kein Verlauf wie bei Übungen nötig) — als Vorbelegung übernehmen.
+    fb.runResults[index] = { type: 'block', reps: block.reps, weight: block.weight != null ? block.weight : '' };
   } else {
     const last = lastValueForExercise(block.exerciseId);
     fb.runResults[index] = { type: 'exercise', reps: block.reps, weight: last && last.weight != null ? last.weight : '' };
@@ -4902,7 +4983,7 @@ function initBlockResult(index) {
 function checkinPanelHtml(index) {
   const result = fb.runResults[index];
   if (!result || result.type === 'pause') return '';
-  if (result.type !== 'exercise') {
+  if (result.doneReps) {
     return `
       <div class="fb-checkin-label mono">GESCHAFFTE SÄTZE — nicht geschaffte abwählen</div>
       <div class="fb-checkin-chips">
@@ -4922,7 +5003,7 @@ function wireCheckinPanel(index) {
   const holder = document.getElementById('fb-checkin');
   const result = fb.runResults[index];
   if (!holder || !result || result.type === 'pause') return;
-  if (result.type !== 'exercise') {
+  if (result.doneReps) {
     holder.querySelectorAll('.fb-chip').forEach((btn) => {
       btn.onclick = () => {
         const i = Number(btn.dataset.satz);
@@ -5156,20 +5237,18 @@ function fbResultsSummaryHtml(blocks, results) {
   const rows = blocks.map((b, i) => {
     const r = results[i];
     if (!r || r.type === 'pause') return '';
-    if (r.type === 'hang' || r.type === 'block') {
+    if (r.doneReps) {
+      // Hang, Campus oder Halten-Griffblock — binäres geschafft/nicht pro Satz.
       const done = r.doneReps.filter(Boolean).length;
       totalReps += r.doneReps.length;
       doneReps += done;
-      return `<div class="fb-summary-row"><span>${r.type === 'block' ? esc(blockGripLabel(b)) : esc(hangGripLabel(b))}</span><span class="mono">${done}/${r.doneReps.length}</span></div>`;
+      const label = r.type === 'campus' ? campusLabel(b) : r.type === 'block' ? esc(blockGripLabel(b)) : esc(hangGripLabel(b));
+      return `<div class="fb-summary-row"><span>${label}</span><span class="mono">${done}/${r.doneReps.length}</span></div>`;
     }
-    if (r.type === 'campus') {
-      const done = r.doneReps.filter(Boolean).length;
-      totalReps += r.doneReps.length;
-      doneReps += done;
-      return `<div class="fb-summary-row"><span>${campusLabel(b)}</span><span class="mono">${done}/${r.doneReps.length}</span></div>`;
-    }
+    // Echte Übung ODER Wiederholungen-Griffblock — geloggte Wdh.×Gewicht.
     const weightText = r.weight !== '' && r.weight != null ? ` × ${esc(String(r.weight))}kg` : '';
-    return `<div class="fb-summary-row"><span>${esc(exerciseName(b.exerciseId))}</span><span class="mono">${esc(String(r.reps))}${weightText}</span></div>`;
+    const label = r.type === 'block' ? esc(blockGripLabel(b)) : esc(exerciseName(b.exerciseId));
+    return `<div class="fb-summary-row"><span>${label}</span><span class="mono">${esc(String(r.reps))}${weightText}</span></div>`;
   }).join('');
   const headline = totalReps ? `<div class="fb-summary-headline mono">${doneReps}/${totalReps} Sätze geschafft</div>` : '';
   return `${headline}<div class="fb-summary-list">${rows}</div>`;
@@ -5356,6 +5435,7 @@ function renderChallengeCard(id, c, now) {
     title = `Fingerboard · ${esc(BOARDS[c.board].label)}`;
     detail = (c.blocks || []).map((b) => {
       if (b.type === 'hang') return `<div class="ex core">Hang @ ${esc(hangGripLabel({ ...b, board: b.board || c.board }))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`;
+      if (b.type === 'block' && b.mode === 'reps') return `<div class="ex core">Griffblock @ ${esc(blockGripLabel(b))} · ${b.workSec || 40}s × ${esc(String(b.reps))}</div>`;
       if (b.type === 'block') return `<div class="ex core">Griffblock @ ${esc(blockGripLabel(b))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`;
       if (b.type === 'pause') return `<div class="ex core">⏸ Pause · ${b.seconds}s</div>`;
       return `<div class="ex core">${esc(exerciseName(b.exerciseId))} · ${b.workSec || 40}s × ${esc(String(b.reps))}</div>`;
