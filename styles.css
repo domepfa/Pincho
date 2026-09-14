@@ -18,6 +18,7 @@
   --accent-ink: #06202f;
   --accent2: #ff6b47;
   --danger: #ff6b6b;
+  --success: #4ade80;
   --accent-glow: #9fe4ff;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
@@ -285,6 +286,22 @@ button, input, select, textarea { font-family: inherit; }
 }
 .fs-inline-input .field label { color: var(--ink); font-weight: 600; }
 .fs-inline-input #fs-add-set { margin-top: 2px; }
+.fs-machine-note-view { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.fs-machine-note-text { font-size: 12.5px; color: var(--ink-dim); line-height: 1.4; }
+.fs-set-delta { flex: 0 0 auto; font-size: 11px; font-weight: 700; padding: 2px 6px; }
+.fs-set-delta.fs-delta-up { color: var(--success); background: rgba(74, 222, 128, .12); }
+.fs-set-delta.fs-delta-down { color: var(--danger); background: rgba(255, 107, 107, .12); }
+.fs-trend { font-weight: 700; }
+.fs-trend.fs-trend-up { color: var(--success); }
+.fs-trend.fs-trend-down { color: var(--danger); }
+.fs-trend.fs-trend-flat, .fs-trend.fs-trend-none { color: var(--ink-faint); }
+.fs-recap-title { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: .04em; color: var(--ink); margin-bottom: 12px; }
+.fs-recap-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--ink-dim); border-bottom: 1px solid var(--line); padding: 8px 2px;
+}
+.fs-recap-row:last-of-type { border-bottom: none; }
+.fs-recap-row .fs-trend { font-size: 18px; }
 .fs-group { border: 1px solid var(--line); padding: 8px 10px; margin-bottom: 8px; }
 .fs-group.active { border-color: var(--accent); }
 .fs-group-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--ink); margin-bottom: 4px; }

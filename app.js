@@ -642,6 +642,28 @@ function historyForExercise(exerciseId, limit) {
   return sessions;
 }
 
+/* Trend-Pfeil pro Übung: vergleicht Satz für Satz (gleicher Index) mit der
+   Vorgänger-Session dieser Übung, summiert die Differenzen — Grundlage ist
+   dieselbe Wdh./Zeit-Logik wie beim einzelnen Satz-Delta (siehe
+   setUnitSuffix), nur pro Übung statt pro Satz aggregiert. `null`, wenn es
+   nichts Vergleichbares gibt (erstes Mal, oder nur Einheitswechsel). */
+function exerciseTrend(exerciseId, sets, priorSets) {
+  if (!Array.isArray(sets) || !Array.isArray(priorSets) || !priorSets.length) return null;
+  let sum = 0;
+  let compared = 0;
+  sets.forEach((s, i) => {
+    const prev = priorSets[i];
+    if (!prev) return;
+    if (setUnitSuffix(exerciseId, prev) !== setUnitSuffix(exerciseId, s)) return;
+    const diff = Number(s.reps) - Number(prev.reps);
+    if (Number.isFinite(diff)) { sum += diff; compared++; }
+  });
+  if (!compared) return null;
+  if (sum > 0) return { symbol: '↑', cls: 'fs-trend-up' };
+  if (sum < 0) return { symbol: '↓', cls: 'fs-trend-down' };
+  return { symbol: '→', cls: 'fs-trend-flat' };
+}
+
 /* Vergleichstabelle über die letzten 3 Sessions: Zeilen = Satz 1/2/3...,
    Spalten = Datum je Session (neuste links) — zeigt die Tendenz auf einen
    Blick, nicht nur einen einzelnen "letzten Wert". */
@@ -676,11 +698,15 @@ async function renderLog() {
   // (Klettern/Fingerboard/Jogging/...) ergibt dort keinen Sinn, ist immer
   // "Gym". Datum bleibt trotzdem sichtbar, nur Typ fällt weg.
   const hideTypeField = logMode === 'freestyle' || logMode === 'execute';
+  // Direkt nach dem Speichern zeigt die Karte NUR die Trend-Übersicht (siehe
+  // fsRecap) — Datum/Typ/Chips/Notiz/RPE wären in diesem Moment nur
+  // ablenkende Reste einer bereits abgeschlossenen Session.
+  const showingRecap = !!fsRecap;
   await Promise.all([loadSessionPlans(), loadExerciseSettings(), loadExerciseUnitPrefs(), loadSharedTemplates(), loadWallTemplates()]);
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Neue Session</h2><div class="sec-rule"></div></div>
     <div class="card">
-      ${hideSessionFields ? '' : hideTypeField ? `
+      ${hideSessionFields || showingRecap ? '' : hideTypeField ? `
       <div class="field"><label>Datum</label><input type="date" id="log-date" value="${todayKey()}"></div>
       ` : `
       <div class="field-row">
@@ -692,7 +718,7 @@ async function renderLog() {
         </div>
       </div>`}
 
-      ${logMode === 'execute' ? '' : `
+      ${logMode === 'execute' || showingRecap ? '' : `
       <div class="chip-row log-mode-row">
         <button type="button" class="chip ${logMode === 'planned' ? 'active' : ''}" data-log-mode="planned">Plan</button>
         <button type="button" class="chip ${logMode === 'freestyle' ? 'active' : ''}" data-log-mode="freestyle">Freestyle</button>
@@ -701,10 +727,10 @@ async function renderLog() {
 
       <div id="log-builder-panel"></div>
 
-      ${hideSessionFields ? '' : `
+      ${hideSessionFields || showingRecap ? '' : `
       <div class="field"><label>Notiz (optional)</label><textarea id="log-note" placeholder="Befinden, Bedingungen, Sonstiges…"></textarea></div>
       <div class="field"><label>RPE (1–10, optional)</label><input type="number" id="log-rpe" min="1" max="10"></div>
-      <button class="btn" id="log-save">SESSION SPEICHERN</button>`}
+      <button class="btn" id="log-save">FERTIG &amp; SPEICHERN</button>`}
     </div>
 
     <div class="sec-head"><h2 class="sec-title">Verlauf</h2><div class="sec-rule"></div></div>
@@ -726,7 +752,7 @@ async function renderLog() {
     };
   });
 
-  if (hideSessionFields) { renderLogHistory(); return; }
+  if (hideSessionFields || showingRecap) { renderLogHistory(); return; }
 
   document.getElementById('log-save').onclick = async () => {
     const builder = logMode === 'execute' ? planExecution : freestyleBuilder;
@@ -751,6 +777,15 @@ async function renderLog() {
     if (id) {
       stopAllFsTimers();
       toast('Session gespeichert.', 'ok');
+      // Trend JE Übung (↑/↓/→) gegenüber der letzten Session damit — Basis
+      // ist state.logs VOR diesem Speichern (wird erst gleich neu geladen).
+      fsRecap = rawExercises
+        .filter((g) => g.exerciseId !== 'warmup_general')
+        .map((g) => {
+          const prevSession = historyForExercise(g.exerciseId, 1)[0];
+          const trend = prevSession ? exerciseTrend(g.exerciseId, g.sets, prevSession.sets) : null;
+          return { name: exerciseName(g.exerciseId), symbol: trend ? trend.symbol : '–', cls: trend ? trend.cls : 'fs-trend-none' };
+        });
       if (logMode === 'execute') {
         // Der Plan selbst bleibt erhalten (wie eine Fingerboard-Vorlage) —
         // nur die gerade laufende Ausführung wird zurückgesetzt.
@@ -780,14 +815,27 @@ async function renderLogHistory() {
   state.logs = entries.map(([, e]) => e);
   const list = document.getElementById('log-list');
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
-  list.innerHTML = entries.length ? entries.map(([id, e]) => `
+  // Trend-Vergleich braucht die NÄCHSTÄLTERE Session mit derselben Übung —
+  // also relativ zur eigenen Position in der (neueste-zuerst) Liste, nicht
+  // immer die global letzte (sonst würde eine ältere Karte gegen eine noch
+  // neuere verglichen, was rückwärts wäre).
+  const priorSetsForExercise = (exerciseId, fromIdx) => {
+    for (let i = fromIdx + 1; i < entries.length; i++) {
+      const ex = entries[i][1].exercises && entries[i][1].exercises.find((e) => e.exerciseId === exerciseId && Array.isArray(e.sets) && e.sets.length);
+      if (ex) return ex.sets;
+    }
+    return null;
+  };
+  list.innerHTML = entries.length ? entries.map(([id, e], idx) => `
     <div class="log-item">
       <div class="top"><span>${esc(e.date)}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
       ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>${sessionTypeIconLabel(e.type)}</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
       ${e.totalSessionSec ? `<div class="ex-log-list"><div class="ex-log-row"><span>⏱ Zeit</span><span class="mono">${fmtMinSec(e.totalSessionSec)} gesamt · ${fmtMinSec(e.totalWorkSec || 0)} Arbeit</span></div></div>` : ''}
-      ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => `
-        <div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>
-      `).join('')}</div>` : ''}
+      ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => {
+        const priorSets = Array.isArray(ex.sets) ? priorSetsForExercise(ex.exerciseId, idx) : null;
+        const trend = priorSets ? exerciseTrend(ex.exerciseId, ex.sets, priorSets) : null;
+        return `<div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}${trend ? ` <span class="fs-trend ${trend.cls}">${trend.symbol}</span>` : ''}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>`;
+      }).join('')}</div>` : ''}
       ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
       ${(e.exercises && e.exercises.length) ? `<button type="button" class="btn ghost small" data-save-plan="${id}" style="width:100%;margin-top:6px;">Als Plan speichern</button>` : ''}
       ${challengeDurationChipsHtml(`log-share-${id}`, CHALLENGE_WINDOW_H)}
@@ -1254,6 +1302,18 @@ function renderLogBuilderPanel() {
   const holder = document.getElementById('log-builder-panel');
   if (!holder) return;
 
+  if (fsRecap) {
+    holder.innerHTML = `
+      <div class="fs-recap">
+        <div class="fs-recap-title">Session gespeichert</div>
+        ${fsRecap.map((r) => `<div class="fs-recap-row"><span>${esc(r.name)}</span><span class="fs-trend ${r.cls}">${r.symbol}</span></div>`).join('')}
+        <button type="button" class="btn" id="fs-recap-close" style="width:100%;margin-top:12px;">Weiter</button>
+      </div>
+    `;
+    document.getElementById('fs-recap-close').onclick = () => { fsRecap = null; renderLog(); };
+    return;
+  }
+
   if (logMode === 'wall') {
     renderWallBuilder(holder);
   } else if (logMode === 'freestyle') {
@@ -1512,6 +1572,7 @@ function stopAllFsTimers() {
    für die neue Übung beendet sie dann wirklich. */
 function activateFsGroup(builder, idx) {
   builder.activeIndex = idx;
+  fsNoteEditing = false;
   if (fsPhase !== 'resting') {
     fsPhase = 'idle';
     stopFsWorkTimer();
@@ -1663,17 +1724,34 @@ function renderFsPanel() {
       ${isActive ? fsMachineNoteHtml(g.exerciseId) : ''}
       ${isActive && targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
       ${isActive ? exerciseHistoryTableHtml(g.exerciseId) : ''}
-      ${g.sets.length ? g.sets.map((s, si) => ({ s, si })).reverse().map(({ s, si }) => {
-        const setIsHold = setUnitSuffix(g.exerciseId, s) === 's';
-        return `
+      ${(() => {
+        // Vergleich mit demselben Satz (gleicher Index) der letzten Session
+        // mit dieser Übung — zeigt sofort, ob man sich gegenüber letztem
+        // Mal gesteigert hat, statt das erst in der Verlaufstabelle
+        // nachrechnen zu müssen. Nur bei gleicher Einheit (Wdh. vs. Zeit)
+        // vergleichbar — sonst stünden Sekunden gegen Wiederholungen.
+        const prevSession = historyForExercise(g.exerciseId, 1)[0];
+        return g.sets.length ? g.sets.map((s, si) => ({ s, si })).reverse().map(({ s, si }) => {
+          const setIsHold = setUnitSuffix(g.exerciseId, s) === 's';
+          const prevSet = prevSession && prevSession.sets[si];
+          let deltaHtml = '';
+          if (prevSet && setUnitSuffix(g.exerciseId, prevSet) === (setIsHold ? 's' : '')) {
+            const diff = Number(s.reps) - Number(prevSet.reps);
+            if (Number.isFinite(diff) && diff !== 0) {
+              deltaHtml = `<span class="fs-set-delta ${diff > 0 ? 'fs-delta-up' : 'fs-delta-down'}">${diff > 0 ? '+' : ''}${diff}</span>`;
+            }
+          }
+          return `
         <div class="fs-set-row mono">
           <span>Satz ${si + 1}</span>
+          ${deltaHtml}
           <input type="number" inputmode="decimal" step="0.5" class="ex-row-input" data-edit="${gi}:${si}:weight" value="${s.weight !== '' && s.weight != null ? esc(String(s.weight)) : ''}" placeholder="kg" title="Gewicht">
           <input type="text" inputmode="numeric" class="ex-row-input" data-edit="${gi}:${si}:reps" value="${esc(String(s.reps))}" placeholder="${setIsHold ? 's' : 'Wdh'}" title="${setIsHold ? 'Dauer (s)' : 'Wiederholungen'}">
           <button type="button" class="ex-row-remove" data-remove-set="${gi}:${si}" title="Satz entfernen">×</button>
         </div>
       `;
-      }).join('') : '<div class="fs-set-row mono" style="color:var(--ink-faint);">noch keine Sätze</div>'}
+        }).join('') : '<div class="fs-set-row mono" style="color:var(--ink-faint);">noch keine Sätze</div>';
+      })()}
     </div>
   `;
     }).join('')}`;
@@ -1784,7 +1862,19 @@ function renderFsPanel() {
       exerciseSettings[id] = ta.value;
       fbPut(`exerciseSettings/${state.member.id}/${id}`, ta.value);
     };
+    // Zurück zur kompakten Textanzeige, sobald man das Feld verlässt —
+    // ändert nichts an "change" oben, das feuert unabhängig davon vorher.
+    ta.onblur = () => { fsNoteEditing = false; renderFsPanel(); };
   });
+  const noteEditBtn = document.getElementById('fs-machine-note-edit');
+  if (noteEditBtn) {
+    noteEditBtn.onclick = () => { fsNoteEditing = true; renderFsPanel(); };
+  }
+  const noteInput = document.getElementById('fs-machine-note-input');
+  if (noteInput) {
+    noteInput.focus();
+    noteInput.setSelectionRange(noteInput.value.length, noteInput.value.length);
+  }
   holder.querySelectorAll('#fs-unit-toggle .chip').forEach((btn) => {
     btn.onclick = () => {
       setExerciseUnit(activeGroup.exerciseId, btn.dataset.unit);
@@ -3598,13 +3688,32 @@ function fsExerciseInfoHtml(exerciseId) {
    Mal an derselben Maschine wieder — anders als Ausführung/Zielmuskeln (die
    man höchstens einmal nachschaut) gehört das direkt sichtbar zur aktiven
    Übung, nicht hinter dem ℹ-Umschalter versteckt. Wert kommt automatisch
-   vom letzten Mal, da er dauerhaft pro Übung in exerciseSettings liegt. */
+   vom letzten Mal, da er dauerhaft pro Übung in exerciseSettings liegt.
+   Standardmässig nur als kompakter Text angezeigt (nicht als leeres,
+   mehrzeiliges Eingabefeld, das viel Platz frisst, auch wenn nichts oder
+   nur ein kurzer Satz drinsteht) — erst der ✎-Button schaltet auf ein
+   echtes, fokussiertes Textfeld um; nur EINE Übung ist je aktiv, daher
+   reicht ein einzelnes modul-globales Flag statt einem pro Übung. */
+let fsNoteEditing = false;
+
+/* Kurze Trend-Übersicht direkt nach "Fertig & Speichern" — {name, symbol,
+   cls} pro geloggter Übung dieser Session, bevor der Screen wieder in den
+   normalen (leeren) Zustand zurückspringt. null = keine Übersicht aktiv. */
+let fsRecap = null;
 function fsMachineNoteHtml(exerciseId) {
   const note = exerciseSettings[exerciseId] || '';
+  if (!fsNoteEditing) {
+    return `
+      <div class="fs-machine-note-view">
+        <span class="fs-machine-note-text">${note ? esc(note) : 'Keine Maschineneinstellungen notiert.'}</span>
+        <button type="button" class="ex-row-remove" id="fs-machine-note-edit" title="Maschineneinstellungen bearbeiten">✎</button>
+      </div>
+    `;
+  }
   return `
     <div class="field fs-machine-note">
       <label>Maschineneinstellungen (optional)</label>
-      <textarea data-machine-note="${exerciseId}" placeholder="z. B. Sitz Stufe 4, ROM oben eingeschränkt…">${esc(note)}</textarea>
+      <textarea data-machine-note="${exerciseId}" id="fs-machine-note-input" placeholder="z. B. Sitz Stufe 4, ROM oben eingeschränkt…">${esc(note)}</textarea>
     </div>
   `;
 }
