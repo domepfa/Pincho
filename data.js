@@ -232,7 +232,7 @@ const EXERCISE_LIBRARY = [
   { id: 'squat', name: 'Kniebeuge', category: 'beine', howTo: 'Füsse schulterbreit, Hüfte nach hinten unten absenken, Knie zeigen in Fussrichtung, Rücken gerade.', muscles: { primary: ['quads', 'glutes'], secondary: ['hamstrings'] } },
   { id: 'deadlift', name: 'Kreuzheben', category: 'beine', howTo: 'Stange nah am Schienbein, Rücken gerade, aus Hüfte und Beinen heraus aufrichten.', muscles: { primary: ['hamstrings', 'glutes'], secondary: ['lower_back'] } },
   { id: 'rdl', name: 'Romanian Deadlift', category: 'beine', howTo: 'Beine leicht gebeugt, Hüfte nach hinten schieben, Stange nah am Bein absenken, Rücken bleibt gerade.', muscles: { primary: ['hamstrings', 'glutes'], secondary: ['lower_back'] } },
-  { id: 'zercher_squat_rotation', name: 'Zerchersquat in Rotation', category: 'beine', howTo: 'Kniebeuge mit dem Gewicht in den Armbeugen, oben angekommen den Oberkörper kontrolliert rotieren.', muscles: { primary: ['quads', 'obliques'], secondary: ['glutes', 'abs'] } },
+  { id: 'zercher_squat_rotation', name: 'Zerchersquat in Rotation', category: 'beine', howTo: 'Kniebeuge mit dem Gewicht in den Armbeugen, unten in der gehaltenen Position den Oberkörper kontrolliert rotieren, dann erst aufrichten.', muscles: { primary: ['quads', 'obliques'], secondary: ['glutes', 'abs'] } },
   { id: 'split_squat', name: 'Bulgarian Split Squat', category: 'beine', pauseFriendly: true, howTo: 'Ausfallschritt-Position, hinterer Fuss erhöht, vorderes Bein beugt bis das Knie ca. 90° erreicht.', muscles: { primary: ['quads', 'glutes'], secondary: ['hamstrings'] } },
   { id: 'leg_extension', name: 'Beinstrecker', category: 'beine', howTo: 'An der Maschine sitzend die Unterschenkel gegen den Widerstand strecken, kontrolliert absenken.', muscles: { primary: ['quads'], secondary: [] } },
   { id: 'leg_curl_lying', name: 'Beinbieger im Liegen', category: 'beine', howTo: 'Bauchlage an der Maschine, Fersen gegen den Widerstand Richtung Gesäss ziehen.', muscles: { primary: ['hamstrings'], secondary: [] } },
@@ -270,6 +270,7 @@ const EXERCISE_LIBRARY = [
   { id: 'dumbbell_flyes', name: 'Kurzhantel-Fliegende', category: 'push', howTo: 'Rückenlage, Arme leicht gebeugt seitlich absenken, dann in einem Bogen über der Brust zusammenführen.', muscles: { primary: ['chest'], secondary: ['shoulders'] } },
   { id: 'cable_crossover', name: 'Kabelzug Crossover', category: 'push', howTo: 'Kabel von oben/aussen kommend vor dem Körper zusammenführen, Bewegung kontrolliert zurückführen.', muscles: { primary: ['chest'], secondary: ['shoulders'] } },
   { id: 'dumbbell_pullover', name: 'Kurzhantel-Pullover', category: 'push', howTo: 'Rückenlage quer zur Bank, Hantel mit gestreckten Armen hinter den Kopf absenken, zur Brust zurückführen.', muscles: { primary: ['chest'], secondary: ['lats', 'triceps'] } },
+  { id: 'pullover_machine', name: 'Pullover Maschine', category: 'push', howTo: 'An der Maschine sitzend die Arme von oben nach unten vor dem Körper ziehen, Ellbogen leicht gebeugt, kontrolliert zurückführen.', muscles: { primary: ['lats'], secondary: ['chest', 'triceps'] } },
   // Rücken
   { id: 'pullup_close_grip', name: 'Klimmzug enger Griff', category: 'zug', howTo: 'Enger Untergriff, Körper ruhig, bis Kinn über die Stange ziehen, kontrolliert ablassen.', muscles: { primary: ['lats'], secondary: ['biceps', 'forearms_front'] } },
   { id: 'deadlift_sumo', name: 'Kreuzheben Sumo', category: 'beine', howTo: 'Breiter Stand, Hände innerhalb der Beine, Rücken gerade, aus Hüfte und Beinen aufrichten.', muscles: { primary: ['hamstrings', 'glutes'], secondary: ['lower_back'] } },
@@ -296,6 +297,7 @@ const ACCESSORY_EXERCISES = EXERCISE_LIBRARY.filter((e) => e.pauseFriendly);
 
 function exerciseName(id) {
   if (id === 'warmup_general') return 'Warm-up';
+  if (id === 'cooldown_general') return 'Cooldown';
   const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
   return ex ? ex.name : id;
 }
@@ -314,9 +316,9 @@ function exerciseHowTo(id) {
    Zahl in Wirklichkeit eine Haltedauer in Sekunden, deshalb bekommen sie
    im Log einen Timer statt eines reinen Zahlenfelds. */
 function exerciseIsHold(id) {
-  // Warm-up ist eine zeitbasierte Pseudo-Übung (siehe app.js) statt eines
-  // echten Bibliothekseintrags — daher der Sonderfall statt eines Lookups.
-  if (id === 'warmup_general') return true;
+  // Warm-up/Cooldown sind zeitbasierte Pseudo-Übungen (siehe app.js) statt
+  // echte Bibliothekseinträge — daher der Sonderfall statt eines Lookups.
+  if (id === 'warmup_general' || id === 'cooldown_general') return true;
   const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
   return !!(ex && ex.isHold);
 }

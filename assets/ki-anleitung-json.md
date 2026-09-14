@@ -118,13 +118,23 @@ Ein einfacher direkter Sprung 1 → 4:
 
 | Feld | Typ | Pflicht | Beschreibung |
 |---|---|---|---|
-| `exerciseId` | String | ja | ID aus der Übungsliste unten |
+| `exerciseId` | String | ja | ID aus der Übungsliste unten, ODER `warmup_general`/`cooldown_general` (siehe unten) |
 | `reps` | Zahl > 0 | ja | Wiederholungen pro Satz |
 | `workSec` | Zahl > 0 | optional (Default 40) | Zeit pro Satz |
 | `restSec` | Zahl >= 0 | optional (Default 0) | Pause zwischen den Sätzen |
 
 ```json
 { "type": "exercise", "exerciseId": "face_pull", "reps": 15, "workSec": 40, "restSec": 30 }
+```
+
+**Sonderfall `warmup_general` / `cooldown_general`:** Das sind keine echten
+Übungen aus der Liste unten, sondern zwei feste Pseudo-IDs für einen
+allgemeinen Aufwärm- bzw. Cooldown-/Stretch-Block (kein bestimmter
+Bewegungsablauf, einfach eine Zeitspanne). Gültig genau wie jede andere
+`exerciseId`, z. B.:
+
+```json
+{ "type": "exercise", "exerciseId": "warmup_general", "reps": 1, "workSec": 300, "restSec": 0 }
 ```
 
 ---
@@ -197,7 +207,8 @@ gestreckte Arme)
 `triceps_extension` (Trizepsstrecker), `decline_bench_press`
 (Negativ-Bankdrücken), `dumbbell_bench_press` (Kurzhantel-Bankdrücken),
 `dumbbell_flyes` (Kurzhantel-Fliegende), `cable_crossover`
-(Kabelzug Crossover), `dumbbell_pullover` (Kurzhantel-Pullover)
+(Kabelzug Crossover), `dumbbell_pullover` (Kurzhantel-Pullover),
+`pullover_machine` (Pullover Maschine)
 
 **Beine/Hüfte:** `squat` (Kniebeuge), `deadlift` (Kreuzheben), `rdl`
 (Romanian Deadlift), `zercher_squat_rotation` (Zerchersquat in Rotation),

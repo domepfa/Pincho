@@ -794,7 +794,7 @@ async function renderLog() {
       // Trend JE Übung (↑/↓/→) gegenüber der letzten Session damit — Basis
       // ist state.logs VOR diesem Speichern (wird erst gleich neu geladen).
       fsRecap = rawExercises
-        .filter((g) => g.exerciseId !== 'warmup_general')
+        .filter((g) => g.exerciseId !== 'warmup_general' && g.exerciseId !== 'cooldown_general')
         .map((g) => {
           const prevSession = historyForExercise(g.exerciseId, 1)[0];
           const trend = prevSession ? exerciseTrend(g.exerciseId, g.sets, prevSession.sets) : null;
@@ -866,10 +866,11 @@ async function renderLogHistory() {
       const found = entries.find(([id2]) => id2 === btn.dataset.savePlan);
       if (!found) return;
       const entry = found[1];
-      // Warm-up ist eine Aufwärm-Pseudoübung, kein trainingswirksamer Satz —
-      // gehört nicht in eine wiederverwendbare Plan-Vorlage.
+      // Warm-up/Cooldown sind Aufwärm-/Ausklang-Pseudoübungen, kein
+      // trainingswirksamer Satz — gehören nicht in eine wiederverwendbare
+      // Plan-Vorlage.
       const exercises = entry.exercises
-        .filter((ex) => Array.isArray(ex.sets) && ex.sets.length && ex.exerciseId !== 'warmup_general')
+        .filter((ex) => Array.isArray(ex.sets) && ex.sets.length && ex.exerciseId !== 'warmup_general' && ex.exerciseId !== 'cooldown_general')
         .map((ex) => {
           // Ein Plan kennt pro Übung nur EINEN Zielwert (Sätze × Wdh. @ Gewicht),
           // ein geloggter Satz aber oft unterschiedliche Werte je Satz (z. B.
@@ -1336,8 +1337,12 @@ function renderLogBuilderPanel() {
     // — landet dadurch automatisch in derselben Session/demselben
     // Verlaufseintrag wie die Übungen danach, statt in einem eigenen.
     const hasWarmup = freestyleBuilder.exercises.some((g) => g.exerciseId === 'warmup_general');
+    const hasCooldown = freestyleBuilder.exercises.some((g) => g.exerciseId === 'cooldown_general');
     holder.innerHTML = `
-      ${hasWarmup ? '' : `<button type="button" class="btn ghost small" id="fs-add-warmup" style="width:100%;margin-bottom:12px;">🔥 Warm-up hinzufügen</button>`}
+      <div class="field-row" style="margin-bottom:12px;">
+        ${hasWarmup ? '' : `<button type="button" class="btn ghost small" id="fs-add-warmup" style="flex:1;">🔥 Warm-up hinzufügen</button>`}
+        ${hasCooldown ? '' : `<button type="button" class="btn ghost small" id="fs-add-cooldown" style="flex:1;">🧘 Cooldown hinzufügen</button>`}
+      </div>
       <div class="field">
         <label>Übung</label>
         <div id="fs-exercise-grid"></div>
@@ -1345,18 +1350,19 @@ function renderLogBuilderPanel() {
       <div id="fs-panel"></div>
       <div id="fs-discard-holder"></div>
     `;
+    const addPseudoExercise = (exerciseId) => {
+      if (!freestyleBuilder.exercises.length) freestyleBuilder.sessionStartedAt = Date.now();
+      freestyleBuilder.exercises.push({ exerciseId, sets: [] });
+      freestyleBuilder.activeIndex = freestyleBuilder.exercises.length - 1;
+      fsPhase = 'idle';
+      stopFsRestTimer();
+      stopFsWorkTimer();
+      renderLogBuilderPanel();
+    };
     const addWarmupBtn = document.getElementById('fs-add-warmup');
-    if (addWarmupBtn) {
-      addWarmupBtn.onclick = () => {
-        if (!freestyleBuilder.exercises.length) freestyleBuilder.sessionStartedAt = Date.now();
-        freestyleBuilder.exercises.push({ exerciseId: 'warmup_general', sets: [] });
-        freestyleBuilder.activeIndex = freestyleBuilder.exercises.length - 1;
-        fsPhase = 'idle';
-        stopFsRestTimer();
-        stopFsWorkTimer();
-        renderLogBuilderPanel();
-      };
-    }
+    if (addWarmupBtn) addWarmupBtn.onclick = () => addPseudoExercise('warmup_general');
+    const addCooldownBtn = document.getElementById('fs-add-cooldown');
+    if (addCooldownBtn) addCooldownBtn.onclick = () => addPseudoExercise('cooldown_general');
     wireExercisePickerGrid('fs-exercise-grid', EXERCISE_LIBRARY, freestyleBuilder.pickerExerciseId, (id) => {
       freestyleBuilder.pickerExerciseId = id;
       if (!freestyleBuilder.exercises.length) freestyleBuilder.sessionStartedAt = Date.now();
@@ -2041,7 +2047,8 @@ function parseImportedAblauf(text) {
       if (blockRestSec != null && !(blockRestSec >= 0)) { errors.push(`Satz ${n}: blockRestSec muss eine Zahl >= 0 sein.`); return; }
       blocks.push({ type: 'hang', board: b.board, ...gripFields, reps, hangSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}) });
     } else if (b.type === 'exercise') {
-      if (!EXERCISE_LIBRARY.some((e) => e.id === b.exerciseId)) { errors.push(`Satz ${n}: unbekannte exerciseId "${b.exerciseId}".`); return; }
+      const isPseudoExercise = b.exerciseId === 'warmup_general' || b.exerciseId === 'cooldown_general';
+      if (!isPseudoExercise && !EXERCISE_LIBRARY.some((e) => e.id === b.exerciseId)) { errors.push(`Satz ${n}: unbekannte exerciseId "${b.exerciseId}".`); return; }
       const reps = Number(b.reps);
       const workSec = Number(b.workSec != null ? b.workSec : 40);
       const restSec = Number(b.restSec != null ? b.restSec : 0);
@@ -2331,6 +2338,10 @@ function renderFbAddPanel() {
     };
   } else if (fb.addType === 'exercise') {
     holder.innerHTML = `
+      <div class="chip-row" id="fb-pseudo-exercise-row" style="margin-bottom:10px;">
+        <button type="button" class="chip ${fb.newExercise.exerciseId === 'warmup_general' ? 'active' : ''}" data-pseudo-exercise="warmup_general">🔥 Warm-up</button>
+        <button type="button" class="chip ${fb.newExercise.exerciseId === 'cooldown_general' ? 'active' : ''}" data-pseudo-exercise="cooldown_general">🧘 Cooldown</button>
+      </div>
       <div class="field">
         <label>Übung</label>
         <div id="fb-exercise-grid"></div>
@@ -2342,6 +2353,9 @@ function renderFbAddPanel() {
       </div>
       <button type="button" class="btn" id="fb-add-exercise" style="width:100%;">+ Übung hinzufügen</button>
     `;
+    holder.querySelectorAll('[data-pseudo-exercise]').forEach((btn) => {
+      btn.onclick = () => { fb.newExercise.exerciseId = btn.dataset.pseudoExercise; renderFbAddPanel(); };
+    });
     wireExercisePickerGrid('fb-exercise-grid', EXERCISE_LIBRARY, fb.newExercise.exerciseId, (id) => { fb.newExercise.exerciseId = id; }, 'fb-add-exercise', false);
     document.getElementById('fb-new-exreps').oninput = (e) => { fb.newExercise.reps = Number(e.target.value) || 1; };
     document.getElementById('fb-new-exwork').oninput = (e) => { fb.newExercise.workSec = Number(e.target.value) || 5; };
@@ -2653,7 +2667,10 @@ async function renderFingerboard() {
       <span class="sec-chevron" id="fb-import-chevron">${fbImportOpen ? '▾' : '▸'}</span>
     </div>
     <div id="fb-import-panel" ${fbImportOpen ? '' : 'hidden'} style="margin-bottom:16px;">
-      <a href="./assets/ki-anleitung-json.md" download class="btn ghost small" style="width:100%;margin-bottom:10px;text-decoration:none;box-sizing:border-box;">📄 Anleitung für KI herunterladen</a>
+      <div class="field-row" style="margin-bottom:10px;">
+        <a href="./assets/ki-anleitung-json.md" download class="btn ghost small" style="flex:1;text-decoration:none;box-sizing:border-box;">📄 Herunterladen</a>
+        <button type="button" class="btn ghost small" id="fb-import-guide-copy" style="flex:1;">📋 Kopieren</button>
+      </div>
       <div class="field">
         <label>JSON einfügen</label>
         <textarea id="fb-import-textarea" rows="6" placeholder='[{"type":"exercise","exerciseId":"face_pull","reps":15,"workSec":40,"restSec":30}]'></textarea>
@@ -2697,6 +2714,16 @@ async function renderFingerboard() {
     fbImportOpen = !fbImportOpen;
     document.getElementById('fb-import-panel').hidden = !fbImportOpen;
     document.getElementById('fb-import-chevron').textContent = fbImportOpen ? '▾' : '▸';
+  };
+  document.getElementById('fb-import-guide-copy').onclick = async () => {
+    try {
+      const res = await fetch('./assets/ki-anleitung-json.md');
+      const text = await res.text();
+      await navigator.clipboard.writeText(text);
+      toast('Anleitung kopiert.', 'ok');
+    } catch {
+      toast('Kopieren nicht möglich.', 'err');
+    }
   };
   document.getElementById('fb-import-btn').onclick = () => {
     const text = document.getElementById('fb-import-textarea').value.trim();
