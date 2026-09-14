@@ -1537,6 +1537,7 @@ function updateFsWorkTimerUI() {
   if (el) el.textContent = fmtMinSec(fsWorkTimer.seconds);
 }
 function startFsWorkTimer() {
+  requestWakeLock(); // Bildschirm soll während einer laufenden Session nicht ausgehen (dieselbe Sperre wie im Fingerboard-Ablauf)
   clearInterval(fsWorkTimer.intervalId);
   fsWorkTimer.seconds = 0;
   updateFsWorkTimerUI();
@@ -1556,6 +1557,7 @@ function updateFsRestTimerUI() {
   el.textContent = `PAUSE ${fmtMinSec(fsRestTimer.seconds)}`;
 }
 function startFsRestTimer() {
+  requestWakeLock();
   clearInterval(fsRestTimer.intervalId);
   fsRestTimer.seconds = 0;
   updateFsRestTimerUI();
@@ -1575,6 +1577,7 @@ function stopFsRestTimer() {
 function stopAllFsTimers() {
   stopFsWorkTimer();
   stopFsRestTimer();
+  releaseWakeLock();
 }
 
 /* Eine neue oder bereits vorhandene Übung wird aktiv: normalerweise erstmal

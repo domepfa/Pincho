@@ -160,12 +160,20 @@ function gripInfo(boardId, gripId) {
    (eine Hand pro Seite) — das lässt sich aus den kalibrierten hotspots
    ableiten. EIN Loch ist dagegen mehrdeutig: das kann eine schmale,
    wirklich einarmige Position sein, ODER eine durchgehende breite Kante,
-   die trotz nur einem Kalibrierpunkt ganz normal beidhändig genutzt wird
-   (z. B. die grosse Kante — klassischer beidhändiger Aufwärm-Hang trotz
-   nur einem Punkt in der Mitte). Ohne Rückmeldung vom echten Brett lässt
-   sich das nicht unterscheiden, darum wird bei einem Loch bewusst NICHTS
-   behauptet, statt zu raten. */
+   die trotz nur einem Kalibrierpunkt ganz normal beidhändig genutzt wird.
+   Ohne Rückmeldung vom echten Brett lässt sich das nicht unterscheiden,
+   darum wird bei einem Loch bewusst NICHTS behauptet, statt zu raten —
+   ausser für die wenigen unten explizit bestätigten Ausnahmen. */
+const GRIP_ARM_OVERRIDE = {
+  // Beim Beastmaker 2000 ist "Grosse Kante" (anders als beim 1000er) real
+  // zu schmal für zwei Hände nebeneinander — laut Nutzer-Rückmeldung am
+  // echten Brett nur einarmig nutzbar, keine gewöhnliche beidhändige
+  // Aufwärm-Kante wie sonst bei einem einzelnen Kalibrierpunkt vermutet.
+  bm2000: { edge_large: 'einarmig' },
+};
 function gripArmNote(boardId, gripId) {
+  const override = GRIP_ARM_OVERRIDE[boardId] && GRIP_ARM_OVERRIDE[boardId][gripId];
+  if (override) return override;
   const board = BOARDS[boardId];
   if (!board) return '';
   const count = board.hotspots.filter((h) => h.grip === gripId).length;

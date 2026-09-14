@@ -153,6 +153,12 @@ Ein einfacher direkter Sprung 1 → 4:
 `pocket3_small`, `pocket2`, `pocket2_small`, `pocket2_offset`, `mono`,
 `mono_small`, `sloper_easy`, `sloper_medium`, `sloper_hard`
 
+**Achtung `edge_large` bei `bm2000`:** Anders als beim BM1000 ist die
+"Grosse Kante" beim BM2000 real zu schmal für zwei Hände nebeneinander —
+nur einarmig nutzbar, kein normaler beidhändiger Aufwärm-Griff. Nicht als
+"einfachen"/ersten Griff einer Aufwärmphase für `bm2000` verwenden, ausser
+es ist ausdrücklich ein einarmiger Satz gewünscht.
+
 (`gripLeft`/`gripRight` müssen aus derselben Liste des jeweiligen `board`
 stammen wie `grip`.)
 
