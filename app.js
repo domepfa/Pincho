@@ -2623,6 +2623,8 @@ async function renderFingerboard() {
 
     <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Eigenen Ablauf bauen</h2><div class="sec-rule"></div></div>
 
+    <button type="button" class="btn ghost small" id="fb-new-ablauf" style="width:100%;margin-bottom:12px;">Neue Session</button>
+
     <div class="chip-row">
       <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Hang-Satz</button>
       <button class="chip ${fb.addType === 'exercise' ? 'active' : ''}" data-add-type="exercise">Fixübung</button>
@@ -2644,7 +2646,6 @@ async function renderFingerboard() {
     </div>
     <div class="chip-row" style="margin-bottom:16px;">
       <button type="button" class="chip" id="fb-template-save">Aktuellen Ablauf als Vorlage speichern</button>
-      <button type="button" class="chip" id="fb-new-ablauf">Neuen, leeren Ablauf beginnen</button>
     </div>
 
     <div class="sec-head" id="fb-import-toggle" style="cursor:pointer;margin-top:0;">
