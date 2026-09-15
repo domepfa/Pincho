@@ -54,7 +54,7 @@ function loadDraft(key) {
    "Stretch"-Gruppe, unabhängig vom Zielmuskel — sonst würden sie mit
    Kraftübungen derselben Körperregion vermischt (z. B. Katze-Kuh unter
    "Rücken" neben Rudern), was Kraft und Dehnen visuell nicht trennt. */
-const EX_SUPERGROUP_LABEL = { arm: 'Arm', brust: 'Brust', ruecken: 'Rücken', rumpf: 'Rumpf', huefte_beine: 'Hüfte/Beine', stretch: 'Stretch', agility: 'Agilität' };
+const EX_SUPERGROUP_LABEL = { arm: 'Arm', brust: 'Brust', ruecken: 'Rücken', rumpf: 'Rumpf', huefte_beine: 'Beine', stretch: 'Stretch', agility: 'Agilität' };
 const MUSCLE_SUPERGROUP = {
   shoulders: 'arm', biceps: 'arm', forearms_front: 'arm', triceps: 'arm', forearms_back: 'arm',
   chest: 'brust',
@@ -3375,7 +3375,7 @@ async function renderFingerboard() {
 
     <button type="button" class="btn ghost small" id="fb-new-ablauf" style="width:100%;margin-bottom:12px;">Neue Session</button>
 
-    <div class="chip-row">
+    <div class="chip-row fb-addtype-row">
       <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Board</button>
       <button class="chip ${fb.addType === 'block' ? 'active' : ''}" data-add-type="block">Lifting Pin</button>
       <button class="chip ${fb.addType === 'exercise' ? 'active' : ''}" data-add-type="exercise">Fixübung</button>

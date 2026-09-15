@@ -449,6 +449,9 @@ button, input, select, textarea { font-family: inherit; }
 .ex-supergroup-row::-webkit-scrollbar { display: none; }
 .ex-supergroup-row .chip { flex: 1; color: var(--ink); padding: 8px 6px; font-size: 11px; white-space: nowrap; text-align: center; }
 .ex-supergroup-row .chip.active { color: var(--accent); }
+.fb-addtype-row { flex-wrap: nowrap; }
+.fb-addtype-row .chip { flex: 1; color: var(--ink); padding: 8px 4px; font-size: 11px; white-space: nowrap; text-align: center; }
+.fb-addtype-row .chip.active { color: var(--accent); }
 .ex-pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px; }
 .ex-pick-cell { display: flex; gap: 4px; }
 .ex-pick-btn {
