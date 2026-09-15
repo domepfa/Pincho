@@ -56,15 +56,17 @@ Beispiel (asymmetrisch, pro Hand ein anderer Griff):
 
 ---
 
-### Block-Typ `block` (Griffblock / Lifting Pin, auch als Pinch nutzbar)
+### Block-Typ `block` (Lifting Pin, auch als Pinch nutzbar)
 
-Ein freistehender Griffblock oder Lifting Pin mit mehreren Leisten, der
-über die Querseite auch als Pinch-Block genutzt werden kann — anders als
-beim Fingerboard gibt es dafür kein Foto mit Hotspots, `grip` ist deshalb
-freier Text. Immer einarmig (nur eine Hand gleichzeitig), deshalb gibt es
-hier — anders als bei `hang` — kein `gripLeft`/`gripRight`. `weight` ist
-das TATSÄCHLICHE geladene Gesamtgewicht (z. B. eine angesteckte Scheibe),
-kein Zusatzgewicht oben auf das Körpergewicht wie beim Hang-Satz.
+Ein Lifting Pin mit mehreren Leisten, der über die Querseite auch als
+Pinch-Block genutzt werden kann — anders als beim Fingerboard gibt es
+dafür kein Foto mit Hotspots, `grip` ist deshalb freier Text (in der App
+per Presets zusammengestellt: `"Leiste 5mm"` bis `"Leiste 30mm"` in
+5mm-Schritten, oder `"Pinch"`). Immer einarmig (nur eine Hand
+gleichzeitig), deshalb gibt es hier — anders als bei `hang` — kein
+`gripLeft`/`gripRight`. `weight` ist das TATSÄCHLICHE geladene
+Gesamtgewicht (z. B. eine angesteckte Scheibe), kein Zusatzgewicht oben
+auf das Körpergewicht wie beim Hang-Satz.
 
 Zwei Modi über `mode`:
 - `"hold"` (Default): statisches Halten mit Sekundentimer, wie ein Hang-Satz.
@@ -72,7 +74,7 @@ Zwei Modi über `mode`:
 
 | Feld | Typ | Pflicht | Beschreibung |
 |---|---|---|---|
-| `grip` | String | ja | Frei benannter Griff/Leiste, z. B. `"Leiste 1"` oder `"Pinch"` |
+| `grip` | String | ja | Frei benannter Griff/Leiste, z. B. `"Leiste 15mm"` oder `"Pinch"` |
 | `fingers` | Zahl (1, 2, 3 oder 4) | ja | Wie viele Finger greifen dürfen — gilt für Leisten UND Pinch, weniger Finger = schwerer |
 | `weight` | Zahl | optional (Default 0) | Tatsächliches Gesamtgewicht in kg, das gehoben/gehalten wird |
 | `mode` | String | optional (Default `"hold"`) | `"hold"` oder `"reps"`, siehe oben |
@@ -92,9 +94,9 @@ Nur bei `mode: "reps"` zusätzlich:
 |---|---|---|---|
 | `workSec` | Zahl > 0 | optional (Default 40) | Zeit für die Wiederholungen |
 
-Halten (z. B. Leiste 1, 3 Finger, 10kg):
+Halten (z. B. Leiste 15mm, 3 Finger, 10kg):
 ```json
-{ "type": "block", "grip": "Leiste 1", "fingers": 3, "weight": 10, "mode": "hold", "reps": 5, "hangSec": 7, "restSec": 45, "blockRestSec": 90 }
+{ "type": "block", "grip": "Leiste 15mm", "fingers": 3, "weight": 10, "mode": "hold", "reps": 5, "hangSec": 7, "restSec": 45, "blockRestSec": 90 }
 ```
 
 Wiederholungen (z. B. Lifting Pin heben/ablassen):
@@ -282,7 +284,20 @@ gestreckte Arme)
 `shoulder_circles_band` (Schulterkreisen mit Band), `wrist_mobility`
 (Handgelenk-Mobilisation), `leg_swings` (Beinschwingen), `ankle_rocks`
 (Sprunggelenk-Mobilisation), `neck_mobility` (Nacken-Mobilisation),
-`doorway_pec_stretch` (Türrahmen-Dehnung Brust)
+`doorway_pec_stretch` (Türrahmen-Dehnung Brust), `couch_stretch`
+(Couch-Stretch), `figure_four_stretch` (Figure-4-Dehnung), `frog_stretch`
+(Frosch-Dehnung), `deep_squat_hold` (Tiefe Hocke halten),
+`spiderman_lunge_rotation` (Spiderman-Ausfallschritt mit Rotation),
+`standing_hip_circles` (Stehende Hüftkreise), `lateral_lunge_mobility`
+(Seitlicher Ausfallschritt), `standing_quad_stretch`
+(Stehende Quadrizeps-Dehnung), `calf_stretch_wall`
+(Wadendehnung an der Wand), `adductor_rock` (Adduktoren-Rock)
+
+**Agilität:** `lateral_shuffle` (Seitliches Shuffle), `carioca`
+(Carioca-Lauf), `quick_feet` (Schnelle Füsse), `high_knees`
+(Hohe Kniehebe), `single_leg_hops` (Einbeinige Sprünge), `lateral_bounds`
+(Seitliche Sprünge/Skater Jumps), `shuttle_sprint` (Pendelsprint 5-10-5),
+`agility_ladder_run` (Leiterlauf)
 
 **Arm:** `bicep_curl_dumbbell` (Bizeps-Curl Kurzhantel),
 `bicep_curl_barbell` (Bizeps-Curl Langhantel), `hammer_curl`

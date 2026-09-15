@@ -54,7 +54,7 @@ function loadDraft(key) {
    "Stretch"-Gruppe, unabhängig vom Zielmuskel — sonst würden sie mit
    Kraftübungen derselben Körperregion vermischt (z. B. Katze-Kuh unter
    "Rücken" neben Rudern), was Kraft und Dehnen visuell nicht trennt. */
-const EX_SUPERGROUP_LABEL = { arm: 'Arm', brust: 'Brust', ruecken: 'Rücken', rumpf: 'Rumpf', huefte_beine: 'Hüfte/Beine', stretch: 'Stretch' };
+const EX_SUPERGROUP_LABEL = { arm: 'Arm', brust: 'Brust', ruecken: 'Rücken', rumpf: 'Rumpf', huefte_beine: 'Hüfte/Beine', stretch: 'Stretch', agility: 'Agilität' };
 const MUSCLE_SUPERGROUP = {
   shoulders: 'arm', biceps: 'arm', forearms_front: 'arm', triceps: 'arm', forearms_back: 'arm',
   chest: 'brust',
@@ -64,6 +64,7 @@ const MUSCLE_SUPERGROUP = {
 };
 function exerciseSupergroup(ex) {
   if (ex.category === 'mobility') return 'stretch';
+  if (ex.category === 'agility') return 'agility';
   return MUSCLE_SUPERGROUP[ex.muscles.primary[0]] || 'rumpf';
 }
 
@@ -2708,7 +2709,7 @@ const fb = {
   selectedGripRight: null,
   addType: 'hang',       // 'hang' | 'block' | 'exercise' | 'campus' | 'pause' — welches Add-Panel gerade offen ist
   newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
-  newBlock: { grip: '', fingers: 4, weight: 0, mode: 'hold', reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60, workSec: 40 },
+  newBlock: { gripType: 'leiste', leisteWidth: 15, fingers: 4, weight: 0, mode: 'hold', reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60, workSec: 40 },
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
   newCampus: {
     rungType: CAMPUS_RUNG_TYPES[0].id, moveMode: 'direct',
@@ -2987,10 +2988,32 @@ function renderFbAddPanel() {
    ein Hang-Satz) ODER als Wiederholungen (heben/ablassen zählen, wie eine
    Fixübung) — ein Lifting Pin wird nicht nur statisch gehalten, sondern
    auch für Wiederholungen genutzt. */
+const LEISTE_WIDTHS_MM = [5, 10, 15, 20, 25, 30];
+/* Baut den freien Griff-Anzeigetext aus der strukturierten Auswahl statt
+   ihn frei eintippen zu lassen — Pinch braucht keine Breite (über die
+   Querseite), eine Leiste schon (feste Auswahl in 5mm-Schritten). */
+function blockGripFromSelection(b) {
+  return b.gripType === 'pinch' ? 'Pinch' : `Leiste ${b.leisteWidth}mm`;
+}
 function renderBlockAddPanel(holder) {
   const isReps = fb.newBlock.mode === 'reps';
+  const isLeiste = fb.newBlock.gripType === 'leiste';
   holder.innerHTML = `
-    <div class="field"><label>Griff/Leiste (frei, z. B. "Leiste 1" oder "Pinch")</label><input type="text" id="fb-block-grip" value="${esc(fb.newBlock.grip)}" placeholder="Leiste 1"></div>
+    <div class="field">
+      <label>Griff</label>
+      <div class="chip-row" id="fb-block-griptype-row">
+        <button type="button" class="chip ${isLeiste ? 'active' : ''}" data-grip-type="leiste">Leiste</button>
+        <button type="button" class="chip ${!isLeiste ? 'active' : ''}" data-grip-type="pinch">Pinch</button>
+      </div>
+    </div>
+    <div id="fb-block-leiste-width-field" ${isLeiste ? '' : 'hidden'}>
+      <div class="field">
+        <label>Leisten-Breite</label>
+        <div class="chip-row" id="fb-block-leistewidth-row">
+          ${LEISTE_WIDTHS_MM.map((mm) => `<button type="button" class="chip ${fb.newBlock.leisteWidth === mm ? 'active' : ''}" data-leiste-width="${mm}">${mm}mm</button>`).join('')}
+        </div>
+      </div>
+    </div>
     <div class="field">
       <label>Finger</label>
       <div class="chip-row" id="fb-block-fingers-row">
@@ -3003,9 +3026,23 @@ function renderBlockAddPanel(holder) {
       <button type="button" class="chip ${isReps ? 'active' : ''}" data-mode="reps">Wiederholungen</button>
     </div>
     <div id="fb-block-mode-fields"></div>
-    <button type="button" class="btn" id="fb-add-block" style="width:100%;">+ Griffblock-Satz hinzufügen</button>
+    <button type="button" class="btn" id="fb-add-block" style="width:100%;">+ Lifting-Pin-Satz hinzufügen</button>
   `;
-  document.getElementById('fb-block-grip').oninput = (e) => { fb.newBlock.grip = e.target.value; };
+  document.getElementById('fb-block-griptype-row').querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => {
+      fb.newBlock.gripType = btn.dataset.gripType;
+      renderBlockAddPanel(holder);
+    };
+  });
+  const leisteWidthRow = document.getElementById('fb-block-leistewidth-row');
+  if (leisteWidthRow) {
+    leisteWidthRow.querySelectorAll('.chip').forEach((btn) => {
+      btn.onclick = () => {
+        fb.newBlock.leisteWidth = Number(btn.dataset.leisteWidth);
+        leisteWidthRow.querySelectorAll('.chip').forEach((b) => b.classList.toggle('active', b === btn));
+      };
+    });
+  }
   document.getElementById('fb-block-fingers-row').querySelectorAll('.chip').forEach((btn) => {
     btn.onclick = () => {
       fb.newBlock.fingers = Number(btn.dataset.fingers);
@@ -3022,8 +3059,7 @@ function renderBlockAddPanel(holder) {
   });
   renderBlockModeFields();
   document.getElementById('fb-add-block').onclick = () => {
-    if (!fb.newBlock.grip.trim()) { toast('Zuerst Griff/Leiste benennen.', 'err'); return; }
-    const b = { type: 'block', grip: fb.newBlock.grip.trim(), fingers: fb.newBlock.fingers, weight: fb.newBlock.weight, mode: fb.newBlock.mode };
+    const b = { type: 'block', grip: blockGripFromSelection(fb.newBlock), fingers: fb.newBlock.fingers, weight: fb.newBlock.weight, mode: fb.newBlock.mode };
     if (fb.newBlock.mode === 'reps') {
       Object.assign(b, { reps: fb.newBlock.reps, workSec: fb.newBlock.workSec, restSec: fb.newBlock.restSec });
     } else {
@@ -3340,8 +3376,8 @@ async function renderFingerboard() {
     <button type="button" class="btn ghost small" id="fb-new-ablauf" style="width:100%;margin-bottom:12px;">Neue Session</button>
 
     <div class="chip-row">
-      <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Hang-Satz</button>
-      <button class="chip ${fb.addType === 'block' ? 'active' : ''}" data-add-type="block">Griffblock</button>
+      <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Board</button>
+      <button class="chip ${fb.addType === 'block' ? 'active' : ''}" data-add-type="block">Lifting Pin</button>
       <button class="chip ${fb.addType === 'exercise' ? 'active' : ''}" data-add-type="exercise">Fixübung</button>
       <button class="chip ${fb.addType === 'campus' ? 'active' : ''}" data-add-type="campus">Campus</button>
       <button class="chip ${fb.addType === 'pause' ? 'active' : ''}" data-add-type="pause">Pause</button>
@@ -4591,7 +4627,7 @@ function hangBoardThumb(b) {
    Muster wie hangGripLabel/hangArmNote/hangBoardThumb — immer einarmig,
    da ein Griffblock nur mit einer Hand gleichzeitig gegriffen wird. */
 function blockGripLabel(b) {
-  return `${b.grip || 'Griffblock'} · ${b.fingers}-Finger`;
+  return `${b.grip || 'Lifting Pin'} · ${b.fingers}-Finger`;
 }
 function blockArmNote() {
   return 'einarmig';
@@ -4617,7 +4653,7 @@ function isHoldModeBlock(b) { return b.type === 'hang' || (b.type === 'block' &&
 function holdBlockArmNote(b) { return b.type === 'block' ? blockArmNote() : hangArmNote(b); }
 function holdBlockThumb(b) { return b.type === 'block' ? blockThumb() : hangBoardThumb(b); }
 function holdBlockTitle(b) {
-  return b.type === 'block' ? `Griffblock @ ${esc(blockGripLabel(b))}` : `Hang @ ${esc(hangGripLabel(b))}`;
+  return b.type === 'block' ? `Lifting Pin @ ${esc(blockGripLabel(b))}` : `Hang @ ${esc(hangGripLabel(b))}`;
 }
 
 /* Campus-Sätze brauchen keine Foto-Hotspots wie beim Hangboard — die
@@ -5173,7 +5209,7 @@ function fbUpcomingLabel() {
   const nextBlock = fb.blocks[fb.blockIndex + 1];
   if (!nextBlock) return 'Letzter Satz — gleich geschafft!';
   if (nextBlock.type === 'hang') return 'Hang @ ' + hangGripLabel(nextBlock);
-  if (nextBlock.type === 'block') return 'Griffblock @ ' + blockGripLabel(nextBlock);
+  if (nextBlock.type === 'block') return 'Lifting Pin @ ' + blockGripLabel(nextBlock);
   if (nextBlock.type === 'campus') return campusLabel(nextBlock);
   if (nextBlock.type === 'pause') return 'Pause';
   return exerciseName(nextBlock.exerciseId);
@@ -5951,8 +5987,8 @@ function renderChallengeCard(id, c, now) {
     title = `Fingerboard · ${esc(BOARDS[c.board].label)}`;
     detail = (c.blocks || []).map((b) => {
       if (b.type === 'hang') return `<div class="ex core">Hang @ ${esc(hangGripLabel({ ...b, board: b.board || c.board }))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`;
-      if (b.type === 'block' && b.mode === 'reps') return `<div class="ex core">Griffblock @ ${esc(blockGripLabel(b))} · ${b.workSec || 40}s × ${esc(String(b.reps))}</div>`;
-      if (b.type === 'block') return `<div class="ex core">Griffblock @ ${esc(blockGripLabel(b))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`;
+      if (b.type === 'block' && b.mode === 'reps') return `<div class="ex core">Lifting Pin @ ${esc(blockGripLabel(b))} · ${b.workSec || 40}s × ${esc(String(b.reps))}</div>`;
+      if (b.type === 'block') return `<div class="ex core">Lifting Pin @ ${esc(blockGripLabel(b))} · ${b.hangSec}s × ${esc(String(b.reps))} · ${b.restSec}s Pause</div>`;
       if (b.type === 'pause') return `<div class="ex core">⏸ Pause · ${b.seconds}s</div>`;
       return `<div class="ex core">${esc(exerciseName(b.exerciseId))} · ${b.workSec || 40}s × ${esc(String(b.reps))}</div>`;
     }).join('');
