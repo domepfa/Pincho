@@ -430,6 +430,10 @@ button, input, select, textarea { font-family: inherit; }
 .crew .p.expired { border-color: var(--ink-faint); color: var(--ink-faint); text-decoration: line-through; }
 .chal-actions { display: flex; gap: 8px; }
 .chal-actions .btn { flex: 1; }
+/* Mit "Annehmen" dazu stehen jetzt bis zu 3 Buttons in einer Zeile — die
+   Standard-.btn.small-Grösse (14px/8px 14px Padding) liess "LÖSCHEN" bei
+   3 Buttons auf schmalen Screens abgeschnitten wirken. */
+.chal-actions .btn.small { padding: 8px 6px; font-size: 12px; white-space: nowrap; }
 .chal-duration-row { margin: 8px 0 0; }
 .chal-duration-row .chip { font-size: 10px; padding: 5px 9px; }
 

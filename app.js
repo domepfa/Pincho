@@ -5958,11 +5958,46 @@ async function renderChallenges() {
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
   list.innerHTML = entries.length ? entries.map(([id, c]) => renderChallengeCard(id, c, now)).join('') : '<div class="list-empty">Noch keine Challenges — teile ein fertiges Training, um die erste zu starten.</div>';
 
-  list.querySelectorAll('[data-confirm]').forEach((btn) => {
+  list.querySelectorAll('[data-toggle-done]').forEach((btn) => {
     btn.onclick = async () => {
-      await fbPatch(`challenges/${btn.dataset.confirm}/participants/${state.member.id}`, { status: 'done', completedAt: Date.now() });
-      toast('Mitgemacht — stark!', 'ok');
+      const id = btn.dataset.toggleDone;
+      const c = state.challenges[id];
+      const myStatus = c && c.participants && c.participants[state.member.id] && c.participants[state.member.id].status;
+      if (myStatus === 'done') {
+        await fbPatch(`challenges/${id}/participants/${state.member.id}`, { status: 'pending', completedAt: null });
+        toast('Zurückgesetzt.', 'ok');
+      } else {
+        await fbPatch(`challenges/${id}/participants/${state.member.id}`, { status: 'done', completedAt: Date.now() });
+        toast('Mitgemacht — stark!', 'ok');
+      }
       renderChallenges();
+    };
+  });
+  // "Annehmen" kopiert die Challenge in den eigenen Ablauf-Baukasten (Board
+  // bzw. Plan), statt sie nur als erledigt zu markieren — so kann man sie
+  // auch wirklich NACHMACHEN, nicht nur bestätigen, dass man sie schon kennt.
+  list.querySelectorAll('[data-accept]').forEach((btn) => {
+    btn.onclick = () => {
+      const c = state.challenges[btn.dataset.accept];
+      if (!c) return;
+      if (c.kind === 'fingerboard') {
+        if (fb.blocks.length && !confirm('Aktuellen Fingerboard-Ablauf durch diese Challenge ersetzen?')) return;
+        fb.board = fb.board || currentMemberBoard();
+        fb.blocks = (c.blocks || []).map((b) => (b.type === 'hang' ? { ...b, board: fb.board } : { ...b }));
+        renderFbBlocksList();
+        location.hash = '#fingerboard';
+        toast('Challenge in den Ablauf geladen — leg los!', 'ok');
+      } else if (c.kind === 'session') {
+        if (logBuilder.exercises.length && !confirm('Aktuellen Plan durch diese Challenge ersetzen?')) return;
+        logBuilder.exercises = (c.exercises || []).map((g) => {
+          const first = (g.sets || [])[0] || {};
+          return { exerciseId: g.exerciseId, sets: (g.sets || []).length || 3, reps: first.reps ?? '', weight: first.weight ?? '' };
+        });
+        saveDraft('log_exercises', logBuilder.exercises);
+        logMode = 'planned';
+        location.hash = '#log';
+        toast('Challenge als Plan geladen — leg los!', 'ok');
+      }
     };
   });
   list.querySelectorAll('[data-delete]').forEach((btn) => {
@@ -6009,7 +6044,8 @@ function renderChallengeCard(id, c, now) {
         ${Object.entries(c.participants || {}).map(([pid, p]) => `<span class="p ${p.status}">${esc((state.members[pid] || {}).name || '?')}</span>`).join('')}
       </div>
       <div class="chal-actions">
-        ${(!expired && my && my.status === 'pending') ? `<button class="btn small" data-confirm="${id}">MITGEMACHT</button>` : ''}
+        ${(!expired && (c.kind === 'fingerboard' || (c.kind === 'session' && (c.exercises || []).length))) ? `<button class="btn small" data-accept="${id}">ANNEHMEN</button>` : ''}
+        ${(!expired && my) ? `<button class="btn ghost small" data-toggle-done="${id}">${myDone ? '✓ MITGEMACHT' : 'MITGEMACHT'}</button>` : ''}
         ${isMine ? `<button class="btn ghost small" data-delete="${id}">LÖSCHEN</button>` : ''}
       </div>
     </div>
