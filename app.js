@@ -3555,12 +3555,19 @@ function renderFbQuickstart() {
   }
   holder.innerHTML = all.map((t, i) => {
     const totalSec = t.blocks.reduce((total, b) => total + fbBlockSeconds(b), 0);
+    // Info-Button nur bei Vorlagen, deren Inhalt man vorher nicht schon aus
+    // dem Namen kennt (eigene oder von der Crew geteilte) — bei den fest
+    // eingebauten Vorlagen ist der Ablauf über den Namen bereits bekannt.
+    const isCustomOrShared = t.custom || t.kind === 'fingerboard';
     const badge = t.custom ? '<span class="qs-badge">Eigene</span>' : t.kind === 'fingerboard' ? `<span class="qs-badge">von ${esc(t.createdByName)}</span>` : '';
     return `
       <div class="qs-card anim-in" style="animation-delay:${i * 55}ms">
         <div class="qs-top">
           <div class="qs-name">${esc(t.name)}</div>
-          ${badge}
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            ${badge}
+            ${isCustomOrShared ? `<button type="button" class="ex-pick-info" data-tpl-info="${t.id}" title="Enthaltenen Ablauf ansehen">ℹ</button>` : ''}
+          </div>
         </div>
         ${t.note ? `<div class="qs-note">${esc(t.note)}</div>` : ''}
         <div class="qs-meta mono">${t.blocks.length} Sätze · ~${fmtMinSec(totalSec)}</div>
@@ -3578,6 +3585,51 @@ function renderFbQuickstart() {
       startAblauf(); // öffnet direkt das Ablauf-Vollbild
     };
   });
+  holder.querySelectorAll('[data-tpl-info]').forEach((btn) => {
+    btn.onclick = () => showFbTemplateInfoSheet(btn.dataset.tplInfo);
+  });
+}
+
+/* Info-Sheet für Schnelltraining-Vorlagen — zeigt den enthaltenen Ablauf
+   (welche Sätze in welcher Reihenfolge), bevor man ihn per "Los" sofort
+   startet. Eigene Backdrop-Instanz statt showExerciseInfoSheet() wieder-
+   zuverwenden, da Inhalt/Kontext (Ablauf statt einzelne Übung) verschieden
+   sind — die CSS-Klassen (info-sheet-*) sind trotzdem dieselben. */
+function ensureFbTemplateInfoSheet() {
+  let el = document.getElementById('fb-template-info-sheet');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fb-template-info-sheet';
+    el.className = 'info-sheet-backdrop hidden';
+    document.body.appendChild(el);
+    el.onclick = (e) => { if (e.target === el) el.classList.add('hidden'); };
+  }
+  return el;
+}
+
+function showFbTemplateInfoSheet(templateId) {
+  const t = findFbTemplateById(templateId);
+  if (!t) return;
+  const el = ensureFbTemplateInfoSheet();
+  const totalSec = t.blocks.reduce((total, b) => total + fbBlockSeconds(b), 0);
+  const items = t.blocks.map((b) => {
+    const isHang = isHangLikeBlock(b);
+    const isCampus = b.type === 'campus';
+    const isPause = b.type === 'pause';
+    const title = isPause ? 'Pause' : isHang ? holdBlockTitle(b) : isCampus ? campusLabel(b) : esc(exerciseName(b.exerciseId));
+    return `<div class="ex core">${title} · ${esc(fbBlockSub(b))}</div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="info-sheet-card">
+      <button type="button" class="info-sheet-close" id="fb-template-info-close">✕</button>
+      <div class="info-sheet-title">${esc(t.name)}</div>
+      ${t.note ? `<div class="qs-note" style="margin-bottom:10px;">${esc(t.note)}</div>` : ''}
+      <div class="qs-meta mono">${t.blocks.length} Sätze · ~${fmtMinSec(totalSec)}</div>
+      <div class="exlist">${items}</div>
+    </div>
+  `;
+  el.classList.remove('hidden');
+  document.getElementById('fb-template-info-close').onclick = () => el.classList.add('hidden');
 }
 
 /* ---------- Fingerboard-Vorlagen (laden/speichern) ----------
