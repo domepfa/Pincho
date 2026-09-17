@@ -7678,7 +7678,7 @@ function renderFbOverlay() {
       : (isExercise ? exerciseMuscles(block.exerciseId) : null);
     const muscleText = muscles ? muscleLabelsText(muscles.primary, muscles.secondary) : '';
     const headerText = isTrailingPause
-      ? `GLEICH: ${displayLabel}`
+      ? `NEXT: ${displayLabel}`
       : `SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${displayLabel}${showTarget ? ' · Ziel ' + esc(String(block.reps)) + '×' : ''}`;
     // "Schritt X/Y" zählte bisher auch die Pausen-Schritte mit (z. B.
     // "Schritt 2/6" bei nur 3 Wiederholungen), das war verwirrend — bei
@@ -7699,7 +7699,7 @@ function renderFbOverlay() {
       if (isPausedNow) phaseText += ' · PAUSIERT';
     }
     stage = `
-      <div class="fb-stage-label mono">${headerText}</div>
+      <div class="fb-stage-label mono${isTrailingPause ? ' fb-stage-label-next' : ''}">${headerText}</div>
       ${displayIsHang
         ? `<div class="fb-stage-figure">${holdBlockThumb(displayBlock)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
@@ -7840,11 +7840,33 @@ function beepEnd() {
 
 async function requestWakeLock() {
   if (fb.wakeLock) return; // schon aktiv — nicht doppelt anfordern (würde den Handle auf das alte Lock verlieren)
-  try { if ('wakeLock' in navigator) fb.wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* ignorieren */ }
+  try {
+    if ('wakeLock' in navigator) {
+      fb.wakeLock = await navigator.wakeLock.request('screen');
+      // Der Browser gibt das Lock automatisch frei, sobald der Tab in den
+      // Hintergrund geht (Screen aus, App-Wechsel, ...) — OHNE dass wir das
+      // sonst mitbekommen. fb.wakeLock zeigte danach fälschlich weiter auf
+      // ein bereits totes Lock, wodurch der obige Frühausstieg jede weitere
+      // Anfrage stillschweigend blockierte und der Screen nie wieder
+      // wachgehalten wurde. Sentinel hier zurücksetzen, sobald es freigegeben
+      // wird, damit ein späterer requestWakeLock()-Aufruf (siehe
+      // visibilitychange unten) tatsächlich neu anfordert.
+      fb.wakeLock.addEventListener('release', () => { fb.wakeLock = null; });
+    }
+  } catch (e) { /* ignorieren */ }
 }
 function releaseWakeLock() {
   if (fb.wakeLock) { fb.wakeLock.release().catch(() => {}); fb.wakeLock = null; }
 }
+/* Kommt der Tab aus dem Hintergrund zurück (Screen wieder an, App wieder
+   im Vordergrund), während eigentlich noch ein Ablauf/eine Session läuft,
+   das Lock aber (siehe oben) automatisch verfallen ist — sofort neu
+   anfordern, statt erst beim nächsten Satzwechsel. */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const sessionActive = fb.running || fb.preCount != null || !!fsWorkTimer.intervalId || !!fsRestTimer.intervalId;
+  if (sessionActive) requestWakeLock();
+});
 
 function startAblauf() {
   fb.blockIndex = 0;
