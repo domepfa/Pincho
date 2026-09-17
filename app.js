@@ -472,8 +472,44 @@ function positionNavIndicator() {
 }
 window.addEventListener('resize', positionNavIndicator);
 
+/* Fliegender "Starten"-Button — bleibt beim Scrollen sichtbar, damit ein
+   fertig gebauter Plan (Gym) oder Ablauf (Fingerboard) auch ohne
+   Runterscrollen zum echten Start-Button gestartet werden kann. Reine
+   Sichtbarkeits-/Positions-Hülle: klickt beim Antippen immer nur den
+   schon vorhandenen, echten Start-Button an (z. B. #plan-start,
+   #fb-start-ablauf) — der eigentliche Start-Vorgang bleibt dadurch exakt
+   derselbe wie vorher. */
+function ensureFabStart() {
+  let el = document.getElementById('fab-start');
+  if (!el) {
+    el = document.createElement('button');
+    el.id = 'fab-start';
+    el.type = 'button';
+    el.className = 'hidden';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function hideFabStart() {
+  const el = document.getElementById('fab-start');
+  if (el) el.classList.add('hidden');
+}
+function showFabStart(label, targetId) {
+  const el = ensureFabStart();
+  const target = document.getElementById(targetId);
+  if (!target) { hideFabStart(); return; }
+  el.textContent = label;
+  el.disabled = target.disabled;
+  el.classList.remove('hidden');
+  el.onclick = () => {
+    const t = document.getElementById(targetId);
+    if (t && !t.disabled) t.click();
+  };
+}
+
 function render() {
   if (!state.member) { boot(); return; }
+  hideFabStart(); // jede Route entscheidet selbst, ob/wofür sie ihn zeigt
   switch (state.route) {
     case 'log': renderLog(); break;
     case 'fingerboard': renderFingerboard(); break;
@@ -2008,6 +2044,7 @@ function renderLogBuilderPanel() {
       <button type="button" class="btn" id="plan-start" ${logBuilder.exercises.length ? '' : 'disabled'} style="width:100%;">PLAN STARTEN</button>
     `;
     renderLogExerciseRows();
+    showFabStart('▶ STARTEN', 'plan-start');
     wireExercisePickerGrid('log-exercise-grid', EXERCISE_LIBRARY, logPickerExerciseId, (id) => { logPickerExerciseId = id; }, 'log-exercise-add');
     document.getElementById('log-template').onchange = (e) => {
       const val = e.target.value;
@@ -2026,6 +2063,7 @@ function renderLogBuilderPanel() {
       renderLogExerciseRows();
       const startBtn = document.getElementById('plan-start');
       if (startBtn) startBtn.disabled = !logBuilder.exercises.length;
+      showFabStart('▶ STARTEN', 'plan-start');
       // Löschen-Button nur zeigen, wenn wirklich ein EIGENER Plan geladen ist
       // (nicht bei einer Fertig-Vorlage oder einem geteilten Plan der Crew,
       // die man ohnehin nicht löschen kann) — sonst sieht der Button wie ein
@@ -2043,6 +2081,7 @@ function renderLogBuilderPanel() {
       document.getElementById(`log-exercise-row-${logBuilder.exercises.length - 1}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       const startBtn = document.getElementById('plan-start');
       if (startBtn) startBtn.disabled = !logBuilder.exercises.length;
+      showFabStart('▶ STARTEN', 'plan-start');
     };
     document.getElementById('plan-save').onclick = async () => {
       if (!logBuilder.exercises.length) { toast('Erst Übungen zusammenstellen.', 'err'); return; }
@@ -2617,6 +2656,7 @@ function renderLogExerciseRows() {
       renderLogExerciseRows();
       const startBtn = document.getElementById('plan-start');
       if (startBtn) startBtn.disabled = !logBuilder.exercises.length;
+      showFabStart('▶ STARTEN', 'plan-start');
     };
   });
 }
@@ -7310,6 +7350,7 @@ function renderFbRuntime() {
   holder.innerHTML = `<button class="btn" id="fb-start-ablauf" ${fb.blocks.length ? '' : 'disabled'}>ABLAUF STARTEN</button>`;
   const btn = document.getElementById('fb-start-ablauf');
   if (btn) btn.onclick = startAblauf;
+  showFabStart('▶ STARTEN', 'fb-start-ablauf');
 }
 
 /* ---------- Ablauf-Vollbild ----------

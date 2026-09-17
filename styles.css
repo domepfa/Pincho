@@ -475,6 +475,26 @@ button, input, select, textarea { font-family: inherit; }
 }
 .ex-pick-hint { white-space: nowrap; font-size: clamp(9.5px, 3.3vw, 12px); }
 
+/* ---------- Fliegender Start-Button ----------
+   Bleibt beim Scrollen sichtbar, damit man einen fertig gebauten Plan/
+   Ablauf starten kann, ohne erst bis ans Seitenende zu scrollen — klickt
+   immer nur den echten, schon vorhandenen Start-Button an (siehe
+   showFabStart in app.js), der eigentliche Start-Vorgang bleibt also
+   exakt derselbe. */
+#fab-start {
+  position: fixed; left: 50%; bottom: calc(76px + var(--safe-bottom) + 14px); z-index: 7;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: .05em;
+  background: linear-gradient(135deg, var(--accent-glow), var(--accent) 65%); color: var(--accent-ink);
+  border: none; border-radius: 999px; padding: 13px 26px; cursor: pointer;
+  box-shadow: 0 6px 20px -4px rgba(var(--accent-rgb), .65);
+  transition: transform .13s ease, box-shadow .13s ease, opacity .13s ease;
+}
+#fab-start:active { transform: translateX(-50%) scale(.95); }
+#fab-start:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
+#fab-start.hidden { display: none; }
+
 /* ---------- Toast ---------- */
 #toast-root { position: fixed; bottom: calc(76px + var(--safe-bottom)); left: 16px; right: 16px; z-index: 20; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
 .toast {
