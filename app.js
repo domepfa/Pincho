@@ -770,6 +770,11 @@ async function renderLog() {
   // (Klettern/Fingerboard/Jogging/...) ergibt dort keinen Sinn, ist immer
   // "Gym". Datum bleibt trotzdem sichtbar, nur Typ fällt weg.
   const hideTypeField = logMode === 'freestyle' || logMode === 'execute';
+  // Freestyle läuft live mit — Start-/Endzeit trackt die App ohnehin schon
+  // (sessionStartedAt/totalSessionSec) — eine manuelle Datumsauswahl bringt
+  // dort nur unnötiges Rätselraten/Fehlerpotenzial, wird beim Speichern
+  // einfach automatisch auf heute gesetzt (siehe log-save unten).
+  const hideDateField = logMode === 'freestyle';
   // Direkt nach dem Speichern zeigt die Karte NUR die Trend-Übersicht (siehe
   // fsRecap) — Datum/Typ/Chips/Notiz/RPE wären in diesem Moment nur
   // ablenkende Reste einer bereits abgeschlossenen Session.
@@ -778,7 +783,7 @@ async function renderLog() {
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Neue Session</h2><div class="sec-rule"></div></div>
     <div class="card">
-      ${hideSessionFields || showingRecap ? '' : hideTypeField ? `
+      ${hideSessionFields || showingRecap || hideDateField ? '' : hideTypeField ? `
       <div class="field"><label>Datum</label><input type="date" id="log-date" value="${todayKey()}"></div>
       ` : `
       <div class="field-row">
@@ -836,8 +841,9 @@ async function renderLog() {
     // Verlaufskarte sichtbar bleiben.
     const totalWorkSec = rawExercises.reduce((sum, g) => sum + g.sets.reduce((s, set) => s + (set.elapsedSec || 0), 0), 0);
     const totalSessionSec = builder.sessionStartedAt ? Math.round((Date.now() - builder.sessionStartedAt) / 1000) : totalWorkSec;
+    const dateInput = document.getElementById('log-date');
     const entry = {
-      date: document.getElementById('log-date').value || todayKey(),
+      date: (dateInput && dateInput.value) || todayKey(),
       type: hideTypeField ? 'gym' : document.getElementById('log-type').value,
       exercises: rawExercises.map((g) => ({ exerciseId: g.exerciseId, sets: g.sets })),
       note: document.getElementById('log-note').value.trim(),
@@ -2171,6 +2177,30 @@ function stopAllFsTimers() {
   releaseWakeLock();
 }
 
+/* Plan-Ausführung in abgeänderter Reihenfolge: eine Übung gilt als
+   "erledigt", sobald sie ihr Satz-Ziel erreicht hat (ohne Ziel schon ab
+   einem Satz) — unabhängig davon, ob sie in der ursprünglichen Plan-
+   Reihenfolge dran war. So kann man z. B. bei besetztem Gerät zur
+   nächsten NOCH OFFENEN Übung springen (data-activate erlaubt das Antippen
+   jeder Übung schon länger) und eine übersprungene später nachholen —
+   nur der Fortschritt (erledigt/offen) zählt, nicht die Position. */
+function fsExerciseDone(g) {
+  return g.targetSets != null ? g.sets.length >= g.targetSets : g.sets.length > 0;
+}
+/* Sucht ab fromIndex vorwärts (mit Umlauf ans Ende der Liste) die nächste
+   noch offene Übung — nicht einfach fromIndex+1, sonst würde "Nächste
+   Übung" nach einem Sprung ausser der Reihe eine bereits erledigte Übung
+   nochmal vorschlagen, statt eine wirklich noch offene. null, wenn schon
+   alles erledigt ist. */
+function findNextUnfinishedExerciseIndex(builder, fromIndex) {
+  const n = builder.exercises.length;
+  for (let step = 1; step <= n; step++) {
+    const idx = (fromIndex + step) % n;
+    if (!fsExerciseDone(builder.exercises[idx])) return idx;
+  }
+  return null;
+}
+
 /* Eine neue oder bereits vorhandene Übung wird aktiv: normalerweise erstmal
    nur die Phase auf 'idle' setzen (Stoppuhr steht still) — die Uhr läuft
    nicht automatisch los, sondern erst nachdem man bewusst "Start" antippt.
@@ -2247,17 +2277,21 @@ function renderFsPanel() {
       // "nächste" einer schon begonnenen.
       const isExecute = logMode === 'execute';
       const reachedTarget = isExecute && g.targetSets != null && g.sets.length >= g.targetSets;
-      const hasNextExercise = isExecute && builder.activeIndex < builder.exercises.length - 1;
-      if (reachedTarget && hasNextExercise) {
+      // Nächste NOCH OFFENE Übung, nicht einfach die nächste im Array —
+      // sonst würde ein Sprung ausser der Reihe (z. B. Gerät besetzt, erst
+      // eine andere gemacht) hier eine bereits erledigte Übung nochmal
+      // vorschlagen statt eine wirklich offene.
+      const nextUnfinishedIdx = isExecute ? findNextUnfinishedExerciseIndex(builder, builder.activeIndex) : null;
+      if (reachedTarget && nextUnfinishedIdx != null) {
         // Plan-Ziel für diese Übung erreicht (z. B. nur 1 Satz vorgesehen) —
-        // automatisch zur nächsten Übung vorschlagen statt weiter Sätze an
-        // dieser zu sammeln. Ein Extra-Satz bleibt trotzdem manuell möglich
-        // (z. B. wenn man mehr schaffen will) — das ändert nur DIESE
-        // Ausführung, nicht den gespeicherten Plan selbst, der nächstes Mal
-        // wieder mit der ursprünglichen Satzzahl startet.
+        // automatisch zur nächsten offenen Übung vorschlagen statt weiter
+        // Sätze an dieser zu sammeln. Ein Extra-Satz bleibt trotzdem manuell
+        // möglich (z. B. wenn man mehr schaffen will) — das ändert nur
+        // DIESE Ausführung, nicht den gespeicherten Plan selbst, der
+        // nächstes Mal wieder mit der ursprünglichen Satzzahl startet.
         return `
           <div class="fs-rest-timer mono" id="fs-rest-timer">PAUSE ${fmtMinSec(fsRestTimer.seconds)}</div>
-          <button type="button" class="btn small" id="fs-next-exercise" style="width:100%;">▶ Nächste Übung</button>
+          <button type="button" class="btn small" id="fs-next-exercise" data-next-idx="${nextUnfinishedIdx}" style="width:100%;">▶ Nächste Übung (${esc(exerciseName(builder.exercises[nextUnfinishedIdx].exerciseId))})</button>
           <button type="button" class="btn ghost small" id="fs-next-set" style="width:100%;margin-top:6px;">+ Extra-Satz</button>
         `;
       }
@@ -2315,13 +2349,14 @@ function renderFsPanel() {
     </div>` : ''}
     ${orderedExercises.map(({ g, gi }) => {
       const isActive = gi === builder.activeIndex;
+      const isDone = isExecute && fsExerciseDone(g);
       const targetText = g.targetReps != null
         ? `Ziel: ${g.targetSets}×${g.targetReps}${g.targetWeight ? ' @ ' + g.targetWeight + 'kg' : ''}`
         : '';
       return `
-    <div class="fs-group ${isActive ? 'active' : ''}" id="fs-group-${gi}">
+    <div class="fs-group ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}" id="fs-group-${gi}">
       <div class="fs-group-head">
-        <span data-activate="${gi}" style="cursor:pointer;">${esc(exerciseName(g.exerciseId))}</span>
+        <span data-activate="${gi}" style="cursor:pointer;">${isDone ? '<span class="fs-done-check">✓</span> ' : ''}${esc(exerciseName(g.exerciseId))}</span>
         <div style="display:flex;gap:6px;flex-shrink:0;">
           <button type="button" class="ex-row-remove" data-info="${gi}" title="Info zur Übung">ℹ</button>
           ${logMode === 'freestyle' ? `<button type="button" class="ex-row-remove" data-remove-group="${gi}" title="Übung entfernen">×</button>` : ''}
@@ -2435,7 +2470,7 @@ function renderFsPanel() {
     // deshalb hier direkt die Arbeits-Stoppuhr für die neue Übung starten,
     // ohne nochmal "Start" verlangen zu müssen.
     nextExerciseBtn.onclick = () => {
-      builder.activeIndex += 1;
+      builder.activeIndex = Number(nextExerciseBtn.dataset.nextIdx);
       fsNoteEditing = false;
       stopFsRestTimer();
       fsPhase = 'working';
@@ -2651,7 +2686,17 @@ function parseImportedAblauf(text) {
         const blockRestSec = b.blockRestSec != null ? Number(b.blockRestSec) : null;
         if (!(hangSec > 0)) { errors.push(`Satz ${n}: hangSec muss eine Zahl > 0 sein.`); return; }
         if (blockRestSec != null && !(blockRestSec >= 0)) { errors.push(`Satz ${n}: blockRestSec muss eine Zahl >= 0 sein.`); return; }
-        blocks.push({ type: 'block', grip: b.grip.trim(), fingers, weight, mode, reps, hangSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}) });
+        // handMode/startHand nur im Halten-Modus (dort ist jede Wiederholung
+        // ein eigener, klar abgegrenzter Satz — im Wiederholungen-Modus läuft
+        // alles in einem durchgehenden Timer, ein Handwechsel liesse sich
+        // dort nicht sauber verorten). Fehlen sie im Import, "fixed"/"left"
+        // als rückwärtskompatibler Standard (ältere Sätze kannten das noch
+        // nicht, waren aber implizit immer einarmig-fixiert).
+        const handMode = b.handMode != null ? b.handMode : 'fixed';
+        if (!['fixed', 'alternate', 'block'].includes(handMode)) { errors.push(`Satz ${n}: handMode muss "fixed", "alternate" oder "block" sein.`); return; }
+        const startHand = b.startHand != null ? b.startHand : 'left';
+        if (startHand !== 'left' && startHand !== 'right') { errors.push(`Satz ${n}: startHand muss "left" oder "right" sein.`); return; }
+        blocks.push({ type: 'block', grip: b.grip.trim(), fingers, weight, mode, reps, hangSec, restSec, ...(blockRestSec != null ? { blockRestSec } : {}), handMode, startHand });
       }
     } else if (b.type === 'exercise') {
       const isPseudoExercise = b.exerciseId === 'warmup_general' || b.exerciseId === 'cooldown_general';
@@ -2716,7 +2761,7 @@ const fb = {
   selectedGripRight: null,
   addType: 'hang',       // 'hang' | 'block' | 'exercise' | 'campus' | 'pause' — welches Add-Panel gerade offen ist
   newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
-  newBlock: { gripType: 'leiste', leisteWidth: 15, fingers: 4, weight: 0, mode: 'hold', reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60, workSec: 40 },
+  newBlock: { gripType: 'leiste', leisteWidth: 15, fingers: 4, weight: 0, mode: 'hold', reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60, workSec: 40, handMode: 'fixed', startHand: 'left' },
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
   newCampus: {
     rungType: CAMPUS_RUNG_TYPES[0].id, moveMode: 'direct',
@@ -3251,6 +3296,20 @@ function renderBlockAddPanel(holder) {
       <button type="button" class="chip ${isReps ? 'active' : ''}" data-mode="reps">Wiederholungen</button>
     </div>
     <div id="fb-block-mode-fields"></div>
+    ${!isReps ? `
+    <div class="field">
+      <label>Hand (einarmig)</label>
+      <div class="chip-row" id="fb-block-handmode-row">
+        <button type="button" class="chip ${fb.newBlock.handMode === 'fixed' ? 'active' : ''}" data-hand-mode="fixed">Fixiert</button>
+        <button type="button" class="chip ${fb.newBlock.handMode === 'alternate' ? 'active' : ''}" data-hand-mode="alternate">Abwechselnd</button>
+        <button type="button" class="chip ${fb.newBlock.handMode === 'block' ? 'active' : ''}" data-hand-mode="block">Block</button>
+      </div>
+    </div>
+    <div class="chip-row" id="fb-block-starthand-row">
+      <button type="button" class="chip ${fb.newBlock.startHand === 'left' ? 'active' : ''}" data-start-hand="left"><span class="emoji">🫲</span>${fb.newBlock.handMode === 'fixed' ? 'Links' : 'Links zuerst'}</button>
+      <button type="button" class="chip ${fb.newBlock.startHand === 'right' ? 'active' : ''}" data-start-hand="right"><span class="emoji">🫱</span>${fb.newBlock.handMode === 'fixed' ? 'Rechts' : 'Rechts zuerst'}</button>
+    </div>
+    ` : ''}
     <button type="button" class="btn" id="fb-add-block" style="width:100%;">+ Lifting-Pin-Satz hinzufügen</button>
   `;
   document.getElementById('fb-block-griptype-row').querySelectorAll('.chip').forEach((btn) => {
@@ -3282,13 +3341,31 @@ function renderBlockAddPanel(holder) {
       renderBlockAddPanel(holder);
     };
   });
+  const handModeRow = document.getElementById('fb-block-handmode-row');
+  if (handModeRow) {
+    handModeRow.querySelectorAll('.chip').forEach((btn) => {
+      btn.onclick = () => {
+        fb.newBlock.handMode = btn.dataset.handMode;
+        renderBlockAddPanel(holder);
+      };
+    });
+  }
+  const startHandRow = document.getElementById('fb-block-starthand-row');
+  if (startHandRow) {
+    startHandRow.querySelectorAll('.chip').forEach((btn) => {
+      btn.onclick = () => {
+        fb.newBlock.startHand = btn.dataset.startHand;
+        startHandRow.querySelectorAll('.chip').forEach((b) => b.classList.toggle('active', b === btn));
+      };
+    });
+  }
   renderBlockModeFields();
   document.getElementById('fb-add-block').onclick = () => {
     const b = { type: 'block', grip: blockGripFromSelection(fb.newBlock), fingers: fb.newBlock.fingers, weight: fb.newBlock.weight, mode: fb.newBlock.mode };
     if (fb.newBlock.mode === 'reps') {
       Object.assign(b, { reps: fb.newBlock.reps, workSec: fb.newBlock.workSec, restSec: fb.newBlock.restSec });
     } else {
-      Object.assign(b, { reps: fb.newBlock.reps, hangSec: fb.newBlock.hangSec, restSec: fb.newBlock.restSec, blockRestSec: fb.newBlock.blockRestSec });
+      Object.assign(b, { reps: fb.newBlock.reps, hangSec: fb.newBlock.hangSec, restSec: fb.newBlock.restSec, blockRestSec: fb.newBlock.blockRestSec, handMode: fb.newBlock.handMode, startHand: fb.newBlock.startHand });
     }
     fb.blocks.push(b);
     renderFbBlocksList();
@@ -3966,12 +4043,15 @@ function buildBlockSequence(b, isLastBlock = false) {
     const seq = [];
     const workPhase = b.type === 'block' ? 'Halten' : 'Hang';
     for (let s = 0; s < b.reps; s++) {
-      seq.push({ phase: workPhase, seconds: b.hangSec });
+      // rep (0-indiziert): welche Wiederholung dieser Schritt gehört —
+      // nur fürs Lifting-Pin-Hand-Muster gebraucht (siehe blockHandForRep),
+      // bei Hang-Sätzen einfach ungenutzt.
+      seq.push({ phase: workPhase, seconds: b.hangSec, rep: s });
       if (s < b.reps - 1) {
-        if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec });
+        if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec, rep: s });
       } else if (!isLastBlock) {
         const trailingRest = b.blockRestSec != null ? b.blockRestSec : b.restSec;
-        seq.push({ phase: trailingRest > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(trailingRest, 10) });
+        seq.push({ phase: trailingRest > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(trailingRest, 10), rep: s });
       }
     }
     return seq;
@@ -4915,11 +4995,49 @@ function hangBoardThumb(b) {
 function blockGripLabel(b) {
   return `${b.grip || 'Lifting Pin'} · ${b.fingers}-Finger`;
 }
-function blockArmNote() {
-  return 'einarmig';
+function handLabel(hand) { return hand === 'right' ? 'Rechts' : 'Links'; }
+function handIcon(hand) { return hand === 'right' ? '🫱' : '🫲'; }
+/* Welche Hand für die wievielte Wiederholung (0-indiziert, siehe rep-Feld
+   in buildBlockSequence) dran ist — nur für Halten-Modus relevant (dort
+   ist jede Wiederholung ein eigener, klar abgegrenzter Satz); im
+   Wiederholungen-Modus läuft alles in einem durchgehenden Timer ohne
+   Grenzen dazwischen, ein Wechsel liesse sich dort nicht sauber anzeigen. */
+function blockHandForRep(b, repIndex) {
+  const start = b.startHand || 'left';
+  const other = start === 'left' ? 'right' : 'left';
+  if (b.handMode === 'alternate') return repIndex % 2 === 0 ? start : other;
+  if (b.handMode === 'block') return repIndex < Math.ceil(b.reps / 2) ? start : other;
+  return start; // 'fixed' (Standard, auch bei älteren/importierten Sätzen ohne handMode)
+}
+/* Kurzbeschreibung des Hand-Musters ohne "einarmig,"-Präfix — fürs
+   Timeline-Sub (fbBlockSub), wo schon andere, kommafreie Angaben mit " · "
+   aneinandergereiht werden. */
+function blockHandPatternText(b) {
+  const handMode = b.handMode || 'fixed';
+  const start = b.startHand || 'left';
+  if (handMode === 'alternate') return `abwechselnd (${handLabel(start)} zuerst)`;
+  if (handMode === 'block') {
+    const other = start === 'left' ? 'right' : 'left';
+    const firstCount = Math.ceil(b.reps / 2);
+    return `${firstCount}× ${handLabel(start)} dann ${b.reps - firstCount}× ${handLabel(other)}`;
+  }
+  return handLabel(start);
+}
+/* Ohne activeRep: allgemeine Beschreibung des Hand-Musters (Vorschau-
+   Bildschirme). MIT activeRep (nur während eines laufenden Halten-
+   Arbeitsschritts übergeben): zeigt stattdessen die JETZT aktive Hand —
+   genau dann will man wissen, welcher Arm dran ist, nicht das ganze
+   Muster nochmal lesen müssen. */
+function blockArmNote(b, activeRep) {
+  if (activeRep != null) {
+    const hand = blockHandForRep(b, activeRep);
+    return `einarmig · ${handIcon(hand)} ${handLabel(hand)}`;
+  }
+  return `einarmig, ${blockHandPatternText(b)}`;
 }
 /* Kein Foto vorhanden (anders als beim Fingerboard) — die generische
-   Hänge-Figur reicht als Vorschau-"Thumb". */
+   Hänge-Figur reicht als Vorschau-"Thumb" (klein genug, dass die
+   abweichende Bewegung dort nicht ins Gewicht fällt). */
 function blockThumb() {
   return `<div class="timeline-thumb fb-block-thumb">${FB_HANG_FIGURE_SVG}</div>`;
 }
@@ -4933,10 +5051,11 @@ function isHangLikeBlock(b) { return b.type === 'hang' || b.type === 'block'; }
    ODER Wiederholungen (heben/ablassen zählen, wie eine Fixübung) — dieser
    Dispatcher entscheidet NUR die Ablaufform (Sequenz/Checkin-Form/Ziel-
    Anzeige), unabhängig von holdBlockTitle/-Thumb/-ArmNote oben, die immer
-   den Griffblock-Look zeigen, egal in welchem Modus. */
+   den Griffblock-Look zeigen, egal in welchem Modus. activeRep wird nur
+   für Griffblock/Halten durchgereicht (siehe blockArmNote). */
 function isRepsStyleBlock(b) { return b.type === 'exercise' || (b.type === 'block' && b.mode === 'reps'); }
 function isHoldModeBlock(b) { return b.type === 'hang' || (b.type === 'block' && b.mode !== 'reps'); }
-function holdBlockArmNote(b) { return b.type === 'block' ? blockArmNote() : hangArmNote(b); }
+function holdBlockArmNote(b, activeRep) { return b.type === 'block' ? blockArmNote(b, activeRep) : hangArmNote(b); }
 function holdBlockThumb(b) { return b.type === 'block' ? blockThumb() : hangBoardThumb(b); }
 function holdBlockTitle(b) {
   return b.type === 'block' ? `Lifting Pin @ ${esc(blockGripLabel(b))}` : `Hang @ ${esc(hangGripLabel(b))}`;
@@ -5158,7 +5277,8 @@ function fbBlockSub(b) {
   if (isHoldModeBlock(b)) {
     const blockRestSec = b.blockRestSec != null ? b.blockRestSec : b.restSec;
     const prefix = b.type === 'block' ? 'Halten' : 'Hang';
-    return `${b.hangSec}s ${prefix} · ${b.restSec}s zw. Sätzen · ${blockRestSec}s danach · ×${b.reps}`;
+    const handSuffix = b.type === 'block' ? ' · ' + blockHandPatternText(b) : '';
+    return `${b.hangSec}s ${prefix} · ${b.restSec}s zw. Sätzen · ${blockRestSec}s danach · ×${b.reps}${handSuffix}`;
   }
   if (b.type === 'campus') {
     const blockRestSec = b.blockRestSec != null ? b.blockRestSec : b.restSec;
@@ -5335,6 +5455,43 @@ const FB_REST_FIGURE_SVG = `
     <line class="fig-pose fb-arm-shake" x1="99" y1="65" x2="118" y2="112"/>
   </svg>
 `;
+/* Lifting Pin ist kein Hängen (FB_HANG_FIGURE_SVG), sondern ein einarmiges
+   Ziehen von unten (Pin auf Hüfthöhe) nach oben (Richtung Schulter) — eigene
+   Animation dafür, stehende Fixfigur + EIN animierter Arm (Start/Ende
+   überblenden wie bei den dynamischen Übungs-Strichmännchen), der andere
+   Arm hängt ruhig/gedämpft daneben. Standardzeichnung ist die rechte Hand;
+   für "links" wird die ganze Figur per CSS horizontal gespiegelt. */
+function blockPullFigureSvg(hand) {
+  const flip = hand === 'left' ? ' style="transform:scaleX(-1);"' : '';
+  return `
+  <svg viewBox="0 0 200 200" class="ex-figure fb-block-pull-figure"${flip}>
+    <path class="fig-motion" d="M138,148 L138,76"/>
+    <polygon class="fig-arrow" points="138,76 130,90 146,90"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="100" cy="42" r="14"/>
+      <line x1="100" y1="56" x2="100" y2="128"/>
+      <line x1="100" y1="128" x2="86" y2="190"/>
+      <line x1="100" y1="128" x2="114" y2="190"/>
+      <line x1="100" y1="60" x2="76" y2="108"/>
+    </g>
+    <g class="fig-pose fig-a" style="animation-duration:1.6s;">
+      <line x1="100" y1="60" x2="138" y2="148"/>
+      <circle class="fig-joint fig-hi" cx="138" cy="148" r="6"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.6s;">
+      <line x1="100" y1="60" x2="130" y2="76"/>
+      <circle class="fig-joint fig-hi" cx="130" cy="76" r="6"/>
+    </g>
+  </svg>
+  `;
+}
+/* Dispatcher fürs "Work"-Strichmännchen während des laufenden Timers:
+   Hang bleibt die Hänge-Figur, Griffblock/Lifting Pin zeigt stattdessen
+   das Zieh-Strichmännchen mit der gerade aktiven Hand (activeRep kommt
+   aus dem rep-Feld des laufenden Sequenz-Schritts, siehe buildBlockSequence). */
+function holdBlockWorkFigure(b, activeRep) {
+  return b.type === 'block' ? blockPullFigureSvg(blockHandForRep(b, activeRep || 0)) : FB_HANG_FIGURE_SVG;
+}
 
 function ensureFbOverlay() {
   let el = document.getElementById('fb-overlay');
@@ -5542,11 +5699,18 @@ function renderFbOverlay() {
     const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
     const isPausedNow = fb.running && !fb.intervalId;
     const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
-    const armNote = isHang ? holdBlockArmNote(block) : '';
+    const activeRep = working && step ? step.rep : null;
+    const armNote = isHang ? holdBlockArmNote(block, activeRep) : '';
+    // Bei Hang ist armNote (Griff-Notiz) übers ganze Satz-Vollbild fix, bei
+    // Lifting Pin ändert sich die aktive Hand aber pro Wiederholung — ein
+    // eigenes Element dafür, das updateTimerUI() bei jedem Tick auffrischen
+    // kann, statt es nur einmal beim vollen Rendern dieses Bildschirms
+    // (renderFbOverlay) reinzuschreiben und dann bis zum nächsten Satz
+    // eingefroren zu lassen.
     const label = isPause
       ? 'Pause'
       : isHang
-        ? `${holdBlockTitle(block)}${armNote ? ' · ' + armNote : ''}`
+        ? `${holdBlockTitle(block)}${armNote ? ` · <span id="fb-hand-note">${armNote}</span>` : ''}`
         : isCampus ? campusLabel(block) : esc(exerciseName(block.exerciseId));
     const muscles = isExercise ? exerciseMuscles(block.exerciseId) : null;
     const muscleText = muscles ? muscleLabelsText(muscles.primary, muscles.secondary) : '';
@@ -5555,7 +5719,7 @@ function renderFbOverlay() {
       ${isHang
         ? `<div class="fb-stage-figure">${holdBlockThumb(block)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
-             <div class="fb-phase-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}">${working ? FB_HANG_FIGURE_SVG : FB_REST_FIGURE_SVG}</div>
+             <div class="fb-phase-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:${activeRep != null ? activeRep : ''}">${working ? holdBlockWorkFigure(block, activeRep) : FB_REST_FIGURE_SVG}</div>
              <div class="fb-timer-ring">
                <svg viewBox="0 0 120 120">
                  <circle class="ring-bg" cx="60" cy="60" r="52"/>
@@ -5564,7 +5728,7 @@ function renderFbOverlay() {
                <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
              </div>
            </div>`
-        : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}">${working ? (isCampus ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId)) : FB_REST_FIGURE_SVG}</div>
+        : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:">${working ? (isCampus ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId)) : FB_REST_FIGURE_SVG}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
              <div class="fb-timer-ring">
                <svg viewBox="0 0 120 120">
@@ -5988,15 +6152,26 @@ function updateTimerUI() {
     ring.classList.toggle('rest', !working);
     ring.classList.toggle('rest-warn', restWarn);
   }
-  const kind = working ? 'work' : 'rest';
+  // Schlüssel enthält zusätzlich die aktuelle Wiederholung (rep) — beim
+  // Lifting Pin mit Hand-Wechsel pro Satz UND restSec=0 (keine Pause
+  // zwischen den Wiederholungen) bliebe "kind" sonst durchgehend "work",
+  // die Figur würde beim Handwechsel nie neu gezeichnet.
+  const activeRep = working && step ? step.rep : null;
+  const kind = (working ? 'work' : 'rest') + ':' + (activeRep != null ? activeRep : '');
   if (figureHolder && figureHolder.dataset.kind !== kind) {
     figureHolder.innerHTML = working
-      ? (isHangLikeBlock(block) ? FB_HANG_FIGURE_SVG : block.type === 'campus' ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId))
+      ? (isHangLikeBlock(block) ? holdBlockWorkFigure(block, activeRep) : block.type === 'campus' ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId))
       : FB_REST_FIGURE_SVG;
     figureHolder.dataset.kind = kind;
   }
   const repsDoneBtn = document.getElementById('fb-reps-done');
   if (repsDoneBtn) repsDoneBtn.hidden = !working;
+  // Aktive Hand beim Lifting Pin ändert sich pro Wiederholung — das
+  // fb-stage-label selbst wird nur einmal pro Satz komplett aufgebaut
+  // (renderFbOverlay), deshalb hier gezielt nur die Hand-Anzeige darin
+  // nachziehen, statt das ganze Label (inkl. Titel/Griff) neu zu bauen.
+  const handNoteEl = document.getElementById('fb-hand-note');
+  if (handNoteEl && block && block.type === 'block') handNoteEl.textContent = blockArmNote(block, activeRep);
   updateFbUpcomingUI();
   updateFbProgressUI();
 }

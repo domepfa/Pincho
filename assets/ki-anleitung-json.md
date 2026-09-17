@@ -63,10 +63,11 @@ Pinch-Block genutzt werden kann — anders als beim Fingerboard gibt es
 dafür kein Foto mit Hotspots, `grip` ist deshalb freier Text (in der App
 per Presets zusammengestellt: `"Leiste 5mm"` bis `"Leiste 30mm"` in
 5mm-Schritten, oder `"Pinch"`). Immer einarmig (nur eine Hand
-gleichzeitig), deshalb gibt es hier — anders als bei `hang` — kein
-`gripLeft`/`gripRight`. `weight` ist das TATSÄCHLICHE geladene
-Gesamtgewicht (z. B. eine angesteckte Scheibe), kein Zusatzgewicht oben
-auf das Körpergewicht wie beim Hang-Satz.
+gleichzeitig) — anders als bei `hang` gibt es deshalb kein
+`gripLeft`/`gripRight`, dafür (nur bei `mode: "hold"`) `handMode`/
+`startHand`, um festzulegen, welche Hand(en) dran sind. `weight` ist das
+TATSÄCHLICHE geladene Gesamtgewicht (z. B. eine angesteckte Scheibe),
+kein Zusatzgewicht oben auf das Körpergewicht wie beim Hang-Satz.
 
 Zwei Modi über `mode`:
 - `"hold"` (Default): statisches Halten mit Sekundentimer, wie ein Hang-Satz.
@@ -87,6 +88,8 @@ Nur bei `mode: "hold"` zusätzlich:
 |---|---|---|---|
 | `hangSec` | Zahl > 0 | ja | Haltedauer pro Satz in Sekunden |
 | `blockRestSec` | Zahl >= 0 | optional | Pause NACH diesem ganzen Block, bevor der nächste beginnt |
+| `handMode` | String | optional (Default `"fixed"`) | `"fixed"` (immer dieselbe Hand), `"alternate"` (wechselt jede Wiederholung) oder `"block"` (erste Hälfte der Sätze eine Hand, Rest die andere) |
+| `startHand` | String | optional (Default `"left"`) | `"left"` oder `"right"` — bei `"fixed"` die einzige Hand, sonst die zuerst dran ist |
 
 Nur bei `mode: "reps"` zusätzlich:
 
@@ -97,6 +100,11 @@ Nur bei `mode: "reps"` zusätzlich:
 Halten (z. B. Leiste 15mm, 3 Finger, 10kg):
 ```json
 { "type": "block", "grip": "Leiste 15mm", "fingers": 3, "weight": 10, "mode": "hold", "reps": 5, "hangSec": 7, "restSec": 45, "blockRestSec": 90 }
+```
+
+Halten mit Handwechsel (6 Sätze, erste 3 rechts, dann 3 links):
+```json
+{ "type": "block", "grip": "Leiste 15mm", "fingers": 4, "weight": 15, "mode": "hold", "reps": 6, "hangSec": 7, "restSec": 30, "blockRestSec": 60, "handMode": "block", "startHand": "right" }
 ```
 
 Wiederholungen (z. B. Lifting Pin heben/ablassen):
