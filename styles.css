@@ -603,6 +603,7 @@ button, input, select, textarea { font-family: inherit; }
   color: var(--accent); margin: 2px 0; animation: popIn .35s cubic-bezier(.25, 1.4, .4, 1) both;
 }
 .fb-precount-tense { color: var(--accent2); animation: precountTick .5s cubic-bezier(.25, 1.4, .4, 1) both; }
+.fb-precount-heading { font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: .06em; color: #fff; }
 @keyframes precountTick { 0% { opacity: 0; transform: scale(1.4); } 60% { opacity: 1; transform: scale(.95); } 100% { transform: scale(1); } }
 
 .fb-overlay-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }

@@ -4116,11 +4116,15 @@ function buildBlockSequence(b, isLastBlock = false) {
   if (b.type === 'pause') {
     return [{ phase: 'Pause', seconds: b.seconds }];
   }
+  // Bei einer Fixübung ist die Pause danach nur noch die Zeit zum Loggen
+  // von Wdh./Gewicht (kein weiterer Satz derselben Übung folgt hier) —
+  // 5s reichen dafür, das Mindestmass ist entsprechend niedriger als bei
+  // Hang/Campus-Sätzen (dort geht's zusätzlich um echte Erholung).
   return isLastBlock
     ? [{ phase: 'Work', seconds: b.workSec || 40 }]
     : [
         { phase: 'Work', seconds: b.workSec || 40 },
-        { phase: b.restSec > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(b.restSec, 10) },
+        { phase: b.restSec > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(b.restSec, 5) },
       ];
 }
 function isWorkPhase(step) {
@@ -7613,6 +7617,7 @@ function renderFbOverlay() {
     stage = `
       <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${isHang ? holdBlockTitle(block) : campusLabel(block)}${armNote ? ' · ' + armNote : ''}</div>
       <div class="fb-stage-figure">${isHang ? holdBlockThumb(block) : campusWorkFigureSvg(block)}</div>
+      <div class="fb-precount-heading mono">GET READY!</div>
       <div class="fb-precount ${tense ? 'fb-precount-tense' : ''}" id="fb-precount">${fb.preCount}</div>
       <div class="fb-stage-sub mono">Hände ans Board — Zeit zum Vorbereiten!</div>
       <button class="btn fb-stage-btn" id="fb-precount-skip">Jetzt starten</button>
@@ -7994,7 +7999,7 @@ function startCurrentBlock() {
    Wird sowohl beim allerersten Satz als auch bei jedem automatischen
    Weiterschalten sowie bei Zurück/Weiter aufgerufen — ein einziger
    Einstiegspunkt statt Sonderfällen pro Aufrufer. */
-const FB_PRECOUNT_SECONDS = 15;
+const FB_PRECOUNT_SECONDS = 10;
 function beginBlock() {
   const block = fb.blocks[fb.blockIndex];
   if (!block) { finishAblauf(); return; }
