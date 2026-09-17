@@ -2749,16 +2749,16 @@ const fb = {
    data.js, in % von Bildbreite/-höhe — funktioniert responsiv). Da es sich
    bislang um eine Illustration handelt, ist die Zuordnung Zone↔Kategorie
    nach bestem Augenmass gewählt, nicht pixelgenau vermessen. */
-function renderBoardImage() {
-  const board = BOARDS[fb.board];
+function renderBoardImage(gripState = fb, photoId = 'fb-board-photo') {
+  const board = BOARDS[gripState.board];
   const spots = board.hotspots.map((h) => {
     const grip = board.grips.find((g) => g.id === h.grip);
-    const cls = fb.gripMode === 'different'
-      ? [h.grip === fb.selectedGripLeft ? 'active-left' : '', h.grip === fb.selectedGripRight ? 'active-right' : ''].filter(Boolean).join(' ')
-      : (fb.selectedGrip === h.grip ? 'active' : '');
+    const cls = gripState.gripMode === 'different'
+      ? [h.grip === gripState.selectedGripLeft ? 'active-left' : '', h.grip === gripState.selectedGripRight ? 'active-right' : ''].filter(Boolean).join(' ')
+      : (gripState.selectedGrip === h.grip ? 'active' : '');
     return `<button type="button" class="board-hotspot ${cls}" style="left:${h.x}%;top:${h.y}%;" data-grip="${h.grip}" title="${esc(grip.label)}${grip.note ? ' · ' + esc(grip.note) : ''}"></button>`;
   }).join('');
-  return `<div class="board-photo-wrap" id="fb-board-photo">
+  return `<div class="board-photo-wrap" id="${photoId}">
     <img src="${board.image}" alt="${esc(board.label)}">
     ${spots}
   </div>`;
@@ -2783,14 +2783,14 @@ function wireCalibration() {
   });
 }
 
-function fbSelectedGripHint() {
-  if (fb.gripMode === 'different') {
-    const left = fb.selectedGripLeft ? esc(gripLabel(fb.board, fb.selectedGripLeft)) : '—';
-    const right = fb.selectedGripRight ? esc(gripLabel(fb.board, fb.selectedGripRight)) : '—';
+function fbSelectedGripHint(gripState = fb) {
+  if (gripState.gripMode === 'different') {
+    const left = gripState.selectedGripLeft ? esc(gripLabel(gripState.board, gripState.selectedGripLeft)) : '—';
+    const right = gripState.selectedGripRight ? esc(gripLabel(gripState.board, gripState.selectedGripRight)) : '—';
     return `Links: ${left} · Rechts: ${right}`;
   }
-  return fb.selectedGrip
-    ? 'Gewählt: ' + esc(gripLabel(fb.board, fb.selectedGrip))
+  return gripState.selectedGrip
+    ? 'Gewählt: ' + esc(gripLabel(gripState.board, gripState.selectedGrip))
     : 'Griff am Board antippen (oder unten aus der Liste wählen).';
 }
 
@@ -2839,6 +2839,224 @@ function selectFbGrip(gripId) {
       if (label) label.textContent = 'Oder aus der Liste wählen (für rechts)';
     }
   }
+}
+
+/* ---------- Griff eines bestehenden Satzes nachträglich ändern ----------
+   Antippen des Board-Thumbnails in der Ablauf-Liste (siehe renderFbBlocksList)
+   statt den Satz löschen und neu anlegen zu müssen, nur um den Griff zu
+   korrigieren. Eigener State (fbGripEditor) statt der fb.*-Felder von oben,
+   die für den "neuen Satz hinzufügen"-Baukasten reserviert sind — beide
+   könnten sonst gleichzeitig offen sein (Baukasten unten auf der Seite,
+   Editor als Overlay darüber) und sich gegenseitig überschreiben. Volles
+   Neu-Rendern des Sheets bei jedem Tap statt der Teil-Updates von
+   selectFbGrip() — hier unkritisch, da es sich (anders als der oft
+   mehrfach hintereinander genutzte Baukasten) um ein selten geöffnetes
+   Overlay handelt. */
+let fbGripEditor = null; // { blockIndex, board, gripMode, pickingHand, selectedGrip, selectedGripLeft, selectedGripRight }
+
+function ensureFbGripEditorSheet() {
+  let el = document.getElementById('fb-grip-editor-sheet');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fb-grip-editor-sheet';
+    el.className = 'info-sheet-backdrop hidden';
+    document.body.appendChild(el);
+    el.onclick = (e) => { if (e.target === el) closeFbGripEditor(); };
+  }
+  return el;
+}
+function closeFbGripEditor() {
+  fbGripEditor = null;
+  const el = document.getElementById('fb-grip-editor-sheet');
+  if (el) el.classList.add('hidden');
+}
+function openFbGripEditor(index) {
+  const b = fb.blocks[index];
+  if (!b) return;
+  if (b.type === 'block') { openFbBlockGripEditor(index); return; } // Lifting Pin: Chips statt Board-Bild
+  fbGripEditor = {
+    blockIndex: index,
+    board: b.board,
+    gripMode: hangIsAsymmetric(b) ? 'different' : 'same',
+    pickingHand: 'left',
+    selectedGrip: hangIsAsymmetric(b) ? null : b.grip,
+    selectedGripLeft: hangIsAsymmetric(b) ? b.gripLeft : null,
+    selectedGripRight: hangIsAsymmetric(b) ? b.gripRight : null,
+  };
+  renderFbGripEditorSheet();
+}
+function selectFbEditorGrip(gripId) {
+  const st = fbGripEditor;
+  if (!st) return;
+  const advanceToRight = st.gripMode === 'different' && st.pickingHand === 'left';
+  if (st.gripMode === 'different') {
+    if (st.pickingHand === 'left') st.selectedGripLeft = gripId;
+    else st.selectedGripRight = gripId;
+    if (advanceToRight) st.pickingHand = 'right';
+  } else {
+    st.selectedGrip = gripId;
+  }
+  renderFbGripEditorSheet();
+}
+function renderFbGripEditorSheet() {
+  const st = fbGripEditor;
+  if (!st) return;
+  const el = ensureFbGripEditorSheet();
+  el.innerHTML = `
+    <div class="info-sheet-card">
+      <button type="button" class="info-sheet-close" id="fbge-close">✕</button>
+      <div class="info-sheet-title">Griff bearbeiten</div>
+      <div class="chip-row" id="fbge-board-toggle">
+        <button type="button" class="chip ${st.board === 'bm1000' ? 'active' : ''}" data-board="bm1000">BM 1000</button>
+        <button type="button" class="chip ${st.board === 'bm2000' ? 'active' : ''}" data-board="bm2000">BM 2000</button>
+      </div>
+      <div class="chip-row" id="fbge-gripmode-toggle">
+        <button type="button" class="chip ${st.gripMode === 'same' ? 'active' : ''}" data-grip-mode="same">Beide Hände gleich</button>
+        <button type="button" class="chip ${st.gripMode === 'different' ? 'active' : ''}" data-grip-mode="different">Unterschiedlich</button>
+      </div>
+      ${st.gripMode === 'different' ? `
+        <div class="chip-row" id="fbge-hand-toggle">
+          <button type="button" class="chip ${st.pickingHand === 'left' ? 'active' : ''}" data-hand="left">Links${st.selectedGripLeft ? ': ' + esc(gripLabel(st.board, st.selectedGripLeft)) : ' wählen'}</button>
+          <button type="button" class="chip ${st.pickingHand === 'right' ? 'active' : ''}" data-hand="right">Rechts${st.selectedGripRight ? ': ' + esc(gripLabel(st.board, st.selectedGripRight)) : ' wählen'}</button>
+        </div>
+      ` : ''}
+      <div class="board-visual">${renderBoardImage(st, 'fbge-board-photo')}</div>
+      <p class="login-hint" style="margin:8px 0;">${fbSelectedGripHint(st)}</p>
+      <div class="field">
+        <label>${st.gripMode === 'different' ? `Oder aus der Liste wählen (für ${st.pickingHand === 'left' ? 'links' : 'rechts'})` : 'Oder aus der Liste wählen'}</label>
+        <select id="fbge-grip-select">
+          <option value="">— Griff wählen —</option>
+          ${BOARDS[st.board].grips.map((g) => `<option value="${g.id}" ${(st.gripMode === 'different' ? (st.pickingHand === 'left' ? st.selectedGripLeft : st.selectedGripRight) : st.selectedGrip) === g.id ? 'selected' : ''}>${esc(g.label)}${g.note ? ' · ' + esc(g.note) : ''}${gripArmNote(st.board, g.id) ? ' · ' + gripArmNote(st.board, g.id) : ''}</option>`).join('')}
+        </select>
+      </div>
+      <button type="button" class="btn" id="fbge-save" style="width:100%;margin-top:12px;">Übernehmen</button>
+    </div>
+  `;
+  el.classList.remove('hidden');
+  document.getElementById('fbge-close').onclick = closeFbGripEditor;
+  document.getElementById('fbge-board-toggle').querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => {
+      st.board = btn.dataset.board;
+      st.selectedGrip = null;
+      st.selectedGripLeft = null;
+      st.selectedGripRight = null;
+      renderFbGripEditorSheet();
+    };
+  });
+  document.getElementById('fbge-gripmode-toggle').querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => { st.gripMode = btn.dataset.gripMode; st.pickingHand = 'left'; renderFbGripEditorSheet(); };
+  });
+  const handToggle = document.getElementById('fbge-hand-toggle');
+  if (handToggle) {
+    handToggle.querySelectorAll('.chip').forEach((btn) => {
+      btn.onclick = () => { st.pickingHand = btn.dataset.hand; renderFbGripEditorSheet(); };
+    });
+  }
+  el.querySelectorAll('.board-hotspot').forEach((btn) => {
+    btn.onclick = () => selectFbEditorGrip(btn.dataset.grip);
+  });
+  document.getElementById('fbge-grip-select').onchange = (e) => selectFbEditorGrip(e.target.value || null);
+  document.getElementById('fbge-save').onclick = () => {
+    const b = fb.blocks[st.blockIndex];
+    if (!b) { closeFbGripEditor(); return; }
+    if (st.gripMode === 'different') {
+      if (!st.selectedGripLeft || !st.selectedGripRight) { toast('Zuerst Griff für links UND rechts wählen.', 'err'); return; }
+      b.board = st.board;
+      b.gripLeft = st.selectedGripLeft;
+      b.gripRight = st.selectedGripRight;
+      delete b.grip;
+    } else {
+      if (!st.selectedGrip) { toast('Zuerst einen Griff wählen.', 'err'); return; }
+      b.board = st.board;
+      b.grip = st.selectedGrip;
+      delete b.gripLeft;
+      delete b.gripRight;
+    }
+    renderFbBlocksList();
+    closeFbGripEditor();
+    toast('Griff aktualisiert.', 'ok');
+  };
+}
+
+/* Lifting-Pin-Pendant: kein Board-Bild, sondern dieselben Leiste/Pinch- +
+   mm-Preset-Chips wie im "neuen Satz hinzufügen"-Baukasten (siehe
+   renderBlockAddPanel/blockGripFromSelection), nur eben zum Nachbearbeiten
+   eines bereits angelegten Satzes statt zum Neuanlegen. */
+let fbBlockGripEditor = null; // { blockIndex, gripType, leisteWidth }
+
+function ensureFbBlockGripEditorSheet() {
+  let el = document.getElementById('fb-block-grip-editor-sheet');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fb-block-grip-editor-sheet';
+    el.className = 'info-sheet-backdrop hidden';
+    document.body.appendChild(el);
+    el.onclick = (e) => { if (e.target === el) closeFbBlockGripEditor(); };
+  }
+  return el;
+}
+function closeFbBlockGripEditor() {
+  fbBlockGripEditor = null;
+  const el = document.getElementById('fb-block-grip-editor-sheet');
+  if (el) el.classList.add('hidden');
+}
+function openFbBlockGripEditor(index) {
+  const b = fb.blocks[index];
+  if (!b || b.type !== 'block') return;
+  // Bestehenden Freitext-Grip so gut wie möglich in gripType/leisteWidth
+  // zurückübersetzen (auch bei älterem/importiertem Freitext, der nicht
+  // exakt "Leiste Xmm" lautet — dann Default 15mm als Startpunkt).
+  const m = /^Leiste (\d+)mm$/.exec(b.grip || '');
+  fbBlockGripEditor = {
+    blockIndex: index,
+    gripType: b.grip === 'Pinch' ? 'pinch' : 'leiste',
+    leisteWidth: m ? Number(m[1]) : 15,
+  };
+  renderFbBlockGripEditorSheet();
+}
+function renderFbBlockGripEditorSheet() {
+  const st = fbBlockGripEditor;
+  if (!st) return;
+  const el = ensureFbBlockGripEditorSheet();
+  const isLeiste = st.gripType === 'leiste';
+  el.innerHTML = `
+    <div class="info-sheet-card">
+      <button type="button" class="info-sheet-close" id="fbbge-close">✕</button>
+      <div class="info-sheet-title">Griff bearbeiten</div>
+      <div class="chip-row" id="fbbge-griptype-row">
+        <button type="button" class="chip ${isLeiste ? 'active' : ''}" data-grip-type="leiste">Leiste</button>
+        <button type="button" class="chip ${!isLeiste ? 'active' : ''}" data-grip-type="pinch">Pinch</button>
+      </div>
+      ${isLeiste ? `
+        <div class="chip-row" id="fbbge-width-row">
+          ${LEISTE_WIDTHS_MM.map((mm) => `<button type="button" class="chip ${st.leisteWidth === mm ? 'active' : ''}" data-leiste-width="${mm}">${mm}mm</button>`).join('')}
+        </div>
+      ` : ''}
+      <button type="button" class="btn" id="fbbge-save" style="width:100%;margin-top:12px;">Übernehmen</button>
+    </div>
+  `;
+  el.classList.remove('hidden');
+  document.getElementById('fbbge-close').onclick = closeFbBlockGripEditor;
+  document.getElementById('fbbge-griptype-row').querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => { st.gripType = btn.dataset.gripType; renderFbBlockGripEditorSheet(); };
+  });
+  const widthRow = document.getElementById('fbbge-width-row');
+  if (widthRow) {
+    widthRow.querySelectorAll('.chip').forEach((btn) => {
+      btn.onclick = () => {
+        st.leisteWidth = Number(btn.dataset.leisteWidth);
+        widthRow.querySelectorAll('.chip').forEach((b) => b.classList.toggle('active', b === btn));
+      };
+    });
+  }
+  document.getElementById('fbbge-save').onclick = () => {
+    const b = fb.blocks[st.blockIndex];
+    if (!b) { closeFbBlockGripEditor(); return; }
+    b.grip = blockGripFromSelection(st);
+    renderFbBlocksList();
+    closeFbBlockGripEditor();
+    toast('Griff aktualisiert.', 'ok');
+  };
 }
 
 /* ---------- "Eigenen Ablauf bauen": ein Satz nach dem anderen ----------
@@ -4959,7 +5177,7 @@ function renderFbBlocksList() {
     const thumb = isPause
       ? `<div class="timeline-thumb timeline-thumb-emoji">⏸</div>`
       : isHang
-        ? holdBlockThumb(b)
+        ? `<button type="button" class="timeline-thumb-edit" data-edit-grip="${i}" title="Griff bearbeiten">${holdBlockThumb(b)}<span class="thumb-edit-badge">✏</span></button>`
         : isCampus
           ? `<div class="timeline-thumb"><img src="${CAMPUS_BOARD_IMAGE}" alt=""></div>`
           : `<div class="timeline-thumb timeline-thumb-emoji">💪</div>`;
@@ -5031,6 +5249,9 @@ function renderFbBlocksList() {
   });
   holder.querySelectorAll('[data-fb-info]').forEach((btn) => {
     btn.onclick = () => showExerciseInfoSheet(fb.blocks[Number(btn.dataset.fbInfo)].exerciseId);
+  });
+  holder.querySelectorAll('[data-edit-grip]').forEach((btn) => {
+    btn.onclick = () => openFbGripEditor(Number(btn.dataset.editGrip));
   });
   holder.querySelectorAll('[data-move-up]').forEach((btn) => {
     btn.onclick = () => {
