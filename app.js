@@ -4062,12 +4062,12 @@ function buildBlockSequence(b, isLastBlock = false) {
     // sind eine aktive Bewegung, kein Halten.
     const seq = [];
     for (let s = 0; s < b.reps; s++) {
-      seq.push({ phase: 'Work', seconds: b.workSec });
+      seq.push({ phase: 'Work', seconds: b.workSec, rep: s });
       if (s < b.reps - 1) {
-        if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec });
+        if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec, rep: s });
       } else if (!isLastBlock) {
         const trailingRest = b.blockRestSec != null ? b.blockRestSec : b.restSec;
-        seq.push({ phase: trailingRest > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(trailingRest, 10) });
+        seq.push({ phase: trailingRest > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(trailingRest, 10), rep: s });
       }
     }
     return seq;
@@ -4084,6 +4084,17 @@ function buildBlockSequence(b, isLastBlock = false) {
 }
 function isWorkPhase(step) {
   return !step || step.phase === 'Hang' || step.phase === 'Work' || step.phase === 'Halten';
+}
+/* Die ABSCHLIESSENDE Pause eines Blocks (letzter Schritt seiner Sequenz) —
+   danach kommt entweder ein anderer Block oder der Ablauf ist fertig,
+   NICHT eine weitere Wiederholung desselben Blocks. Wird sowohl fürs
+   Check-in-Fenster als auch für die "was kommt als Nächstes"-Vorschau
+   während des laufenden Ablaufs gebraucht (siehe renderFbOverlay/
+   updateFbUpcomingUI) — ein Schritt weiterspringen (fbStepForward) kann
+   das mitten in der Pause jederzeit ändern. */
+function fbIsTrailingPause() {
+  const step = fb.sequence[fb.stepIndex];
+  return !!step && !isWorkPhase(step) && fb.stepIndex === fb.sequence.length - 1;
 }
 
 function fbEstimateSeconds() {
@@ -5505,9 +5516,9 @@ function ensureFbOverlay() {
   return el;
 }
 
-/* Nach links wischen = "fertig, weiter" (dasselbe wie ⏭/"Wiederholungen
-   geschafft"), nach rechts = zurück — v. a. bei Übungs-Sätzen soll man so
-   ohne genaues Zielen auf einen Button weiterkommen. Einmal auf das
+/* Nach links wischen = "einen Schritt weiter" (dasselbe wie ⏭, siehe
+   fbStepForward), nach rechts = zurück — v. a. bei Übungs-Sätzen soll man
+   so ohne genaues Zielen auf einen Button weiterkommen. Einmal auf das
    Overlay-Element selbst gebunden (bleibt über jedes innerHTML-Neurendern
    hinweg bestehen), nicht auf einzelne Kind-Elemente. */
 function wireFbOverlaySwipe(el) {
@@ -5527,7 +5538,7 @@ function wireFbOverlaySwipe(el) {
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.3) return; // zu kurz oder zu diagonal
-    if (dx < 0) fbSkipForward(); else fbGoBack();
+    if (dx < 0) fbStepForward(); else fbGoBack();
   }, { passive: true });
 }
 
@@ -5589,7 +5600,11 @@ function updateFbProgressUI() {
 
 function updateFbUpcomingUI() {
   const el = document.getElementById('fb-upcoming');
-  if (el) el.textContent = 'Danach: ' + fbUpcomingLabel();
+  if (!el) return;
+  // Während der abschliessenden Pause zeigt schon der grosse Titel "GLEICH:
+  // ..." (siehe renderFbOverlay/fbIsTrailingPause) genau das, was diese
+  // Zeile sonst ankündigen würde — Wiederholung hier weglassen.
+  el.textContent = fbIsTrailingPause() ? '' : 'Danach: ' + fbUpcomingLabel();
 }
 
 /* ---------- Transport-Leiste (Zurück / Play-Pause / Weiter) ----------
@@ -5605,7 +5620,7 @@ function fbTransportRow() {
     <div class="fb-transport">
       <button type="button" class="fb-transport-btn" id="fb-prev" ${fb.blockIndex === 0 ? 'disabled' : ''} title="Zurück">⏮</button>
       <button type="button" class="fb-transport-btn fb-play" id="fb-playpause" ${canPause ? '' : 'disabled'} title="${isPaused ? 'Weiter' : 'Pause'}">${isPaused ? '▶' : '⏸'}</button>
-      <button type="button" class="fb-transport-btn" id="fb-skip" title="Diesen Satz überspringen">⏭</button>
+      <button type="button" class="fb-transport-btn" id="fb-skip" title="Einen Schritt weiter">⏭</button>
     </div>
   `;
 }
@@ -5618,18 +5633,19 @@ function fbGoBack() {
   beginBlock();
 }
 
-function fbSkipForward() {
+/* Transport "Weiter" (⏭) sowie Wischen nach links: laut Nutzer-Feedback
+   soll das nur EINEN Schritt vorspulen (wie ein abgelaufener Timer),
+   nicht den ganzen Satz überspringen — das sprang bisher direkt zum
+   nächsten Block/zur nächsten Übung, "man fliegt immer direkt zur
+   nächsten Übung". Jeder Schritt einzeln, wie tickBlock() es bei Ablauf
+   der Zeit auch tut — siehe advanceToNextStep(). */
+function fbStepForward() {
   clearInterval(fb.intervalId);
   fb.intervalId = null;
   fbCheckinTyping = false; // Feld ist beim Blockwechsel weg — sonst bliebe die Zeit im neuen Block angehalten
-  initBlockResult(fb.blockIndex); // frühzeitig übersprungen (z. B. "Wiederholungen geschafft") — trotzdem Standardwerte fürs Ergebnis
-  fb.blockIndex++;
-  if (fb.blockIndex >= fb.blocks.length) {
-    releaseWakeLock();
-    finishAblauf();
-  } else {
-    beginBlock();
-  }
+  if (advanceToNextStep()) return; // Block war zu Ende -> beginBlock()/finishAblauf() haben schon gerendert
+  fb.intervalId = setInterval(tickBlock, 1000);
+  renderFbOverlay();
 }
 
 function fbTogglePause() {
@@ -5684,14 +5700,12 @@ function renderFbOverlay() {
     // (Board-Punkt, generische Hänge-Figur, animiertes Strichmännchen der
     // Übung, oder das Campus-Symbol).
     const block = fb.blocks[fb.blockIndex];
-    const isHang = isHangLikeBlock(block);
     const isExercise = block.type === 'exercise';
     // Wiederholungen-Griffblock zeigt wie eine Übung ein Ziel + den
     // manuellen "geschafft"-Button, aber OHNE Zielmuskel-Anzeige (dafür
     // bleibt isExercise oben strikt auf echte Übungen begrenzt).
     const showTarget = isExercise || (block.type === 'block' && block.mode === 'reps');
     const isCampus = block.type === 'campus';
-    const isPause = block.type === 'pause';
     const step = fb.sequence[fb.stepIndex];
     const working = isWorkPhase(step);
     const phaseTotal = step ? step.seconds : 1;
@@ -5700,24 +5714,68 @@ function renderFbOverlay() {
     const isPausedNow = fb.running && !fb.intervalId;
     const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
     const activeRep = working && step ? step.rep : null;
-    const armNote = isHang ? holdBlockArmNote(block, activeRep) : '';
+
+    // Während der ABSCHLIESSENDEN Pause dieses Blocks (danach kommt ein
+    // anderer Block oder der Ablauf ist fertig) interessiert nicht mehr,
+    // was gerade erledigt wurde — Titel und grosses Bild zeigen deshalb
+    // schon den NÄCHSTEN Block ("GLEICH: ..."), statt weiter den bereits
+    // fertigen aktuellen zu zeigen. Pausen MIT verbleibenden Wiederholungen
+    // desselben Blocks (z. B. zwischen Hang-Wiederholung 1 und 2) sind
+    // davon nicht betroffen, dort bleibt es ja ohnehin derselbe Satz/Griff.
+    // isLastBlock (buildBlockSequence) sorgt schon dafür, dass der
+    // ALLERLETZTE Block im Ablauf keine abschliessende Pause mehr bekommt,
+    // weshalb nextBlockRef hier praktisch immer existiert.
+    const isTrailingPause = fbIsTrailingPause();
+    const nextBlockRef = isTrailingPause ? fb.blocks[fb.blockIndex + 1] : null;
+    const displayBlock = nextBlockRef || block;
+    const displayIsHang = isHangLikeBlock(displayBlock);
+    const displayIsCampus = displayBlock.type === 'campus';
+    const displayIsPause = displayBlock.type === 'pause';
+    const displayIsExercise = displayBlock.type === 'exercise';
     // Bei Hang ist armNote (Griff-Notiz) übers ganze Satz-Vollbild fix, bei
     // Lifting Pin ändert sich die aktive Hand aber pro Wiederholung — ein
     // eigenes Element dafür, das updateTimerUI() bei jedem Tick auffrischen
     // kann, statt es nur einmal beim vollen Rendern dieses Bildschirms
     // (renderFbOverlay) reinzuschreiben und dann bis zum nächsten Satz
-    // eingefroren zu lassen.
-    const label = isPause
+    // eingefroren zu lassen. Während der Vorschau (isTrailingPause) gibt es
+    // noch keine "aktive" Wiederholung des NÄCHSTEN Blocks, deshalb dort
+    // activeRep bewusst null (zeigt das statische Hand-Muster statt einer
+    // konkreten Hand).
+    const displayArmNote = displayIsHang ? holdBlockArmNote(displayBlock, isTrailingPause ? null : activeRep) : '';
+    const displayLabel = displayIsPause
       ? 'Pause'
-      : isHang
-        ? `${holdBlockTitle(block)}${armNote ? ` · <span id="fb-hand-note">${armNote}</span>` : ''}`
-        : isCampus ? campusLabel(block) : esc(exerciseName(block.exerciseId));
-    const muscles = isExercise ? exerciseMuscles(block.exerciseId) : null;
+      : displayIsHang
+        ? `${holdBlockTitle(displayBlock)}${displayArmNote ? ` · <span id="fb-hand-note">${displayArmNote}</span>` : ''}`
+        : displayIsCampus ? campusLabel(displayBlock) : esc(exerciseName(displayBlock.exerciseId));
+    const muscles = isTrailingPause
+      ? (displayIsExercise ? exerciseMuscles(displayBlock.exerciseId) : null)
+      : (isExercise ? exerciseMuscles(block.exerciseId) : null);
     const muscleText = muscles ? muscleLabelsText(muscles.primary, muscles.secondary) : '';
+    const headerText = isTrailingPause
+      ? `GLEICH: ${displayLabel}`
+      : `SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${displayLabel}${showTarget ? ' · Ziel ' + esc(String(block.reps)) + '×' : ''}`;
+    // "Schritt X/Y" zählte bisher auch die Pausen-Schritte mit (z. B.
+    // "Schritt 2/6" bei nur 3 Wiederholungen), das war verwirrend — bei
+    // Blöcken mit rep-Feld pro Schritt (Hang/Griffblock/Campus) jetzt
+    // stattdessen die tatsächliche, noch kommende Wiederholungszahl zeigen.
+    // Während der abschliessenden Pause reicht "Pause" allein, der Titel
+    // oben zeigt ja schon, was als Nächstes kommt.
+    let phaseText = '';
+    if (step) {
+      if (isTrailingPause) {
+        phaseText = 'Pause';
+      } else if (step.rep != null) {
+        const remaining = block.reps - step.rep - 1;
+        phaseText = working ? `${step.phase} · Satz ${step.rep + 1}/${block.reps}` : `Pause · noch ${remaining} Satz${remaining === 1 ? '' : 'e'}`;
+      } else {
+        phaseText = step.phase;
+      }
+      if (isPausedNow) phaseText += ' · PAUSIERT';
+    }
     stage = `
-      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${label}${showTarget ? ' · Ziel ' + esc(String(block.reps)) + '×' : ''}</div>
-      ${isHang
-        ? `<div class="fb-stage-figure">${holdBlockThumb(block)}</div>
+      <div class="fb-stage-label mono">${headerText}</div>
+      ${displayIsHang
+        ? `<div class="fb-stage-figure">${holdBlockThumb(displayBlock)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
              <div class="fb-phase-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:${activeRep != null ? activeRep : ''}">${working ? holdBlockWorkFigure(block, activeRep) : FB_REST_FIGURE_SVG}</div>
              <div class="fb-timer-ring">
@@ -5728,7 +5786,9 @@ function renderFbOverlay() {
                <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
              </div>
            </div>`
-        : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:">${working ? (isCampus ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId)) : FB_REST_FIGURE_SVG}</div>
+        : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:">${working
+            ? (isCampus ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId))
+            : (isTrailingPause ? (displayIsCampus ? campusWorkFigureSvg(displayBlock) : displayIsPause ? FB_REST_FIGURE_SVG : exerciseFigureSvg(displayBlock.exerciseId)) : FB_REST_FIGURE_SVG)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
              <div class="fb-timer-ring">
                <svg viewBox="0 0 120 120">
@@ -5738,7 +5798,7 @@ function renderFbOverlay() {
                <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
              </div>
            </div>`}
-      <div class="phase mono" id="fb-phase">${step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}${isPausedNow ? ' · PAUSIERT' : ''}` : ''}</div>
+      <div class="phase mono" id="fb-phase">${esc(phaseText)}</div>
       ${muscleText ? `
         <div class="fb-muscle-block">
           ${bodyMapSvg(muscles.primary, muscles.secondary)}
@@ -5746,7 +5806,7 @@ function renderFbOverlay() {
         </div>
       ` : ''}
       <div class="fb-stage-next mono" id="fb-upcoming"></div>
-      <div class="fb-checkin" id="fb-checkin" ${fb.stepIndex === fb.sequence.length - 1 && !working ? '' : 'hidden'}>${fb.stepIndex === fb.sequence.length - 1 && !working ? checkinPanelHtml(fb.blockIndex) : ''}</div>
+      <div class="fb-checkin" id="fb-checkin" ${isTrailingPause ? '' : 'hidden'}>${isTrailingPause ? checkinPanelHtml(fb.blockIndex) : ''}</div>
       ${showTarget ? `<button class="btn fb-stage-btn" id="fb-reps-done" ${working ? '' : 'hidden'}>Wiederholungen geschafft — weiter</button>` : ''}
       ${fbTransportRow()}
       ${fb.blockIndex > 0 ? '<button class="btn ghost fb-stage-btn" id="fb-finish-early">Vorzeitig beenden & speichern</button>' : ''}
@@ -5766,7 +5826,7 @@ function renderFbOverlay() {
   const prevBtn = document.getElementById('fb-prev');
   if (prevBtn) prevBtn.onclick = fbGoBack;
   const skipBtn = document.getElementById('fb-skip');
-  if (skipBtn) skipBtn.onclick = fbSkipForward;
+  if (skipBtn) skipBtn.onclick = fbStepForward;
   const ppBtn = document.getElementById('fb-playpause');
   if (ppBtn && !ppBtn.disabled) ppBtn.onclick = fbTogglePause;
   if (fb.awaitingNext) {
@@ -5787,8 +5847,7 @@ function renderFbOverlay() {
     // existiert z. B. nach "Zurück" zu einem bereits abgeschlossenen Block
     // (der schon ein Ergebnis hat, aber gerade nicht in der Schluss-Pause
     // steht) kein #fb-checkin-Inhalt zum Verdrahten.
-    const inCheckinWindow = fb.stepIndex === fb.sequence.length - 1 && !isWorkPhase(fb.sequence[fb.stepIndex]);
-    if (inCheckinWindow && fb.runResults[fb.blockIndex]) wireCheckinPanel(fb.blockIndex);
+    if (fbIsTrailingPause() && fb.runResults[fb.blockIndex]) wireCheckinPanel(fb.blockIndex);
     updateFbUpcomingUI();
   }
   updateFbProgressUI();
@@ -6053,7 +6112,7 @@ function advanceToNextStep() {
   // Letzte Pause des Blocks (danach kommt der nächste Satz) — genau hier
   // ist Zeit fürs Check-in, ohne den Ablauf zu unterbrechen: es läuft
   // nebenher während der ohnehin schon geplanten Erholung.
-  if (!isWorkPhase(newStep) && fb.stepIndex === fb.sequence.length - 1) openBlockCheckin();
+  if (fbIsTrailingPause()) openBlockCheckin();
   return false;
 }
 
@@ -6063,6 +6122,16 @@ function tickBlock() {
   const step = fb.sequence[fb.stepIndex];
   if (fb.secondsLeft <= 0) {
     if (advanceToNextStep()) return;
+    if (fbIsTrailingPause()) {
+      // Übergang in die ABSCHLIESSENDE Pause: Titel/Bild wechseln jetzt auf
+      // den NÄCHSTEN Block (siehe renderFbOverlay/fbStageDisplayInfo), der
+      // ein komplett anderer Satz-Typ sein kann (anderes Layout: Board-
+      // Thumb vs. kombinierte Figur) — ein gezieltes Update reicht dafür
+      // nicht, hier lohnt sich ein voller Re-Render (passiert nur einmal
+      // pro Block, kein Performance-Problem).
+      renderFbOverlay();
+      return;
+    }
     // Ring der EBEN beendeten Phase soll sich noch sichtbar ganz schliessen,
     // statt (wie bisher) direkt auf den offenen Ring der neuen Phase zu
     // springen — Zustand (Sekunden, Schritt, Signalton, Check-in) bleibt
@@ -6099,15 +6168,16 @@ function tickBlock() {
 /* "Wiederholungen geschafft — weiter" bei Fixübungen/Lifting-Pin-Reps:
    beendet nur die gerade laufende ARBEITS-Phase vorzeitig (wie ein
    abgelaufener Timer) und geht in die danach ohnehin vorgesehene Pause —
-   NICHT den ganzen Satz überspringen wie der "Satz überspringen"-Transport-
-   Button (fbSkipForward). Bisher riefen beide Buttons dieselbe Funktion
-   auf, wodurch "Wiederholungen geschafft" fälschlich direkt zum nächsten
-   Satz sprang und die Pause verschluckte. Der laufende Interval-Timer
-   bleibt unverändert (tickt weiter für die neue Pause-Phase), nur Sekunden/
-   Schritt werden vorgezogen. */
+   bei diesen Blöcken (Sequenz immer nur Work+Pause) ist das automatisch
+   IMMER die abschliessende Pause, deshalb hier direkt voll neu rendern
+   (zeigt dann schon den nächsten Block, siehe renderFbOverlay), statt nur
+   gezielt zu aktualisieren. Der laufende Interval-Timer bleibt unverändert
+   (tickt weiter für die neue Pause-Phase) — anders als fbStepForward()
+   (⏭/Wischen), das auch ausserhalb der Arbeitsphase funktionieren muss und
+   deshalb den Timer selbst neu aufsetzt. */
 function fbFinishRepsWork() {
   if (advanceToNextStep()) return;
-  updateTimerUI();
+  renderFbOverlay();
 }
 
 /* Satz fertig -> sofort weiter zum nächsten (kein Warten auf einen erneuten
@@ -6144,7 +6214,26 @@ function updateTimerUI() {
     big.textContent = pad2(fb.secondsLeft);
     big.className = 'big' + (working ? '' : ' rest') + (restWarn ? ' rest-warn' : '');
   }
-  if (phase) phase.textContent = step ? `${step.phase} · Schritt ${fb.stepIndex + 1}/${fb.sequence.length}` : '';
+  // Während der abschliessenden Pause (isTrailingPause) zeigt das grosse
+  // Bild/der Titel schon den NÄCHSTEN Block (siehe renderFbOverlay) — das
+  // wird dort einmalig beim vollen Rendern gesetzt und bleibt für die
+  // Dauer dieser Pause gültig (blockIndex/stepIndex ändern sich erst beim
+  // nächsten Block), deshalb hier einfach griffbereit neu berechnet.
+  const isTrailingPauseNow = fbIsTrailingPause();
+  const displayBlockNow = isTrailingPauseNow ? (fb.blocks[fb.blockIndex + 1] || block) : block;
+  const displayIsHangNow = isHangLikeBlock(displayBlockNow);
+  if (phase) {
+    let phaseText;
+    if (isTrailingPauseNow) {
+      phaseText = 'Pause';
+    } else if (step && step.rep != null) {
+      const remaining = block.reps - step.rep - 1;
+      phaseText = working ? `${step.phase} · Satz ${step.rep + 1}/${block.reps}` : `Pause · noch ${remaining} Satz${remaining === 1 ? '' : 'e'}`;
+    } else {
+      phaseText = step ? step.phase : '';
+    }
+    phase.textContent = phaseText;
+  }
   if (ring) {
     const phaseTotal = step ? step.seconds : 1;
     const frac = phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 0;
@@ -6157,11 +6246,21 @@ function updateTimerUI() {
   // zwischen den Wiederholungen) bliebe "kind" sonst durchgehend "work",
   // die Figur würde beim Handwechsel nie neu gezeichnet.
   const activeRep = working && step ? step.rep : null;
-  const kind = (working ? 'work' : 'rest') + ':' + (activeRep != null ? activeRep : '');
+  const kind = (working ? 'work' : 'rest') + ':' + (activeRep != null ? activeRep : '') + (isTrailingPauseNow ? ':next' : '');
   if (figureHolder && figureHolder.dataset.kind !== kind) {
-    figureHolder.innerHTML = working
-      ? (isHangLikeBlock(block) ? holdBlockWorkFigure(block, activeRep) : block.type === 'campus' ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId))
-      : FB_REST_FIGURE_SVG;
+    if (working) {
+      figureHolder.innerHTML = isHangLikeBlock(block) ? holdBlockWorkFigure(block, activeRep) : block.type === 'campus' ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId);
+    } else if (displayIsHangNow) {
+      // Layout mit separatem Board-Thumb oben (schon beim vollen Rendern
+      // gesetzt, hier unberührt) — die kleine Figur bleibt die Ruhefigur.
+      figureHolder.innerHTML = FB_REST_FIGURE_SVG;
+    } else {
+      // Kombinierte Grossfigur (kein separater Board-Thumb): während der
+      // abschliessenden Pause die Vorschau des nächsten Blocks zeigen.
+      figureHolder.innerHTML = isTrailingPauseNow
+        ? (displayBlockNow.type === 'campus' ? campusWorkFigureSvg(displayBlockNow) : displayBlockNow.type === 'pause' ? FB_REST_FIGURE_SVG : exerciseFigureSvg(displayBlockNow.exerciseId))
+        : FB_REST_FIGURE_SVG;
+    }
     figureHolder.dataset.kind = kind;
   }
   const repsDoneBtn = document.getElementById('fb-reps-done');
@@ -6170,8 +6269,12 @@ function updateTimerUI() {
   // fb-stage-label selbst wird nur einmal pro Satz komplett aufgebaut
   // (renderFbOverlay), deshalb hier gezielt nur die Hand-Anzeige darin
   // nachziehen, statt das ganze Label (inkl. Titel/Griff) neu zu bauen.
+  // Nur während einer laufenden Arbeitsphase nötig (nur dort ändert sich
+  // pro Tick etwas) — während einer Pause stünde hier sonst fälschlich
+  // wieder das Muster des AKTUELLEN statt des in der Vorschau gezeigten
+  // nächsten Blocks.
   const handNoteEl = document.getElementById('fb-hand-note');
-  if (handNoteEl && block && block.type === 'block') handNoteEl.textContent = blockArmNote(block, activeRep);
+  if (handNoteEl && working && block && block.type === 'block') handNoteEl.textContent = blockArmNote(block, activeRep);
   updateFbUpcomingUI();
   updateFbProgressUI();
 }
