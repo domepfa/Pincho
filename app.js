@@ -1998,8 +1998,9 @@ function renderLogBuilderPanel() {
     holder.innerHTML = `
       <div class="sec-head" style="margin-top:0;"><h2 class="sec-title" style="font-size:16px;">${esc(planExecution.planName)}</h2><div class="sec-rule"></div></div>
       <div id="fs-panel"></div>
-      <button type="button" class="btn ghost small" id="plan-execute-cancel" style="width:100%;margin-top:8px;">Ausführung abbrechen</button>
+      <button type="button" class="btn ghost accent-outline small" id="plan-execute-cancel" style="width:100%;margin-top:8px;">Ausführung abbrechen</button>
     `;
+    hideFabStart(); // Ausführung läuft schon, kein Start-Button mehr nötig
     renderFsPanel();
     document.getElementById('plan-execute-cancel').onclick = () => {
       if (!confirm('Ausführung abbrechen? Noch nicht gespeicherte Sätze gehen verloren.')) return;
