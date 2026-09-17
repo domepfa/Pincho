@@ -160,11 +160,18 @@ function showExerciseInfoSheet(exerciseId, onChange) {
   const muscleText = muscleLabelsText(muscles.primary, muscles.secondary);
   const howTo = exerciseHowTo(exerciseId);
   const isFav = isExerciseFavorite(exerciseId);
+  // Dasselbe animierte Strichmännchen wie im Ablauf-Vollbild (siehe
+  // exerciseFigureSvg) — bisher zeigte die Info nur den Text und die
+  // Zielmuskeln, nicht die Bewegung selbst. Nur bei Übungen mit einer
+  // echten Animation zeigen (EXERCISE_FIGURES), sonst bliebe nur der
+  // generische 💪-Platzhalter übrig, der hier nichts beiträgt.
+  const hasFigure = !!EXERCISE_FIGURES[exerciseId];
   el.innerHTML = `
     <div class="info-sheet-card">
       <button type="button" class="info-sheet-close" id="info-sheet-close">✕</button>
       <div class="info-sheet-title">${esc(exerciseName(exerciseId))}</div>
       <button type="button" class="btn ghost small" id="info-sheet-fav" style="margin-bottom:10px;">${isFav ? '★ Favorit' : '☆ Zu Favoriten hinzufügen'}</button>
+      ${hasFigure ? `<div class="info-sheet-figure">${exerciseFigureSvg(exerciseId)}</div>` : ''}
       ${howTo ? `<div class="ex-howto">${esc(howTo)}</div>` : ''}
       ${muscleText ? `<div class="fb-muscle-block">${bodyMapSvg(muscles.primary, muscles.secondary)}<div class="fb-muscle-label mono">${esc(muscleText)}</div></div>` : ''}
     </div>
@@ -3947,7 +3954,14 @@ function wireFbTemplatePicker() {
    einzige Zeit fürs Check-in (s. openBlockCheckin) — bei "0" konfigurierter
    Pause wird trotzdem kurz Zeit zum Loggen eingeräumt, statt sie ganz
    wegzulassen. */
-function buildBlockSequence(b) {
+/* isLastBlock: der ganze Ablauf ist nach dem letzten Arbeitssatz fertig —
+   eine abschliessende Pause/"Zeit zum Loggen" davor bringt nichts mehr
+   (kein nächster Satz, für den man sich erholen müsste), sie war bisher
+   trotzdem immer da. Nur beim tatsächlichen Durchlauf relevant (siehe
+   startSequence) — die generische Dauer-Schätzung (fbBlockSeconds) ruft
+   ohne dieses Flag auf und bleibt bewusst unverändert (Standardwert
+   false), sie kennt die Position eines Blocks im jeweiligen Ablauf nicht. */
+function buildBlockSequence(b, isLastBlock = false) {
   if (isHoldModeBlock(b)) {
     const seq = [];
     const workPhase = b.type === 'block' ? 'Halten' : 'Hang';
@@ -3955,7 +3969,7 @@ function buildBlockSequence(b) {
       seq.push({ phase: workPhase, seconds: b.hangSec });
       if (s < b.reps - 1) {
         if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec });
-      } else {
+      } else if (!isLastBlock) {
         const trailingRest = b.blockRestSec != null ? b.blockRestSec : b.restSec;
         seq.push({ phase: trailingRest > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(trailingRest, 10) });
       }
@@ -3971,7 +3985,7 @@ function buildBlockSequence(b) {
       seq.push({ phase: 'Work', seconds: b.workSec });
       if (s < b.reps - 1) {
         if (b.restSec > 0) seq.push({ phase: 'Pause', seconds: b.restSec });
-      } else {
+      } else if (!isLastBlock) {
         const trailingRest = b.blockRestSec != null ? b.blockRestSec : b.restSec;
         seq.push({ phase: trailingRest > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(trailingRest, 10) });
       }
@@ -3981,10 +3995,12 @@ function buildBlockSequence(b) {
   if (b.type === 'pause') {
     return [{ phase: 'Pause', seconds: b.seconds }];
   }
-  return [
-    { phase: 'Work', seconds: b.workSec || 40 },
-    { phase: b.restSec > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(b.restSec, 10) },
-  ];
+  return isLastBlock
+    ? [{ phase: 'Work', seconds: b.workSec || 40 }]
+    : [
+        { phase: 'Work', seconds: b.workSec || 40 },
+        { phase: b.restSec > 0 ? 'Pause' : 'Zeit zum Loggen', seconds: Math.max(b.restSec, 10) },
+      ];
 }
 function isWorkPhase(step) {
   return !step || step.phase === 'Hang' || step.phase === 'Work' || step.phase === 'Halten';
@@ -5203,7 +5219,6 @@ function renderFbBlocksList() {
       <div class="timeline-item anim-in" style="animation-delay:${Math.min(i, 14) * 30}ms">
         <div class="timeline-badge ${isHang ? '' : 'exercise'}">${i + 1}</div>
         <div class="timeline-card">
-          <div class="timeline-drag-handle" data-drag="${i}" title="Ziehen zum Verschieben">⠿</div>
           ${thumb}
           <div class="info">
             <div class="title">${title}</div>
@@ -5269,86 +5284,7 @@ function renderFbBlocksList() {
       renderFbBlocksList();
     };
   });
-  wireFbBlocksDragReorder(holder);
-
   renderFbRuntime(); // Start-Button-Status hängt von fb.blocks.length ab
-}
-
-/* Verschieben per Ziehen am Griff-Symbol (⠿), zusätzlich zu den ▲/▼-
-   Buttons — per Pointer Events (deckt Maus UND Touch einheitlich ab).
-   Der gezogene Satz wird während des Ziehens aus dem normalen Fluss
-   herausgenommen (position:fixed) und an seiner Stelle steht ein
-   Platzhalter mit gleicher Höhe; die übrigen Sätze haben unterschiedliche
-   Höhen (Hang/Übung/Campus/Pause haben verschieden viele Eingabefelder),
-   deshalb lässt der Platzhalter den Browser selbst neu fliessen, statt
-   mit einem festen Versatz zu rechnen. Reihenfolge wird erst beim
-   Loslassen in fb.blocks übernommen und per renderFbBlocksList() (das
-   auch speichert) neu aufgebaut. */
-function wireFbBlocksDragReorder(holder) {
-  const list = holder.querySelector('.timeline');
-  if (!list) return;
-  list.querySelectorAll('[data-drag]').forEach((handle) => {
-    handle.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      const item = handle.closest('.timeline-item');
-      const startIndex = Number(handle.dataset.drag);
-      const rect = item.getBoundingClientRect();
-      const startY = e.clientY;
-      const startTop = rect.top;
-
-      const placeholder = document.createElement('div');
-      placeholder.className = 'timeline-item timeline-drag-placeholder';
-      placeholder.style.height = rect.height + 'px';
-      list.insertBefore(placeholder, item);
-
-      item.classList.add('dragging');
-      item.style.position = 'fixed';
-      item.style.top = startTop + 'px';
-      item.style.left = rect.left + 'px';
-      item.style.width = rect.width + 'px';
-      document.body.appendChild(item);
-
-      try { handle.setPointerCapture(e.pointerId); } catch (err) { /* z. B. sehr alte Browser — Drag funktioniert trotzdem */ }
-
-      const onMove = (ev) => {
-        const dy = ev.clientY - startY;
-        item.style.top = (startTop + dy) + 'px';
-        const centerY = startTop + dy + rect.height / 2;
-        let moved = true;
-        while (moved) {
-          moved = false;
-          const siblings = Array.from(list.children);
-          const phIndex = siblings.indexOf(placeholder);
-          const prev = siblings[phIndex - 1];
-          if (prev) {
-            const pr = prev.getBoundingClientRect();
-            if (centerY < pr.top + pr.height / 2) { list.insertBefore(placeholder, prev); moved = true; continue; }
-          }
-          const next = siblings[phIndex + 1];
-          if (next) {
-            const nr = next.getBoundingClientRect();
-            if (centerY > nr.top + nr.height / 2) { list.insertBefore(placeholder, next.nextSibling); moved = true; }
-          }
-        }
-      };
-      const onUp = () => {
-        handle.removeEventListener('pointermove', onMove);
-        handle.removeEventListener('pointerup', onUp);
-        handle.removeEventListener('pointercancel', onUp);
-        const finalIndex = Array.from(list.children).indexOf(placeholder);
-        placeholder.remove();
-        item.remove();
-        if (finalIndex !== -1 && finalIndex !== startIndex) {
-          const [moved] = fb.blocks.splice(startIndex, 1);
-          fb.blocks.splice(finalIndex, 0, moved);
-        }
-        renderFbBlocksList();
-      };
-      handle.addEventListener('pointermove', onMove);
-      handle.addEventListener('pointerup', onUp);
-      handle.addEventListener('pointercancel', onUp);
-    });
-  });
 }
 
 /* Nur noch der Idle-Zustand ("Ablauf starten") — sobald ein Ablauf läuft,
@@ -5681,7 +5617,7 @@ function renderFbOverlay() {
     if (finishEarlyBtn2) finishEarlyBtn2.onclick = finishAblaufEarly;
     document.getElementById('fb-cancel').onclick = cancelAblauf;
     const repsDoneBtn = document.getElementById('fb-reps-done');
-    if (repsDoneBtn) repsDoneBtn.onclick = fbSkipForward;
+    if (repsDoneBtn) repsDoneBtn.onclick = fbFinishRepsWork;
     // Nur verdrahten, wenn das Check-in-Markup gerade tatsächlich im DOM
     // steht (exakt dieselbe Bedingung wie beim Einbetten oben) — sonst
     // existiert z. B. nach "Zurück" zu einem bereits abgeschlossenen Block
@@ -5879,6 +5815,11 @@ function startCurrentBlock() {
 /* Startet fb.blockIndex: bei Hang- UND Campus-Sätzen erst ein Countdown
    zum Hinlaufen/Hände-ans-Board-Bekommen, danach automatisch der Timer;
    bei Fixübungen direkt der Timer (kein Board, zu dem man erst hinmuss).
+   Der Countdown ist aber NUR vorm allerersten Satz des ganzen Ablaufs
+   nötig — bei jedem weiteren Hang-/Campus-/Lifting-Pin-Satz gab es davor
+   schon die abschliessende Pause des vorherigen Satzes, die genau diese
+   Vorbereitungszeit bereits mitbringt; ein zweiter, separater 15s-
+   Countdown wäre nur Leerlauf oben drauf.
    Wird sowohl beim allerersten Satz als auch bei jedem automatischen
    Weiterschalten sowie bei Zurück/Weiter aufgerufen — ein einziger
    Einstiegspunkt statt Sonderfällen pro Aufrufer. */
@@ -5887,7 +5828,8 @@ function beginBlock() {
   const block = fb.blocks[fb.blockIndex];
   if (!block) { finishAblauf(); return; }
   requestWakeLock();
-  if (block.type === 'hang' || block.type === 'campus' || block.type === 'block') {
+  const needsPrecount = fb.blockIndex === 0 && (block.type === 'hang' || block.type === 'campus' || block.type === 'block');
+  if (needsPrecount) {
     fb.preCount = FB_PRECOUNT_SECONDS;
     renderFbOverlay();
     fb.intervalId = setInterval(tickPreCountdown, 1000);
@@ -5916,7 +5858,7 @@ function tickPreCountdown() {
 function startSequence() {
   const block = fb.blocks[fb.blockIndex];
   fb.running = true;
-  fb.sequence = buildBlockSequence(block);
+  fb.sequence = buildBlockSequence(block, fb.blockIndex === fb.blocks.length - 1);
   fb.stepIndex = 0;
   fb.secondsLeft = fb.sequence[0].seconds;
   fb.intervalId = setInterval(tickBlock, 1000);
@@ -5925,38 +5867,61 @@ function startSequence() {
   updateTimerUI();
 }
 
+/* Schritt-Ende (Timer abgelaufen ODER manuell per "Wiederholungen
+   geschafft" vorzeitig beendet, siehe fbFinishRepsWork) — an einer Stelle,
+   damit beide Wege exakt gleich behandelt werden: nächste Phase im selben
+   Satz (z. B. Work -> Pause) ODER, falls die Sequenz zu Ende ist, der
+   nächste Satz. Gibt true zurück, wenn advanceBlock() übernommen hat (der
+   Aufrufer soll dann nicht mehr selbst weiterrendern, da beginBlock()/
+   finishAblauf() das schon erledigt haben). */
+function advanceToNextStep() {
+  fb.stepIndex++;
+  if (fb.stepIndex >= fb.sequence.length) {
+    clearInterval(fb.intervalId);
+    fb.intervalId = null;
+    beep(1318, 300);
+    advanceBlock();
+    return true;
+  }
+  fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
+  const newStep = fb.sequence[fb.stepIndex];
+  if (isWorkPhase(newStep)) beepStart(); else beepEnd();
+  // Letzte Pause des Blocks (danach kommt der nächste Satz) — genau hier
+  // ist Zeit fürs Check-in, ohne den Ablauf zu unterbrechen: es läuft
+  // nebenher während der ohnehin schon geplanten Erholung.
+  if (!isWorkPhase(newStep) && fb.stepIndex === fb.sequence.length - 1) openBlockCheckin();
+  return false;
+}
+
 function tickBlock() {
   if (fbCheckinTyping) return; // Zeit angehalten, solange man im Check-in tippt
   fb.secondsLeft--;
   const step = fb.sequence[fb.stepIndex];
   if (fb.secondsLeft <= 0) {
-    fb.stepIndex++;
-    if (fb.stepIndex >= fb.sequence.length) {
-      clearInterval(fb.intervalId);
-      fb.intervalId = null;
-      beep(1318, 300);
-      advanceBlock();
-      return;
-    }
-    fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
-    const newStep = fb.sequence[fb.stepIndex];
-    if (isWorkPhase(newStep)) beepStart(); else beepEnd();
-    // Letzte Pause des Blocks (danach kommt der nächste Satz) — genau hier
-    // ist Zeit fürs Check-in, ohne den Ablauf zu unterbrechen: es läuft
-    // nebenher während der ohnehin schon geplanten Erholung.
-    if (!isWorkPhase(newStep) && fb.stepIndex === fb.sequence.length - 1) openBlockCheckin();
+    if (advanceToNextStep()) return;
     // Ring der EBEN beendeten Phase soll sich noch sichtbar ganz schliessen,
     // statt (wie bisher) direkt auf den offenen Ring der neuen Phase zu
     // springen — Zustand (Sekunden, Schritt, Signalton, Check-in) bleibt
     // bewusst synchron/sofort wie eh und je, u. a. weil Tests und Zurück/
     // Weiter/Pause auf sofortige, deterministische Übergänge angewiesen
-    // sind. Nur der abschliessende Render-Aufruf bekommt zwei Animations-
-    // frames Vorlauf, in denen der Browser den geschlossenen Ring wirklich
-    // zeichnen kann, bevor er auf den offenen Ring der neuen Phase springt.
+    // sind. Die CSS-Transition (.95s) auf stroke-dashoffset verhindert
+    // sonst genau das: sie interpoliert erst RICHTUNG 0, kommt in den paar
+    // Millisekunden bis zum nächsten Render aber nie dort an, bevor der
+    // neue Zielwert der nächsten Phase sie schon wieder umlenkt — der Ring
+    // wirkte dadurch, als würde er sich nie ganz füllen. Transition daher
+    // kurz abschalten (harter Sprung auf "ganz geschlossen"), Reflow
+    // erzwingen, damit der Sprung wirklich gemalt wird, dann Transition
+    // erst im nächsten Frame wieder anschalten, bevor die neue Phase ihren
+    // eigenen Zielwert bekommt (der dann wieder sauber animiert).
     const ring = document.getElementById('fb-ring-fg');
     if (ring) {
+      ring.style.transition = 'none';
       ring.style.strokeDashoffset = '0';
-      requestAnimationFrame(() => requestAnimationFrame(updateTimerUI));
+      ring.getBoundingClientRect(); // Reflow erzwingen, damit der Sprung vor dem nächsten Schritt gemalt wird
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        ring.style.transition = '';
+        updateTimerUI();
+      }));
       return;
     }
   } else if (step && !isWorkPhase(step) && fb.secondsLeft <= 3) {
@@ -5964,6 +5929,20 @@ function tickBlock() {
     // akustische Vorwarnung, dass der nächste Satz gleich losgeht.
     beepTick();
   }
+  updateTimerUI();
+}
+
+/* "Wiederholungen geschafft — weiter" bei Fixübungen/Lifting-Pin-Reps:
+   beendet nur die gerade laufende ARBEITS-Phase vorzeitig (wie ein
+   abgelaufener Timer) und geht in die danach ohnehin vorgesehene Pause —
+   NICHT den ganzen Satz überspringen wie der "Satz überspringen"-Transport-
+   Button (fbSkipForward). Bisher riefen beide Buttons dieselbe Funktion
+   auf, wodurch "Wiederholungen geschafft" fälschlich direkt zum nächsten
+   Satz sprang und die Pause verschluckte. Der laufende Interval-Timer
+   bleibt unverändert (tickt weiter für die neue Pause-Phase), nur Sekunden/
+   Schritt werden vorgezogen. */
+function fbFinishRepsWork() {
+  if (advanceToNextStep()) return;
   updateTimerUI();
 }
 
@@ -6089,9 +6068,14 @@ async function finishAblauf(blocksOverride, resultsOverride, isPartial) {
   releaseWakeLock();
   beep(1568, 400);
 
-  const board = fb.board;
   const blocks = blocksOverride || fb.blocks;
   const results = resultsOverride || fb.runResults.slice();
+  // Board des tatsächlich durchgeführten Ablaufs, NICHT das gerade aktuell
+  // ausgewählte fb.board — beim Teilen als Challenge/in der Verlauf-Historie
+  // zeigte sonst z. B. "Beastmaker 2000" an, obwohl der Ablauf mit Sätzen
+  // auf dem BM1000 durchgeführt wurde, nur weil das eigene Board inzwischen
+  // (oder nie) auf BM1000 gestellt war.
+  const board = (blocks.find((b) => b.type === 'hang') || {}).board || fb.board;
   const estimateSeconds = blocks.reduce((total, b) => total + fbBlockSeconds(b), 0);
 
   const el = ensureFbOverlay();
