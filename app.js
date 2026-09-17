@@ -2786,7 +2786,6 @@ const fb = {
   weight: '',
   blockIndex: 0,
   running: false,
-  awaitingNext: false,   // Satz fertig, wartet auf "Los" für den nächsten
   preCount: null,        // 5..1 während des Vorbereitungs-Countdowns vor einem Hang-Satz, sonst null
   sequence: [],          // flache Phasenliste NUR für den gerade laufenden Hang-Satz
   stepIndex: 0,
@@ -7302,12 +7301,12 @@ function renderFbBlocksList() {
   renderFbRuntime(); // Start-Button-Status hängt von fb.blocks.length ab
 }
 
-/* Nur noch der Idle-Zustand ("Ablauf starten") — sobald ein Ablauf läuft,
+/* Nur noch der Idle-Zustand ("Jetzt starten!") — sobald ein Ablauf läuft,
    übernimmt das Vollbild (fb-overlay, siehe unten) komplett. */
 function renderFbRuntime() {
   const holder = document.getElementById('fb-runtime');
   if (!holder) return;
-  holder.innerHTML = `<button class="btn" id="fb-start-ablauf" ${fb.blocks.length ? '' : 'disabled'}>ABLAUF STARTEN</button>`;
+  holder.innerHTML = `<button class="btn" id="fb-start-ablauf" ${fb.blocks.length ? '' : 'disabled'}>JETZT STARTEN!</button>`;
   const btn = document.getElementById('fb-start-ablauf');
   if (btn) btn.onclick = startAblauf;
 }
@@ -7545,25 +7544,10 @@ function fbTogglePause() {
 
 function renderFbOverlay() {
   const el = ensureFbOverlay();
-  if (!fb.running && !fb.awaitingNext && fb.preCount == null) { closeFbOverlay(); return; }
+  if (!fb.running && fb.preCount == null) { closeFbOverlay(); return; }
 
   let stage = '';
-  if (fb.awaitingNext) {
-    const next = fb.blocks[fb.blockIndex];
-    if (!next) { closeFbOverlay(); return; }
-    const isHang = isHangLikeBlock(next);
-    const isCampus = next.type === 'campus';
-    const isPause = next.type === 'pause';
-    const nextArmNote = isHang ? holdBlockArmNote(next) : '';
-    stage = `
-      <div class="fb-stage-label mono">NÄCHSTER SATZ (${fb.blockIndex + 1}/${fb.blocks.length})</div>
-      <div class="fb-stage-figure">${isPause ? FB_REST_FIGURE_SVG : isHang ? holdBlockThumb(next) : isCampus ? campusWorkFigureSvg(next) : exerciseFigureSvg(next.exerciseId)}</div>
-      <div class="fb-stage-title">${isPause ? 'Pause' : isHang ? holdBlockTitle(next) : isCampus ? campusLabel(next) : esc(exerciseName(next.exerciseId))}</div>
-      <div class="fb-stage-sub mono">${esc(fbBlockSub(next))}${nextArmNote ? ' · ' + nextArmNote : ''}</div>
-      ${fbTransportRow()}
-      <button class="btn fb-stage-btn" id="fb-continue">LOS</button>
-    `;
-  } else if (fb.preCount != null) {
+  if (fb.preCount != null) {
     const block = fb.blocks[fb.blockIndex];
     const isHang = isHangLikeBlock(block);
     const armNote = isHang ? holdBlockArmNote(block) : '';
@@ -7713,9 +7697,7 @@ function renderFbOverlay() {
   if (skipBtn) skipBtn.onclick = fbStepForward;
   const ppBtn = document.getElementById('fb-playpause');
   if (ppBtn && !ppBtn.disabled) ppBtn.onclick = fbTogglePause;
-  if (fb.awaitingNext) {
-    document.getElementById('fb-continue').onclick = startCurrentBlock;
-  } else if (fb.preCount != null) {
+  if (fb.preCount != null) {
     document.getElementById('fb-precount-skip').onclick = finishPreCountdown;
     const finishEarlyBtn1 = document.getElementById('fb-finish-early');
     if (finishEarlyBtn1) finishEarlyBtn1.onclick = finishAblaufEarly;
@@ -7807,10 +7789,11 @@ function releaseWakeLock() {
 function startAblauf() {
   fb.blockIndex = 0;
   fb.running = false;
-  fb.awaitingNext = true;
   fb.preCount = null;
   fb.runResults = [];
   fbCheckinTyping = false;
+  requestWakeLock();
+  beginBlock();
   openFbOverlay();
 }
 
@@ -7905,18 +7888,6 @@ function openBlockCheckin() {
   holder.hidden = false;
   holder.innerHTML = checkinPanelHtml(fb.blockIndex);
   wireCheckinPanel(fb.blockIndex);
-}
-
-/* Tap auf "LOS" (nur ganz am Anfang nötig): der Ablauf läuft danach von
-   selbst durch alle Sätze — Hang-Sätze, Übungs-Sätze, die Pause dazwischen,
-   der nächste Satz — ohne dass man nochmal etwas antippen muss. Der
-   Bildschirm bleibt dabei durchgehend an (ein einziges Wake-Lock von hier
-   bis zum Ende/Abbruch, nicht pro Satz neu). Play/Pause bleibt jederzeit
-   möglich, ist aber optional. */
-function startCurrentBlock() {
-  fb.awaitingNext = false;
-  requestWakeLock();
-  beginBlock();
 }
 
 /* Startet fb.blockIndex: bei Hang- UND Campus-Sätzen erst ein Countdown
@@ -8168,7 +8139,6 @@ function cancelAblauf() {
   fb.intervalId = null;
   releaseWakeLock();
   fb.running = false;
-  fb.awaitingNext = false;
   fb.preCount = null;
   fb.blockIndex = 0;
   fbCheckinTyping = false;
@@ -8225,7 +8195,6 @@ function fbResultsSummaryHtml(blocks, results) {
    abgeschlossenen Blöcke, nicht der volle geplante Ablauf. */
 async function finishAblauf(blocksOverride, resultsOverride, isPartial) {
   fb.running = false;
-  fb.awaitingNext = false;
   fb.blockIndex = 0;
   releaseWakeLock();
   beep(1568, 400);
