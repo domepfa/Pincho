@@ -7041,10 +7041,15 @@ function campusArmLabelHtml(b) {
 }
 
 /* Wegpunkte einer Muster-Bewegung: Start, Ende, und jede Stelle, an der
-   sich die Richtung ändert ODER ein einzelner Schritt mehr als eine
-   Sprosse überspringt — genau dort ist die konkrete Sprossen-Nummer
-   wichtig. Eine reine "+1"-Kette ohne Richtungswechsel braucht dazwischen
-   keine eigene Markierung (die Gerade sagt "jede Sprosse" von selbst). */
+   sich die Schrittweite ändert (Richtungswechsel eingeschlossen — der
+   ändert die Schrittweite ja immer mit) — genau dort ist die konkrete
+   Sprossen-Nummer wichtig. Eine Kette gleich grosser Schritte in
+   gleicher Richtung braucht dazwischen keine eigene Markierung (die
+   Gerade sagt "jede Sprosse" bzw. "jede N-te Sprosse" von selbst).
+   WICHTIG: es zählt der Vergleich stepIn vs. stepOut, nicht nur die
+   Grösse von stepIn allein — sonst fällt z. B. bei Start 2 mit Muster
+   +1/+2/+1 die Sprosse 3 (stepIn=1, aber stepOut=2, also sehr wohl ein
+   Wechsel) fälschlich unter den Tisch. */
 function campusPatternWaypoints(b) {
   const positions = [b.startRung];
   b.pattern.forEach((step) => positions.push(positions[positions.length - 1] + step));
@@ -7052,7 +7057,7 @@ function campusPatternWaypoints(b) {
   for (let i = 1; i < positions.length - 1; i++) {
     const stepIn = positions[i] - positions[i - 1];
     const stepOut = positions[i + 1] - positions[i];
-    if (Math.sign(stepIn) !== Math.sign(stepOut) || Math.abs(stepIn) > 1) waypoints.push({ rung: positions[i] });
+    if (stepIn !== stepOut) waypoints.push({ rung: positions[i] });
   }
   waypoints.push({ rung: positions[positions.length - 1] });
   return { positions, waypoints };
