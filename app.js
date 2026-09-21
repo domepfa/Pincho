@@ -2667,6 +2667,7 @@ function renderLogExerciseRows() {
    ================================================================= */
 let fbQuickstartOpen = false; // Schnelltraining-Karten sind standardmässig eingeklappt
 let fbCheckinTyping = false; // während der Wdh./Gewicht-Eingabe im Check-in steht der Countdown still
+let fbCheckinPausedAt = null; // Date.now() seit wann (siehe fbCheckinTyping) — verschiebt fb.stepStartedAt beim Verlassen des Felds um die getippte Dauer (Ring-Sync)
 let fbImportOpen = false; // JSON-Import-Panel ist standardmässig eingeklappt
 
 /* Ablauf aus JSON importieren — z. B. von einer anderen KI generiert (siehe
@@ -2832,6 +2833,8 @@ const fb = {
   sequence: [],          // flache Phasenliste NUR für den gerade laufenden Hang-Satz
   stepIndex: 0,
   secondsLeft: 0,
+  stepStartedAt: 0,      // Date.now() bei Start des aktuellen Schritts — Basis für den Ring (siehe syncFbRingAnimation)
+  pausedAt: null,        // Date.now() seit wann pausiert (fbTogglePause), sonst null — verschiebt stepStartedAt beim Fortsetzen um die Pausendauer
   intervalId: null,
   wakeLock: null,
   runResults: [],        // pro Blockindex: {type:'hang', doneReps:[bool,...]} | {type:'exercise', reps, weight} — was beim Durchlauf tatsächlich geschafft wurde
@@ -7588,7 +7591,13 @@ function fbTogglePause() {
   if (fb.intervalId) {
     clearInterval(fb.intervalId);
     fb.intervalId = null;
+    fb.pausedAt = Date.now();
   } else {
+    // stepStartedAt um die Pausendauer nach vorne schieben — der Ring
+    // orientiert sich an der seit Schrittbeginn VERSTRICHENEN Zeit (siehe
+    // syncFbRingAnimation), ohne das würde die Pause fälschlich mitzählen
+    // und der Ring springt beim Fortsetzen ein Stück nach vorne.
+    if (fb.pausedAt) { fb.stepStartedAt += Date.now() - fb.pausedAt; fb.pausedAt = null; }
     fb.intervalId = setInterval(tickBlock, 1000);
   }
   renderFbOverlay();
@@ -7787,6 +7796,7 @@ function renderFbOverlay() {
     updateFbUpcomingUI();
   }
   updateFbProgressUI();
+  syncFbRingAnimation(); // Ring-Element ist hier ggf. frisch neu gebaut worden — Animation entsprechend (neu) ansetzen
 }
 
 /* Kleiner Konfetti-Regen für den "Ablauf geschafft"-Screen — reines CSS/
@@ -7963,8 +7973,16 @@ function wireCheckinPanel(index) {
     // Zeit anhalten, solange getippt wird — sonst reisst der Countdown
     // mitten in der Eingabe ab, bevor man fertig ist.
     [repsEl, weightEl].forEach((el) => {
-      el.onfocus = () => { fbCheckinTyping = true; el.select(); }; // Vorbelegung markiert, direkt überschreibbar
-      el.onblur = () => { fbCheckinTyping = false; };
+      el.onfocus = () => { fbCheckinTyping = true; fbCheckinPausedAt = Date.now(); el.select(); }; // Vorbelegung markiert, direkt überschreibbar
+      el.onblur = () => {
+        fbCheckinTyping = false;
+        // Getippte Dauer war für den Countdown angehalten (s.o.) — muss
+        // deshalb auch beim Ring nachgeholt werden, sonst zählt die Zeit
+        // im Feld fälschlich als "verstrichen" (siehe syncFbRingAnimation)
+        // und der Ring springt beim Verlassen des Felds nach vorne.
+        if (fbCheckinPausedAt) { fb.stepStartedAt += Date.now() - fbCheckinPausedAt; fbCheckinPausedAt = null; }
+        syncFbRingAnimation();
+      };
       // Enter/"Fertig" auf der virtuellen Tastatur soll das Feld verlassen
       // statt es fokussiert zu lassen — sonst bleibt fbCheckinTyping hängen
       // und der Countdown steht, bis man manuell woanders hintippt. Manche
@@ -8052,6 +8070,8 @@ function startSequence() {
   fb.sequence = buildBlockSequence(block, fb.blockIndex === fb.blocks.length - 1);
   fb.stepIndex = 0;
   fb.secondsLeft = fb.sequence[0].seconds;
+  fb.stepStartedAt = Date.now();
+  fb.pausedAt = null;
   fb.intervalId = setInterval(tickBlock, 1000);
   beepStart();
   renderFbOverlay();
@@ -8075,6 +8095,7 @@ function advanceToNextStep() {
     return true;
   }
   fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
+  fb.stepStartedAt = Date.now();
   const newStep = fb.sequence[fb.stepIndex];
   if (isWorkPhase(newStep)) beepStart(); else beepEnd();
   // Letzte Pause des Blocks (danach kommt der nächste Satz) — genau hier
@@ -8084,30 +8105,37 @@ function advanceToNextStep() {
   return false;
 }
 
-/* Blendet den Fortschritts-Ring hart auf "ganz geschlossen" (Offset 0),
-   bevor der nächste Schritt ihn neu zeichnet — statt (wie bisher) direkt
-   auf den offenen Ring der neuen Phase zu springen. Die CSS-Transition
-   (.95s) auf stroke-dashoffset verhindert das sonst: sie interpoliert erst
-   RICHTUNG 0, kommt in den paar Millisekunden bis zum nächsten Render aber
-   nie dort an, bevor der neue Zielwert der nächsten Phase sie schon wieder
-   umlenkt — der Ring wirkte dadurch, als würde er sich nie ganz füllen.
-   Transition daher kurz abschalten (harter Sprung auf "ganz geschlossen"),
-   Reflow erzwingen, damit der Sprung sicher gemalt wird, den geschlossenen
-   Ring dann kurz sichtbar HALTEN (nicht nur einen Frame lang — sonst geht
-   der Sprung im gleichzeitigen Wechsel von Zahl/Titel optisch unter) und
-   erst danach Transition wieder anschalten, bevor callback() den neuen
-   Zielwert der nächsten Phase setzt (der dann wieder sauber animiert). */
-const FB_RING_CLOSE_HOLD_MS = 150;
-function snapFbRingClosed(callback) {
+/* Treibt #fb-ring-fg über eine ECHTE CSS-Animation an (statt den Offset
+   einmal pro Sekunde per JS zu setzen und drüber zu transitionieren) — der
+   Ring läuft dadurch exakt in Echtzeit mit (animation-delay ist die seit
+   Schrittbeginn verstrichene Zeit, negativ, damit die Animation an genau
+   der richtigen Stelle "einsteigt"), unabhängig vom 1x/Sekunde-Tick-Timing
+   und ohne dass am Phasenende manuell auf "geschlossen" gesprungen werden
+   müsste — die Animation erreicht stroke-dashoffset:0 von selbst exakt im
+   richtigen Moment. Bei "prefers-reduced-motion" (siehe auch styles.css)
+   stattdessen wie bisher ein statischer, aus fb.secondsLeft berechneter
+   Wert ohne Animation. Muss bei jedem echten Schrittwechsel neu aufgerufen
+   werden (frisches DOM-Element durch renderFbOverlay ODER derselbe Ring-
+   Knoten bei einem gezielten Update in tickBlock) — NICHT bei jedem
+   laufenden Tick innerhalb derselben Phase, sonst würde die Animation
+   ständig neu gestartet statt einfach weiterzulaufen. */
+function syncFbRingAnimation() {
   const ring = document.getElementById('fb-ring-fg');
-  if (!ring) { callback(); return; }
-  ring.style.transition = 'none';
-  ring.style.strokeDashoffset = '0';
-  ring.getBoundingClientRect(); // Reflow erzwingen, damit der Sprung sicher gemalt wird
-  setTimeout(() => {
-    ring.style.transition = '';
-    callback();
-  }, FB_RING_CLOSE_HOLD_MS);
+  if (!ring) return;
+  const step = fb.sequence[fb.stepIndex];
+  const phaseTotal = step ? step.seconds : 1;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reducedMotion || !phaseTotal) {
+    ring.style.animation = 'none';
+    ring.style.strokeDashoffset = (FB_RING_CIRCUMFERENCE * (phaseTotal ? fb.secondsLeft / phaseTotal : 0)).toFixed(1);
+    return;
+  }
+  const elapsedSec = Math.max(0, (Date.now() - fb.stepStartedAt) / 1000);
+  ring.style.animation = 'none';
+  ring.getBoundingClientRect(); // Reflow erzwingen, damit der Neustart unten wirklich greift
+  ring.style.animation = `fbRingFill ${phaseTotal}s linear forwards`;
+  ring.style.animationDelay = `-${elapsedSec}s`;
+  ring.style.animationPlayState = (fb.intervalId && !fbCheckinTyping) ? 'running' : 'paused';
 }
 
 function tickBlock() {
@@ -8115,36 +8143,22 @@ function tickBlock() {
   fb.secondsLeft--;
   const step = fb.sequence[fb.stepIndex];
   if (fb.secondsLeft <= 0) {
-    // Zustand (Sekunden, Schritt, Signalton, Check-in) bleibt bewusst
-    // synchron/sofort wie eh und je, u. a. weil Tests und Zurück/Weiter/
-    // Pause auf sofortige, deterministische Übergänge angewiesen sind —
-    // nur der Ring-Sprung unten ist (kurz) visuell verzögert.
-    if (fb.stepIndex >= fb.sequence.length - 1) {
-      // Letzter Schritt DIESES Blocks: advanceToNextStep() würde sofort
-      // advanceBlock() auslösen (nächster Block ODER Ablauf fertig), das
-      // rendert das Overlay direkt neu — der Ring der eben beendeten Phase
-      // müsste sich sonst OHNE je geschlossen auszusehen einfach in Luft
-      // auflösen. Deshalb hier zuerst sichtbar schliessen, DANACH erst den
-      // Blockwechsel auslösen (der sich um sein eigenes Rendering kümmert).
-      snapFbRingClosed(() => { advanceToNextStep(); });
-      return;
-    }
-    if (advanceToNextStep()) return; // Sicherheitsnetz — sollte wegen der Prüfung oben hier nicht mehr eintreten
+    if (advanceToNextStep()) return; // advanceBlock() hat schon (inkl. Ring) neu gerendert
     if (fbIsTrailingPause()) {
       // Übergang in die ABSCHLIESSENDE Pause: Titel/Bild wechseln jetzt auf
       // den NÄCHSTEN Block (siehe renderFbOverlay/fbStageDisplayInfo), der
       // ein komplett anderer Satz-Typ sein kann (anderes Layout: Board-
       // Thumb vs. kombinierte Figur) — ein gezieltes Update reicht dafür
       // nicht, hier lohnt sich ein voller Re-Render (passiert nur einmal
-      // pro Block, kein Performance-Problem). Ring der eben beendeten
-      // Phase soll sich davor noch sichtbar ganz schliessen (siehe
-      // snapFbRingClosed) — sonst verschwindet er auf dem Stand der
-      // letzten Sekunde, ohne je geschlossen auszusehen.
-      snapFbRingClosed(renderFbOverlay);
+      // pro Block, kein Performance-Problem); baut den Ring frisch, dessen
+      // Animation läuft über syncFbRingAnimation() am Ende von
+      // renderFbOverlay() mit an.
+      renderFbOverlay();
       return;
     }
-    snapFbRingClosed(updateTimerUI);
-    return;
+    // Gleicher Ring-Knoten bleibt bestehen (kein voller Re-Render nötig) —
+    // Animation für die neue Phase explizit neu ansetzen.
+    syncFbRingAnimation();
   } else if (step && !isWorkPhase(step) && fb.secondsLeft <= 3) {
     // Letzte 3 Sekunden einer Pause: kurzer Tick pro Sekunde als
     // akustische Vorwarnung, dass der nächste Satz gleich losgeht.
@@ -8223,9 +8237,14 @@ function updateTimerUI() {
     phase.textContent = phaseText;
   }
   if (ring) {
-    const phaseTotal = step ? step.seconds : 1;
-    const frac = phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 0;
-    ring.style.strokeDashoffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
+    // Der Füllstand selbst läuft über die CSS-Animation aus
+    // syncFbRingAnimation() (echtzeit-synchron, hier nichts zu tun) — nur
+    // bei prefers-reduced-motion gibt's keine Animation, dort hier bei
+    // jedem Tick den statischen Wert nachziehen.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const phaseTotal = step ? step.seconds : 1;
+      ring.style.strokeDashoffset = (FB_RING_CIRCUMFERENCE * (phaseTotal ? fb.secondsLeft / phaseTotal : 0)).toFixed(1);
+    }
     ring.classList.toggle('rest', !working);
     ring.classList.toggle('rest-warn', restWarn);
   }

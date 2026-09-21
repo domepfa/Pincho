@@ -593,6 +593,11 @@ button, input, select, textarea { font-family: inherit; }
 .ring-fg.rest-warn { stroke: var(--accent2); animation: ringWarnPulse .6s ease-in-out infinite; }
 @keyframes bigWarnPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
 @keyframes ringWarnPulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+/* Treibt #fb-ring-fg an (siehe syncFbRingAnimation in app.js): eine
+   lineare Animation über die exakte Phasendauer statt Offset per JS einmal
+   pro Sekunde zu setzen — läuft dadurch exakt in Echtzeit mit, unabhängig
+   von Tick-Timing/Frame-Drops. */
+@keyframes fbRingFill { from { stroke-dashoffset: 326.7; } to { stroke-dashoffset: 0; } }
 
 /* Vorbereitungs-Countdown (5..1) vor einem Hang-Satz: grosse Zahl, die bei
    jedem Tick neu einschwingt (neues DOM-Element pro Sekunde durch den
@@ -769,6 +774,7 @@ button, input, select, textarea { font-family: inherit; }
   .fb-hang-figure, .fb-arm-shake { animation: none; }
   .ring-fg { transition: none; }
   .ring-fg.rest-warn, .fb-timer-ring .big.rest-warn { animation: none; }
+  #fb-ring-fg { animation: none !important; }
   .fb-precount, .fb-precount-tense { animation: none; }
   .anim-in, .fb-done-emoji, .fb-overlay-done .fb-stage-title,
   .fb-overlay-done .fb-stage-sub, .fb-overlay-done .fb-stage-btn { animation: none; opacity: 1; transform: none; }
