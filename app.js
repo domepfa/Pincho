@@ -8092,19 +8092,22 @@ function advanceToNextStep() {
    nie dort an, bevor der neue Zielwert der nächsten Phase sie schon wieder
    umlenkt — der Ring wirkte dadurch, als würde er sich nie ganz füllen.
    Transition daher kurz abschalten (harter Sprung auf "ganz geschlossen"),
-   Reflow erzwingen, damit der Sprung wirklich gemalt wird, dann Transition
-   erst im nächsten Frame wieder anschalten, bevor callback() den neuen
+   Reflow erzwingen, damit der Sprung sicher gemalt wird, den geschlossenen
+   Ring dann kurz sichtbar HALTEN (nicht nur einen Frame lang — sonst geht
+   der Sprung im gleichzeitigen Wechsel von Zahl/Titel optisch unter) und
+   erst danach Transition wieder anschalten, bevor callback() den neuen
    Zielwert der nächsten Phase setzt (der dann wieder sauber animiert). */
+const FB_RING_CLOSE_HOLD_MS = 150;
 function snapFbRingClosed(callback) {
   const ring = document.getElementById('fb-ring-fg');
   if (!ring) { callback(); return; }
   ring.style.transition = 'none';
   ring.style.strokeDashoffset = '0';
-  ring.getBoundingClientRect(); // Reflow erzwingen, damit der Sprung vor dem nächsten Schritt gemalt wird
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  ring.getBoundingClientRect(); // Reflow erzwingen, damit der Sprung sicher gemalt wird
+  setTimeout(() => {
     ring.style.transition = '';
     callback();
-  }));
+  }, FB_RING_CLOSE_HOLD_MS);
 }
 
 function tickBlock() {
@@ -8116,7 +8119,17 @@ function tickBlock() {
     // synchron/sofort wie eh und je, u. a. weil Tests und Zurück/Weiter/
     // Pause auf sofortige, deterministische Übergänge angewiesen sind —
     // nur der Ring-Sprung unten ist (kurz) visuell verzögert.
-    if (advanceToNextStep()) return;
+    if (fb.stepIndex >= fb.sequence.length - 1) {
+      // Letzter Schritt DIESES Blocks: advanceToNextStep() würde sofort
+      // advanceBlock() auslösen (nächster Block ODER Ablauf fertig), das
+      // rendert das Overlay direkt neu — der Ring der eben beendeten Phase
+      // müsste sich sonst OHNE je geschlossen auszusehen einfach in Luft
+      // auflösen. Deshalb hier zuerst sichtbar schliessen, DANACH erst den
+      // Blockwechsel auslösen (der sich um sein eigenes Rendering kümmert).
+      snapFbRingClosed(() => { advanceToNextStep(); });
+      return;
+    }
+    if (advanceToNextStep()) return; // Sicherheitsnetz — sollte wegen der Prüfung oben hier nicht mehr eintreten
     if (fbIsTrailingPause()) {
       // Übergang in die ABSCHLIESSENDE Pause: Titel/Bild wechseln jetzt auf
       // den NÄCHSTEN Block (siehe renderFbOverlay/fbStageDisplayInfo), der
