@@ -7964,6 +7964,10 @@ function wireCheckinPanel(index) {
     [repsEl, weightEl].forEach((el) => {
       el.onfocus = () => { fbCheckinTyping = true; };
       el.onblur = () => { fbCheckinTyping = false; };
+      // Enter/"Fertig" auf der virtuellen Tastatur soll das Feld verlassen
+      // statt es fokussiert zu lassen — sonst bleibt fbCheckinTyping hängen
+      // und der Countdown steht, bis man manuell woanders hintippt.
+      el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } };
     });
   }
 }
@@ -8074,11 +8078,38 @@ function advanceToNextStep() {
   return false;
 }
 
+/* Blendet den Fortschritts-Ring hart auf "ganz geschlossen" (Offset 0),
+   bevor der nächste Schritt ihn neu zeichnet — statt (wie bisher) direkt
+   auf den offenen Ring der neuen Phase zu springen. Die CSS-Transition
+   (.95s) auf stroke-dashoffset verhindert das sonst: sie interpoliert erst
+   RICHTUNG 0, kommt in den paar Millisekunden bis zum nächsten Render aber
+   nie dort an, bevor der neue Zielwert der nächsten Phase sie schon wieder
+   umlenkt — der Ring wirkte dadurch, als würde er sich nie ganz füllen.
+   Transition daher kurz abschalten (harter Sprung auf "ganz geschlossen"),
+   Reflow erzwingen, damit der Sprung wirklich gemalt wird, dann Transition
+   erst im nächsten Frame wieder anschalten, bevor callback() den neuen
+   Zielwert der nächsten Phase setzt (der dann wieder sauber animiert). */
+function snapFbRingClosed(callback) {
+  const ring = document.getElementById('fb-ring-fg');
+  if (!ring) { callback(); return; }
+  ring.style.transition = 'none';
+  ring.style.strokeDashoffset = '0';
+  ring.getBoundingClientRect(); // Reflow erzwingen, damit der Sprung vor dem nächsten Schritt gemalt wird
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    ring.style.transition = '';
+    callback();
+  }));
+}
+
 function tickBlock() {
   if (fbCheckinTyping) return; // Zeit angehalten, solange man im Check-in tippt
   fb.secondsLeft--;
   const step = fb.sequence[fb.stepIndex];
   if (fb.secondsLeft <= 0) {
+    // Zustand (Sekunden, Schritt, Signalton, Check-in) bleibt bewusst
+    // synchron/sofort wie eh und je, u. a. weil Tests und Zurück/Weiter/
+    // Pause auf sofortige, deterministische Übergänge angewiesen sind —
+    // nur der Ring-Sprung unten ist (kurz) visuell verzögert.
     if (advanceToNextStep()) return;
     if (fbIsTrailingPause()) {
       // Übergang in die ABSCHLIESSENDE Pause: Titel/Bild wechseln jetzt auf
@@ -8086,35 +8117,15 @@ function tickBlock() {
       // ein komplett anderer Satz-Typ sein kann (anderes Layout: Board-
       // Thumb vs. kombinierte Figur) — ein gezieltes Update reicht dafür
       // nicht, hier lohnt sich ein voller Re-Render (passiert nur einmal
-      // pro Block, kein Performance-Problem).
-      renderFbOverlay();
+      // pro Block, kein Performance-Problem). Ring der eben beendeten
+      // Phase soll sich davor noch sichtbar ganz schliessen (siehe
+      // snapFbRingClosed) — sonst verschwindet er auf dem Stand der
+      // letzten Sekunde, ohne je geschlossen auszusehen.
+      snapFbRingClosed(renderFbOverlay);
       return;
     }
-    // Ring der EBEN beendeten Phase soll sich noch sichtbar ganz schliessen,
-    // statt (wie bisher) direkt auf den offenen Ring der neuen Phase zu
-    // springen — Zustand (Sekunden, Schritt, Signalton, Check-in) bleibt
-    // bewusst synchron/sofort wie eh und je, u. a. weil Tests und Zurück/
-    // Weiter/Pause auf sofortige, deterministische Übergänge angewiesen
-    // sind. Die CSS-Transition (.95s) auf stroke-dashoffset verhindert
-    // sonst genau das: sie interpoliert erst RICHTUNG 0, kommt in den paar
-    // Millisekunden bis zum nächsten Render aber nie dort an, bevor der
-    // neue Zielwert der nächsten Phase sie schon wieder umlenkt — der Ring
-    // wirkte dadurch, als würde er sich nie ganz füllen. Transition daher
-    // kurz abschalten (harter Sprung auf "ganz geschlossen"), Reflow
-    // erzwingen, damit der Sprung wirklich gemalt wird, dann Transition
-    // erst im nächsten Frame wieder anschalten, bevor die neue Phase ihren
-    // eigenen Zielwert bekommt (der dann wieder sauber animiert).
-    const ring = document.getElementById('fb-ring-fg');
-    if (ring) {
-      ring.style.transition = 'none';
-      ring.style.strokeDashoffset = '0';
-      ring.getBoundingClientRect(); // Reflow erzwingen, damit der Sprung vor dem nächsten Schritt gemalt wird
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        ring.style.transition = '';
-        updateTimerUI();
-      }));
-      return;
-    }
+    snapFbRingClosed(updateTimerUI);
+    return;
   } else if (step && !isWorkPhase(step) && fb.secondsLeft <= 3) {
     // Letzte 3 Sekunden einer Pause: kurzer Tick pro Sekunde als
     // akustische Vorwarnung, dass der nächste Satz gleich losgeht.
