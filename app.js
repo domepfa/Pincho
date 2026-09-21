@@ -7935,10 +7935,10 @@ function checkinPanelHtml(index) {
   }
   return `
     <div class="fb-checkin-label mono">GESCHAFFT</div>
-    <div class="fb-checkin-row">
-      <input type="text" inputmode="numeric" id="fb-checkin-reps" value="${esc(String(result.reps))}" placeholder="Wdh.">
-      <div class="kg-field"><input type="number" inputmode="decimal" id="fb-checkin-weight" value="${esc(String(result.weight))}" step="0.5" placeholder="0"><span class="mono">kg</span></div>
-    </div>
+    <form id="fb-checkin-form" class="fb-checkin-row">
+      <input type="text" inputmode="numeric" enterkeyhint="done" id="fb-checkin-reps" value="${esc(String(result.reps))}" placeholder="Wdh.">
+      <div class="kg-field"><input type="number" inputmode="decimal" enterkeyhint="done" id="fb-checkin-weight" value="${esc(String(result.weight))}" step="0.5" placeholder="0"><span class="mono">kg</span></div>
+    </form>
   `;
 }
 function wireCheckinPanel(index) {
@@ -7957,18 +7957,24 @@ function wireCheckinPanel(index) {
   } else {
     const repsEl = document.getElementById('fb-checkin-reps');
     const weightEl = document.getElementById('fb-checkin-weight');
+    const formEl = document.getElementById('fb-checkin-form');
     repsEl.oninput = (e) => { result.reps = e.target.value; };
     weightEl.oninput = (e) => { result.weight = e.target.value === '' ? '' : Number(e.target.value); };
     // Zeit anhalten, solange getippt wird — sonst reisst der Countdown
     // mitten in der Eingabe ab, bevor man fertig ist.
     [repsEl, weightEl].forEach((el) => {
-      el.onfocus = () => { fbCheckinTyping = true; };
+      el.onfocus = () => { fbCheckinTyping = true; el.select(); }; // Vorbelegung markiert, direkt überschreibbar
       el.onblur = () => { fbCheckinTyping = false; };
       // Enter/"Fertig" auf der virtuellen Tastatur soll das Feld verlassen
       // statt es fokussiert zu lassen — sonst bleibt fbCheckinTyping hängen
-      // und der Countdown steht, bis man manuell woanders hintippt.
+      // und der Countdown steht, bis man manuell woanders hintippt. Manche
+      // virtuellen Tastaturen (v. a. bei type="number"/IME-Eingabe) feuern
+      // dafür kein brauchbares keydown — deshalb zusätzlich der Submit
+      // des umschliessenden <form> unten, den so gut wie jede Tastatur
+      // beim Antippen der Enter-/Fertig-Taste auslöst.
       el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } };
     });
+    if (formEl) formEl.onsubmit = (e) => { e.preventDefault(); document.activeElement && document.activeElement.blur(); };
   }
 }
 /* Öffnet das Check-in fürs gerade beendete Set — wird genau beim Eintritt
