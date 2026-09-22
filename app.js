@@ -7265,6 +7265,73 @@ function fbBigContent(restTense) {
   return restTense ? fbFlyDigitsHtml(pad2(fb.secondsLeft)) : pad2(fb.secondsLeft);
 }
 
+/* Regel-Kacheln (reiner Text, keine Icons — siehe Vorschau/Nutzer-
+   Feedback): vier immer gleich angeordnete Fakten zum aktuell laufenden
+   bzw. bei der abschliessenden Pause zum NÄCHSTEN Block, direkt unter der
+   Kopfzeile. Nur für Hang/Griffblock (Halten- und Wiederholungen-Modus)
+   und Campus — genau die Blocktypen mit Griff-/Hand-/Muster-Angaben, die
+   sich aus dem dichten Beschreibungstext allein schlecht auf einen Blick
+   erfassen liessen. Fixübungen/Pause haben kein Griff-/Hand-Konzept und
+   bekommen bewusst keine Zeile, um die Reihenfolge nicht mit Lückenfeldern
+   zu verwässern. */
+function fbFactChipsHtml(b, activeRep) {
+  if (isHangLikeBlock(b)) {
+    const grip = b.type === 'block' ? blockGripLabel(b) : hangGripLabel(b);
+    const timeText = b.type === 'block' && b.mode === 'reps' ? `${b.workSec || 40}s Dauer` : `${b.hangSec}s Halten`;
+    return fbFactRowHtml([
+      ['Griff', grip],
+      // Eigene id: beim Lifting Pin im Wechsel-Modus ändert sich die aktive
+      // Hand pro Wiederholung, ohne dass ein voller Re-Render passiert
+      // (siehe #fb-hand-note-Pendant weiter unten in updateTimerUI) — muss
+      // deshalb dort gezielt nachgezogen werden.
+      ['Arme', fbFactArmText(b, activeRep), 'fb-fact-arm'],
+      ['Zeit', timeText],
+      ['Sätze', `×${b.reps}`],
+    ]);
+  }
+  if (b.type === 'campus') {
+    return fbFactRowHtml([
+      ['Sprosse', campusRungLabel(b.rungType)],
+      ['Modus', fbFactCampusModeText(b)],
+      ['Zeit', `${b.workSec}s je Zug`],
+      ['Muster', fbFactCampusMusterText(b)],
+    ]);
+  }
+  return '';
+}
+function fbFactRowHtml(pairs) {
+  return `<div class="fb-fact-row">${pairs.map(([label, value, id]) => `
+    <div class="fb-fact-chip">
+      <div class="fb-fact-label mono">${esc(label)}</div>
+      <div class="fb-fact-value"${id ? ` id="${id}"` : ''}>${esc(value)}</div>
+    </div>
+  `).join('')}</div>`;
+}
+/* Ohne aktive Wiederholung (Pause, Vorschau des nächsten Blocks): allgemeines
+   Muster ("Einarmig, abwechselnd (links zuerst)"). MIT aktiver Wiederholung
+   (laufende Halten-Arbeitsphase): stattdessen die JETZT dran seiende Hand —
+   dasselbe Prinzip wie holdBlockArmNote, hier aber als reiner Text ohne
+   Emoji, damit die Kachel zur reinen Text-Variante passt. */
+function fbFactArmText(b, activeRep) {
+  if (b.type === 'block') {
+    if (activeRep != null) return `Einarmig · ${handLabel(blockHandForRep(b, activeRep))}`;
+    return `Einarmig, ${blockHandPatternText(b)}`;
+  }
+  if (hangIsAsymmetric(b)) return 'Pro Hand unterschiedlich';
+  const note = gripArmNote(b.board, b.grip);
+  return note ? note.charAt(0).toUpperCase() + note.slice(1) : 'Einarmig';
+}
+function fbFactCampusModeText(b) {
+  const armMode = b.armMode || 'both';
+  const modeLabel = campusArmModeLabel(armMode);
+  return armMode === 'both' ? modeLabel : `${modeLabel}, ${b.startHand === 'right' ? 'Rechts' : 'Links'} zuerst`;
+}
+function fbFactCampusMusterText(b) {
+  if (b.moveMode !== 'pattern') return `Sprosse ${b.fromRung} → ${b.toRung}`;
+  const end = b.pattern.reduce((r, p) => r + p, b.startRung);
+  return `${b.startRung} → ${end}, ${b.pattern.length} Züge`;
+}
+
 /* Restprogramm-Übersicht: Button oben links im laufenden Ablauf-Overlay
    (siehe renderFbOverlay) legt diese Liste über den Timer, der im
    Hintergrund einfach weiterläuft — kein Pausieren nötig, es ist nur eine
@@ -7656,8 +7723,28 @@ function fbStepBack() {
     renderFbOverlay();
     return;
   }
-  fb.blockIndex = Math.max(0, fb.blockIndex - 1);
-  beginBlock();
+  if (fb.blockIndex === 0) {
+    // Ganz am Anfang des Ablaufs — nichts mehr davor (Button ist in diesem
+    // Zustand ohnehin disabled, Wischen kann aber trotzdem hier landen).
+    fb.intervalId = setInterval(tickBlock, 1000);
+    renderFbOverlay();
+    return;
+  }
+  // War bisher der eigentliche Bug: sprang über beginBlock() immer zum
+  // ALLERERSTEN Schritt des vorherigen Blocks (bei mehreren Wiederholungen
+  // also weit zurück, nicht nur einen Schritt) — jetzt stattdessen direkt
+  // der LETZTE Schritt seiner Sequenz, symmetrisch dazu, wie Vorspulen am
+  // Blockende in den ERSTEN Schritt des nächsten Blocks geht. Kein
+  // beginBlock()/Vorbereitungs-Countdown hier: man kehrt in einen bereits
+  // durchlaufenen Schritt zurück, startet ihn nicht neu.
+  fb.blockIndex--;
+  const prevBlock = fb.blocks[fb.blockIndex];
+  fb.sequence = buildBlockSequence(prevBlock, fb.blockIndex === fb.blocks.length - 1);
+  fb.stepIndex = fb.sequence.length - 1;
+  fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
+  fb.stepStartedAt = Date.now();
+  fb.intervalId = setInterval(tickBlock, 1000);
+  renderFbOverlay();
 }
 
 /* Transport "Weiter" (⏭) sowie Wischen nach links: laut Nutzer-Feedback
@@ -7813,6 +7900,7 @@ function renderFbOverlay() {
     }
     stage = `
       <div class="fb-stage-label mono${!working ? (isTrailingPause ? ' fb-stage-label-next' : ' fb-stage-label-readable') : ''}" id="fb-stage-label">${headerText}</div>
+      ${fbFactChipsHtml(displayBlock, isTrailingPause ? null : activeRep)}
       ${displayIsHang
         ? `<div class="fb-stage-figure">${holdBlockThumb(displayBlock)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}${restTense ? ' rest-tense' : ''}">
@@ -8476,6 +8564,10 @@ function updateTimerUI() {
   // nächsten Blocks.
   const handNoteEl = document.getElementById('fb-hand-note');
   if (handNoteEl && working && block && block.type === 'block') handNoteEl.textContent = blockArmNote(block, activeRep);
+  // Analog: die "Arme"-Regel-Kachel (siehe fbFactChipsHtml) zeigt beim
+  // Lifting Pin im Wechsel-Modus dieselbe pro-Wiederholung wechselnde Hand.
+  const factArmEl = document.getElementById('fb-fact-arm');
+  if (factArmEl && working && block && block.type === 'block') factArmEl.textContent = fbFactArmText(block, activeRep);
   updateFbUpcomingUI();
   updateFbProgressUI();
 }

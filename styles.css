@@ -715,6 +715,26 @@ button, input, select, textarea { font-family: inherit; }
    Campus-Leiste + Start + Muster) — moderat statt massiv vergrössert, damit
    lange Texte nicht den knappen Platz im Ablauf-Overlay sprengen. */
 .fb-stage-label.fb-stage-label-readable { font-size: 13px; letter-spacing: .05em; color: var(--ink); line-height: 1.4; }
+
+/* Regel-Kacheln unter der Kopfzeile (siehe fbFactChipsHtml in app.js) —
+   reiner Text statt Icons: in einer Vorschau haben Icons wie 🪵 für
+   "Rundleiste" zu Rätselraten geführt, Text ist eindeutig. Immer vier
+   gleich angeordnete Plätze (Griff/Was, Arme/Hände, Zeit, Wiederholungen),
+   damit man die Zeile einmal lernt und danach bei jedem Satztyp am
+   selben Platz nachschauen kann. */
+.fb-fact-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; margin-bottom: 4px; }
+.fb-fact-chip {
+  border: 1px solid var(--line); background: var(--surface-2);
+  padding: 7px 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
+}
+.fb-fact-label {
+  font-size: 8.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); order: -1;
+}
+.fb-fact-value { font-family: 'Work Sans', sans-serif; font-weight: 700; font-size: 12px; line-height: 1.2; color: var(--ink); }
+@media (max-width: 360px) {
+  .fb-fact-row { grid-template-columns: repeat(2, 1fr); }
+}
+
 .fb-stage-title { font-family: 'Bebas Neue', sans-serif; font-size: 26px; text-align: center; letter-spacing: .02em; }
 .fb-stage-sub { font-size: 12px; color: var(--ink-dim); text-align: center; }
 
