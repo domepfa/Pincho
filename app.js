@@ -7788,7 +7788,7 @@ function renderFbOverlay() {
         phaseText = 'Pause';
       } else if (step.rep != null) {
         const remaining = block.reps - step.rep - 1;
-        phaseText = working ? `${step.phase} · Satz ${step.rep + 1}/${block.reps}` : `Pause · noch ${remaining} Satz${remaining === 1 ? '' : 'e'}`;
+        phaseText = working ? `${step.phase} · Satz ${step.rep + 1}/${block.reps}` : `Pause · noch ${remaining} ${remaining === 1 ? 'Satz' : 'Sätze'}`;
       } else {
         phaseText = step.phase;
       }
@@ -8203,6 +8203,13 @@ function startSequence() {
   fb.pausedAt = null;
   fb.intervalId = setInterval(tickBlock, 1000);
   beepStart();
+  // "LOS!" blitzt auch hier kurz auf (siehe advanceToNextStep) — gilt für
+  // JEDEN Satzstart über diesen Weg: nach dem Vorbereitungs-Countdown vorm
+  // allerersten Satz genauso wie beim automatischen Start jedes weiteren
+  // Blocks (der ja keinen eigenen Countdown mehr bekommt).
+  fb.showLos = true;
+  clearTimeout(fb.losTimeoutId);
+  fb.losTimeoutId = setTimeout(() => { fb.showLos = false; updateTimerUI(); }, 600);
   renderFbOverlay();
   updateTimerUI();
 }
@@ -8396,7 +8403,7 @@ function updateTimerUI() {
       phaseText = 'Pause';
     } else if (step && step.rep != null) {
       const remaining = block.reps - step.rep - 1;
-      phaseText = working ? `${step.phase} · Satz ${step.rep + 1}/${block.reps}` : `Pause · noch ${remaining} Satz${remaining === 1 ? '' : 'e'}`;
+      phaseText = working ? `${step.phase} · Satz ${step.rep + 1}/${block.reps}` : `Pause · noch ${remaining} ${remaining === 1 ? 'Satz' : 'Sätze'}`;
     } else {
       phaseText = step ? step.phase : '';
     }
