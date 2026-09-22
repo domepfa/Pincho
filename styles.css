@@ -568,7 +568,7 @@ button, input, select, textarea { font-family: inherit; }
 /* Hang/Pause-Visual: Ring füllt sich mit dem Fortschritt INNERHALB des
    aktuellen Schritts, daneben ein Strichmännchen, das hängt (Hang) oder
    sich lockert (Pause) — statt einer abstrakten Gesamt-Fortschrittsanzeige. */
-.fb-hang-visual { display: flex; align-items: center; justify-content: center; gap: clamp(8px, 3vw, 18px); }
+.fb-hang-visual { position: relative; display: flex; align-items: center; justify-content: center; gap: clamp(8px, 3vw, 18px); }
 .fb-phase-figure { width: clamp(56px, 13vh, 90px); flex-shrink: 0; }
 .fb-phase-figure .ex-figure { width: 100%; height: auto; display: block; }
 .fb-hang-figure { transform-origin: 50% 10%; animation: figSway 1.7s ease-in-out infinite; }
@@ -593,6 +593,23 @@ button, input, select, textarea { font-family: inherit; }
 .ring-fg.rest-warn { stroke: var(--accent2); animation: ringWarnPulse .6s ease-in-out infinite; }
 @keyframes bigWarnPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
 @keyframes ringWarnPulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+/* Letzte 3 Sekunden einer Pause (synchron zu den beepTick()-Pieptönen,
+   siehe tickBlock in app.js): deutlich kräftigerer Effekt als das normale
+   rest-warn-Pulsieren ab 10s — grosse Zahl schlägt stärker aus und wird
+   knallrot, Ring bekommt einen dicken Glow, dazu ein Hintergrund-Blitz
+   hinter der ganzen Hang-Visual-Gruppe. Alle drei laufen an derselben
+   1s-Animation, damit sie ungefähr im Takt der Sekunden-Ticks aufblitzen. */
+.fb-timer-ring .big.rest-tense { color: var(--danger); animation: bigTensePulse 1s ease-in-out infinite; }
+.ring-fg.rest-tense { stroke: var(--danger); animation: ringTensePulse 1s ease-in-out infinite; }
+.fb-hang-visual.rest-tense::before {
+  content: ''; position: absolute; inset: -14px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 107, 107, .45) 0%, rgba(255, 107, 107, 0) 70%);
+  animation: hangVisualFlash 1s ease-in-out infinite; pointer-events: none;
+}
+@keyframes bigTensePulse { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.38); } }
+@keyframes ringTensePulse { 0%, 100% { opacity: 1; filter: drop-shadow(0 0 0 rgba(255, 107, 107, 0)); } 30% { opacity: .55; filter: drop-shadow(0 0 10px rgba(255, 107, 107, .9)); } }
+@keyframes hangVisualFlash { 0%, 100% { opacity: 0; } 30% { opacity: 1; } }
 /* Treibt #fb-ring-fg an (siehe syncFbRingAnimation in app.js): eine
    lineare Animation über die exakte Phasendauer statt Offset per JS einmal
    pro Sekunde zu setzen — läuft dadurch exakt in Echtzeit mit, unabhängig
@@ -774,6 +791,8 @@ button, input, select, textarea { font-family: inherit; }
   .fb-hang-figure, .fb-arm-shake { animation: none; }
   .ring-fg { transition: none; }
   .ring-fg.rest-warn, .fb-timer-ring .big.rest-warn { animation: none; }
+  .ring-fg.rest-tense, .fb-timer-ring .big.rest-tense { animation: none; }
+  .fb-hang-visual.rest-tense::before { animation: none; opacity: 0; }
   #fb-ring-fg { animation: none !important; }
   .fb-precount, .fb-precount-tense { animation: none; }
   .anim-in, .fb-done-emoji, .fb-overlay-done .fb-stage-title,

@@ -7658,6 +7658,7 @@ function renderFbOverlay() {
     const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
     const isPausedNow = fb.running && !fb.intervalId;
     const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
+    const restTense = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
     const activeRep = working && step ? step.rep : null;
 
     // Während der ABSCHLIESSENDEN Pause dieses Blocks (danach kommt ein
@@ -7721,26 +7722,26 @@ function renderFbOverlay() {
       <div class="fb-stage-label mono${isTrailingPause ? ' fb-stage-label-next' : ''}">${headerText}</div>
       ${displayIsHang
         ? `<div class="fb-stage-figure">${holdBlockThumb(displayBlock)}</div>
-           <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
+           <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}${restTense ? ' rest-tense' : ''}">
              <div class="fb-phase-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:${activeRep != null ? activeRep : ''}">${working ? holdBlockWorkFigure(block, activeRep) : FB_REST_FIGURE_SVG}</div>
              <div class="fb-timer-ring">
                <svg viewBox="0 0 120 120">
                  <circle class="ring-bg" cx="60" cy="60" r="52"/>
-                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
+                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
                </svg>
-               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
+               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
              </div>
            </div>`
         : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:">${working
             ? (isCampus ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId))
             : (isTrailingPause ? (displayIsCampus ? campusWorkFigureSvg(displayBlock) : displayIsPause ? FB_REST_FIGURE_SVG : exerciseFigureSvg(displayBlock.exerciseId)) : FB_REST_FIGURE_SVG)}</div>
-           <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
+           <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}${restTense ? ' rest-tense' : ''}">
              <div class="fb-timer-ring">
                <svg viewBox="0 0 120 120">
                  <circle class="ring-bg" cx="60" cy="60" r="52"/>
-                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
+                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
                </svg>
-               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
+               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
              </div>
            </div>`}
       <div class="phase mono" id="fb-phase">${esc(phaseText)}</div>
@@ -8209,12 +8210,16 @@ function updateTimerUI() {
   const step = fb.sequence[fb.stepIndex];
   const working = isWorkPhase(step);
   // Letzte 10 Sekunden einer Pause optisch hervorheben (Farbe + Pulsieren),
-  // damit man auch aus der Distanz merkt, dass es gleich weitergeht.
+  // damit man auch aus der Distanz merkt, dass es gleich weitergeht. Die
+  // letzten 3 Sekunden (synchron zu den beepTick()-Pieptönen, siehe
+  // tickBlock) bekommen zusätzlich einen deutlich kräftigeren Effekt statt
+  // nur des sanften Dauer-Pulsierens.
   const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
+  const restTense = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
 
   if (big) {
     big.textContent = pad2(fb.secondsLeft);
-    big.className = 'big' + (working ? '' : ' rest') + (restWarn ? ' rest-warn' : '');
+    big.className = 'big' + (working ? '' : ' rest') + (restWarn ? ' rest-warn' : '') + (restTense ? ' rest-tense' : '');
   }
   // Während der abschliessenden Pause (isTrailingPause) zeigt das grosse
   // Bild/der Titel schon den NÄCHSTEN Block (siehe renderFbOverlay) — das
@@ -8247,7 +8252,10 @@ function updateTimerUI() {
     }
     ring.classList.toggle('rest', !working);
     ring.classList.toggle('rest-warn', restWarn);
+    ring.classList.toggle('rest-tense', restTense);
   }
+  const hangVisual = document.querySelector('#fb-overlay .fb-hang-visual');
+  if (hangVisual) hangVisual.classList.toggle('rest-tense', restTense);
   // Schlüssel enthält zusätzlich die aktuelle Wiederholung (rep) — beim
   // Lifting Pin mit Hand-Wechsel pro Satz UND restSec=0 (keine Pause
   // zwischen den Wiederholungen) bliebe "kind" sonst durchgehend "work",
