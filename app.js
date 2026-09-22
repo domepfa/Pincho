@@ -7243,6 +7243,16 @@ function fbBlockTitle(b) {
   return exerciseName(b.exerciseId);
 }
 
+/* Letzte 3 Sekunden einer Pause (rest-tense, siehe renderFbOverlay/
+   updateTimerUI): statt die Zahl nur zu vergrössern/pulsieren, fliegt jede
+   Ziffer einzeln aus dem Bild (siehe .fb-fly-char in styles.css) — jede
+   Ziffer als eigenes <span>, damit die CSS-Animation bei jedem Tick (neues
+   Element durch den Re-Render) von vorne losläuft, statt nur einmal zu
+   laufen und dann stehen zu bleiben. */
+function fbFlyDigitsHtml(text) {
+  return text.split('').map((ch) => `<span class="fb-fly-char">${esc(ch)}</span>`).join('');
+}
+
 /* Restprogramm-Übersicht: Button oben links im laufenden Ablauf-Overlay
    (siehe renderFbOverlay) legt diese Liste über den Timer, der im
    Hintergrund einfach weiterläuft — kein Pausieren nötig, es ist nur eine
@@ -7709,6 +7719,10 @@ function renderFbOverlay() {
     const isPausedNow = fb.running && !fb.intervalId;
     const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 5;
     const restTense = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
+    // Letzte 3 Sekunden eines ARBEITS-Satzes (Hang/Work/Halten): eigener,
+    // schlichterer Effekt (Blinken statt Rausfliegen) — warnt, dass die
+    // Arbeitsphase gleich endet, ohne mit dem Pausen-Effekt zu verwechseln.
+    const workTense = working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
     const activeRep = working && step ? step.rep : null;
 
     // Während der ABSCHLIESSENDEN Pause dieses Blocks (danach kommt ein
@@ -7777,9 +7791,9 @@ function renderFbOverlay() {
              <div class="fb-timer-ring">
                <svg viewBox="0 0 120 120">
                  <circle class="ring-bg" cx="60" cy="60" r="52"/>
-                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
+                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
                </svg>
-               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
+               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}" id="fb-big">${restTense ? fbFlyDigitsHtml(pad2(fb.secondsLeft)) : pad2(fb.secondsLeft)}</div>
              </div>
            </div>`
         : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:">${working
@@ -7789,9 +7803,9 @@ function renderFbOverlay() {
              <div class="fb-timer-ring">
                <svg viewBox="0 0 120 120">
                  <circle class="ring-bg" cx="60" cy="60" r="52"/>
-                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
+                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
                </svg>
-               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}" id="fb-big">${pad2(fb.secondsLeft)}</div>
+               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}" id="fb-big">${restTense ? fbFlyDigitsHtml(pad2(fb.secondsLeft)) : pad2(fb.secondsLeft)}</div>
              </div>
            </div>`}
       <div class="phase mono" id="fb-phase">${esc(phaseText)}</div>
@@ -8303,6 +8317,7 @@ function updateTimerUI() {
   // nur des sanften Dauer-Pulsierens — inkl. spürbar grösserer Zahl.
   const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 5;
   const restTense = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
+  const workTense = working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
   // Während JEDER Pause (nicht nur der abschliessenden) ist die Kopfzeile
   // (Griff/Übungsdetails) das Einzige, was noch verrät, was als Nächstes
   // drankommt, war aber immer winzig — jetzt spürbar besser lesbar. Die
@@ -8318,8 +8333,12 @@ function updateTimerUI() {
   }
 
   if (big) {
-    big.textContent = pad2(fb.secondsLeft);
-    big.className = 'big' + (working ? '' : ' rest') + (restWarn ? ' rest-warn' : '') + (restTense ? ' rest-tense' : '');
+    // rest-tense: jede Ziffer als eigenes <span> neu ins DOM setzen (statt
+    // nur textContent), damit die Rausflieg-Animation (siehe .fb-fly-char)
+    // bei jedem Tick als frisches Element neu von vorne losläuft.
+    if (restTense) big.innerHTML = fbFlyDigitsHtml(pad2(fb.secondsLeft));
+    else big.textContent = pad2(fb.secondsLeft);
+    big.className = 'big' + (working ? '' : ' rest') + (restWarn ? ' rest-warn' : '') + (restTense ? ' rest-tense' : '') + (workTense ? ' work-tense' : '');
   }
   // Während der abschliessenden Pause (isTrailingPause) zeigt das grosse
   // Bild/der Titel schon den NÄCHSTEN Block (siehe renderFbOverlay) — das
@@ -8353,6 +8372,7 @@ function updateTimerUI() {
     ring.classList.toggle('rest', !working);
     ring.classList.toggle('rest-warn', restWarn);
     ring.classList.toggle('rest-tense', restTense);
+    ring.classList.toggle('work-tense', workTense);
   }
   const hangVisual = document.querySelector('#fb-overlay .fb-hang-visual');
   if (hangVisual) hangVisual.classList.toggle('rest-tense', restTense);

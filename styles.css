@@ -628,15 +628,24 @@ button, input, select, textarea { font-family: inherit; }
 @keyframes bigWarnPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
 @keyframes ringWarnPulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
 
-/* Letzte 3 Sekunden einer Pause (synchron zu den beepTick()-Pieptönen,
-   siehe tickBlock in app.js): deutlich kräftigerer Effekt als das normale
-   rest-warn-Pulsieren ab 5s — die Zahl wird selbst spürbar grösser (nicht
-   nur per Pulsier-Animation kurz aufgeblasen) und knallrot, Ring bekommt
-   einen dicken Glow, dazu ein Hintergrund-Blitz hinter der ganzen
-   Hang-Visual-Gruppe. Alle drei laufen an derselben 1s-Animation, damit
-   sie ungefähr im Takt der Sekunden-Ticks aufblitzen. */
-.fb-timer-ring .big.rest-tense {
-  font-size: clamp(44px, 13vh, 96px); color: var(--danger); animation: bigTensePulse 1s ease-in-out infinite;
+/* Letzte 3 Sekunden einer PAUSE (synchron zu den beepTick()-Pieptönen,
+   siehe tickBlock in app.js): jede Ziffer fliegt einzeln aus dem Bild
+   (siehe fbFlyDigitsHtml in app.js — jede Ziffer ein eigenes <span>,
+   dadurch startet die Animation bei jedem Tick als frisches Element neu),
+   dazu Ring-Glow und ein Hintergrund-Blitz hinter der ganzen
+   Hang-Visual-Gruppe. .fb-overlay hat overflow:hidden und deckt den ganzen
+   Screen ab — die Ziffern verschwinden dadurch optisch wirklich "aus dem
+   Bildschirm", nicht nur aus dem Ring. */
+.fb-timer-ring .big.rest-tense { font-size: clamp(44px, 13vh, 96px); color: var(--danger); }
+.fb-fly-char {
+  display: inline-block; animation: flyOutUp .85s cubic-bezier(.3, 0, .7, 1) both;
+}
+.fb-fly-char:nth-child(1) { --fly-x: -70px; --fly-r: -50deg; }
+.fb-fly-char:nth-child(2) { --fly-x: 70px; --fly-r: 50deg; animation-delay: .06s; }
+@keyframes flyOutUp {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  15% { transform: translate(0, 0) rotate(0deg) scale(1.15); opacity: 1; }
+  100% { transform: translate(var(--fly-x, 0), -140vh) rotate(var(--fly-r, 40deg)) scale(1.3); opacity: 0; }
 }
 .ring-fg.rest-tense { stroke: var(--danger); animation: ringTensePulse 1s ease-in-out infinite; }
 .fb-hang-visual.rest-tense::before {
@@ -644,9 +653,15 @@ button, input, select, textarea { font-family: inherit; }
   background: radial-gradient(circle, rgba(255, 107, 107, .45) 0%, rgba(255, 107, 107, 0) 70%);
   animation: hangVisualFlash 1s ease-in-out infinite; pointer-events: none;
 }
-@keyframes bigTensePulse { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.38); } }
 @keyframes ringTensePulse { 0%, 100% { opacity: 1; filter: drop-shadow(0 0 0 rgba(255, 107, 107, 0)); } 30% { opacity: .55; filter: drop-shadow(0 0 10px rgba(255, 107, 107, .9)); } }
 @keyframes hangVisualFlash { 0%, 100% { opacity: 0; } 30% { opacity: 1; } }
+
+/* Letzte 3 Sekunden eines ARBEITS-Satzes (Hang/Work/Halten): eigener,
+   schlichterer Effekt als bei der Pause — ein echtes Blinken (hart an/aus,
+   keine sanfte Überblendung) statt Rausfliegen, warnt, dass die
+   Arbeitsphase gleich endet. */
+.fb-timer-ring .big.work-tense, .ring-fg.work-tense { animation: blinkTense .5s steps(1) infinite; }
+@keyframes blinkTense { 0%, 49% { opacity: 1; } 50%, 100% { opacity: .2; } }
 /* Treibt #fb-ring-fg an (siehe syncFbRingAnimation in app.js): eine
    lineare Animation über die exakte Phasendauer statt Offset per JS einmal
    pro Sekunde zu setzen — läuft dadurch exakt in Echtzeit mit, unabhängig
@@ -835,6 +850,8 @@ button, input, select, textarea { font-family: inherit; }
   .ring-fg.rest-warn, .fb-timer-ring .big.rest-warn { animation: none; }
   .ring-fg.rest-tense, .fb-timer-ring .big.rest-tense { animation: none; }
   .fb-hang-visual.rest-tense::before { animation: none; opacity: 0; }
+  .fb-fly-char { animation: none; }
+  .ring-fg.work-tense, .fb-timer-ring .big.work-tense { animation: none; }
   #fb-ring-fg { animation: none !important; }
   .fb-precount, .fb-precount-tense { animation: none; }
   .anim-in, .fb-done-emoji, .fb-overlay-done .fb-stage-title,
