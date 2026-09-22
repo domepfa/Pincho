@@ -7918,6 +7918,15 @@ function beep(freq, duration) {
   } catch (e) { /* Audio nicht verfügbar, kein Problem */ }
 }
 
+/* Ein Piepton wird zwar synchron zum Sekunden-Tick ausgelöst, kommt beim
+   Hören aber trotzdem noch minimal nach der sichtbaren Änderung an (Geräte-
+   /Browser-Audiolatenz lässt sich softwareseitig nicht "in die
+   Vergangenheit" vorziehen). Stattdessen wird hier der gegenteilige Hebel
+   genutzt: das BILD (Zahl/Ring/Übergang) wird um denselben Betrag NACH dem
+   Ton gezeigt, statt gleichzeitig — im Ergebnis wirkt der Ton dann relativ
+   zum Bild "vorgezogen". Bei Bedarf einfach diese eine Zahl anpassen. */
+const FB_AUDIO_LEAD_MS = 120;
+
 /* Hält die Audio-Ausgabe während eines laufenden Ablaufs durchgehend wach
    (für Menschen unhörbar: 20Hz, praktisch Lautstärke 0), damit sie zwischen
    zwei echten Pieptönen (z. B. über eine ganze Hang-Phase hinweg) nicht in
@@ -8167,7 +8176,7 @@ function tickPreCountdown() {
   fb.preCount--;
   if (fb.preCount <= 0) { finishPreCountdown(); return; }
   if (fb.preCount <= 3) beepTick();
-  renderFbOverlay();
+  setTimeout(renderFbOverlay, FB_AUDIO_LEAD_MS); // siehe FB_AUDIO_LEAD_MS — Ton vor Bild
 }
 
 function startSequence() {
@@ -8259,19 +8268,21 @@ function tickBlock() {
       // nicht, hier lohnt sich ein voller Re-Render (passiert nur einmal
       // pro Block, kein Performance-Problem); baut den Ring frisch, dessen
       // Animation läuft über syncFbRingAnimation() am Ende von
-      // renderFbOverlay() mit an.
-      renderFbOverlay();
+      // renderFbOverlay() mit an. Verzögert (siehe FB_AUDIO_LEAD_MS), damit
+      // der eben ausgelöste Ton (advanceToNextStep) dem Bild vorausläuft.
+      setTimeout(renderFbOverlay, FB_AUDIO_LEAD_MS);
       return;
     }
     // Gleicher Ring-Knoten bleibt bestehen (kein voller Re-Render nötig) —
-    // Animation für die neue Phase explizit neu ansetzen.
-    syncFbRingAnimation();
+    // Animation für die neue Phase explizit neu ansetzen, ebenfalls
+    // verzögert (siehe oben).
+    setTimeout(syncFbRingAnimation, FB_AUDIO_LEAD_MS);
   } else if (step && !isWorkPhase(step) && fb.secondsLeft <= 3) {
     // Letzte 3 Sekunden einer Pause: kurzer Tick pro Sekunde als
     // akustische Vorwarnung, dass der nächste Satz gleich losgeht.
     beepTick();
   }
-  updateTimerUI();
+  setTimeout(updateTimerUI, FB_AUDIO_LEAD_MS);
 }
 
 /* "Wiederholungen geschafft — weiter" bei Fixübungen/Lifting-Pin-Reps:
