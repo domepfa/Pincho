@@ -7937,7 +7937,7 @@ function beep(freq, duration) {
    genutzt: das BILD (Zahl/Ring/Übergang) wird um denselben Betrag NACH dem
    Ton gezeigt, statt gleichzeitig — im Ergebnis wirkt der Ton dann relativ
    zum Bild "vorgezogen". Bei Bedarf einfach diese eine Zahl anpassen. */
-const FB_AUDIO_LEAD_MS = 120;
+const FB_AUDIO_LEAD_MS = 70;
 
 /* Hält die Audio-Ausgabe während eines laufenden Ablaufs durchgehend wach
    (für Menschen unhörbar: 20Hz, praktisch Lautstärke 0), damit sie zwischen
