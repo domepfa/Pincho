@@ -630,11 +630,14 @@ button, input, select, textarea { font-family: inherit; }
 
 /* Letzte 3 Sekunden einer Pause (synchron zu den beepTick()-Pieptönen,
    siehe tickBlock in app.js): deutlich kräftigerer Effekt als das normale
-   rest-warn-Pulsieren ab 10s — grosse Zahl schlägt stärker aus und wird
-   knallrot, Ring bekommt einen dicken Glow, dazu ein Hintergrund-Blitz
-   hinter der ganzen Hang-Visual-Gruppe. Alle drei laufen an derselben
-   1s-Animation, damit sie ungefähr im Takt der Sekunden-Ticks aufblitzen. */
-.fb-timer-ring .big.rest-tense { color: var(--danger); animation: bigTensePulse 1s ease-in-out infinite; }
+   rest-warn-Pulsieren ab 5s — die Zahl wird selbst spürbar grösser (nicht
+   nur per Pulsier-Animation kurz aufgeblasen) und knallrot, Ring bekommt
+   einen dicken Glow, dazu ein Hintergrund-Blitz hinter der ganzen
+   Hang-Visual-Gruppe. Alle drei laufen an derselben 1s-Animation, damit
+   sie ungefähr im Takt der Sekunden-Ticks aufblitzen. */
+.fb-timer-ring .big.rest-tense {
+  font-size: clamp(44px, 13vh, 96px); color: var(--danger); animation: bigTensePulse 1s ease-in-out infinite;
+}
 .ring-fg.rest-tense { stroke: var(--danger); animation: ringTensePulse 1s ease-in-out infinite; }
 .fb-hang-visual.rest-tense::before {
   content: ''; position: absolute; inset: -14px; border-radius: 50%;

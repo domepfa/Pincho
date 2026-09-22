@@ -7707,7 +7707,7 @@ function renderFbOverlay() {
     const frac = phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 0;
     const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
     const isPausedNow = fb.running && !fb.intervalId;
-    const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
+    const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 5;
     const restTense = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
     const activeRep = working && step ? step.rep : null;
 
@@ -7881,6 +7881,13 @@ function beep(freq, duration) {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!beep.ctx) beep.ctx = new Ctx();
+    // Browser legen die Audio-Ausgabe nach ein paar Sekunden Stille aus
+    // Stromspargründen schlafen (state 'suspended') — ohne explizites
+    // resume() bleibt sie stumm bzw. wacht spürbar verzögert auf (genau
+    // das "Ton kommt zu spät"-Gefühl nach einer längeren stillen Phase,
+    // z. B. während eines langen Hangs). Kostet im Normalfall (Context
+    // läuft schon) nichts, siehe auch audioKeepWarm().
+    if (beep.ctx.state === 'suspended') beep.ctx.resume();
     const osc = beep.ctx.createOscillator();
     const gain = beep.ctx.createGain();
     osc.frequency.value = freq;
@@ -7888,6 +7895,28 @@ function beep(freq, duration) {
     gain.gain.setValueAtTime(0.2, beep.ctx.currentTime);
     osc.start();
     osc.stop(beep.ctx.currentTime + duration / 1000);
+  } catch (e) { /* Audio nicht verfügbar, kein Problem */ }
+}
+
+/* Hält die Audio-Ausgabe während eines laufenden Ablaufs durchgehend wach
+   (für Menschen unhörbar: 20Hz, praktisch Lautstärke 0), damit sie zwischen
+   zwei echten Pieptönen (z. B. über eine ganze Hang-Phase hinweg) nicht in
+   den Stromspar-Ruhezustand fällt — sonst wacht sie beim nächsten echten
+   Piepton (beepTick/beepStart/beepEnd) spürbar verzögert auf. Wird bei
+   jedem Sekunden-Tick im Fingerboard-Ablauf mitaufgerufen (siehe tickBlock/
+   tickPreCountdown), kostet dabei praktisch nichts. */
+function audioKeepWarm() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!beep.ctx) beep.ctx = new Ctx();
+    if (beep.ctx.state === 'suspended') beep.ctx.resume();
+    const osc = beep.ctx.createOscillator();
+    const gain = beep.ctx.createGain();
+    osc.frequency.value = 20;
+    gain.gain.setValueAtTime(0.00001, beep.ctx.currentTime);
+    osc.connect(gain); gain.connect(beep.ctx.destination);
+    osc.start();
+    osc.stop(beep.ctx.currentTime + 0.05);
   } catch (e) { /* Audio nicht verfügbar, kein Problem */ }
 }
 
@@ -8114,6 +8143,7 @@ function finishPreCountdown() {
 }
 
 function tickPreCountdown() {
+  audioKeepWarm();
   fb.preCount--;
   if (fb.preCount <= 0) { finishPreCountdown(); return; }
   if (fb.preCount <= 3) beepTick();
@@ -8196,6 +8226,7 @@ function syncFbRingAnimation() {
 
 function tickBlock() {
   if (fbCheckinTyping) return; // Zeit angehalten, solange man im Check-in tippt
+  audioKeepWarm();
   fb.secondsLeft--;
   const step = fb.sequence[fb.stepIndex];
   if (fb.secondsLeft <= 0) {
@@ -8265,12 +8296,12 @@ function updateTimerUI() {
   const block = fb.blocks[fb.blockIndex];
   const step = fb.sequence[fb.stepIndex];
   const working = isWorkPhase(step);
-  // Letzte 10 Sekunden einer Pause optisch hervorheben (Farbe + Pulsieren),
+  // Letzte 5 Sekunden einer Pause optisch hervorheben (Farbe + Pulsieren),
   // damit man auch aus der Distanz merkt, dass es gleich weitergeht. Die
   // letzten 3 Sekunden (synchron zu den beepTick()-Pieptönen, siehe
   // tickBlock) bekommen zusätzlich einen deutlich kräftigeren Effekt statt
-  // nur des sanften Dauer-Pulsierens.
-  const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
+  // nur des sanften Dauer-Pulsierens — inkl. spürbar grösserer Zahl.
+  const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 5;
   const restTense = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
   // Während JEDER Pause (nicht nur der abschliessenden) ist die Kopfzeile
   // (Griff/Übungsdetails) das Einzige, was noch verrät, was als Nächstes
