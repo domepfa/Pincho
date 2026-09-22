@@ -2839,6 +2839,8 @@ const fb = {
   wakeLock: null,
   runResults: [],        // pro Blockindex: {type:'hang', doneReps:[bool,...]} | {type:'exercise', reps, weight} — was beim Durchlauf tatsächlich geschafft wurde
   showOverview: false,   // Restprogramm-Übersicht (siehe toggleFbOverview) gerade über dem laufenden Timer eingeblendet
+  showLos: false,        // "LOS!" blitzt kurz statt der Zahl auf, siehe advanceToNextStep
+  losTimeoutId: null,
 };
 
 /* Echtes Board-Bild (eigene Illustration/eigenes Foto, siehe assets/) mit
@@ -7253,6 +7255,16 @@ function fbFlyDigitsHtml(text) {
   return text.split('').map((ch) => `<span class="fb-fly-char">${esc(ch)}</span>`).join('');
 }
 
+/* Inhalt der grossen Zahl im laufenden Ablauf: "LOS!" hat Vorrang (kurzer
+   Blitz beim Wechsel in eine Arbeitsphase, siehe advanceToNextStep), sonst
+   in den letzten 3 Sekunden einer Pause die rausfliegenden Ziffern, sonst
+   einfach die Sekundenzahl. An allen drei Render-Stellen (zwei Layouts in
+   renderFbOverlay, plus updateTimerUI) identisch verwendet. */
+function fbBigContent(restTense) {
+  if (fb.showLos) return 'LOS!';
+  return restTense ? fbFlyDigitsHtml(pad2(fb.secondsLeft)) : pad2(fb.secondsLeft);
+}
+
 /* Restprogramm-Übersicht: Button oben links im laufenden Ablauf-Overlay
    (siehe renderFbOverlay) legt diese Liste über den Timer, der im
    Hintergrund einfach weiterläuft — kein Pausieren nötig, es ist nur eine
@@ -7793,7 +7805,7 @@ function renderFbOverlay() {
                  <circle class="ring-bg" cx="60" cy="60" r="52"/>
                  <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
                </svg>
-               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}" id="fb-big">${restTense ? fbFlyDigitsHtml(pad2(fb.secondsLeft)) : pad2(fb.secondsLeft)}</div>
+               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}${fb.showLos ? ' los-flash' : ''}" id="fb-big">${fbBigContent(restTense)}</div>
              </div>
            </div>`
         : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:">${working
@@ -7805,7 +7817,7 @@ function renderFbOverlay() {
                  <circle class="ring-bg" cx="60" cy="60" r="52"/>
                  <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
                </svg>
-               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}" id="fb-big">${restTense ? fbFlyDigitsHtml(pad2(fb.secondsLeft)) : pad2(fb.secondsLeft)}</div>
+               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}${fb.showLos ? ' los-flash' : ''}" id="fb-big">${fbBigContent(restTense)}</div>
              </div>
            </div>`}
       <div class="phase mono" id="fb-phase">${esc(phaseText)}</div>
@@ -8008,6 +8020,8 @@ function startAblauf() {
   fb.preCount = null;
   fb.runResults = [];
   fb.showOverview = false;
+  clearTimeout(fb.losTimeoutId);
+  fb.showLos = false;
   fbCheckinTyping = false;
   openFbOverlay();
 }
@@ -8212,7 +8226,18 @@ function advanceToNextStep() {
   fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
   fb.stepStartedAt = Date.now();
   const newStep = fb.sequence[fb.stepIndex];
-  if (isWorkPhase(newStep)) beepStart(); else beepEnd();
+  if (isWorkPhase(newStep)) {
+    beepStart();
+    // "LOS!" blitzt kurz statt der Zahl auf — füllt genau die Lücke, die
+    // sonst entsteht, nachdem die letzte Ziffer der Pause weggeflogen ist
+    // (siehe rest-tense/fbFlyDigitsHtml), bevor die neue Satz-Zeit zu
+    // laufen beginnt.
+    fb.showLos = true;
+    clearTimeout(fb.losTimeoutId);
+    fb.losTimeoutId = setTimeout(() => { fb.showLos = false; updateTimerUI(); }, 600);
+  } else {
+    beepEnd();
+  }
   // Letzte Pause des Blocks (danach kommt der nächste Satz) — genau hier
   // ist Zeit fürs Check-in, ohne den Ablauf zu unterbrechen: es läuft
   // nebenher während der ohnehin schon geplanten Erholung.
@@ -8350,12 +8375,12 @@ function updateTimerUI() {
   }
 
   if (big) {
-    // rest-tense: jede Ziffer als eigenes <span> neu ins DOM setzen (statt
-    // nur textContent), damit die Rausflieg-Animation (siehe .fb-fly-char)
-    // bei jedem Tick als frisches Element neu von vorne losläuft.
-    if (restTense) big.innerHTML = fbFlyDigitsHtml(pad2(fb.secondsLeft));
-    else big.textContent = pad2(fb.secondsLeft);
-    big.className = 'big' + (working ? '' : ' rest') + (restWarn ? ' rest-warn' : '') + (restTense ? ' rest-tense' : '') + (workTense ? ' work-tense' : '');
+    // innerHTML statt textContent: sowohl für "LOS!" als auch für die
+    // rest-tense-Ziffern (jede ein eigenes <span>, siehe fbFlyDigitsHtml)
+    // nötig, damit die jeweilige Animation bei jedem Tick als frisches
+    // Element neu von vorne losläuft.
+    big.innerHTML = fbBigContent(restTense);
+    big.className = 'big' + (working ? '' : ' rest') + (restWarn ? ' rest-warn' : '') + (restTense ? ' rest-tense' : '') + (workTense ? ' work-tense' : '') + (fb.showLos ? ' los-flash' : '');
   }
   // Während der abschliessenden Pause (isTrailingPause) zeigt das grosse
   // Bild/der Titel schon den NÄCHSTEN Block (siehe renderFbOverlay) — das
@@ -8439,6 +8464,8 @@ function cancelAblauf() {
   fb.awaitingNext = false;
   fb.preCount = null;
   fb.blockIndex = 0;
+  clearTimeout(fb.losTimeoutId);
+  fb.showLos = false;
   fbCheckinTyping = false;
   closeFbOverlay();
   renderFbRuntime();

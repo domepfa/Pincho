@@ -662,6 +662,16 @@ button, input, select, textarea { font-family: inherit; }
    Arbeitsphase gleich endet. */
 .fb-timer-ring .big.work-tense, .ring-fg.work-tense { animation: blinkTense .5s steps(1) infinite; }
 @keyframes blinkTense { 0%, 49% { opacity: 1; } 50%, 100% { opacity: .2; } }
+
+/* "LOS!" blitzt kurz statt der Zahl auf (siehe advanceToNextStep/
+   fbBigContent in app.js) — füllt die Lücke, die sonst entsteht, sobald
+   die letzte Pausen-Ziffer weggeflogen ist, bis die neue Satz-Zeit zu
+   laufen beginnt. */
+.fb-timer-ring .big.los-flash {
+  font-size: clamp(30px, 8vh, 60px); letter-spacing: .02em;
+  animation: losPop .3s cubic-bezier(.25, 1.4, .4, 1) both;
+}
+@keyframes losPop { 0% { opacity: 0; transform: scale(1.7); } 60% { opacity: 1; transform: scale(.9); } 100% { transform: scale(1); } }
 /* Treibt #fb-ring-fg an (siehe syncFbRingAnimation in app.js): eine
    lineare Animation über die exakte Phasendauer statt Offset per JS einmal
    pro Sekunde zu setzen — läuft dadurch exakt in Echtzeit mit, unabhängig
@@ -852,6 +862,7 @@ button, input, select, textarea { font-family: inherit; }
   .fb-hang-visual.rest-tense::before { animation: none; opacity: 0; }
   .fb-fly-char { animation: none; }
   .ring-fg.work-tense, .fb-timer-ring .big.work-tense { animation: none; }
+  .fb-timer-ring .big.los-flash { animation: none; }
   #fb-ring-fg { animation: none !important; }
   .fb-precount, .fb-precount-tense { animation: none; }
   .anim-in, .fb-done-emoji, .fb-overlay-done .fb-stage-title,
