@@ -7904,9 +7904,15 @@ function beep(freq, duration) {
     if (beep.ctx.state === 'suspended') beep.ctx.resume();
     const osc = beep.ctx.createOscillator();
     const gain = beep.ctx.createGain();
+    // Rechteckwelle statt reinem Sinus: mehr Obertöne, dadurch kantigerer
+    // "Retro-Piepser"-Charakter, der sich im Trainingslärm besser
+    // durchsetzt als der bisherige weiche Ton — Lautstärke etwas
+    // zurückgenommen (0.2 -> 0.14), weil Rechteckwellen bei gleicher
+    // Amplitude deutlich lauter/schärfer wahrgenommen werden als Sinus.
+    osc.type = 'square';
     osc.frequency.value = freq;
     osc.connect(gain); gain.connect(beep.ctx.destination);
-    gain.gain.setValueAtTime(0.2, beep.ctx.currentTime);
+    gain.gain.setValueAtTime(0.14, beep.ctx.currentTime);
     osc.start();
     osc.stop(beep.ctx.currentTime + duration / 1000);
   } catch (e) { /* Audio nicht verfügbar, kein Problem */ }
