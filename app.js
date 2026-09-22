@@ -8170,7 +8170,7 @@ function checkinPanelHtml(index) {
   if (!result || result.type === 'pause') return '';
   if (result.doneReps) {
     return `
-      <div class="fb-checkin-label mono">GESCHAFFTE SÄTZE — nicht geschaffte abwählen</div>
+      <div class="fb-checkin-label mono">GESCHAFFTE SÄTZE</div>
       <div class="fb-checkin-chips">
         ${result.doneReps.map((ok, i) => `<button type="button" class="fb-chip ${ok ? 'ok' : 'fail'}" data-satz="${i}">${i + 1}</button>`).join('')}
       </div>
