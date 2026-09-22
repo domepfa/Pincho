@@ -2838,6 +2838,7 @@ const fb = {
   intervalId: null,
   wakeLock: null,
   runResults: [],        // pro Blockindex: {type:'hang', doneReps:[bool,...]} | {type:'exercise', reps, weight} — was beim Durchlauf tatsächlich geschafft wurde
+  showOverview: false,   // Restprogramm-Übersicht (siehe toggleFbOverview) gerade über dem laufenden Timer eingeblendet
 };
 
 /* Echtes Board-Bild (eigene Illustration/eigenes Foto, siehe assets/) mit
@@ -7235,6 +7236,55 @@ function fbBlockSub(b) {
   return `${b.workSec || 40}s Ausführung · Ziel ${b.reps}×${b.restSec ? ' · ' + b.restSec + 's Pause danach' : ''}`;
 }
 
+function fbBlockTitle(b) {
+  if (b.type === 'pause') return 'Pause';
+  if (isHangLikeBlock(b)) return holdBlockTitle(b);
+  if (b.type === 'campus') return campusLabel(b);
+  return exerciseName(b.exerciseId);
+}
+
+/* Restprogramm-Übersicht: Button oben links im laufenden Ablauf-Overlay
+   (siehe renderFbOverlay) legt diese Liste über den Timer, der im
+   Hintergrund einfach weiterläuft — kein Pausieren nötig, es ist nur eine
+   zusätzliche Ebene über der schon laufenden Ansicht. */
+function fbOverviewHtml() {
+  const items = fb.blocks.map((b, i) => {
+    const state = i < fb.blockIndex ? 'done' : i === fb.blockIndex ? 'current' : 'upcoming';
+    return `
+      <div class="fb-overview-item fb-overview-${state}">
+        <div class="fb-overview-idx mono">${state === 'done' ? '✓' : i + 1}</div>
+        <div>
+          <div class="fb-overview-title">${esc(fbBlockTitle(b))}</div>
+          <div class="fb-overview-sub mono">${esc(fbBlockSub(b))}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  return `
+    <div class="fb-overview" id="fb-overview">
+      <div class="fb-overview-header">
+        <div class="fb-overview-title-main mono">RESTPROGRAMM · SATZ ${fb.blockIndex + 1}/${fb.blocks.length}</div>
+      </div>
+      <div class="fb-overview-list">${items}</div>
+      <button type="button" class="fb-overlay-close" id="fb-overview-close" title="Schliessen">✕</button>
+    </div>
+  `;
+}
+
+function toggleFbOverview(show) {
+  fb.showOverview = show;
+  renderFbOverlay();
+}
+
+function wireFbOverviewPanel() {
+  const closeBtn = document.getElementById('fb-overview-close');
+  if (closeBtn) closeBtn.onclick = () => toggleFbOverview(false);
+  // Direkt zum aktuellen Satz scrollen, damit man ihn bei langen Abläufen
+  // nicht erst suchen muss.
+  const current = document.querySelector('#fb-overview .fb-overview-current');
+  if (current) current.scrollIntoView({ block: 'center' });
+}
+
 function renderFbBlocksList() {
   saveDraft('fb_blocks', fb.blocks);
   const holder = document.getElementById('fb-blocks-list');
@@ -7719,7 +7769,7 @@ function renderFbOverlay() {
       if (isPausedNow) phaseText += ' · PAUSIERT';
     }
     stage = `
-      <div class="fb-stage-label mono${isTrailingPause ? ' fb-stage-label-next' : ''}">${headerText}</div>
+      <div class="fb-stage-label mono${!working ? (isTrailingPause ? ' fb-stage-label-next' : ' fb-stage-label-readable') : ''}" id="fb-stage-label">${headerText}</div>
       ${displayIsHang
         ? `<div class="fb-stage-figure">${holdBlockThumb(displayBlock)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}${restTense ? ' rest-tense' : ''}">
@@ -7762,13 +7812,17 @@ function renderFbOverlay() {
 
   el.innerHTML = `
     <button type="button" class="fb-overlay-close" id="fb-overlay-close" title="Abbrechen">✕</button>
+    <button type="button" class="fb-overlay-overview-btn" id="fb-overview-btn" title="Restprogramm ansehen">☰</button>
     <div class="fb-overlay-inner">
       <div class="fb-progress-text mono" id="fb-progress-text"></div>
       <div class="fb-overlay-stage">${stage}</div>
     </div>
+    ${fb.showOverview ? fbOverviewHtml() : ''}
   `;
 
   document.getElementById('fb-overlay-close').onclick = cancelAblauf;
+  document.getElementById('fb-overview-btn').onclick = () => toggleFbOverview(true);
+  if (fb.showOverview) wireFbOverviewPanel();
   const prevBtn = document.getElementById('fb-prev');
   if (prevBtn) prevBtn.onclick = fbGoBack;
   const skipBtn = document.getElementById('fb-skip');
@@ -7895,6 +7949,7 @@ function startAblauf() {
   fb.awaitingNext = true;
   fb.preCount = null;
   fb.runResults = [];
+  fb.showOverview = false;
   fbCheckinTyping = false;
   openFbOverlay();
 }
@@ -8206,6 +8261,7 @@ function updateTimerUI() {
   const phase = document.getElementById('fb-phase');
   const ring = document.getElementById('fb-ring-fg');
   const figureHolder = document.getElementById('fb-phase-figure');
+  const stageLabel = document.getElementById('fb-stage-label');
   const block = fb.blocks[fb.blockIndex];
   const step = fb.sequence[fb.stepIndex];
   const working = isWorkPhase(step);
@@ -8216,6 +8272,19 @@ function updateTimerUI() {
   // nur des sanften Dauer-Pulsierens.
   const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 10;
   const restTense = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
+  // Während JEDER Pause (nicht nur der abschliessenden) ist die Kopfzeile
+  // (Griff/Übungsdetails) das Einzige, was noch verrät, was als Nächstes
+  // drankommt, war aber immer winzig — jetzt spürbar besser lesbar. Die
+  // abschliessende Pause zeigt dort nur den kurzen "NEXT: ..."-Titel und
+  // bekommt weiter die grosse Next-Schrift; Pausen MIT verbleibenden
+  // Wiederholungen zeigen den oft langen Griff-/Muster-Text (siehe
+  // headerText in renderFbOverlay) — dort nur moderat vergrössert, damit
+  // z. B. lange Campus-Muster nicht den Bildschirm sprengen.
+  if (stageLabel) {
+    const trailingNow = fbIsTrailingPause();
+    stageLabel.classList.toggle('fb-stage-label-next', !working && trailingNow);
+    stageLabel.classList.toggle('fb-stage-label-readable', !working && !trailingNow);
+  }
 
   if (big) {
     big.textContent = pad2(fb.secondsLeft);

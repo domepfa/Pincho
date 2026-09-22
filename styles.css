@@ -552,6 +552,40 @@ button, input, select, textarea { font-family: inherit; }
   background: none; border: 1px solid var(--line); color: var(--ink-faint);
   width: 34px; height: 34px; font-size: 15px; line-height: 1; cursor: pointer;
 }
+.fb-overlay-overview-btn {
+  position: absolute; top: calc(14px + var(--safe-top)); left: 16px; z-index: 2;
+  background: none; border: 1px solid var(--line); color: var(--ink-faint);
+  width: 34px; height: 34px; font-size: 16px; line-height: 1; cursor: pointer;
+}
+
+/* ---------- Restprogramm-Übersicht (Button oben links im Ablauf-Overlay):
+   Liste aller Sätze des laufenden Ablaufs, damit man nicht raten muss, was
+   noch kommt — legt sich als eigene Ebene über den laufenden Timer, der im
+   Hintergrund einfach weiterläuft (siehe toggleFbOverview in app.js). ---------- */
+.fb-overview {
+  position: fixed; inset: 0; z-index: 3;
+  background: var(--bg);
+  padding: calc(14px + var(--safe-top)) 18px calc(14px + var(--safe-bottom));
+  display: flex; flex-direction: column; gap: 12px;
+  animation: riseIn .18s ease both;
+}
+.fb-overview-header { display: flex; align-items: center; justify-content: center; padding: 0 40px; }
+.fb-overview-title-main { font-size: 12px; letter-spacing: .08em; color: var(--ink-dim); text-align: center; }
+.fb-overview-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; max-width: 420px; width: 100%; margin: 0 auto; }
+.fb-overview-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border: 1px solid var(--line); background: var(--surface-2);
+}
+.fb-overview-idx {
+  flex-shrink: 0; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); font-size: 12px; color: var(--ink-dim);
+}
+.fb-overview-title { font-size: 14px; font-weight: 700; }
+.fb-overview-sub { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+.fb-overview-done { opacity: .45; }
+.fb-overview-done .fb-overview-idx { border-color: var(--accent); color: var(--accent); }
+.fb-overview-current { border-color: var(--accent); background: rgba(var(--accent-rgb), .08); }
+.fb-overview-current .fb-overview-idx { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .15); }
 /* Alles muss ohne Scrollen aufs Display passen — statt einer festen
    Blockgrösse mit "justify-content:center" (die auf kurzen Screens
    überläuft) verteilt space-evenly den verfügbaren Platz auf alle Kinder,
@@ -631,6 +665,11 @@ button, input, select, textarea { font-family: inherit; }
 .fb-overlay-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
 .fb-stage-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
 .fb-stage-label.fb-stage-label-next { font-size: 20px; font-weight: 700; letter-spacing: .04em; color: #fff; }
+/* Pausen MIT verbleibenden Wiederholungen (nicht die abschliessende, kurze
+   "NEXT: ..."-Pause) zeigen hier oft einen langen Griff-/Muster-Text (z. B.
+   Campus-Leiste + Start + Muster) — moderat statt massiv vergrössert, damit
+   lange Texte nicht den knappen Platz im Ablauf-Overlay sprengen. */
+.fb-stage-label.fb-stage-label-readable { font-size: 13px; letter-spacing: .05em; color: var(--ink); line-height: 1.4; }
 .fb-stage-title { font-family: 'Bebas Neue', sans-serif; font-size: 26px; text-align: center; letter-spacing: .02em; }
 .fb-stage-sub { font-size: 12px; color: var(--ink-dim); text-align: center; }
 
