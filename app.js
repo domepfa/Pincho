@@ -7548,7 +7548,7 @@ function wireFbOverlaySwipe(el) {
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.3) return; // zu kurz oder zu diagonal
-    if (dx < 0) fbStepForward(); else fbGoBack();
+    if (dx < 0) fbStepForward(); else fbStepBack();
   }, { passive: true });
 }
 
@@ -7628,17 +7628,34 @@ function fbTransportRow() {
   const isPaused = canPause && !fb.intervalId;
   return `
     <div class="fb-transport">
-      <button type="button" class="fb-transport-btn" id="fb-prev" ${fb.blockIndex === 0 ? 'disabled' : ''} title="Zurück">⏮</button>
+      <button type="button" class="fb-transport-btn" id="fb-prev" ${fb.blockIndex === 0 && fb.stepIndex === 0 ? 'disabled' : ''} title="Zurück">⏮</button>
       <button type="button" class="fb-transport-btn fb-play" id="fb-playpause" ${canPause ? '' : 'disabled'} title="${isPaused ? 'Weiter' : 'Pause'}">${isPaused ? '▶' : '⏸'}</button>
       <button type="button" class="fb-transport-btn" id="fb-skip" title="Einen Schritt weiter">⏭</button>
     </div>
   `;
 }
 
-function fbGoBack() {
+/* Transport "Zurück" (⏮) sowie Wischen nach rechts: sollte wie "Weiter"
+   nur EINEN Schritt zurückspulen, sprang bisher aber immer einen ganzen
+   Satz zurück (fb.blockIndex - 1) — bei einem Block mit mehreren
+   Wiederholungen/Pausen also weit über den eigentlich gewünschten
+   vorherigen Schritt hinaus. Jetzt symmetrisch zu fbStepForward: gibt es
+   innerhalb des laufenden Satzes noch einen vorherigen Schritt, geht's nur
+   dorthin (mit dessen voller Dauer, genau wie beim Vorspulen); nur wenn
+   man schon beim allerersten Schritt dieses Satzes ist, geht's zum
+   vorherigen Satz. */
+function fbStepBack() {
   clearInterval(fb.intervalId);
   fb.intervalId = null;
-  fbCheckinTyping = false; // Feld ist beim Blockwechsel weg — sonst bliebe die Zeit im neuen Block angehalten
+  fbCheckinTyping = false; // Feld ist beim Block-/Schrittwechsel weg — sonst bliebe die Zeit angehalten
+  if (fb.stepIndex > 0) {
+    fb.stepIndex--;
+    fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
+    fb.stepStartedAt = Date.now();
+    fb.intervalId = setInterval(tickBlock, 1000);
+    renderFbOverlay();
+    return;
+  }
   fb.blockIndex = Math.max(0, fb.blockIndex - 1);
   beginBlock();
 }
@@ -7850,7 +7867,7 @@ function renderFbOverlay() {
   document.getElementById('fb-overview-btn').onclick = () => toggleFbOverview(true);
   if (fb.showOverview) wireFbOverviewPanel();
   const prevBtn = document.getElementById('fb-prev');
-  if (prevBtn) prevBtn.onclick = fbGoBack;
+  if (prevBtn) prevBtn.onclick = fbStepBack;
   const skipBtn = document.getElementById('fb-skip');
   if (skipBtn) skipBtn.onclick = fbStepForward;
   const ppBtn = document.getElementById('fb-playpause');

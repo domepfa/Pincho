@@ -519,7 +519,13 @@ button, input, select, textarea { font-family: inherit; }
     repeating-linear-gradient(123deg, rgba(255, 255, 255, 0.02) 0px, rgba(255, 255, 255, 0.02) 1px, transparent 2px, transparent 130px);
   display: flex; flex-direction: column; align-items: stretch;
   padding: calc(10px + var(--safe-top)) 18px calc(10px + var(--safe-bottom));
-  overflow: hidden;
+  overflow-y: auto; overflow-x: hidden;
+  /* War overflow:hidden — das Ziel bleibt, dass alles ohne Scrollen passt
+     (siehe .fb-overlay-inner unten), aber bei sehr vollen Bildschirmen
+     (langer Griff-/Muster-Text + Referenzbild + Check-in-Panel zusammen)
+     reichte der verfügbare Platz trotzdem nicht und Inhalt wurde einfach
+     abgeschnitten. Jetzt als Absicherung scrollbar statt komplett
+     verloren, auch wenn es der Ausnahmefall bleiben soll. */
 }
 .fb-overlay.hidden { display: none; }
 
@@ -548,12 +554,16 @@ button, input, select, textarea { font-family: inherit; }
 .info-sheet-figure .ex-figure-emoji { font-size: 48px; }
 .ex-howto { font-size: 13px; color: var(--ink-dim); line-height: 1.5; margin-bottom: 12px; }
 .fb-overlay-close {
-  position: absolute; top: calc(14px + var(--safe-top)); right: 16px; z-index: 2;
+  /* position:fixed statt :absolute — alle Overlays, in denen das benutzt
+     wird, sind selbst schon vollflächig (inset:0), optisch also identisch,
+     aber bleibt so oben stehen, auch wenn der Inhalt darunter mal scrollen
+     muss (siehe .fb-overlay overflow-y). */
+  position: fixed; top: calc(14px + var(--safe-top)); right: 16px; z-index: 2;
   background: none; border: 1px solid var(--line); color: var(--ink-faint);
   width: 34px; height: 34px; font-size: 15px; line-height: 1; cursor: pointer;
 }
 .fb-overlay-overview-btn {
-  position: absolute; top: calc(14px + var(--safe-top)); left: 16px; z-index: 2;
+  position: fixed; top: calc(14px + var(--safe-top)); left: 16px; z-index: 2;
   background: none; border: 1px solid var(--line); color: var(--ink-faint);
   width: 34px; height: 34px; font-size: 16px; line-height: 1; cursor: pointer;
 }
@@ -692,7 +702,14 @@ button, input, select, textarea { font-family: inherit; }
 
 .fb-overlay-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
 .fb-stage-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
-.fb-stage-label.fb-stage-label-next { font-size: 20px; font-weight: 700; letter-spacing: .04em; color: #fff; }
+/* War fix 20px, unabhängig vom Text — bei langen Titeln (z. B. Campus mit
+   Muster-Angabe) wickelte das auf 3+ Zeilen und sprengte zusammen mit dem
+   Rest (Referenzbild, Check-in-Panel) die Bildschirmhöhe. Jetzt spürbar
+   kleiner als vorher, aber bewusst dieselbe Grösse wie
+   .fb-stage-label-readable (siehe unten) — vorher wirkte die Kopfzeile je
+   nach Pausen-Art mal gross, mal winzig, das war die eigentliche
+   Inkonsistenz. */
+.fb-stage-label.fb-stage-label-next { font-size: 14px; font-weight: 700; letter-spacing: .04em; color: #fff; line-height: 1.35; }
 /* Pausen MIT verbleibenden Wiederholungen (nicht die abschliessende, kurze
    "NEXT: ..."-Pause) zeigen hier oft einen langen Griff-/Muster-Text (z. B.
    Campus-Leiste + Start + Muster) — moderat statt massiv vergrössert, damit
