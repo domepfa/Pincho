@@ -7807,7 +7807,8 @@ function renderFbOverlay() {
     stage = `
       <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${isHang ? holdBlockTitle(block) : campusLabel(block)}${armNote ? ' · ' + armNote : ''}</div>
       <div class="fb-stage-figure">${isHang ? holdBlockThumb(block) : campusWorkFigureSvg(block)}</div>
-      <div class="fb-precount-heading mono">GET READY!</div>
+      <div class="fb-precount-heading mono">ALLEZ${state.member && state.member.name ? `, ${esc(state.member.name)}` : ''}!</div>
+      <div class="fb-precount-subheading mono">GET READY!</div>
       <div class="fb-precount ${tense ? 'fb-precount-tense' : ''}" id="fb-precount">${fb.preCount}</div>
       <div class="fb-stage-sub mono">Hände ans Board — Zeit zum Vorbereiten!</div>
       <button class="btn fb-stage-btn" id="fb-precount-skip">Jetzt starten</button>
