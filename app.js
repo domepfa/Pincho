@@ -3894,6 +3894,22 @@ function findFbTemplateById(id) {
   return FINGERBOARD_TEMPLATES.find((r) => r.id === id) || fb.templates.find((r) => r.id === id) || sharedTemplatesOfKind('fingerboard').find((r) => r.id === id);
 }
 
+/* Beim Übernehmen von Hang-Sätzen aus einer Vorlage/Challenge (Schnell-
+   training starten, Vorlage laden, Challenge annehmen — alle drei Stellen)
+   NUR board:null (das nur die fest eingebauten FINGERBOARD_TEMPLATES
+   benutzen, bewusst board-neutral mit generischen Griff-IDs wie
+   "edge_small", die es auf beiden Boards gibt) auf das aktuell gewählte
+   Board setzen. Eigene/geteilte Vorlagen und Challenges haben dagegen
+   schon ein ECHTES Board mit einer dazu passenden, board-spezifischen
+   Griff-ID (z. B. "kleine_kante" nur auf BM1000) — wurde bisher trotzdem
+   überschrieben, sobald fb.board (typischerweise das zuletzt genutzte
+   Board des Mitglieds) etwas anderes war, wodurch Board und Griff-ID
+   nicht mehr zusammenpassten und am Ende ein falsches Board gespeichert/
+   geteilt wurde ("mit BM1000 trainiert, gespeichert als BM2000"). */
+function fbBlocksWithCurrentBoard(blocks) {
+  return blocks.map((b) => (b.type === 'hang' && b.board == null ? { ...b, board: fb.board } : { ...b }));
+}
+
 function renderFbQuickstart() {
   const holder = document.getElementById('fb-quickstart');
   if (!holder) return;
@@ -3929,7 +3945,7 @@ function renderFbQuickstart() {
       const t = findFbTemplateById(btn.dataset.tpl);
       if (!t) return;
       if (fb.blocks.length && !confirm('Aktuellen Ablauf durch "' + t.name + '" ersetzen und sofort starten?')) return;
-      fb.blocks = t.blocks.map((b) => (b.type === 'hang' ? { ...b, board: fb.board } : { ...b }));
+      fb.blocks = fbBlocksWithCurrentBoard(t.blocks);
       renderFbBlocksList();
       startAblauf(); // öffnet direkt das Ablauf-Vollbild
     };
@@ -4029,7 +4045,7 @@ function wireFbTemplatePicker() {
       updateFbDeleteBtnVisibility();
       return;
     }
-    fb.blocks = t.blocks.map((b) => (b.type === 'hang' ? { ...b, board: fb.board } : { ...b }));
+    fb.blocks = fbBlocksWithCurrentBoard(t.blocks);
     renderFbBlocksList();
     updateFbDeleteBtnVisibility();
   };
@@ -8814,7 +8830,7 @@ async function renderChallenges() {
       if (c.kind === 'fingerboard') {
         if (fb.blocks.length && !confirm('Aktuellen Fingerboard-Ablauf durch diese Challenge ersetzen?')) return;
         fb.board = fb.board || currentMemberBoard();
-        fb.blocks = (c.blocks || []).map((b) => (b.type === 'hang' ? { ...b, board: fb.board } : { ...b }));
+        fb.blocks = fbBlocksWithCurrentBoard(c.blocks || []);
         renderFbBlocksList();
         location.hash = '#fingerboard';
         toast('Challenge in den Ablauf geladen — leg los!', 'ok');
