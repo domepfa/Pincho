@@ -264,8 +264,13 @@ const state = {
 
 /* ---------- Boot ---------- */
 async function boot() {
-  const authed = await ensureValidAuthToken();
-  if (!authed) { renderPasswordGate(); return; }
+  // Einmal angemeldete Geräte starten sofort, auch ohne Netz (z. B. im
+  // Gym) — das Token wird im Hintergrund erneuert, Daten kommen bis dahin
+  // aus der lokalen Kopie (siehe fbGet in firebase.js). Nur ein Gerät, das
+  // noch nie angemeldet war, braucht den Team-Code.
+  const storedAuth = typeof hasStoredAuth === 'function' ? hasStoredAuth() : await ensureValidAuthToken();
+  if (!storedAuth) { renderPasswordGate(); return; }
+  ensureValidAuthToken();
   if (!state.member) { renderNamePicker(); return; }
 
   // Sofort rendern statt auf eine (ggf. langsame/wacklige) Firebase-Antwort
