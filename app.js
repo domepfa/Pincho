@@ -2230,7 +2230,8 @@ function startFsRestTimer() {
   fsRestTimer.intervalId = setInterval(() => {
     fsRestTimer.seconds++;
     updateFsRestTimerUI();
-    if (fsRestTimer.seconds % 30 === 0) beepStart();
+    // Gong je 30s: 0:30 → 1×, 1:00 → 2×, 1:30 → 3×, ab 2:00 → 4× (Obergrenze).
+    if (fsRestTimer.seconds % 30 === 0) gongStrikes(Math.min(4, fsRestTimer.seconds / 30));
   }, 1000);
 }
 // Ohne explizites Stoppen lief die Pausenuhr bisher im Hintergrund einfach
@@ -8133,6 +8134,43 @@ function beepStart() {
 }
 function beepEnd() {
   beep(1046, 380);
+}
+
+/* Gong-Schlag für die Gym-Pausenuhr: statt eines Pieptons mehrere
+   Sinus-Teiltöne mit leicht unharmonischen Verhältnissen (typisch für
+   Gong/Klangschale), kurzer Anschlag und langes, weiches Ausklingen.
+   gongStrikes(n) schlägt n-mal hintereinander, damit man die Pausenlänge
+   auch ohne hinzuschauen am Gehör abzählen kann. */
+function gong(when) {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!beep.ctx) beep.ctx = new Ctx();
+    const ctx = beep.ctx;
+    if (ctx.state === 'suspended') ctx.resume();
+    const t0 = when ?? ctx.currentTime;
+    const base = 220;
+    const partials = [[1, 0.22, 2.6], [2.02, 0.09, 1.8], [2.74, 0.06, 1.3], [4.1, 0.03, 0.8]];
+    partials.forEach(([ratio, vol, decay]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = base * ratio;
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + decay);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + decay + 0.05);
+    });
+  } catch (e) { /* Audio nicht verfügbar, kein Problem */ }
+}
+function gongStrikes(n) {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!beep.ctx) beep.ctx = new Ctx();
+    const start = beep.ctx.currentTime;
+    for (let i = 0; i < n; i++) gong(start + i * 0.9);
+  } catch (e) { /* Audio nicht verfügbar, kein Problem */ }
 }
 
 async function requestWakeLock() {
