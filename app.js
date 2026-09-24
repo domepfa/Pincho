@@ -1768,17 +1768,27 @@ async function beginFlowBlock() {
   }
   flow.intervalId = setInterval(tickFlow, 1000);
   renderFlowOverlay();
-  beepStart();
+  // Flow bewusst ruhig: nur ein Gong zum Einstieg in die erste Pose —
+  // danach kommt der Gong jeweils am Ende einer Haltephase (Signal zum
+  // Wechseln, siehe tickFlow), nicht nochmal beim Beginn der nächsten.
+  if (flow.blockIndex === 0) gong();
 }
 
 function tickFlow() {
   flow.secondsLeft--;
   if (flow.secondsLeft <= 0) {
+    const endedPhase = flow.sequence[flow.stepIndex].phase;
     flow.stepIndex++;
-    if (flow.stepIndex >= flow.sequence.length) {
+    const sequenceDone = flow.stepIndex >= flow.sequence.length;
+    // Ein Gong, sobald eine Pose fertig gehalten ist (= jetzt in die
+    // nächste wechseln) — keine Countdown-Pieps, kein Ton am Ende der
+    // Wechselzeit. Ausnahme: endet mit dieser Pose der ganze Flow, gibt
+    // finishFlowSession() den Abschluss-Gong (2×) statt eines einzelnen.
+    const isFinalStep = sequenceDone && flow.blockIndex === flowBlocks.length - 1;
+    if (endedPhase === 'Halten' && !isFinalStep) gong();
+    if (sequenceDone) {
       clearInterval(flow.intervalId);
       flow.intervalId = null;
-      beep(1318, 300);
       flow.blockIndex++;
       // Ring der eben beendeten Phase soll sich noch sichtbar ganz
       // schliessen, bevor die nächste Pose ihn mit offenem Ring
@@ -1793,9 +1803,6 @@ function tickFlow() {
       return;
     }
     flow.secondsLeft = flow.sequence[flow.stepIndex].seconds;
-    if (flow.sequence[flow.stepIndex].phase === 'Halten') beepStart(); else beepEnd();
-  } else if (flow.secondsLeft <= 3) {
-    beepTick();
   }
   updateFlowUI();
 }
@@ -1894,7 +1901,7 @@ async function finishFlowSession(blocksOverride) {
   flow.intervalId = null;
   flow.running = false;
   releaseWakeLock();
-  beep(1568, 400);
+  if (!blocksOverride) gongStrikes(2); // Flow komplett durch — Abschluss-Gong
 
   const blocksDone = blocksOverride || flowBlocks;
   const isPartial = !!blocksOverride;
