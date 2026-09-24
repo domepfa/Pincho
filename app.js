@@ -507,9 +507,33 @@ function showFabStart(label, targetId) {
   };
 }
 
+/* Grosse Trainings-Leiste unten (ersetzt während einer laufenden Freestyle-
+   Session/Plan-Ausführung den fliegenden Start-Button): zeigt Satz- bzw.
+   Pausenzeit gross und EINEN breiten Knopf für den nächsten Schritt
+   (Start → Satz beenden → Nächster Satz) — immer an derselben Stelle
+   unter dem Daumen, statt die kleine Box in der Liste suchen zu müssen.
+   Nur die Eingabe von Gewicht/Wdh. bleibt in der Karte der Übung (unten
+   würde die Tastatur sie verdecken). Inhalt baut renderFsPanel(). */
+function ensureFsDock() {
+  let el = document.getElementById('fs-dock');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fs-dock';
+    el.className = 'hidden';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function hideFsDock() {
+  const el = document.getElementById('fs-dock');
+  if (el) { el.classList.add('hidden'); el.innerHTML = ''; }
+  document.body.classList.remove('has-fs-dock');
+}
+
 function render() {
   if (!state.member) { boot(); return; }
   hideFabStart(); // jede Route entscheidet selbst, ob/wofür sie ihn zeigt
+  hideFsDock();
   switch (state.route) {
     case 'log': renderLog(); break;
     case 'fingerboard': renderFingerboard(); break;
@@ -1930,6 +1954,11 @@ function fbExerciseSetsText(ex) {
 function renderLogBuilderPanel() {
   const holder = document.getElementById('log-builder-panel');
   if (!holder) return;
+  // Wechsel zwischen den Unter-Modi (Plan/Freestyle/...) läuft nicht über
+  // render() — ohne das blieb der "▶ STARTEN"-Button vom Plan-Tab z. B. im
+  // Freestyle stehen. Der jeweilige Modus zeigt ihn/die Leiste selbst wieder.
+  hideFabStart();
+  hideFsDock();
 
   if (fsRecap) {
     holder.innerHTML = `
@@ -2287,67 +2316,71 @@ function renderFsPanel() {
   renderFsDiscardButton();
 
   if (!builder.exercises.length) {
+    hideFsDock();
     holder.innerHTML = '<p class="login-hint">Übung wählen und "+ Übung" antippen, um Sätze zu erfassen.</p>';
     return;
   }
 
-  // Das Eingabefeld schwebt fest oben, statt in der Karte der jeweiligen
-  // Übung mitzuscrollen — sonst musste man bei einer langen Übungsliste
-  // (oder offener Tastatur, die den unteren Bildschirmteil frisst) erst
-  // zur richtigen Stelle zurückscrollen. Läuft für JEDE Übung als kleine
-  // Phasenmaschine (siehe activateFsGroup/fsPhase weiter oben):
-  // 'working' (Arbeits-Stoppuhr) → 'entering' (Gewicht/Wdh. eintragen,
-  // gestoppte Dauer als Kontext) → 'resting' (Pausenstoppuhr) → zurück
-  // zu 'working' für den nächsten Satz.
-  const floatingInputHtml = (g) => {
-    const unit = exerciseUnit(g.exerciseId);
-    const isHold = unit === 'time';
+  // Satz-Steuerung (Start / Satz beenden / Nächster Satz) sitzt in der
+  // grossen Leiste unten (#fs-dock, siehe ensureFsDock) — nur die Eingabe
+  // von Gewicht/Wdh. ('entering') steht in der Karte der aktiven Übung.
+  // Kleine Phasenmaschine je Übung (siehe activateFsGroup/fsPhase):
+  // 'idle' → 'working' (Arbeits-Stoppuhr) → 'entering' (Gewicht/Wdh.
+  // eintragen) → 'resting' (Pausenstoppuhr) → zurück zu 'working'.
+  const dockHtml = (g) => {
+    const head = `
+      <div class="fs-dock-head mono">
+        <span class="fs-dock-name">▸ ${esc(exerciseName(g.exerciseId))}</span>
+        ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-dock-add">+ Übung</button>` : ''}
+      </div>`;
     if (fsPhase === 'idle') {
-      return `<button type="button" class="btn small" id="fs-start-set" style="width:100%;">▶ Start</button>`;
+      return `${head}
+        <button type="button" class="btn fs-dock-btn" id="fs-start-set">▶ Satz starten</button>`;
     }
     if (fsPhase === 'working') {
-      return `
+      return `${head}
         <div class="fs-work-timer mono" id="fs-work-timer">${fmtMinSec(fsWorkTimer.seconds)}</div>
-        <button type="button" class="btn small" id="fs-end-set" style="width:100%;">Satz beenden</button>
-      `;
+        <button type="button" class="btn fs-dock-btn" id="fs-end-set">■ Satz beenden</button>`;
     }
-    if (fsPhase === 'resting') {
-      // Während der Pause zur Übung gewechselt (siehe activateFsGroup) —
-      // für die noch satzlose neue Übung ist es der ERSTE Satz, nicht der
-      // "nächste" einer schon begonnenen.
-      const isExecute = logMode === 'execute';
-      const reachedTarget = isExecute && g.targetSets != null && g.sets.length >= g.targetSets;
-      // Nächste NOCH OFFENE Übung, nicht einfach die nächste im Array —
-      // sonst würde ein Sprung ausser der Reihe (z. B. Gerät besetzt, erst
-      // eine andere gemacht) hier eine bereits erledigte Übung nochmal
-      // vorschlagen statt eine wirklich offene.
-      const nextUnfinishedIdx = isExecute ? findNextUnfinishedExerciseIndex(builder, builder.activeIndex) : null;
-      if (reachedTarget && nextUnfinishedIdx != null) {
-        // Plan-Ziel für diese Übung erreicht (z. B. nur 1 Satz vorgesehen) —
-        // automatisch zur nächsten offenen Übung vorschlagen statt weiter
-        // Sätze an dieser zu sammeln. Ein Extra-Satz bleibt trotzdem manuell
-        // möglich (z. B. wenn man mehr schaffen will) — das ändert nur
-        // DIESE Ausführung, nicht den gespeicherten Plan selbst, der
-        // nächstes Mal wieder mit der ursprünglichen Satzzahl startet.
-        return `
-          <div class="fs-rest-timer mono" id="fs-rest-timer">PAUSE ${fmtMinSec(fsRestTimer.seconds)}</div>
-          <button type="button" class="btn small" id="fs-next-exercise" data-next-idx="${nextUnfinishedIdx}" style="width:100%;">▶ Nächste Übung (${esc(exerciseName(builder.exercises[nextUnfinishedIdx].exerciseId))})</button>
-          <button type="button" class="btn ghost small" id="fs-next-set" style="width:100%;margin-top:6px;">+ Extra-Satz</button>
-        `;
-      }
-      const label = g.sets.length ? (reachedTarget ? '+ Extra-Satz' : 'Nächster Satz') : '▶ Start';
-      return `
-        <div class="fs-rest-timer mono" id="fs-rest-timer">PAUSE ${fmtMinSec(fsRestTimer.seconds)}</div>
-        <button type="button" class="btn small" id="fs-next-set" style="width:100%;">${label}</button>
-      `;
+    // 'resting' — während der Pause zur Übung gewechselt (siehe
+    // activateFsGroup): für die noch satzlose neue Übung ist es der ERSTE
+    // Satz, nicht der "nächste" einer schon begonnenen.
+    const isExecute = logMode === 'execute';
+    const reachedTarget = isExecute && g.targetSets != null && g.sets.length >= g.targetSets;
+    // Nächste NOCH OFFENE Übung, nicht einfach die nächste im Array —
+    // sonst würde ein Sprung ausser der Reihe (z. B. Gerät besetzt, erst
+    // eine andere gemacht) hier eine bereits erledigte Übung nochmal
+    // vorschlagen statt eine wirklich offene.
+    const nextUnfinishedIdx = isExecute ? findNextUnfinishedExerciseIndex(builder, builder.activeIndex) : null;
+    const restHtml = `<div class="fs-rest-timer mono" id="fs-rest-timer">PAUSE ${fmtMinSec(fsRestTimer.seconds)}</div>`;
+    if (reachedTarget && nextUnfinishedIdx != null) {
+      // Plan-Ziel für diese Übung erreicht — automatisch die nächste offene
+      // Übung vorschlagen. Ein Extra-Satz bleibt trotzdem manuell möglich;
+      // das ändert nur DIESE Ausführung, nicht den gespeicherten Plan.
+      return `${head}${restHtml}
+        <div class="fs-dock-row">
+          <button type="button" class="btn ghost fs-dock-btn fs-dock-secondary" id="fs-next-set">+ Extra</button>
+          <button type="button" class="btn fs-dock-btn" id="fs-next-exercise" data-next-idx="${nextUnfinishedIdx}">▶ ${esc(exerciseName(builder.exercises[nextUnfinishedIdx].exerciseId))}</button>
+        </div>`;
     }
+    const label = g.sets.length ? (reachedTarget ? '+ Extra-Satz' : '▶ Nächster Satz') : '▶ Satz starten';
+    return `${head}${restHtml}
+      <button type="button" class="btn fs-dock-btn" id="fs-next-set">${label}</button>`;
+  };
+
+  const enteringHtml = (g) => {
+    const unit = exerciseUnit(g.exerciseId);
+    const isHold = unit === 'time';
     // 'entering': Vorschlag fürs Gewicht-Feld zuerst der zuletzt in DIESER
     // Session geloggte Satz (damit ein zweiter, dritter... Satz nicht
     // wieder den alten Session-übergreifenden Wert zeigt), erst wenn noch
-    // keiner erfasst wurde die Historie als Ausgangspunkt. Wdh. bleibt
-    // bewusst leer — der Vorschlag käme sonst von einem alten Satz, der
-    // mit der gerade gestoppten Dauer nichts zu tun hat.
+    // keiner erfasst wurde die Historie als Ausgangspunkt. Wdh. kommt nur
+    // vom Vorsatz DIESER Session (gleiche Einheit) — beim ersten Satz
+    // bleibt sie leer. Vorausgefüllt wird sie beim Fokussieren markiert,
+    // eine neue Zahl ersetzt sie also direkt.
     const last = g.sets.length ? g.sets[g.sets.length - 1] : lastValueForExercise(g.exerciseId);
+    const prevSessionSet = g.sets.length ? g.sets[g.sets.length - 1] : null;
+    const prevReps = prevSessionSet && (prevSessionSet.unit || 'reps') === 'reps' ? String(prevSessionSet.reps ?? '') : '';
     // Bei Isohold-Übungen IST die gestoppte Dauer die Angabe — die wird
     // direkt übernommen statt sie erst manuell als "Wiederholung" abtippen
     // oder per Extra-Knopf umdeuten zu müssen. Sekunden sind eine Zeit,
@@ -2360,33 +2393,19 @@ function renderFsPanel() {
       </div>
       <div class="field-row">
         <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" enterkeyhint="next" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
-        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" value="${isHold ? fsCapturedElapsed : ''}"></div>
+        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" value="${isHold ? fsCapturedElapsed : esc(prevReps)}"></div>
       </div>
       <button type="button" class="btn small" id="fs-add-set" style="width:100%;">Satz speichern</button>
     `;
   };
 
-  // Plan-Ausführung hat eine FESTE Reihenfolge (der Plan gibt sie vor) und
-  // ein anderes Eingabe-System als Freestyle: statt einer fix am
-  // Bildschirmrand klebenden Leiste (die bei einem langen Plan weit von der
-  // gerade aktiven Übung entfernt sein kann) wandert das Eingabefeld direkt
-  // MIT in die Karte der aktiven Übung, an ihrer Stelle in der Liste — dort
-  // wo man ohnehin gerade hinschaut. Freestyle behält die klebende Leiste
-  // (Übungen kommen dort nach und nach dazu, die neueste soll ganz oben
-  // erscheinen, nicht in fester Reihenfolge).
+  // Plan-Ausführung zeigt die Übungen in fester Plan-Reihenfolge,
+  // Freestyle die neueste ganz oben (Übungen kommen nach und nach dazu).
   const isExecute = logMode === 'execute';
   const activeGroup = builder.exercises[builder.activeIndex];
   const orderedExercises = builder.exercises.map((g, gi) => ({ g, gi }));
   if (!isExecute) orderedExercises.reverse();
   holder.innerHTML = `
-    ${activeGroup && !isExecute ? `
-    <div class="fs-sticky-bar fs-sticky-input" id="fs-sticky-bar">
-      <div class="fs-sticky-head mono">
-        <span>▸ ${esc(exerciseName(activeGroup.exerciseId))}</span>
-        ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-sticky-add" style="flex-shrink:0;">+ Übung</button>` : ''}
-      </div>
-      ${floatingInputHtml(activeGroup)}
-    </div>` : ''}
     ${orderedExercises.map(({ g, gi }) => {
       const isActive = gi === builder.activeIndex;
       const isDone = isExecute && fsExerciseDone(g);
@@ -2402,7 +2421,7 @@ function renderFsPanel() {
           ${logMode === 'freestyle' ? `<button type="button" class="ex-row-remove" data-remove-group="${gi}" title="Übung entfernen">×</button>` : ''}
         </div>
       </div>
-      ${isActive && isExecute ? `<div class="fs-inline-input">${floatingInputHtml(g)}</div>` : ''}
+      ${isActive && fsPhase === 'entering' ? `<div class="fs-inline-input" id="fs-entry-box">${enteringHtml(g)}</div>` : ''}
       ${g.infoOpen ? fsExerciseInfoHtml(g.exerciseId) : ''}
       ${isActive ? fsMachineNoteHtml(g.exerciseId) : ''}
       ${isActive && targetText ? `<div class="fs-target-value mono">${esc(targetText)}</div>` : ''}
@@ -2446,29 +2465,29 @@ function renderFsPanel() {
     </div>
   `;
     }).join('')}`;
+  if (activeGroup && fsPhase !== 'entering') {
+    const dock = ensureFsDock();
+    dock.innerHTML = dockHtml(activeGroup);
+    dock.classList.toggle('resting', fsPhase === 'resting');
+    dock.classList.remove('hidden');
+    document.body.classList.add('has-fs-dock');
+  } else {
+    hideFsDock();
+  }
   updateFsWorkTimerUI();
   updateFsRestTimerUI();
 
-  const stickyBar = document.getElementById('fs-sticky-bar');
-  if (stickyBar) {
-    const topbarH = document.querySelector('.topbar')?.getBoundingClientRect().height || 0;
-    stickyBar.style.top = `${topbarH}px`;
-    const stickyAdd = document.getElementById('fs-sticky-add');
-    if (stickyAdd) {
-      stickyAdd.onclick = () => {
-        // Einfaches scrollIntoView({block:'start'}) reicht nicht: die
-        // klebende Eingabeleiste (position:sticky) legt sich danach über
-        // den oberen Teil des Ziels (Körperbild + Regionen-Chips wären
-        // darunter versteckt) — deshalb hier die Höhe von Topbar UND
-        // Eingabeleiste selbst mit einrechnen, damit wirklich alles
-        // darunter sichtbar bleibt.
-        const grid = document.getElementById('fs-exercise-grid');
-        if (!grid) return;
-        const barH = stickyBar.getBoundingClientRect().height || 0;
-        const targetTop = grid.getBoundingClientRect().top + window.scrollY - topbarH - barH - 8;
-        window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
-      };
-    }
+  const dockAdd = document.getElementById('fs-dock-add');
+  if (dockAdd) {
+    dockAdd.onclick = () => {
+      // Hoch zur Übungsauswahl — Topbar-Höhe abziehen, sonst läge der obere
+      // Teil (Körperbild + Regionen-Chips) unter der fixen Topbar.
+      const grid = document.getElementById('fs-exercise-grid');
+      if (!grid) return;
+      const topbarH = document.querySelector('.topbar')?.getBoundingClientRect().height || 0;
+      const targetTop = grid.getBoundingClientRect().top + window.scrollY - topbarH - 8;
+      window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+    };
   }
   const startSetBtn = document.getElementById('fs-start-set');
   if (startSetBtn) {
@@ -2491,6 +2510,17 @@ function renderFsPanel() {
       // nur zuverlässig, weil das noch im selben Klick-Handler (also
       // innerhalb der Nutzer-Geste) passiert.
       document.getElementById('fs-weight')?.focus();
+      // Die Eingabe steht in der Karte der Übung, nicht unten in der
+      // Leiste — dorthin scrollen, sobald die Tastatur aufgegangen ist
+      // (vorher stimmt die sichtbare Höhe noch nicht), damit das Feld
+      // oben im Bild steht und nicht von der Tastatur verdeckt wird.
+      setTimeout(() => {
+        const box = document.getElementById('fs-entry-box');
+        if (!box) return;
+        const topbarH = document.querySelector('.topbar')?.getBoundingClientRect().height || 0;
+        box.style.scrollMarginTop = `${topbarH + 8}px`;
+        box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
     };
   }
   const nextSetBtn = document.getElementById('fs-next-set');
