@@ -496,6 +496,31 @@ button, input, select, textarea { font-family: inherit; }
 #fab-start:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
 #fab-start.hidden { display: none; }
 
+/* Grosse Trainings-Leiste unten während einer laufenden Session (siehe
+   ensureFsDock in app.js) — sitzt direkt über der Navigation, breit und
+   mit grossem Knopf, damit man ihn beim Training nicht suchen muss. */
+#fs-dock {
+  position: fixed; left: 0; right: 0; bottom: calc(41px + var(--safe-bottom)); z-index: 7;
+  background: var(--surface-2); border-top: 2px solid var(--accent);
+  padding: 10px 16px 12px; box-shadow: 0 -8px 24px rgba(0, 0, 0, .5);
+}
+#fs-dock.resting { border-top-color: var(--accent2); }
+#fs-dock.hidden { display: none; }
+#fs-dock .fs-dock-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: 12.5px; color: var(--ink); font-weight: 600; margin-bottom: 8px;
+}
+#fs-dock .fs-dock-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#fs-dock .fs-dock-head .btn { flex-shrink: 0; padding: 6px 12px; font-size: 13px; }
+#fs-dock .fs-work-timer { font-size: 48px; margin-bottom: 8px; }
+#fs-dock .fs-rest-timer { font-size: 22px; padding: 8px; margin-bottom: 10px; }
+#fs-dock .fs-dock-btn { width: 100%; padding: 18px 12px; font-size: 22px; margin: 0; }
+#fs-dock .fs-dock-row { display: flex; gap: 8px; }
+#fs-dock .fs-dock-row .fs-dock-btn { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#fs-dock .fs-dock-row .fs-dock-secondary { flex: 0 0 auto; width: auto; font-size: 16px; }
+/* Platz schaffen, damit die Leiste nicht die letzten Einträge verdeckt. */
+body.has-fs-dock { padding-bottom: calc(64px + 200px + var(--safe-bottom)); }
+
 /* ---------- Toast ---------- */
 #toast-root { position: fixed; bottom: calc(76px + var(--safe-bottom)); left: 16px; right: 16px; z-index: 20; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
 .toast {
