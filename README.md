@@ -72,6 +72,21 @@ Sicherheit kommt von den Regeln, nicht vom Verstecken des Keys). Wer welche
 Person ist (Name), ist davon unabhängig und rein lokal gespeichert — keine
 echten Einzel-Accounts nötig.
 
+## Offline
+
+Die App startet auch ohne bzw. mit sehr schlechtem Netz (z. B. im Gym):
+
+- **Service Worker** (`sw.js`): Code/Seiten kommen aus dem Netz, wenn es
+  innert 2,5 s antwortet, sonst sofort aus der gespeicherten Kopie. Die
+  Netz-Antwort aktualisiert die Kopie im Hintergrund (neue Version beim
+  nächsten Öffnen). Bilder und Google Fonts: Cache zuerst.
+- **Daten** (`firebase.js`): Jeder gelesene Pfad wird in `localStorage`
+  gespiegelt (`pincho_c:<pfad>`). Schreibzugriffe landen zuerst lokal und in
+  einer Warteschlange (`pincho_queue`), die automatisch hochgeladen wird,
+  sobald wieder Netz da ist. Push-IDs werden lokal erzeugt (Firebase-Format).
+- **Login**: Ein einmal angemeldetes Gerät startet offline direkt, das
+  Token wird im Hintergrund erneuert.
+
 ## Offene Punkte / bewusst nicht in v1
 
 - **App-Icons**: Aktuell ein einfaches SVG (`icon.svg`). Für optimale
