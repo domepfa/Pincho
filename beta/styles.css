@@ -1292,3 +1292,25 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .fb-fact-chip { border-radius: 14px; background: var(--surface); border-color: var(--line-soft); }
 .fb-fact-label { font-weight: 700; letter-spacing: .08em; }
 .fb-fact-value { font-size: 13px; }
+
+/* ---------- BETA: Campus antippen + Routen-Animation ---------- */
+.campus-pick-wrap { border-radius: 14px; overflow: hidden; background: #0c1116; border: 1px solid var(--line-soft); }
+.campus-pick { width: 100%; height: auto; display: block; }
+.campus-pick .cr { fill: rgba(7, 9, 12, .05); stroke: rgba(7, 9, 12, .0); stroke-width: 3; cursor: pointer; }
+.campus-pick .cr.cr-col { stroke: rgba(79, 195, 255, .55); stroke-width: 3; }
+.campus-pick .cr.cr-virtual { stroke-dasharray: 8 6; stroke: rgba(244, 246, 248, .45); }
+.campus-pick .cr:active { fill: rgba(var(--accent-rgb), .3); }
+.cr-stop { fill: rgba(var(--accent-rgb), .6) !important; stroke: var(--ink) !important; stroke-width: 4 !important; }
+.cr-path { fill: none; stroke: var(--accent); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 14 10; opacity: .9; pointer-events: none; }
+.cr-num { fill: var(--ink); font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 34px; paint-order: stroke; stroke: var(--bg); stroke-width: 6px; pointer-events: none; }
+.campus-pick-bar { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.campus-pick-route { flex: 1; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; color: var(--ink); }
+.campus-pick-route:empty { display: none; }
+
+.campus-anim-row { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; }
+.campus-anim { width: auto; max-width: 58%; height: clamp(160px, 34vh, 320px); display: block; border-radius: 14px; background: #0c1116; }
+.campus-anim .cr-stop { stroke-width: 4 !important; }
+.cr-hand { stroke: var(--ink); stroke-width: 4; }
+.cr-hand.l { fill: var(--accent); }
+.cr-hand.r { fill: #ff6b47; }
+.campus-work-figure .campus-route { font-size: 14px; }
