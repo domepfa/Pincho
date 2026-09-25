@@ -131,6 +131,22 @@ const CAMPUS_BOARD_IMAGE = '../assets/board-campus.jpg';
    von links nach rechts: gross/klein/klein/gross (aussen = gross, innen =
    klein) — bei Bedarf über die Kalibrier-Anzeige direkt am Referenzbild
    nachjustierbar. */
+/* Beta: vermessene Lage jeder Sprosse im Campus-Bild (Pixel im Original,
+   1364×694), Sprosse 1 = unterste. Leisten: gemeinsamer x-Bereich + Höhe;
+   Kugeln: zwei Spalten (linke Hand links, rechte Hand rechts). Bei den
+   grossen Kugeln fehlt im Bild die 10. Reihe — oben im Zickzack ergänzt
+   (virtual). */
+const CAMPUS_IMG_W = 1364;
+const CAMPUS_IMG_H = 694;
+const CAMPUS_GEOMETRY = {
+  rundleiste_gross: { kind: 'bar', x0: 25, x1: 193, h: 28, ys: [594, 534, 474, 413, 353, 292, 231, 170, 109, 48] },
+  kugel_gross: { kind: 'ball', r: 23, cols: [253, 445], ys: [553.5, 492.5, 431.5, 371, 310.5, 249.5, 189, 128.5, 67.5, 6.5], virtual: [10] },
+  kugel_klein: { kind: 'ball', r: 23, cols: [307, 390], ys: [583.5, 522.5, 462, 401, 341, 280.5, 220, 160, 99.5, 39.5] },
+  leiste_35: { kind: 'bar', x0: 507, x1: 693, h: 18, ys: [600, 539, 478.5, 417.5, 356.5, 295.5, 234.5, 173, 111.5, 50.5] },
+  leiste_27: { kind: 'bar', x0: 732, x1: 918, h: 18, ys: [603.5, 542, 481, 419.5, 358.5, 296.5, 235.5, 174, 112.5, 50.5] },
+  leiste_19: { kind: 'bar', x0: 960, x1: 1152, h: 14, ys: [606, 545, 482, 420.5, 358.5, 296.5, 235, 173, 111.5, 50] },
+  leiste_gross: { kind: 'bar', x0: 1183, x1: 1348, h: 24, ys: [605, 540, 477, 414, 353, 291, 229, 167, 106, 44] },
+};
 const CAMPUS_RUNG_TYPES = [
   { id: 'rundleiste_gross', label: 'Rundleiste gross', lineX: 7 },
   { id: 'kugel_gross', label: 'Kugel gross', lineX: 19.5, lineX2: 31.5 },

@@ -3689,6 +3689,109 @@ function campusRoundTripPreview(c) {
   return { stops: [...out.stops, ...back.stops.slice(1)], pattern };
 }
 
+/* Beta: Sprossen direkt am Campus-Bild antippen. Die Route wird in den
+   bestehenden Feldern gespeichert (2 Stationen = "Von → Zu", mehr =
+   Muster mit startRung + pattern), die Zahlen-Stepper darunter bleiben
+   als Alternative. */
+function campusBuilderStops(c) {
+  if (c.routeFresh) return [];
+  if (c.moveMode === 'pattern') return campusStopsOf(c);
+  const pv = campusRoundTripPreview(c);
+  return pv.error ? [c.fromRung, c.toRung] : pv.stops;
+}
+function campusSetStops(c, stops) {
+  c.routeFresh = false;
+  c.returnEnabled = false;
+  if (stops.length === 2) {
+    c.moveMode = 'direct';
+    c.fromRung = stops[0]; c.toRung = stops[1];
+    c.stepSize = Math.max(1, Math.abs(stops[1] - stops[0]));
+  } else {
+    c.moveMode = 'pattern';
+    c.startRung = stops[0];
+    c.pattern = stops.slice(1).map((r, i) => r - stops[i]);
+  }
+}
+function campusPickerSvg(c) {
+  const stops = campusBuilderStops(c);
+  const typeL = c.rungType;
+  const typeR = c.rungSides === 'different' ? (c.rungTypeRight || c.rungType) : c.rungType;
+  const stopSet = new Set(stops);
+  let shapes = '';
+  Object.keys(CAMPUS_GEOMETRY).forEach((t) => {
+    const inUse = t === typeL || t === typeR;
+    for (let r = 1; r <= 10; r++) {
+      const cls = `cr ${inUse ? 'cr-col' : ''} ${inUse && stopSet.has(r) ? 'cr-stop' : ''} ${CAMPUS_GEOMETRY[t].virtual && CAMPUS_GEOMETRY[t].virtual.includes(r) ? 'cr-virtual' : ''}`;
+      shapes += campusRungShapes(t, r, cls, `data-type="${t}" data-rung="${r}"`);
+    }
+  });
+  const numbers = {};
+  stops.forEach((r, i) => { (numbers[r] = numbers[r] || []).push(i + 1); });
+  const [, xR] = campusTypeXRange(typeR);
+  const labels = Object.entries(numbers).map(([r, nums]) => {
+    const y = campusRungPoint(typeR, Number(r), 'r').y;
+    return `<text class="cr-num" x="${Math.min(xR + 8, CAMPUS_IMG_W - 60)}" y="${y + 10}">${nums.join('·')}</text>`;
+  }).join('');
+  const path = stops.length > 1 ? `<polyline class="cr-path" points="${stops.map((r) => { const pt = campusRungPoint(typeL, r, 'l'); return `${pt.x},${pt.y}`; }).join(' ')}"/>` : '';
+  return `<svg class="campus-pick" viewBox="0 0 ${CAMPUS_IMG_W} ${CAMPUS_IMG_H}" role="group" aria-label="Campusboard: Sprossen antippen">
+    <image href="${CAMPUS_BOARD_IMAGE}" x="0" y="0" width="${CAMPUS_IMG_W}" height="${CAMPUS_IMG_H}"/>
+    ${shapes}${path}${labels}
+  </svg>`;
+}
+function wireCampusPicker(c) {
+  document.querySelectorAll('.campus-pick .cr[data-rung]').forEach((el) => {
+    el.onclick = () => {
+      const type = el.dataset.type;
+      const rung = Number(el.dataset.rung);
+      const stops = campusBuilderStops(c);
+      const typeR = c.rungTypeRight || c.rungType;
+      if (c.rungSides === 'different') {
+        if (type !== c.rungType && type !== typeR) {
+          // Neue Spalte für die gerade gewählte Hand
+          if (c.pickHand === 'r') c.rungTypeRight = type;
+          else { c.rungType = type; c.pickHand = 'r'; }
+          if (!stops.length) { c.routeFresh = false; c.moveMode = 'pattern'; c.startRung = rung; c.pattern = []; }
+          renderFbAddPanel();
+          return;
+        }
+      } else if (type !== c.rungType) {
+        // Andere Spalte: Typ wechseln und neue Route an dieser Sprosse starten
+        c.rungType = type;
+        c.routeFresh = false; c.moveMode = 'pattern'; c.startRung = rung; c.pattern = []; c.returnEnabled = false;
+        renderFbAddPanel();
+        return;
+      }
+      if (!stops.length) {
+        c.routeFresh = false; c.moveMode = 'pattern'; c.startRung = rung; c.pattern = []; c.returnEnabled = false;
+      } else if (stops[stops.length - 1] !== rung) {
+        campusSetStops(c, [...stops, rung]);
+      }
+      renderFbAddPanel();
+    };
+  });
+  const sides = document.getElementById('campus-sides-toggle');
+  if (sides) sides.querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => {
+      c.rungSides = btn.dataset.sides;
+      if (c.rungSides === 'different') { c.rungTypeRight = c.rungTypeRight || c.rungType; c.pickHand = 'l'; }
+      renderFbAddPanel();
+    };
+  });
+  const pick = document.getElementById('campus-pickhand-toggle');
+  if (pick) pick.querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => { c.pickHand = btn.dataset.pick; renderFbAddPanel(); };
+  });
+  const undo = document.getElementById('campus-route-undo');
+  if (undo) undo.onclick = () => {
+    const stops = campusBuilderStops(c).slice(0, -1);
+    if (stops.length >= 2) campusSetStops(c, stops);
+    else if (stops.length === 1) { c.moveMode = 'pattern'; c.startRung = stops[0]; c.pattern = []; }
+    else c.routeFresh = true;
+    renderFbAddPanel();
+  };
+  document.getElementById('campus-route-new').onclick = () => { c.routeFresh = true; c.pattern = []; renderFbAddPanel(); };
+}
+
 /* Campus-Board: keine Foto-Hotspots wie beim Hangboard (Sprossen sind
    durchnummeriert, immer in einer Spalte) — stattdessen Sprossen-TYP per
    Chip + die Bewegung rein über Zahlen/Stepper, entweder als direkter
@@ -3702,12 +3805,21 @@ function renderCampusAddPanel(holder) {
       <div class="chip-row" id="campus-rung-toggle" style="margin-bottom:6px;">
         ${CAMPUS_RUNG_TYPES.map((t) => `<button type="button" class="chip ${c.rungType === t.id ? 'active' : ''}" data-rung="${t.id}">${esc(t.label)}</button>`).join('')}
       </div>
-      <div class="campus-ref" id="campus-ref">
-        <img src="${CAMPUS_BOARD_IMAGE}" alt="">
-        ${campusRefLinesHtml(c.rungType)}
-        <div class="campus-ref-label">Antippen wählt den passenden Sprossen-Typ</div>
+      <div class="chip-row" id="campus-sides-toggle" style="margin:8px 0 8px;">
+        <button type="button" class="chip ${c.rungSides !== 'different' ? 'active' : ''}" data-sides="same">Beide Hände gleich</button>
+        <button type="button" class="chip ${c.rungSides === 'different' ? 'active' : ''}" data-sides="different">Unterschiedlich</button>
       </div>
-      <p class="mono" id="campus-ref-calib" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:4px 0 0;min-height:14px;"></p>
+      ${c.rungSides === 'different' ? `
+        <div class="chip-row" id="campus-pickhand-toggle" style="margin-bottom:8px;">
+          <button type="button" class="chip ${c.pickHand !== 'r' ? 'active' : ''}" data-hand-color="l" data-pick="l">Links: ${esc(campusRungLabel(c.rungType))}</button>
+          <button type="button" class="chip ${c.pickHand === 'r' ? 'active' : ''}" data-hand-color="r" data-pick="r">Rechts: ${esc(campusRungLabel(c.rungTypeRight || c.rungType))}</button>
+        </div>` : ''}
+      <div class="campus-pick-wrap">${campusPickerSvg(c)}</div>
+      <div class="campus-pick-bar">
+        <span class="campus-pick-route">${(() => { const st = campusBuilderStops(c); return st.length ? st.join(' → ') : 'Sprossen der Reihe nach antippen: 1. Tipp = Start'; })()}</span>
+        <button type="button" class="btn ghost small" id="campus-route-undo" ${campusBuilderStops(c).length ? '' : 'disabled'}>Zurück</button>
+        <button type="button" class="btn ghost small" id="campus-route-new">Neu</button>
+      </div>
     </div>
 
     <div class="field">
@@ -3820,7 +3932,7 @@ function renderCampusAddPanel(holder) {
   document.getElementById('campus-rung-toggle').querySelectorAll('.chip').forEach((btn) => {
     btn.onclick = () => { c.rungType = btn.dataset.rung; renderFbAddPanel(); };
   });
-  wireCampusRefCalibration(c);
+  wireCampusPicker(c);
   document.getElementById('campus-mode-toggle').querySelectorAll('.chip').forEach((btn) => {
     btn.onclick = () => { c.moveMode = btn.dataset.mode; renderFbAddPanel(); };
   });
@@ -3871,7 +3983,13 @@ function renderCampusAddPanel(holder) {
   document.getElementById('campus-restsec').oninput = (e) => { c.restSec = Number(e.target.value) || 0; };
   document.getElementById('campus-blockrestsec').oninput = (e) => { c.blockRestSec = Number(e.target.value) || 0; };
   document.getElementById('fb-add-campus').onclick = () => {
-    if (c.moveMode === 'pattern' && !c.pattern.length) { toast('Zuerst ein Muster antippen.', 'err'); return; }
+    if (c.routeFresh || (c.moveMode === 'pattern' && !c.pattern.length)) { toast('Zuerst mindestens zwei Sprossen antippen (oder ein Muster wählen).', 'err'); return; }
+    const pushCampus = (blk) => {
+      const out = { ...blk };
+      delete out.rungSides; delete out.pickHand; delete out.routeFresh;
+      if (c.rungSides !== 'different' || !out.rungTypeRight || out.rungTypeRight === out.rungType) delete out.rungTypeRight;
+      fb.blocks.push(out);
+    };
     if (c.moveMode === 'direct') {
       const preview = campusRoundTripPreview(c);
       if (preview.error) { toast(preview.error, 'err'); return; }
@@ -3880,12 +3998,12 @@ function renderCampusAddPanel(holder) {
         // Zwischenstopps: intern als 'pattern'-Satz gespeichert (kein
         // neuer Datentyp nötig, exakt dieselbe Struktur wie ein von Hand
         // gebautes Muster).
-        fb.blocks.push({ type: 'campus', ...c, moveMode: 'pattern', startRung: c.fromRung, pattern: preview.pattern });
+        pushCampus({ type: 'campus', ...c, moveMode: 'pattern', startRung: c.fromRung, pattern: preview.pattern });
         renderFbBlocksList();
         return;
       }
     }
-    fb.blocks.push({ type: 'campus', ...c, pattern: c.pattern.slice() });
+    pushCampus({ type: 'campus', ...c, pattern: c.pattern.slice() });
     renderFbBlocksList();
   };
 }
@@ -7353,7 +7471,10 @@ function campusArmIcons(b) {
   return `${armIcon}${handIcon}`;
 }
 function campusLabel(b) {
-  return `${campusArmIcons(b)} Campus (${esc(campusRungLabel(b.rungType))}) · ${esc(campusMoveText(b))}`;
+  const rungs = b.rungTypeRight && b.rungTypeRight !== b.rungType
+    ? `<span class="hand-l">L: ${esc(campusRungLabel(b.rungType))}</span> · <span class="hand-r">R: ${esc(campusRungLabel(b.rungTypeRight))}</span>`
+    : esc(campusRungLabel(b.rungType));
+  return `${campusArmIcons(b)} Campus (${rungs}) · ${esc(campusMoveText(b))}`;
 }
 /* Bewegungsart als Klartext statt reiner Symbol-Kombo ("🔃🫲") — musste man
    erst entschlüsseln, "Übergreifen · Links zuerst" liest sich von selbst.
@@ -7482,11 +7603,130 @@ function campusLadderSvgMarkup(b) {
 /* Ersetzt das reine Deko-Strichmännchen während des Campus-Arbeitssatzes.
    Direkt-Sätze bleiben ein kompakter Pfeil ("1→4"), Muster-Sätze bekommen
    die Leiter-Grafik + den Wegtext statt der Zahlen-Kacheln von früher. */
-function campusWorkFigureSvg(b) {
-  const moveHtml = b.moveMode === 'pattern'
-    ? `<div class="campus-ladder-row">${campusLadderSvgMarkup(b)}<div class="campus-route">${campusRouteStepsHtml(b)}</div></div>`
-    : `<div class="campus-work-move mono">${b.fromRung}<span class="campus-work-arrow">→</span>${b.toRung}</div>`;
-  return `<div class="campus-work-figure">${campusArmLabelHtml(b)}${moveHtml}</div>`;
+/* Beta: Campus-Satz als Ausschnitt des echten Boards mit der Route —
+   nummerierte Sprossen, Linie dazwischen und (animate) zwei Hand-Punkte,
+   die den Ablauf vorspielen: gleichzeitig, nachziehen oder übergreifen.
+   Gedacht vor allem für die Pause VOR dem Satz (Überblick holen, dann zur
+   Wand); während des Satzes selbst ruhig ohne Animation. */
+function campusWorkFigureSvg(b, animate = true) {
+  const stops = campusStopsOf(b);
+  const text = stops.length === 2
+    ? `<div class="campus-route-step"><span class="campus-route-dot up"></span>Start <b>Sprosse ${stops[0]}</b></div><div class="campus-route-step"><span class="campus-route-dot ${stops[1] > stops[0] ? 'up' : 'down'}"></span>${stops[1] > stops[0] ? 'Rauf' : 'Runter'} bis <b>Sprosse ${stops[1]}</b></div>`
+    : campusRouteStepsHtml({ ...b, pattern: stops.slice(1).map((r, i) => r - stops[i]), startRung: stops[0] });
+  return `<div class="campus-work-figure">${campusArmLabelHtml(b)}<div class="campus-anim-row">${campusRouteAnimSvg(b, animate)}<div class="campus-route">${text}</div></div></div>`;
+}
+
+/* Alle Stationen eines Campus-Satzes (Sprossennummern in Reihenfolge). */
+function campusStopsOf(b) {
+  if (b.moveMode !== 'pattern') return [b.fromRung, b.toRung];
+  const stops = [b.startRung];
+  (b.pattern || []).forEach((p) => stops.push(stops[stops.length - 1] + p));
+  return stops;
+}
+/* Mittelpunkt einer Sprosse für eine Hand ('l'/'r') im Campus-Bild. */
+function campusRungPoint(typeId, rung, hand) {
+  const g = CAMPUS_GEOMETRY[typeId];
+  if (!g) return null;
+  const y = g.ys[Math.min(Math.max(rung, 1), g.ys.length) - 1];
+  if (g.kind === 'ball') return { x: hand === 'r' ? g.cols[1] : g.cols[0], y };
+  const w = g.x1 - g.x0;
+  return { x: hand === 'r' ? g.x0 + w * 0.72 : g.x0 + w * 0.28, y };
+}
+function campusTypeXRange(typeId) {
+  const g = CAMPUS_GEOMETRY[typeId];
+  if (!g) return [0, CAMPUS_IMG_W];
+  return g.kind === 'ball' ? [g.cols[0] - g.r, g.cols[1] + g.r] : [g.x0, g.x1];
+}
+/* Form einer Sprosse als SVG (Leiste = abgerundetes Rechteck, Kugel = Kreis
+   pro Spalte). cls/attrs werden an jede Form gehängt. */
+function campusRungShapes(typeId, rung, cls, attrs = '') {
+  const g = CAMPUS_GEOMETRY[typeId];
+  const y = g.ys[rung - 1];
+  if (g.kind === 'ball') {
+    return g.cols.map((cx, i) => `<circle class="${cls}" cx="${cx}" cy="${y}" r="${g.r + 3}" ${attrs} data-side="${i ? 'r' : 'l'}"/>`).join('');
+  }
+  return `<rect class="${cls}" x="${g.x0 - 3}" y="${y - g.h / 2 - 3}" width="${g.x1 - g.x0 + 6}" height="${g.h + 6}" rx="${g.h / 2 + 3}" ${attrs}/>`;
+}
+
+/* Zeitplan der Hand-Bewegungen: Liste [{t0, t1, rung}] je Hand. */
+function campusHandEvents(b, stops) {
+  const armMode = b.armMode || 'both';
+  const lead = b.startHand === 'right' ? 'r' : 'l';
+  const other = lead === 'l' ? 'r' : 'l';
+  const ev = { l: [], r: [] };
+  for (let i = 1; i < stops.length; i++) {
+    const t = i - 1;
+    if (armMode === 'both') {
+      ev.l.push({ t0: t + 0.1, t1: t + 0.6, rung: stops[i] });
+      ev.r.push({ t0: t + 0.1, t1: t + 0.6, rung: stops[i] });
+    } else if (armMode === 'match') {
+      ev[lead].push({ t0: t + 0.05, t1: t + 0.45, rung: stops[i] });
+      ev[other].push({ t0: t + 0.5, t1: t + 0.9, rung: stops[i] });
+    } else {
+      const hand = i % 2 === 1 ? lead : other;
+      ev[hand].push({ t0: t + 0.1, t1: t + 0.6, rung: stops[i] });
+    }
+  }
+  return ev;
+}
+
+function campusRouteAnimSvg(b, animate) {
+  const typeL = b.rungType;
+  const typeR = b.rungTypeRight || b.rungType;
+  if (!CAMPUS_GEOMETRY[typeL] || !CAMPUS_GEOMETRY[typeR]) return campusLadderSvgMarkup(b.moveMode === 'pattern' ? b : { ...b, moveMode: 'pattern', startRung: b.fromRung, pattern: [b.toRung - b.fromRung] });
+  const stops = campusStopsOf(b);
+  const [ax0, ax1] = campusTypeXRange(typeL);
+  const [bx0, bx1] = campusTypeXRange(typeR);
+  const x0 = Math.max(0, Math.min(ax0, bx0) - 40);
+  const x1 = Math.max(ax1, bx1) + 90; // Platz rechts für die Nummern
+  // Nur der benutzte Höhenbereich (plus eine Sprosse Luft), damit die Route
+  // gross genug erscheint.
+  const ysUsed = stops.flatMap((r) => [campusRungPoint(typeL, r, 'l').y, campusRungPoint(typeR, r, 'r').y]);
+  const y0 = Math.max(0, Math.min(...ysUsed) - 70);
+  const y1 = Math.min(CAMPUS_IMG_H, Math.max(...ysUsed) + 70);
+  const types = typeL === typeR ? [typeL] : [typeL, typeR];
+  const stopSet = new Set(stops);
+  let shapes = '';
+  types.forEach((t) => {
+    for (let r = 1; r <= 10; r++) {
+      if (stopSet.has(r)) shapes += campusRungShapes(t, r, 'cr-stop');
+    }
+  });
+  // Nummern (Reihenfolge) neben den Stationen
+  const labelX = Math.max(ax1, bx1) + 12;
+  const labels = {};
+  stops.forEach((r, i) => { (labels[r] = labels[r] || []).push(i + 1); });
+  const labelSvg = Object.entries(labels).map(([r, nums]) => {
+    const y = campusRungPoint(typeR, Number(r), 'r').y;
+    return `<text class="cr-num" x="${labelX}" y="${y + 9}">${nums.join('·')}</text>`;
+  }).join('');
+  const T = Math.max(1, stops.length - 1) + 1.2;
+  const dur = (T * 0.9).toFixed(2);
+  const ev = campusHandEvents(b, stops);
+  const handSvg = ['l', 'r'].map((hand) => {
+    const type = hand === 'l' ? typeL : typeR;
+    const p0 = campusRungPoint(type, stops[0], hand);
+    if (!animate) return `<circle class="cr-hand ${hand}" cx="${p0.x}" cy="${p0.y}" r="17"/>`;
+    const pts = [[0, stops[0]]];
+    let last = stops[0];
+    ev[hand].forEach((e) => { pts.push([e.t0, last], [e.t1, e.rung]); last = e.rung; });
+    pts.push([T, last]);
+    // keyTimes streng steigend halten
+    const times = [];
+    pts.forEach(([t], i) => { times.push(Math.max(t, i ? times[i - 1] + 0.001 : 0)); });
+    const keyTimes = times.map((t) => Math.min(1, t / T).toFixed(4)).join(';');
+    const values = pts.map(([, r]) => campusRungPoint(type, r, hand).y).join(';');
+    return `<circle class="cr-hand ${hand}" cx="${p0.x}" cy="${p0.y}" r="17"><animate attributeName="cy" dur="${dur}s" repeatCount="indefinite" values="${values}" keyTimes="${keyTimes}"/></circle>`;
+  }).join('');
+  const lineL = stops.map((r) => { const p = campusRungPoint(typeL, r, 'l'); return `${p.x},${p.y}`; }).join(' ');
+  return `
+    <svg class="campus-anim" viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}" preserveAspectRatio="xMidYMid meet" aria-label="Route ${stops.join(' → ')}">
+      <image href="${CAMPUS_BOARD_IMAGE}" x="0" y="0" width="${CAMPUS_IMG_W}" height="${CAMPUS_IMG_H}" opacity=".55"/>
+      ${shapes}
+      <polyline class="cr-path" points="${lineL}"/>
+      ${labelSvg}
+      ${handSvg}
+    </svg>`;
 }
 
 /* Senkrechter Strich (zwei bei den Kugeln, da im Zickzack statt einer
@@ -8263,8 +8503,8 @@ function renderFbOverlay() {
              </div>
            </div>`
         : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:">${working
-            ? (isCampus ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId))
-            : (isTrailingPause ? (displayIsCampus ? campusWorkFigureSvg(displayBlock) : displayIsPause ? FB_REST_FIGURE_SVG : exerciseFigureSvg(displayBlock.exerciseId)) : FB_REST_FIGURE_SVG)}</div>
+            ? (isCampus ? campusWorkFigureSvg(block, false) : exerciseFigureSvg(block.exerciseId))
+            : (isTrailingPause ? (displayIsCampus ? campusWorkFigureSvg(displayBlock) : displayIsPause ? FB_REST_FIGURE_SVG : exerciseFigureSvg(displayBlock.exerciseId)) : isCampus ? campusWorkFigureSvg(block) : FB_REST_FIGURE_SVG)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}${restTense ? ' rest-tense' : ''}">
              <div class="fb-timer-ring">
                <svg viewBox="0 0 120 120">
@@ -8924,7 +9164,7 @@ function updateTimerUI() {
   const kind = (working ? 'work' : 'rest') + ':' + (activeRep != null ? activeRep : '') + (isTrailingPauseNow ? ':next' : '');
   if (figureHolder && figureHolder.dataset.kind !== kind) {
     if (working) {
-      figureHolder.innerHTML = isHangLikeBlock(block) ? holdBlockWorkFigure(block, activeRep) : block.type === 'campus' ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId);
+      figureHolder.innerHTML = isHangLikeBlock(block) ? holdBlockWorkFigure(block, activeRep) : block.type === 'campus' ? campusWorkFigureSvg(block, false) : exerciseFigureSvg(block.exerciseId);
     } else if (displayIsHangNow) {
       // Layout mit separatem Board-Thumb oben (schon beim vollen Rendern
       // gesetzt, hier unberührt) — die kleine Figur bleibt die Ruhefigur.
@@ -8934,7 +9174,7 @@ function updateTimerUI() {
       // abschliessenden Pause die Vorschau des nächsten Blocks zeigen.
       figureHolder.innerHTML = isTrailingPauseNow
         ? (displayBlockNow.type === 'campus' ? campusWorkFigureSvg(displayBlockNow) : displayBlockNow.type === 'pause' ? FB_REST_FIGURE_SVG : exerciseFigureSvg(displayBlockNow.exerciseId))
-        : FB_REST_FIGURE_SVG;
+        : block.type === 'campus' ? campusWorkFigureSvg(block) : FB_REST_FIGURE_SVG;
     }
     figureHolder.dataset.kind = kind;
   }
