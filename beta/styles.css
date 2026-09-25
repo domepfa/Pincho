@@ -1174,3 +1174,5 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .field label.ex-search {
   display: flex; margin-bottom: 12px; font-size: 16px; letter-spacing: 0; text-transform: none; color: var(--ink-faint);
 }
+.ex-recent-label { font-size: 12px; font-weight: 700; letter-spacing: .12em; color: var(--ink-faint); margin: 2px 0 8px; text-transform: uppercase; }
+.ex-card.recent:not(.active) { border-color: #24425a; }
