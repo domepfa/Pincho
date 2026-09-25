@@ -1232,3 +1232,63 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .chip[data-hand-color="r"] { border-color: rgba(255, 107, 71, .6); }
 .chip[data-hand-color="l"].active { background: var(--accent) !important; border-color: var(--accent) !important; color: var(--accent-ink) !important; }
 .chip[data-hand-color="r"].active { background: #ff6b47 !important; border-color: #ff6b47 !important; color: #2a0d05 !important; }
+
+/* ---------- BETA Schritt 4: laufender Ablauf ---------- */
+.fb-overlay { background-image: none; background-color: var(--bg); }
+.fb-overlay-close, .fb-overlay-overview-btn {
+  width: 44px; height: 44px; border-radius: 22px; border-color: var(--line);
+  background: var(--surface); color: var(--ink); font-size: 17px;
+}
+.fb-progress-text { font-size: 13px; font-weight: 600; letter-spacing: .06em; color: var(--ink-dim); }
+.fb-stage-label { font-size: 13px; font-weight: 700; letter-spacing: .08em; color: var(--ink-dim); }
+.fb-stage-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; }
+
+/* Countdown-Ring: blau beim Hängen, orange in der Pause */
+.fb-timer-ring { width: clamp(120px, 24vh, 230px); height: clamp(120px, 24vh, 230px); }
+.ring-bg { stroke: #1a212a; stroke-width: 9; }
+.ring-fg { stroke: var(--accent); stroke-width: 9; stroke-linecap: round; }
+.ring-fg.rest { stroke: #ff6b47; }
+.fb-timer-ring .big { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; color: var(--ink); }
+.fb-timer-ring .big.rest { color: #ffb49b; }
+.phase { font-size: 14px; font-weight: 600; color: var(--ink-dim); letter-spacing: .04em; }
+
+/* Transport: runde Knöpfe, Play/Pause gross und weiss */
+.fb-transport { gap: 22px; margin: 4px 0; }
+.fb-transport-btn {
+  width: 62px; height: 62px; border-radius: 31px; border-color: var(--line);
+  background: var(--surface); color: var(--ink);
+  display: inline-flex; align-items: center; justify-content: center; padding: 0;
+}
+.fb-transport-btn.fb-play {
+  width: 84px; height: 84px; border-radius: 42px; border: none;
+  background: var(--ink); color: var(--bg); box-shadow: 0 10px 30px -10px rgba(244, 246, 248, .5);
+}
+.fb-transport-btn.fb-play:disabled { background: var(--surface); color: var(--ink-dim); box-shadow: none; }
+.fb-transport-btn:not(:disabled):active { transform: scale(.92); }
+.fb-stage-btn.btn.ghost { max-width: 320px; }
+
+/* Faultier-Figuren */
+.fb-phase-figure { width: clamp(80px, 16vh, 130px); }
+.sloth-fig .sloth-bar { stroke: #8a6a4a; stroke-width: 7; stroke-linecap: round; }
+.sloth-fig .sloth-limb { fill: none; stroke: #b7a58f; stroke-width: 10; stroke-linecap: round; }
+.sloth-fig .sloth-claw { fill: none; stroke: var(--ink); stroke-width: 2.6; stroke-linecap: round; }
+.sloth-fig .sloth-body { fill: #6f5a44; stroke: #b7a58f; stroke-width: 3; }
+.sloth-fig .sloth-head { fill: #cdb89d; stroke: #b7a58f; stroke-width: 3; }
+.sloth-fig .sloth-mask { fill: #3a2c20; }
+.sloth-fig .sloth-eye { fill: var(--ink); }
+.sloth-fig .sloth-line { fill: none; stroke: #2a2018; stroke-width: 2.4; stroke-linecap: round; }
+.sloth-fig .sloth-body + .sloth-line { stroke: #8f7760; }
+.sloth-fig .sloth-z { fill: var(--accent); font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .sloth-swing { transform-origin: 100px 20px; animation: sloth-hang-swing 3.2s ease-in-out infinite; }
+  .sloth-breathe { transform-origin: 100px 170px; animation: sloth-breathe 3s ease-in-out infinite; }
+  .sloth-fig .sloth-z { animation: sloth-z 3s ease-in-out infinite; }
+  .sloth-fig .sloth-z2 { animation-delay: 1.2s; }
+}
+@keyframes sloth-hang-swing { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes sloth-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03, .98); } }
+@keyframes sloth-z { 0% { opacity: 0; transform: translateY(6px); } 40% { opacity: .9; } 100% { opacity: 0; transform: translateY(-10px); } }
+.fb-hang-visual.fb-paused .sloth-swing, .fb-hang-visual.fb-paused .sloth-breathe { animation-play-state: paused; }
+.fb-fact-chip { border-radius: 14px; background: var(--surface); border-color: var(--line-soft); }
+.fb-fact-label { font-weight: 700; letter-spacing: .08em; }
+.fb-fact-value { font-size: 13px; }

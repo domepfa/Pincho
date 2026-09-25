@@ -1466,7 +1466,7 @@ function renderWallOverlay() {
       <div class="phase mono">${isPausedNow ? 'PAUSIERT' : working ? 'Wand' : 'Pause'}</div>
       <div class="fb-stage-next mono">${esc(nextText)}</div>
       <div class="fb-transport">
-        <button type="button" class="fb-transport-btn fb-play" id="wall-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? '▶' : '⏸'}</button>
+        <button type="button" class="fb-transport-btn fb-play" id="wall-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? TRANSPORT_ICON.play : TRANSPORT_ICON.pause}</button>
       </div>
       <button class="btn fb-stage-btn" id="wall-done-btn">FERTIG</button>
       <button class="btn ghost fb-stage-btn" id="wall-cancel-btn">ABBRECHEN</button>
@@ -1969,7 +1969,7 @@ function renderFlowOverlay() {
       <div class="phase mono" id="flow-phase">${isPausedNow ? 'PAUSIERT' : working ? 'Halten' : 'Wechsel'}</div>
       <div class="fb-stage-next mono">${nextText}</div>
       <div class="fb-transport">
-        <button type="button" class="fb-transport-btn fb-play" id="flow-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? '▶' : '⏸'}</button>
+        <button type="button" class="fb-transport-btn fb-play" id="flow-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? TRANSPORT_ICON.play : TRANSPORT_ICON.pause}</button>
       </div>
       ${flow.blockIndex > 0 ? '<button class="btn ghost fb-stage-btn" id="flow-finish-early">Vorzeitig beenden & speichern</button>' : ''}
       <button class="btn ghost fb-stage-btn" id="flow-cancel-btn">ABBRECHEN</button>
@@ -7842,29 +7842,45 @@ function renderFbRuntime() {
    grosse Zahl füllt sich dabei mit dem Fortschritt INNERHALB des
    aktuellen Hang-/Pause-Schritts (nicht des ganzen Ablaufs). */
 const FB_RING_CIRCUMFERENCE = 326.7; // 2 * PI * r(52)
+/* Beta: Faultier statt Strichmännchen (Pincho = Fingerkraft wie ein
+   Faultier). Beim Hängen hängt es mit den Krallen an der Leiste und
+   schwingt leicht, in der Pause sitzt es mit hängenden Armen und atmet
+   durch (Animationen in styles.css, .sloth-*). */
+const SLOTH_FACE = `
+  <circle class="sloth-head" cx="100" cy="64" r="19"/>
+  <path class="sloth-mask" d="M86 62 q6 -7 12 1 q-6 7 -12 -1z M114 62 q-6 -7 -12 1 q6 7 12 -1z"/>
+  <path class="sloth-line" d="M97 71 h6 M94 76 q6 4 12 0"/>`;
 const FB_HANG_FIGURE_SVG = `
-  <svg viewBox="0 0 200 200" class="ex-figure fb-hang-figure">
-    <line class="fig-rig" x1="40" y1="20" x2="160" y2="20"/>
-    <g class="fig-pose">
-      <line x1="78" y1="20" x2="94" y2="58"/>
-      <line x1="122" y1="20" x2="106" y2="58"/>
-      <circle cx="100" cy="42" r="14"/>
-      <line x1="100" y1="58" x2="100" y2="120"/>
-      <line x1="100" y1="120" x2="90" y2="180"/>
-      <line x1="100" y1="120" x2="110" y2="180"/>
+  <svg viewBox="0 0 200 200" class="ex-figure fb-hang-figure sloth-fig">
+    <line class="fig-rig sloth-bar" x1="36" y1="20" x2="164" y2="20"/>
+    <g class="sloth-swing">
+      <path class="sloth-limb" d="M72 22 Q70 50 88 76"/>
+      <path class="sloth-limb" d="M128 22 Q130 50 112 76"/>
+      <path class="sloth-claw" d="M66 20 q4 -8 10 -2 M70 22 q6 -8 11 0 M124 22 q5 -8 11 -2 M128 22 q6 -8 10 0"/>
+      <ellipse class="sloth-body" cx="100" cy="118" rx="27" ry="36"/>
+      <path class="sloth-line" d="M86 108 q14 9 28 0 M88 124 q12 7 24 0"/>
+      ${SLOTH_FACE}
+      <circle class="sloth-eye" cx="93" cy="62" r="2.4"/>
+      <circle class="sloth-eye" cx="107" cy="62" r="2.4"/>
+      <path class="sloth-limb" d="M88 148 Q82 164 84 182 M112 148 Q118 164 116 182"/>
+      <path class="sloth-claw" d="M80 184 q-2 7 -8 8 M85 185 q0 7 -4 10 M120 184 q2 7 8 8 M115 185 q0 7 4 10"/>
     </g>
   </svg>
 `;
 const FB_REST_FIGURE_SVG = `
-  <svg viewBox="0 0 200 200" class="ex-figure fb-rest-figure">
-    <g class="fig-pose">
-      <circle cx="99" cy="42" r="15"/>
-      <line x1="99" y1="60" x2="99" y2="138"/>
-      <line x1="99" y1="138" x2="86" y2="196"/>
-      <line x1="99" y1="138" x2="114" y2="196"/>
+  <svg viewBox="0 0 200 200" class="ex-figure fb-rest-figure sloth-fig">
+    <g class="sloth-breathe">
+      <ellipse class="sloth-body" cx="100" cy="134" rx="32" ry="34"/>
+      <path class="sloth-line" d="M84 124 q16 10 32 0 M86 142 q14 8 28 0"/>
+      <circle class="sloth-head" cx="100" cy="84" r="19"/>
+      <path class="sloth-mask" d="M86 82 q6 -7 12 1 q-6 7 -12 -1z M114 82 q-6 -7 -12 1 q6 7 12 -1z"/>
+      <path class="sloth-line" d="M89 82 q4 3 8 0 M103 82 q4 3 8 0 M97 91 h6 M95 96 q5 3 10 0"/>
+      <path class="sloth-limb" d="M82 170 q-10 10 -24 12 M118 170 q10 10 24 12"/>
     </g>
-    <line class="fig-pose fb-arm-shake" x1="99" y1="65" x2="80" y2="112"/>
-    <line class="fig-pose fb-arm-shake" x1="99" y1="65" x2="118" y2="112"/>
+    <path class="sloth-limb fb-arm-shake" d="M72 116 Q60 140 64 164"/>
+    <path class="sloth-limb fb-arm-shake" d="M128 116 Q140 140 136 164"/>
+    <text class="sloth-z" x="128" y="58">z</text>
+    <text class="sloth-z sloth-z2" x="142" y="42">z</text>
   </svg>
 `;
 /* Lifting Pin ist kein Hängen (FB_HANG_FIGURE_SVG), sondern ein einarmiges
@@ -8014,14 +8030,22 @@ function updateFbUpcomingUI() {
    Zurück/Weiter springen direkt in den Nachbar-Satz (inkl. dessen eigenem
    Vorbereitungs-Countdown bei Hang-Sätzen), Play/Pause hält den gerade
    laufenden Timer an, ohne den Bildschirm auszuschalten. */
+/* Transport-Symbole als SVG statt Emoji-Zeichen (⏮⏸⏭ werden auf Android
+   als bunte Emoji-Kacheln gezeichnet). */
+const TRANSPORT_ICON = {
+  prev: '<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M6 5h2v14H6zM20 6.2v11.6a1 1 0 01-1.5.9L10 12.9a1 1 0 010-1.8l8.5-5.8a1 1 0 011.5.9z"/></svg>',
+  next: '<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM4 6.2v11.6a1 1 0 001.5.9L14 12.9a1 1 0 000-1.8L5.5 5.3A1 1 0 004 6.2z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 001.5.9l10.2-6.5a1 1 0 000-1.8L9.5 4.6A1 1 0 008 5.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>',
+};
 function fbTransportRow() {
   const canPause = fb.running;
   const isPaused = canPause && !fb.intervalId;
   return `
     <div class="fb-transport">
-      <button type="button" class="fb-transport-btn" id="fb-prev" ${fb.blockIndex === 0 && fb.stepIndex === 0 ? 'disabled' : ''} title="Zurück">⏮</button>
-      <button type="button" class="fb-transport-btn fb-play" id="fb-playpause" ${canPause ? '' : 'disabled'} title="${isPaused ? 'Weiter' : 'Pause'}">${isPaused ? '▶' : '⏸'}</button>
-      <button type="button" class="fb-transport-btn" id="fb-skip" title="Einen Schritt weiter">⏭</button>
+      <button type="button" class="fb-transport-btn" id="fb-prev" ${fb.blockIndex === 0 && fb.stepIndex === 0 ? 'disabled' : ''} title="Zurück" aria-label="Zurück">${TRANSPORT_ICON.prev}</button>
+      <button type="button" class="fb-transport-btn fb-play" id="fb-playpause" ${canPause ? '' : 'disabled'} title="${isPaused ? 'Weiter' : 'Pause'}">${isPaused ? TRANSPORT_ICON.play : TRANSPORT_ICON.pause}</button>
+      <button type="button" class="fb-transport-btn" id="fb-skip" title="Einen Schritt weiter" aria-label="Einen Schritt weiter">${TRANSPORT_ICON.next}</button>
     </div>
   `;
 }
