@@ -1314,3 +1314,13 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .cr-hand.l { fill: var(--accent); }
 .cr-hand.r { fill: #ff6b47; }
 .campus-work-figure .campus-route { font-size: 14px; }
+
+/* Vollbild muss ohne Scrollen passen: Titel unter die runden Kopf-Knöpfe,
+   Board-Ausschnitt, Ring und Transport-Knöpfe etwas kompakter. */
+.fb-overlay-inner { padding-top: 46px; }
+.fb-overlay-stage { gap: 8px; }
+.campus-anim { height: clamp(120px, 25vh, 260px); }
+.fb-timer-ring { width: clamp(104px, 19vh, 200px); height: clamp(104px, 19vh, 200px); }
+.fb-transport { gap: 18px; }
+.fb-transport-btn { width: 54px; height: 54px; border-radius: 27px; }
+.fb-transport-btn.fb-play { width: 72px; height: 72px; border-radius: 36px; }
