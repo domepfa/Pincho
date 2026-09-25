@@ -3006,6 +3006,20 @@ const fb = {
    data.js, in % von Bildbreite/-höhe — funktioniert responsiv). Da es sich
    bislang um eine Illustration handelt, ist die Zuordnung Zone↔Kategorie
    nach bestem Augenmass gewählt, nicht pixelgenau vermessen. */
+/* Welche Seite des Boards ein Loch ist — bei "pro Hand unterschiedlich"
+   gehört das linke Loch zur linken Hand, das rechte zur rechten (mittige
+   Griffe wie die grosse Kante zu beiden). */
+function hotspotSide(h) {
+  const x = h.hx != null ? h.hx : h.x;
+  return x < 47 ? 'left' : x > 53 ? 'right' : 'center';
+}
+function hotspotHandClass(gripState, h) {
+  const side = hotspotSide(h);
+  return [
+    h.grip === gripState.selectedGripLeft && side !== 'right' ? 'active-left' : '',
+    h.grip === gripState.selectedGripRight && side !== 'left' ? 'active-right' : '',
+  ].filter(Boolean).join(' ');
+}
 function holeStyle(h) {
   if (h.hw == null) return `left:${h.x}%;top:${h.y}%;`;
   return `left:${h.hx}%;top:${h.hy}%;width:${h.hw}%;height:${h.hh}%;`;
@@ -3015,11 +3029,11 @@ function renderBoardImage(gripState = fb, photoId = 'fb-board-photo') {
   const spots = board.hotspots.map((h) => {
     const grip = board.grips.find((g) => g.id === h.grip);
     const cls = gripState.gripMode === 'different'
-      ? [h.grip === gripState.selectedGripLeft ? 'active-left' : '', h.grip === gripState.selectedGripRight ? 'active-right' : ''].filter(Boolean).join(' ')
+      ? hotspotHandClass(gripState, h)
       : (gripState.selectedGrip === h.grip ? 'active' : '');
     // Form des echten Lochs (hx/hy/hw/hh in % des Bildes, siehe data.js);
     // Sloper oben sind Flächen statt Löcher (surface).
-    return `<button type="button" class="board-hotspot hole ${h.surface ? 'surface' : ''} ${cls}" style="${holeStyle(h)}" data-grip="${h.grip}" title="${esc(grip.label)}${grip.note ? ' · ' + esc(grip.note) : ''}" aria-label="${esc(grip.label)}"></button>`;
+    return `<button type="button" class="board-hotspot hole ${h.surface ? 'surface' : ''} ${cls}" style="${holeStyle(h)}" data-grip="${h.grip}" data-side="${hotspotSide(h)}" data-hx="${h.hx != null ? h.hx : h.x}" title="${esc(grip.label)}${grip.note ? ' · ' + esc(grip.note) : ''}" aria-label="${esc(grip.label)}"></button>`;
   }).join('');
   return `<div class="board-photo-wrap" id="${photoId}">
     <img src="${board.image}" alt="${esc(board.label)}">
@@ -3050,7 +3064,7 @@ function fbSelectedGripHint(gripState = fb) {
   if (gripState.gripMode === 'different') {
     const left = gripState.selectedGripLeft ? esc(gripLabel(gripState.board, gripState.selectedGripLeft)) : '—';
     const right = gripState.selectedGripRight ? esc(gripLabel(gripState.board, gripState.selectedGripRight)) : '—';
-    return `Links: ${left} · Rechts: ${right}`;
+    return `<span class="hand-l">Links: ${left}</span> · <span class="hand-r">Rechts: ${right}</span>`;
   }
   return gripState.selectedGrip
     ? 'Gewählt: ' + esc(gripLabel(gripState.board, gripState.selectedGrip))
@@ -3065,10 +3079,13 @@ function fbSelectedGripHint(gripState = fb) {
    gripMode==='different' schreibt ein Tap auf die gerade aktive Hand
    (fb.pickingHand), beide Hände bleiben gleichzeitig am Board sichtbar
    (unterschiedlich eingefärbt), damit man den Unterschied sofort sieht. */
-function selectFbGrip(gripId) {
-  // Nach der linken Hand automatisch zur rechten weiterschalten — ein Klick
-  // weniger, da als Nächstes ohnehin der rechte Griff drankommt.
-  const advanceToRight = fb.gripMode === 'different' && fb.pickingHand === 'left';
+function selectFbGrip(gripId, side) {
+  // Loch links/rechts am Board angetippt: bestimmt direkt die Hand. Nur bei
+  // mittigen Griffen oder Auswahl aus der Liste zählt die gerade aktive
+  // Hand — dann nach links automatisch zu rechts weiterschalten.
+  const bySide = fb.gripMode === 'different' && (side === 'left' || side === 'right');
+  if (bySide) fb.pickingHand = side;
+  const advanceToRight = fb.gripMode === 'different' && !bySide && fb.pickingHand === 'left';
   if (fb.gripMode === 'different') {
     if (fb.pickingHand === 'left') fb.selectedGripLeft = gripId;
     else fb.selectedGripRight = gripId;
@@ -3077,11 +3094,12 @@ function selectFbGrip(gripId) {
     fb.selectedGrip = gripId;
   }
   const hint = document.getElementById('fb-selected-hint');
-  if (hint) hint.textContent = fbSelectedGripHint();
+  if (hint) hint.innerHTML = fbSelectedGripHint();
   document.querySelectorAll('#fb-board-visual .board-hotspot').forEach((el) => {
     if (fb.gripMode === 'different') {
-      el.classList.toggle('active-left', el.dataset.grip === fb.selectedGripLeft);
-      el.classList.toggle('active-right', el.dataset.grip === fb.selectedGripRight);
+      const h = { grip: el.dataset.grip, hx: Number(el.dataset.hx) };
+      el.classList.remove('active-left', 'active-right');
+      hotspotHandClass(fb, h).split(' ').filter(Boolean).forEach((c) => el.classList.add(c));
     } else {
       el.classList.toggle('active', el.dataset.grip === gripId);
     }
@@ -3095,12 +3113,10 @@ function selectFbGrip(gripId) {
     const rightBtn = handLabels.querySelector('[data-hand="right"]');
     if (leftBtn) leftBtn.textContent = 'Links' + (fb.selectedGripLeft ? ': ' + gripLabel(fb.board, fb.selectedGripLeft) : ' wählen');
     if (rightBtn) rightBtn.textContent = 'Rechts' + (fb.selectedGripRight ? ': ' + gripLabel(fb.board, fb.selectedGripRight) : ' wählen');
-    if (advanceToRight) {
-      leftBtn.classList.remove('active');
-      rightBtn.classList.add('active');
-      const label = document.querySelector('#fb-add-panel .field label');
-      if (label) label.textContent = 'Oder aus der Liste wählen (für rechts)';
-    }
+    leftBtn.classList.toggle('active', fb.pickingHand === 'left');
+    rightBtn.classList.toggle('active', fb.pickingHand === 'right');
+    const label = document.querySelector('#fb-add-panel .field label');
+    if (label) label.textContent = `Oder aus der Liste wählen (für ${fb.pickingHand === 'left' ? 'links' : 'rechts'})`;
   }
 }
 
@@ -3148,10 +3164,12 @@ function openFbGripEditor(index) {
   };
   renderFbGripEditorSheet();
 }
-function selectFbEditorGrip(gripId) {
+function selectFbEditorGrip(gripId, side) {
   const st = fbGripEditor;
   if (!st) return;
-  const advanceToRight = st.gripMode === 'different' && st.pickingHand === 'left';
+  const bySide = st.gripMode === 'different' && (side === 'left' || side === 'right');
+  if (bySide) st.pickingHand = side;
+  const advanceToRight = st.gripMode === 'different' && !bySide && st.pickingHand === 'left';
   if (st.gripMode === 'different') {
     if (st.pickingHand === 'left') st.selectedGripLeft = gripId;
     else st.selectedGripRight = gripId;
@@ -3179,8 +3197,8 @@ function renderFbGripEditorSheet() {
       </div>
       ${st.gripMode === 'different' ? `
         <div class="chip-row" id="fbge-hand-toggle">
-          <button type="button" class="chip ${st.pickingHand === 'left' ? 'active' : ''}" data-hand="left">Links${st.selectedGripLeft ? ': ' + esc(gripLabel(st.board, st.selectedGripLeft)) : ' wählen'}</button>
-          <button type="button" class="chip ${st.pickingHand === 'right' ? 'active' : ''}" data-hand="right">Rechts${st.selectedGripRight ? ': ' + esc(gripLabel(st.board, st.selectedGripRight)) : ' wählen'}</button>
+          <button type="button" class="chip ${st.pickingHand === 'left' ? 'active' : ''}" data-hand="left" data-hand-color="l">Links${st.selectedGripLeft ? ': ' + esc(gripLabel(st.board, st.selectedGripLeft)) : ' wählen'}</button>
+          <button type="button" class="chip ${st.pickingHand === 'right' ? 'active' : ''}" data-hand="right" data-hand-color="r">Rechts${st.selectedGripRight ? ': ' + esc(gripLabel(st.board, st.selectedGripRight)) : ' wählen'}</button>
         </div>
       ` : ''}
       <div class="board-visual">${renderBoardImage(st, 'fbge-board-photo')}</div>
@@ -3216,7 +3234,7 @@ function renderFbGripEditorSheet() {
     });
   }
   el.querySelectorAll('.board-hotspot').forEach((btn) => {
-    btn.onclick = () => selectFbEditorGrip(btn.dataset.grip);
+    btn.onclick = () => selectFbEditorGrip(btn.dataset.grip, btn.dataset.side);
   });
   document.getElementById('fbge-grip-select').onchange = (e) => selectFbEditorGrip(e.target.value || null);
   document.getElementById('fbge-save').onclick = () => {
@@ -3344,8 +3362,8 @@ function renderFbAddPanel() {
       </div>
       ${fb.gripMode === 'different' ? `
         <div class="chip-row" id="fb-hand-toggle">
-          <button class="chip ${fb.pickingHand === 'left' ? 'active' : ''}" data-hand="left">Links${fb.selectedGripLeft ? ': ' + esc(gripLabel(fb.board, fb.selectedGripLeft)) : ' wählen'}</button>
-          <button class="chip ${fb.pickingHand === 'right' ? 'active' : ''}" data-hand="right">Rechts${fb.selectedGripRight ? ': ' + esc(gripLabel(fb.board, fb.selectedGripRight)) : ' wählen'}</button>
+          <button class="chip ${fb.pickingHand === 'left' ? 'active' : ''}" data-hand="left" data-hand-color="l">Links${fb.selectedGripLeft ? ': ' + esc(gripLabel(fb.board, fb.selectedGripLeft)) : ' wählen'}</button>
+          <button class="chip ${fb.pickingHand === 'right' ? 'active' : ''}" data-hand="right" data-hand-color="r">Rechts${fb.selectedGripRight ? ': ' + esc(gripLabel(fb.board, fb.selectedGripRight)) : ' wählen'}</button>
         </div>
       ` : ''}
       <div class="board-visual" id="fb-board-visual">${renderBoardImage()}</div>
@@ -3401,7 +3419,7 @@ function renderFbAddPanel() {
       });
     }
     document.getElementById('fb-board-visual').querySelectorAll('.board-hotspot').forEach((el) => {
-      el.onclick = () => selectFbGrip(el.dataset.grip);
+      el.onclick = () => selectFbGrip(el.dataset.grip, el.dataset.side);
     });
     document.getElementById('fb-grip-select').onchange = (e) => selectFbGrip(e.target.value || null);
     document.getElementById('fb-new-reps').oninput = (e) => { fb.newHang.reps = Number(e.target.value) || 1; };
@@ -7205,11 +7223,11 @@ function miniBoardThumb(boardId, gripId, gripId2) {
   // zweiter, andersfarbig markierter Griff für Sätze mit unterschiedlichem
   // Griff pro Hand (siehe hangBoardThumb).
   const dots = board.hotspots
-    .filter((h) => h.grip === gripId)
+    .filter((h) => h.grip === gripId && (!gripId2 || hotspotSide(h) !== 'right'))
     .map((s) => `<span class="dot hole ${s.surface ? 'surface' : ''}" style="${holeStyle(s)}"></span>`)
     .join('');
   const dots2 = gripId2 ? board.hotspots
-    .filter((h) => h.grip === gripId2)
+    .filter((h) => h.grip === gripId2 && hotspotSide(h) !== 'left')
     .map((s) => `<span class="dot dot-alt hole ${s.surface ? 'surface' : ''}" style="${holeStyle(s)}"></span>`)
     .join('') : '';
   return `<div class="timeline-thumb"><img src="${board.image}" alt="">${dots}${dots2}</div>`;
@@ -7304,7 +7322,13 @@ function isHoldModeBlock(b) { return b.type === 'hang' || (b.type === 'block' &&
 function holdBlockArmNote(b, activeRep) { return b.type === 'block' ? blockArmNote(b, activeRep) : hangArmNote(b); }
 function holdBlockThumb(b) { return b.type === 'block' ? blockThumb() : hangBoardThumb(b); }
 function holdBlockTitle(b) {
-  return b.type === 'block' ? `Lifting Pin @ ${esc(blockGripLabel(b))}` : `Hang @ ${esc(hangGripLabel(b))}`;
+  if (b.type === 'block') return `Lifting Pin @ ${esc(blockGripLabel(b))}`;
+  // Pro Hand unterschiedlich: gleiche Farben wie am Board (links blau,
+  // rechts orange), damit sofort klar ist, welche Hand wohin gehört.
+  if (hangIsAsymmetric(b)) {
+    return `Hang @ <span class="hand-l">L: ${esc(gripLabel(b.board, b.gripLeft))}</span> · <span class="hand-r">R: ${esc(gripLabel(b.board, b.gripRight))}</span>`;
+  }
+  return `Hang @ ${esc(hangGripLabel(b))}`;
 }
 
 /* Campus-Sätze brauchen keine Foto-Hotspots wie beim Hangboard — die
@@ -7542,7 +7566,7 @@ function fbBlockTitle(b) {
   if (b.type === 'pause') return 'Pause';
   if (isHangLikeBlock(b)) return holdBlockTitle(b);
   if (b.type === 'campus') return campusLabel(b);
-  return exerciseName(b.exerciseId);
+  return esc(exerciseName(b.exerciseId));
 }
 
 /* Letzte 3 Sekunden einer Pause (rest-tense, siehe renderFbOverlay/
@@ -7643,7 +7667,7 @@ function fbOverviewHtml() {
       <div class="fb-overview-item fb-overview-${state}">
         <div class="fb-overview-idx mono">${state === 'done' ? '✓' : i + 1}</div>
         <div>
-          <div class="fb-overview-title">${esc(fbBlockTitle(b))}</div>
+          <div class="fb-overview-title">${fbBlockTitle(b)}</div>
           <div class="fb-overview-sub mono">${esc(fbBlockSub(b))}</div>
         </div>
       </div>
