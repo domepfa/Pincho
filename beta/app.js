@@ -536,12 +536,14 @@ function navIconSvg(d) {
   return `<svg class="nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
 }
 
+// Beta läuft unter /beta/ — dort das BETA-Schild zeigen, sonst nicht.
+const IS_BETA = location.pathname.includes('/beta/');
 function renderShell(contentHtml) {
   const memberName = state.member ? esc(state.member.name) : '';
   APP_ROOT.innerHTML = `
     <div class="topbar">
       <div class="brand">
-        <span class="mark">PIN<em>CHO</em> <span class="beta-badge">BETA</span></span>
+        <span class="mark">PIN<em>CHO</em>${IS_BETA ? ' <span class="beta-badge">BETA</span>' : ''}</span>
         <p class="app-tagline mono" id="app-tagline">${appTaglineTyped ? esc(APP_TAGLINE) : ''}</p>
       </div>
       <div class="who">
