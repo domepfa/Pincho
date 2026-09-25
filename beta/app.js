@@ -114,16 +114,37 @@ function recentExerciseIdsForSupergroup(sg, limit) {
    Regionen hinweg), sonst der angetippte Muskel (Hauptmuskel zuerst, dann
    Übungen, die ihn nur mittrainieren), sonst die Körperregion mit
    Kurzliste (Favoriten + zuletzt geloggte) und "Alle anzeigen". */
+/* Die zuletzt geloggten Übungen über alle Regionen (neueste zuerst). */
+function recentExerciseIds(limit) {
+  const ids = [];
+  for (const entry of state.logs) {
+    for (const ex of entry.exercises || []) {
+      if (!ids.includes(ex.exerciseId)) ids.push(ex.exerciseId);
+      if (ids.length >= limit) return ids;
+    }
+  }
+  return ids;
+}
+
 function exercisePickerSelection(list, sg, muscle, query, useRecents, showAll) {
-  const byName = (a, b) => a.name.localeCompare(b.name, 'de');
+  // Zuletzt gemachte Übungen (max. 5) stehen in jeder Auswahl zuoberst,
+  // in Reihenfolge der letzten Nutzung — danach alphabetisch.
+  const recent = useRecents ? recentExerciseIds(5) : [];
+  const rank = (e) => { const i = recent.indexOf(e.id); return i === -1 ? 99 : i; };
+  const byName = (a, b) => (rank(a) - rank(b)) || a.name.localeCompare(b.name, 'de');
   const q = (query || '').trim().toLowerCase();
   if (q) return { visible: list.filter((e) => e.name.toLowerCase().includes(q)).sort(byName), total: 0 };
   if (muscle) {
-    const prim = list.filter((e) => e.muscles && e.muscles.primary.includes(muscle)).sort(byName);
-    const sec = list.filter((e) => e.muscles && !e.muscles.primary.includes(muscle) && e.muscles.secondary.includes(muscle)).sort(byName);
-    return { visible: [...prim, ...sec], total: 0 };
+    const prim = list.filter((e) => e.muscles && e.muscles.primary.includes(muscle));
+    const sec = list.filter((e) => e.muscles && !e.muscles.primary.includes(muscle) && e.muscles.secondary.includes(muscle));
+    // Zuletzt gemachte zuerst, dann Hauptmuskel vor Nebenmuskel.
+    const isPrim = (e) => (prim.includes(e) ? 0 : 1);
+    return { visible: [...prim, ...sec].sort((a, b) => (rank(a) - rank(b)) || (isPrim(a) - isPrim(b)) || a.name.localeCompare(b.name, 'de')), total: 0 };
   }
-  if (!sg) return { visible: [], total: 0 };
+  if (!sg) {
+    // Noch nichts gewählt: direkt die zuletzt gemachten Übungen anbieten.
+    return { visible: recent.map((id) => list.find((e) => e.id === id)).filter(Boolean), total: 0, recentOnly: true };
+  }
   const groupList = list.filter((e) => exerciseSupergroup(e) === sg);
   let visible = groupList;
   if (useRecents && !showAll) {
@@ -145,8 +166,9 @@ function exerciseCardHtml(e, selectedId) {
     : '';
   const tags = (e.muscles ? e.muscles.primary : []).map((m) => `<span class="ex-card-tag">${esc(MUSCLE_ZONE_LABEL[m] || m)}</span>`).join('');
   const active = e.id === selectedId ? 'active' : '';
+  const isRecent = recentExerciseIds(5).includes(e.id);
   return `
-    <div class="ex-card ${active}">
+    <div class="ex-card ${active} ${isRecent ? 'recent' : ''}">
       <button type="button" class="ex-pick-btn ex-card-main ${active}" data-exercise="${e.id}">
         <span class="ex-card-text">
           <span class="ex-card-name">${isExerciseFavorite(e.id) ? '<span class="ex-card-star">★</span> ' : ''}${esc(e.name)}</span>
@@ -160,9 +182,16 @@ function exerciseCardHtml(e, selectedId) {
 }
 
 function exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents, showAll) {
-  const { visible, total } = exercisePickerSelection(list, sg, muscle, query, useRecents, showAll);
+  const { visible, total, recentOnly } = exercisePickerSelection(list, sg, muscle, query, useRecents, showAll);
   const hasFilter = sg || muscle || (query || '').trim();
-  if (!hasFilter) return '<p class="login-hint ex-pick-hint">Muskel antippen, Bereich wählen oder oben suchen.</p>';
+  if (!hasFilter && !visible.length) return '<p class="login-hint ex-pick-hint">Muskel antippen, Bereich wählen oder oben suchen.</p>';
+  if (recentOnly) {
+    return `
+      <div class="ex-recent-label">Zuletzt gemacht</div>
+      <div class="ex-card-list">${visible.map((e) => exerciseCardHtml(e, selectedId)).join('')}</div>
+      <p class="login-hint ex-pick-hint">Oder Muskel antippen, Bereich wählen bzw. suchen.</p>
+    `;
+  }
   if (!visible.length) return '<p class="login-hint ex-pick-hint">Keine Übung gefunden.</p>';
   return `
     <div class="ex-card-list">${visible.map((e) => exerciseCardHtml(e, selectedId)).join('')}</div>
@@ -573,7 +602,9 @@ function hideFabStart() {
 function showFabStart(label, targetId) {
   const el = ensureFabStart();
   const target = document.getElementById(targetId);
-  if (!target) { hideFabStart(); return; }
+  // Ohne startbaren Inhalt (z. B. leerer Ablauf) gar nicht erst zeigen —
+  // ein ausgegrauter, schwebender Knopf wirkte nur kaputt.
+  if (!target || target.disabled) { hideFabStart(); return; }
   el.textContent = label;
   el.disabled = target.disabled;
   el.classList.remove('hidden');
