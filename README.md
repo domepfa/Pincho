@@ -87,8 +87,24 @@ Die App startet auch ohne bzw. mit sehr schlechtem Netz (z. B. im Gym):
 - **Login**: Ein einmal angemeldetes Gerät startet offline direkt, das
   Token wird im Hintergrund erneuert.
 
+## Beta (`/beta/`)
+
+Unter `https://domepfa.github.io/Pincho/beta/` läuft parallel eine Beta
+(installierbar als eigene App „Pincho Beta"). Neues landet zuerst dort und
+wird erst nach dem Testen in die Haupt-App übernommen.
+
+- Eigene Kopie der Dateien in `beta/` (Bilder/Anleitungen aus `../assets/`).
+- Gleiche Firebase-Daten und gleicher Login wie die Haupt-App, aber eigener
+  Offline-Speicher (`pinchobeta_…`-Keys, Cache `pincho-beta-…`) — beide
+  Service Worker löschen nur ihre eigenen alten Caches.
+- Neuer Look als Überschreib-Schicht am Ende von `beta/styles.css`.
+
 ## Offene Punkte / bewusst nicht in v1
 
+- **Zyklus-Tracking (geplant)**: Leistungskurve mit Zyklusphasen vergleichen,
+  freiwillig und nur für die Person selbst sichtbar. Wegen des gemeinsamen
+  Team-Accounts nur lokal auf dem Gerät oder verschlüsselt mit eigener PIN
+  speichern, nie im Klartext in Firebase.
 - **App-Icons**: Aktuell ein einfaches SVG (`icon.svg`). Für optimale
   iOS/Android-Installierbarkeit später durch echte PNG-Icons (192×192,
   512×512) ersetzen.

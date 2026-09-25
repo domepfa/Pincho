@@ -1,10 +1,10 @@
-const CACHE_NAME = 'pincho-shell-v109';
+const CACHE_NAME = 'pincho-beta-v1';
 const SHELL_ASSETS = [
   './', './index.html', './styles.css', './data.js', './firebase.js', './app.js',
-  './manifest.json', './assets/icon-512-any.png',
-  './assets/board-bm1000.png', './assets/board-bm2000.png', './assets/board-campus.jpg',
-  './assets/ki-anleitung-json.md',
-  './assets/ki-anleitung-flow-json.md',
+  './manifest.json', '../assets/icon-512-any.png',
+  '../assets/board-bm1000.png', '../assets/board-bm2000.png', '../assets/board-campus.jpg',
+  '../assets/ki-anleitung-json.md',
+  '../assets/ki-anleitung-flow-json.md',
 ];
 
 self.addEventListener('install', (e) => {
@@ -22,7 +22,7 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     // Nur eigene alte Caches löschen — App und Beta (/beta/) liegen auf
     // derselben Domain und dürfen sich den Offline-Speicher nicht wegräumen.
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('pincho-shell-') && k !== CACHE_NAME).map((k) => caches.delete(k))))
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('pincho-beta-') && k !== CACHE_NAME).map((k) => caches.delete(k))))
   );
   self.clients.claim();
 });

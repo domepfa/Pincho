@@ -1,0 +1,12 @@
+{
+  "name": "Pincho Beta",
+  "short_name": "Pincho β",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0c0e12",
+  "theme_color": "#0c0e12",
+  "icons": [
+    { "src": "../assets/icon-512-any.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
