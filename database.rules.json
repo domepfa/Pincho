@@ -1,0 +1,143 @@
+{
+  "rules": {
+    ".read": "auth != null && auth.token.email === 'crew@pincho.app'",
+    ".write": "auth != null && auth.token.email === 'crew@pincho.app'",
+    "config": {
+      ".read": "auth != null"
+    },
+    "migration": {
+      ".read": "auth != null",
+      ".write": "auth != null && (auth.token.email === 'ADMIN_EMAIL' && auth.token.email_verified === true)"
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "memberId": {
+          ".validate": "newData.isString() && newData.parent().parent().parent().child('members/' + newData.val() + '/uid').val() === auth.uid"
+        },
+        "joinCode": {
+          ".validate": "newData.isString() && newData.val().length <= 12"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "names": {
+      "$name": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && ((auth.token.email === 'ADMIN_EMAIL' && auth.token.email_verified === true) || (newData.parent().parent().child('users/' + auth.uid + '/memberId').isString() && newData.val() === newData.parent().parent().child('users/' + auth.uid + '/memberId').val()))) || (data.exists() && !newData.exists() && root.child('users/' + auth.uid + '/memberId').isString() && data.val() === root.child('users/' + auth.uid + '/memberId').val()))",
+        ".validate": "newData.isString()"
+      }
+    },
+    "members": {
+      ".read": "auth != null && (auth.token.email === 'ADMIN_EMAIL' && auth.token.email_verified === true)",
+      "$mid": {
+        ".read": "auth != null && data.child('uid').val() === auth.uid",
+        ".write": "auth != null && ((!newData.exists() && data.child('uid').val() === auth.uid) || (newData.child('uid').val() === auth.uid && (data.child('uid').val() === auth.uid || (!data.child('uid').exists() && (auth.token.email === 'ADMIN_EMAIL' && auth.token.email_verified === true)) || (!data.exists() && (newData.parent().parent().child('users/' + auth.uid + '/joinCode').isString() && newData.parent().parent().child('invites/' + newData.parent().parent().child('users/' + auth.uid + '/joinCode').val() + '/crewId').isString() && newData.parent().parent().child('crews/' + newData.parent().parent().child('invites/' + newData.parent().parent().child('users/' + auth.uid + '/joinCode').val() + '/crewId').val()).exists())) || (data.exists() && !data.child('uid').exists() && (newData.parent().parent().child('users/' + auth.uid + '/joinCode').isString() && root.child('invites/' + newData.parent().parent().child('users/' + auth.uid + '/joinCode').val() + '/crewId').isString() && root.child('crews/' + root.child('invites/' + newData.parent().parent().child('users/' + auth.uid + '/joinCode').val() + '/crewId').val()).exists()) && root.child('crews/' + root.child('invites/' + newData.parent().parent().child('users/' + auth.uid + '/joinCode').val() + '/crewId').val() + '/members/' + $mid + '/legacy').val() === true))))"
+      }
+    },
+    "crews": {
+      "$crewId": {
+        ".read": "auth != null && ((root.child('users/' + auth.uid + '/memberId').isString() && root.child('crews/' + $crewId + '/members/' + root.child('users/' + auth.uid + '/memberId').val()).exists()) || (root.child('users/' + auth.uid + '/joinCode').isString() && root.child('invites/' + root.child('users/' + auth.uid + '/joinCode').val() + '/crewId').val() === $crewId))",
+        ".write": "auth != null && ((!data.exists() && newData.parent().parent().child('users/' + auth.uid + '/memberId').isString() && newData.child('owner').val() === newData.parent().parent().child('users/' + auth.uid + '/memberId').val() && ((auth.token.email === 'ADMIN_EMAIL' && auth.token.email_verified === true) || root.child('config/crewCreationOpen').val() === true)) || (data.exists() && root.child('users/' + auth.uid + '/memberId').isString() && data.child('owner').val() === root.child('users/' + auth.uid + '/memberId').val() && (!newData.exists() || newData.child('owner').val() === data.child('owner').val())))",
+        "members": {
+          "$mid": {
+            ".write": "auth != null && newData.parent().parent().parent().parent().child('users/' + auth.uid + '/memberId').isString() && $mid === newData.parent().parent().parent().parent().child('users/' + auth.uid + '/memberId').val() && (data.exists() || (newData.child('code').isString() && newData.parent().parent().parent().parent().child('invites/' + newData.child('code').val() + '/crewId').val() === $crewId))"
+          }
+        }
+      }
+    },
+    "crewSecrets": {
+      "$crewId": {
+        ".read": "auth != null && (root.child('users/' + auth.uid + '/memberId').isString() && root.child('crews/' + $crewId + '/owner').val() === root.child('users/' + auth.uid + '/memberId').val())",
+        ".write": "auth != null && (newData.parent().parent().child('users/' + auth.uid + '/memberId').isString() && newData.parent().parent().child('crews/' + $crewId + '/owner').val() === newData.parent().parent().child('users/' + auth.uid + '/memberId').val())"
+      }
+    },
+    "invites": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('crewId').isString() && (newData.parent().parent().child('users/' + auth.uid + '/memberId').isString() && newData.parent().parent().child('crews/' + newData.child('crewId').val() + '/owner').val() === newData.parent().parent().child('users/' + auth.uid + '/memberId').val())) || (data.exists() && !newData.exists() && (root.child('users/' + auth.uid + '/memberId').isString() && root.child('crews/' + data.child('crewId').val() + '/owner').val() === root.child('users/' + auth.uid + '/memberId').val())))"
+      }
+    },
+    "crewData": {
+      "$crewId": {
+        ".read": "auth != null && (root.child('users/' + auth.uid + '/memberId').isString() && root.child('crews/' + $crewId + '/members/' + root.child('users/' + auth.uid + '/memberId').val()).exists())",
+        ".write": "auth != null && (root.child('users/' + auth.uid + '/memberId').isString() && root.child('crews/' + $crewId + '/members/' + root.child('users/' + auth.uid + '/memberId').val()).exists())"
+      }
+    },
+    "challenges": {
+      ".read": "auth != null && (auth.token.email === 'ADMIN_EMAIL' && auth.token.email_verified === true)"
+    },
+    "sharedTemplates": {
+      ".read": "auth != null && (auth.token.email === 'ADMIN_EMAIL' && auth.token.email_verified === true)"
+    },
+    "logs": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    },
+    "plans": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    },
+    "sessionPlans": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    },
+    "exerciseSettings": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    },
+    "exerciseFavorites": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    },
+    "exerciseUnitPrefs": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    },
+    "fingerboardSessions": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    },
+    "fingerboardTemplates": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    },
+    "flowTemplates": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    },
+    "wallTemplates": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    },
+    "hiddenTemplates": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    }
+  }
+}

@@ -16,15 +16,10 @@ wie bei Firnspur/Fixseil), Speicherung über Firebase Realtime Database.
 
 1. [Firebase Console](https://console.firebase.google.com/) → "Projekt hinzufügen" → eigenes Projekt (z. B. `pincho-crew`).
 2. Im Projekt: **Build → Realtime Database → Datenbank erstellen**. Region z. B. `europe-west1`.
-3. Unter **Regeln** einen Login verlangen (siehe "Sicherheit" unten):
-   ```json
-   {
-     "rules": {
-       ".read": "auth != null",
-       ".write": "auth != null"
-     }
-   }
-   ```
+3. Unter **Regeln** den Inhalt von [`database.rules.json`](./database.rules.json)
+   einfügen und darin **`ADMIN_EMAIL`** (kommt mehrfach vor, alle ersetzen)
+   durch die eigene E-Mail ersetzen — die echte Adresse steht so nur in der
+   Konsole, nicht im öffentlichen Repo. Siehe "Sicherheit" unten.
 4. Die Datenbank-URL oben in der Konsole kopieren (Format
    `https://<projekt>-default-rtdb.<region>.firebasedatabase.app`) und in
    [`firebase.js`](./firebase.js) bei `FIREBASE_URL` eintragen.
@@ -43,34 +38,50 @@ Pages kostenlos**: Repo-Einstellungen → **Pages** → Branch `main`, Ordner
 erreichbar. Läuft genauso gut lokal per Doppelklick auf `index.html` oder mit
 einem simplen `python3 -m http.server`.
 
-### 3. Erste Anmeldung
+### 3. Erste Anmeldung (Beta mit eigenen Konten)
 
-- **Team-Code**: Beim allerersten Öffnen gibt es noch keinen gemeinsamen
-  Firebase-Auth-Account — wer als Erste/r einen Code eingibt, richtet ihn
-  damit automatisch ein (technisch: ein `signUp` auf einen einzigen,
-  gemeinsamen Auth-Account für die ganze Crew). Alle weiteren müssen
-  denselben Code verwenden. Login gilt einmal pro Gerät (Token in
-  `localStorage`), kein wiederholtes Eintippen nötig.
-- **Name wählen**: Nach dem Team-Code einmalig den eigenen Namen antippen
-  (oder über "+ Neu" anlegen) — das ist rein lokal pro Gerät gemerkt und hat
-  nichts mit dem Auth-Account zu tun (dient nur der Zuordnung "von wem ist
-  diese Session/Challenge").
+- **Admin zuerst**: In der Beta mit der Admin-E-Mail registrieren (Code-Feld
+  leer lassen), den Bestätigungslink in der Mail antippen, dann „Neu
+  prüfen". Danach erscheint **„Bestehende Crew übernehmen"**: eigenes Profil
+  antippen — die App legt die erste Crew mit Einladungscode an, nimmt alle
+  bisherigen Profile als „noch nicht dabei" auf und kopiert Challenges und
+  geteilte Vorlagen in die Crew.
+- **Einladen**: Unter **KONTO** (oben rechts) → „Einladen" schickt einen
+  Link mit Code (z. B. per WhatsApp). Wer schon ein Profil hatte, wählt beim
+  Registrieren „Das bin ich: …" und bekommt alle bisherigen Trainings; neue
+  Leute wählen einen Namen (jeder Name nur einmal).
+- **Crews**: Man kann in mehreren Crews sein; Challenges und geteilte
+  Vorlagen gelten für die aktive Crew. Wer eine Crew gegründet hat, sieht den
+  Code, kann ihn erneuern (alter wird ungültig) und Leute entfernen.
+- **Crew gründen** darf vorerst nur der Admin. Für alle freischalten: in der
+  Firebase-Konsole unter **Daten** `config/crewCreationOpen` = `true` setzen.
 - Board-Zuordnung (Beastmaker 1000 vs. 2000) wird beim ersten Umschalten im
   Fingerboard-Tab automatisch im eigenen Profil gespeichert.
 
 ## Sicherheit
 
-Gleiches Modell wie bei Firnspur/Fixseil: **ein einziger, gemeinsamer**
-Firebase-Auth-Account fürs Team (die Mailadresse dafür ist nur ein
-technischer Platzhalter, siehe `AUTH_EMAIL` in `firebase.js`, keine echte
-Adresse). Das "Passwort" dieses Accounts ist euer Team-Code. Die
-Datenbank-Regeln verlangen `auth != null` — ohne gültigen Code kommt niemand
-an die Daten, auch nicht bei öffentlichem Repo (der `apiKey` in `firebase.js`
-ist bei Firebase kein Geheimnis, siehe
-[Google-Doku](https://firebase.google.com/docs/projects/api-keys) — die
-Sicherheit kommt von den Regeln, nicht vom Verstecken des Keys). Wer welche
-Person ist (Name), ist davon unabhängig und rein lokal gespeichert — keine
-echten Einzel-Accounts nötig.
+Jede Person hat ein **eigenes Konto** (E-Mail + Passwort, Firebase Auth).
+Die Regeln in [`database.rules.json`](./database.rules.json) sorgen dafür, dass
+
+- private Daten (Logs, Pläne, Vorlagen, Einstellungen unter `…/{memberId}`)
+  nur die Person selbst lesen/schreiben kann (`members/{id}/uid` = eigenes
+  Konto; `users/{uid}/memberId` zeigt aufs eigene Profil),
+- Crew-Daten (`crewData/{crewId}`: Challenges, geteilte Vorlagen) nur
+  Mitglieder der Crew sehen,
+- ein Profil nur mit gültigem **Einladungscode** entsteht — ein Fremder kann
+  höchstens ein leeres Login-Konto anlegen, aber nichts lesen oder schreiben,
+- den Code (`crewSecrets`) nur sieht, wer die Crew gegründet hat.
+
+Der `apiKey` in `firebase.js` ist bei Firebase kein Geheimnis (siehe
+[Google-Doku](https://firebase.google.com/docs/projects/api-keys)) — die
+Sicherheit kommt von den Regeln.
+
+**Übergang**: Die Haupt-App nutzt noch den alten gemeinsamen Team-Login
+(`crew@pincho.app`). Die Regeln lassen ihn vorerst weiter alles lesen und
+schreiben, damit sie bis zur Übernahme der Beta normal läuft. Challenges der
+Haupt-App (`challenges/`) und der Beta (`crewData/…`) sind in dieser Zeit
+getrennt. Nach `tools/promote-beta.sh` die zwei Team-Zeilen ganz oben in den
+Regeln (`".read"`/`".write"` mit `crew@pincho.app`) löschen.
 
 ## Offline
 
@@ -94,8 +105,8 @@ Unter `https://domepfa.github.io/Pincho/beta/` läuft parallel eine Beta
 wird erst nach dem Testen in die Haupt-App übernommen.
 
 - Eigene Kopie der Dateien in `beta/` (Bilder/Anleitungen aus `../assets/`).
-- Gleiche Firebase-Daten und gleicher Login wie die Haupt-App, aber eigener
-  Offline-Speicher (`pinchobeta_…`-Keys, Cache `pincho-beta-…`) — beide
+- Gleiche Firebase-Daten wie die Haupt-App, aber eigene Konten (siehe
+  "Erste Anmeldung") und eigener Offline-Speicher (`pinchobeta_…`-Keys, Cache `pincho-beta-…`) — beide
   Service Worker löschen nur ihre eigenen alten Caches.
 - Neuer Look als Überschreib-Schicht am Ende von `beta/styles.css`.
 - **Übernehmen in die Haupt-App:** `tools/promote-beta.sh` kopiert
@@ -109,9 +120,11 @@ wird erst nach dem Testen in die Haupt-App übernommen.
 ## Offene Punkte / bewusst nicht in v1
 
 - **Zyklus-Tracking (geplant)**: Leistungskurve mit Zyklusphasen vergleichen,
-  freiwillig und nur für die Person selbst sichtbar. Wegen des gemeinsamen
-  Team-Accounts nur lokal auf dem Gerät oder verschlüsselt mit eigener PIN
-  speichern, nie im Klartext in Firebase.
+  freiwillig (Schalter, standardmässig aus) und nur für die Person selbst
+  sichtbar — mit den eigenen Konten einfach im privaten Bereich
+  (`…/{memberId}`), ausdrückliche Zustimmung beim Einschalten.
+- **Konto löschen + Datenschutz-Info** (geplant, vor dem Freischalten von
+  Crew-Gründen für alle).
 - **App-Icons**: Logo `assets/icon-512-any.png` (Original, auch im Login).
   Daraus erzeugt: `icon-512-transparent.png`/`icon-192-any.png` (ohne weissen
   Hintergrund) und `icon-512-maskable.png` (dunkler Hintergrund, Logo im
@@ -151,7 +164,8 @@ wird erst nach dem Testen in die Haupt-App übernommen.
 index.html      App-Shell, lädt Fonts + Scripts
 styles.css      Gesamtes Styling (ein dunkles Theme: Granit/Chalk/Flechte/Alpenglühen)
 data.js         Statische Konfiguration: Boards, Protokolle, Übungen, Standard-Wochenplan
-firebase.js     Dünne REST-Anbindung an Firebase Realtime Database
+firebase.js     Dünne REST-Anbindung an Firebase Realtime Database + Auth
+database.rules.json  Datenbank-Regeln (in die Firebase-Konsole kopieren)
 app.js          Login, Routing, Views (Plan/Log/Fingerboard/Challenges), Timer-Logik
 manifest.json   PWA-Manifest
 sw.js           Service Worker (Netzwerk-zuerst, Offline-Fallback fürs App-Shell)
