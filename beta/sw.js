@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pincho-beta-v5';
+const CACHE_NAME = 'pincho-beta-v6';
 const SHELL_ASSETS = [
   './', './index.html', './styles.css', './data.js', './firebase.js', './app.js',
   './manifest.json', '../assets/icon-512-any.png',
