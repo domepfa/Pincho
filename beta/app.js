@@ -68,20 +68,25 @@ function exerciseSupergroup(ex) {
   return MUSCLE_SUPERGROUP[ex.muscles.primary[0]] || 'rumpf';
 }
 
-/* Dasselbe Körper-Umriss-SVG wie bei der Zielmuskel-Anzeige (bodyMapSvg),
-   hier aber pro Körperregion antippbar statt nur zur Anzeige. */
-function clickableBodyMapSvg(activeSupergroup) {
+/* Dieselbe anatomische Körperkarte wie bei der Zielmuskel-Anzeige
+   (bodyMapSvg), hier aber pro Muskel antippbar. Der gewählte Muskel
+   leuchtet voll, die übrigen Muskeln derselben Körperregion schwächer. */
+function clickableBodyMapSvg(activeSupergroup, activeMuscle) {
   const zoneEl = (id, shape) => {
     const sg = MUSCLE_SUPERGROUP[id];
-    return `<g class="body-zone ${sg === activeSupergroup ? 'active' : ''}" data-supergroup="${sg}">${shape}</g>`;
+    const cls = id === activeMuscle ? 'active' : sg === activeSupergroup ? 'in-group' : '';
+    return `<g class="body-zone ${cls}" data-supergroup="${sg}" data-muscle="${id}">${shape}</g>`;
   };
   const zones = Object.entries(MUSCLE_ZONES_SVG).map(([id, shape]) => zoneEl(id, shape)).join('');
   return `
-    <svg viewBox="0 0 190 160" class="muscle-map ex-body-map">
-      <circle class="muscle-head" cx="45" cy="13" r="9"/>
-      <circle class="muscle-head" cx="145" cy="13" r="9"/>
-      ${zones}
-    </svg>
+    <div class="ex-body-wrap">
+      <svg viewBox="${BODY_VIEWBOX}" class="muscle-map ex-body-map" role="group" aria-label="Muskel antippen">
+        ${BODY_BASE_SVG}
+        ${zones}
+        ${BODY_DECO_SVG}
+      </svg>
+      <div class="ex-body-labels"><span>VORNE</span><span>HINTEN</span></div>
+    </div>
   `;
 }
 
@@ -105,41 +110,81 @@ function recentExerciseIdsForSupergroup(sg, limit) {
   return ids;
 }
 
-function exercisePickerBodyHtml(list, selectedId, sg, useRecents, showAll) {
-  const groupList = sg ? list.filter((e) => exerciseSupergroup(e) === sg) : [];
-  let visibleList = groupList;
-  let showAllToggle = false;
-  if (sg && useRecents && !showAll) {
+/* Welche Übungen zeigt die Auswahl gerade? Suche schlägt alles (über alle
+   Regionen hinweg), sonst der angetippte Muskel (Hauptmuskel zuerst, dann
+   Übungen, die ihn nur mittrainieren), sonst die Körperregion mit
+   Kurzliste (Favoriten + zuletzt geloggte) und "Alle anzeigen". */
+function exercisePickerSelection(list, sg, muscle, query, useRecents, showAll) {
+  const byName = (a, b) => a.name.localeCompare(b.name, 'de');
+  const q = (query || '').trim().toLowerCase();
+  if (q) return { visible: list.filter((e) => e.name.toLowerCase().includes(q)).sort(byName), total: 0 };
+  if (muscle) {
+    const prim = list.filter((e) => e.muscles && e.muscles.primary.includes(muscle)).sort(byName);
+    const sec = list.filter((e) => e.muscles && !e.muscles.primary.includes(muscle) && e.muscles.secondary.includes(muscle)).sort(byName);
+    return { visible: [...prim, ...sec], total: 0 };
+  }
+  if (!sg) return { visible: [], total: 0 };
+  const groupList = list.filter((e) => exerciseSupergroup(e) === sg);
+  let visible = groupList;
+  if (useRecents && !showAll) {
     const recentIds = recentExerciseIdsForSupergroup(sg, 10);
     // Favoriten IMMER mit in die Kurzliste, auch ohne kürzlich geloggten
     // Satz — sonst müsste man sie trotz Sternchen jedes Mal unter "Alle
-    // anzeigen" neu suchen, was den Zweck des Favorisierens untergräbt.
+    // anzeigen" neu suchen.
     const favIds = groupList.filter((e) => isExerciseFavorite(e.id)).map((e) => e.id);
     const shortlistIds = Array.from(new Set([...favIds, ...recentIds]));
-    if (shortlistIds.length) {
-      visibleList = groupList.filter((e) => shortlistIds.includes(e.id));
-      showAllToggle = groupList.length > visibleList.length;
-    }
-    // Noch keine geloggte/favorisierte Übung dieser Region — dann direkt
-    // die volle Liste zeigen, sonst stünde man vor einer leeren Auswahl.
+    if (shortlistIds.length) visible = groupList.filter((e) => shortlistIds.includes(e.id));
   }
-  visibleList = visibleList.slice().sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  return { visible: visible.slice().sort(byName), total: visible.length < groupList.length ? groupList.length : 0 };
+}
+
+function exerciseCardHtml(e, selectedId) {
+  const last = lastValueForExercise(e.id);
+  const lastText = last && last.reps !== '' && last.reps != null
+    ? `${last.weight !== '' && last.weight != null ? esc(String(last.weight)) + ' kg × ' : ''}${esc(String(last.reps))}`
+    : '';
+  const tags = (e.muscles ? e.muscles.primary : []).map((m) => `<span class="ex-card-tag">${esc(MUSCLE_ZONE_LABEL[m] || m)}</span>`).join('');
+  const active = e.id === selectedId ? 'active' : '';
   return `
-    ${clickableBodyMapSvg(sg)}
+    <div class="ex-card ${active}">
+      <button type="button" class="ex-pick-btn ex-card-main ${active}" data-exercise="${e.id}">
+        <span class="ex-card-text">
+          <span class="ex-card-name">${isExerciseFavorite(e.id) ? '<span class="ex-card-star">★</span> ' : ''}${esc(e.name)}</span>
+          ${tags ? `<span class="ex-card-tags">${tags}</span>` : ''}
+        </span>
+        ${lastText ? `<span class="ex-card-last"><strong>${lastText}</strong><small>zuletzt</small></span>` : ''}
+      </button>
+      <button type="button" class="ex-pick-info" data-info-exercise="${e.id}" title="Info zur Übung" aria-label="Info zu ${esc(e.name)}">i</button>
+    </div>
+  `;
+}
+
+function exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents, showAll) {
+  const { visible, total } = exercisePickerSelection(list, sg, muscle, query, useRecents, showAll);
+  const hasFilter = sg || muscle || (query || '').trim();
+  if (!hasFilter) return '<p class="login-hint ex-pick-hint">Muskel antippen, Bereich wählen oder oben suchen.</p>';
+  if (!visible.length) return '<p class="login-hint ex-pick-hint">Keine Übung gefunden.</p>';
+  return `
+    <div class="ex-card-list">${visible.map((e) => exerciseCardHtml(e, selectedId)).join('')}</div>
+    ${total ? `<button type="button" class="btn ghost small" id="ex-show-all" style="width:100%;margin-top:8px;">Alle anzeigen (${total})</button>` : ''}
+  `;
+}
+
+function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll) {
+  const muscleLabel = muscle ? (MUSCLE_ZONE_LABEL[muscle] || muscle) : '';
+  return `
+    <label class="ex-search">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" class="ex-search-input" placeholder="Übung suchen …" aria-label="Übung suchen" value="${esc(query || '')}">
+    </label>
+    ${clickableBodyMapSvg(sg, muscle)}
+    ${muscle ? `<div class="ex-muscle-row"><span class="ex-muscle-pill">${esc(muscleLabel)}</span><button type="button" class="ex-muscle-clear" id="ex-muscle-clear">ganzer Bereich</button></div>` : ''}
     <div class="chip-row ex-supergroup-row">
       ${Object.entries(EX_SUPERGROUP_LABEL).filter(([key]) => list.some((e) => exerciseSupergroup(e) === key)).map(([key, label]) => `
-        <button type="button" class="chip ${key === sg ? 'active' : ''}" data-supergroup-btn="${key}">${esc(label)}</button>
+        <button type="button" class="chip ${key === sg && !muscle ? 'active' : ''}" data-supergroup-btn="${key}">${esc(label)}</button>
       `).join('')}
     </div>
-    <div class="ex-pick-grid">
-      ${sg ? visibleList.map((e) => `
-        <div class="ex-pick-cell">
-          <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">${isExerciseFavorite(e.id) ? '★ ' : ''}${esc(e.name)}</button>
-          <button type="button" class="ex-pick-info" data-info-exercise="${e.id}" title="Info zur Übung">ℹ</button>
-        </div>
-      `).join('') : '<p class="login-hint ex-pick-hint">Körperbereich oben antippen, um Übungen zu sehen.</p>'}
-    </div>
-    ${showAllToggle ? `<button type="button" class="btn ghost small" id="ex-show-all" style="width:100%;margin-top:6px;">Alle anzeigen (${groupList.length})</button>` : ''}
+    <div class="ex-pick-list">${exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents, showAll)}</div>
   `;
 }
 function ensureExerciseInfoSheet() {
@@ -193,23 +238,25 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
   const holder = document.getElementById(containerId);
   if (!holder) return;
   let selectedId = initialSelectedId;
-  // Bewusst immer geschlossen starten, statt anhand von initialSelectedId
-  // (das ist oft nur ein nie benutzter Default-Wert, kein echter Vorwahl)
-  // schon eine Körperregion aufzuklappen — man soll erst bewusst antippen.
+  // Bewusst immer geschlossen starten — man soll erst bewusst einen Muskel
+  // oder Bereich antippen (initialSelectedId ist oft nur ein Default).
   let sg = '';
+  let muscle = '';
+  let query = '';
   let showAll = false;
 
-  const render = () => {
-    holder.innerHTML = exercisePickerBodyHtml(list, selectedId, sg, useRecents, showAll);
-    holder.querySelectorAll('[data-supergroup-btn], .body-zone').forEach((el) => {
-      el.onclick = () => { sg = el.dataset.supergroup || el.dataset.supergroupBtn; showAll = false; render(); };
-    });
-    const showAllBtn = document.getElementById('ex-show-all');
-    if (showAllBtn) showAllBtn.onclick = () => { showAll = true; render(); };
-    holder.querySelectorAll('.ex-pick-btn').forEach((btn) => {
+  // Nur die Liste neu zeichnen (z. B. beim Tippen in der Suche) — sonst
+  // würde das Suchfeld bei jedem Buchstaben neu erzeugt und die Tastatur
+  // ginge zu.
+  const wireList = () => {
+    const listHolder = holder.querySelector('.ex-pick-list');
+    const showAllBtn = listHolder.querySelector('#ex-show-all');
+    if (showAllBtn) showAllBtn.onclick = () => { showAll = true; renderList(); };
+    listHolder.querySelectorAll('.ex-pick-btn').forEach((btn) => {
       btn.onclick = () => {
         selectedId = btn.dataset.exercise;
-        holder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
+        listHolder.querySelectorAll('.ex-card').forEach((c) => c.classList.toggle('active', c.contains(btn)));
+        listHolder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
         onSelect(selectedId);
         if (scrollTargetId) {
           document.getElementById(scrollTargetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -217,15 +264,35 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
       };
     });
     // Info-Button NEBEN der Übung, nicht Teil ihres Auswahl-Buttons — so
-    // kann man die Ausführung/Zielmuskeln nachschauen, ohne die Übung schon
-    // auszuwählen (wichtig bei uneindeutigen Namen wie "Rudern Kabel" vs.
-    // "Rudern Langhantel").
-    holder.querySelectorAll('.ex-pick-info').forEach((btn) => {
-      // render als Callback übergeben, damit ein Favoriten-Toggle in der
-      // Info-Ansicht sofort die dahinterliegende Kurzliste/Sternchen
-      // aktualisiert, statt erst beim nächsten Öffnen des Rasters.
-      btn.onclick = () => showExerciseInfoSheet(btn.dataset.infoExercise, render);
+    // kann man Ausführung/Zielmuskeln nachschauen, ohne sie auszuwählen.
+    listHolder.querySelectorAll('.ex-pick-info').forEach((btn) => {
+      btn.onclick = () => showExerciseInfoSheet(btn.dataset.infoExercise, renderList);
     });
+  };
+  const renderList = () => {
+    holder.querySelector('.ex-pick-list').innerHTML = exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents, showAll);
+    wireList();
+  };
+  const render = () => {
+    holder.innerHTML = exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll);
+    holder.querySelectorAll('.body-zone').forEach((el) => {
+      el.onclick = () => {
+        const m = el.dataset.muscle;
+        muscle = muscle === m ? '' : m;
+        sg = el.dataset.supergroup;
+        query = '';
+        showAll = false;
+        render();
+      };
+    });
+    holder.querySelectorAll('[data-supergroup-btn]').forEach((el) => {
+      el.onclick = () => { sg = el.dataset.supergroupBtn; muscle = ''; query = ''; showAll = false; render(); };
+    });
+    const clearBtn = holder.querySelector('#ex-muscle-clear');
+    if (clearBtn) clearBtn.onclick = () => { muscle = ''; showAll = false; render(); };
+    const search = holder.querySelector('.ex-search-input');
+    search.oninput = () => { query = search.value; renderList(); };
+    wireList();
   };
   render();
 }
@@ -6962,26 +7029,42 @@ function exerciseFigureSvg(exerciseId) {
    Bild selbst bleibt immer dasselbe. Positionen sind bewusst schematisch
    (Rechtecke/Ellipsen wie bei den Strichmännchen), keine anatomische
    Illustration. */
+/* Anatomische Zonen (Beta): Vorderansicht links, Rückansicht rechts
+   (um 125 nach rechts verschoben). Jede Zone ist ein Pfad, links und
+   rechts gespiegelt; die Form orientiert sich grob am echten Muskel statt
+   an Rechtecken. BODY_BASE_SVG ist der dunkle Körperumriss darunter,
+   BODY_DECO_SVG feine Linien darüber (nicht antippbar). */
+const BACK = (d) => `<path transform="translate(125 0)" d="${d}"/>`;
+const FRONT = (d) => `<path d="${d}"/>`;
 const MUSCLE_ZONES_SVG = {
-  neck_traps: '<rect x="33" y="25" width="24" height="8" rx="3"/>',
-  shoulders: '<ellipse cx="24" cy="34" rx="8" ry="7"/><ellipse cx="66" cy="34" rx="8" ry="7"/>',
-  chest: '<rect x="30" y="32" width="30" height="18" rx="4"/>',
-  biceps: '<rect x="14" y="38" width="9" height="20" rx="4"/><rect x="67" y="38" width="9" height="20" rx="4"/>',
-  forearms_front: '<rect x="10" y="60" width="8" height="24" rx="4"/><rect x="72" y="60" width="8" height="24" rx="4"/>',
-  abs: '<rect x="34" y="52" width="22" height="26" rx="4"/>',
-  obliques: '<rect x="26" y="54" width="7" height="22" rx="3"/><rect x="57" y="54" width="7" height="22" rx="3"/>',
-  quads: '<rect x="28" y="80" width="16" height="34" rx="5"/><rect x="46" y="80" width="16" height="34" rx="5"/>',
-  shins: '<rect x="30" y="116" width="11" height="28" rx="4"/><rect x="49" y="116" width="11" height="28" rx="4"/>',
-  traps: '<rect x="133" y="21" width="24" height="14" rx="4"/>',
-  rear_delts: '<ellipse cx="124" cy="34" rx="8" ry="7"/><ellipse cx="166" cy="34" rx="8" ry="7"/>',
-  lats: '<rect x="128" y="38" width="34" height="24" rx="5"/>',
-  triceps: '<rect x="112" y="38" width="9" height="20" rx="4"/><rect x="169" y="38" width="9" height="20" rx="4"/>',
-  forearms_back: '<rect x="108" y="60" width="8" height="24" rx="4"/><rect x="174" y="60" width="8" height="24" rx="4"/>',
-  lower_back: '<rect x="133" y="62" width="24" height="18" rx="4"/>',
-  glutes: '<rect x="128" y="80" width="34" height="18" rx="6"/>',
-  hamstrings: '<rect x="128" y="98" width="16" height="30" rx="5"/><rect x="146" y="98" width="16" height="30" rx="5"/>',
-  calves: '<rect x="130" y="130" width="11" height="26" rx="4"/><rect x="149" y="130" width="11" height="26" rx="4"/>',
+  neck_traps: FRONT('M55 38 Q48 43 41 46 Q46 49 52 47 Q56 44 56 40 Z M65 38 Q72 43 79 46 Q74 49 68 47 Q64 44 64 40 Z'),
+  shoulders: FRONT('M38 47 Q28 49 26 62 Q31 66 36 62 Q40 56 40 50 Z M82 47 Q92 49 94 62 Q89 66 84 62 Q80 56 80 50 Z'),
+  chest: FRONT('M59 50 Q48 48 41 52 Q38 62 42 70 Q52 74 59 70 Z M61 50 Q72 48 79 52 Q82 62 78 70 Q68 74 61 70 Z'),
+  biceps: FRONT('M34 66 Q27 70 26 82 Q27 90 31 92 Q35 84 36 72 Z M86 66 Q93 70 94 82 Q93 90 89 92 Q85 84 84 72 Z'),
+  forearms_front: FRONT('M29 96 Q23 106 21 122 Q23 126 26 124 Q30 110 33 98 Z M91 96 Q97 106 99 122 Q97 126 94 124 Q90 110 87 98 Z'),
+  abs: FRONT('M53 74 L67 74 Q68 96 66 116 Q60 120 54 116 Q52 96 53 74 Z'),
+  obliques: FRONT('M42 74 Q41 90 44 110 Q48 114 51 112 Q50 92 51 76 Z M78 74 Q79 90 76 110 Q72 114 69 112 Q70 92 69 76 Z'),
+  quads: FRONT('M44 124 Q38 148 42 174 Q47 180 53 177 Q58 152 58 128 Q52 122 44 124 Z M76 124 Q82 148 78 174 Q73 180 67 177 Q62 152 62 128 Q68 122 76 124 Z'),
+  shins: FRONT('M43 190 Q40 210 43 232 Q46 236 49 234 Q52 212 51 192 Z M77 190 Q80 210 77 232 Q74 236 71 234 Q68 212 69 192 Z'),
+  traps: BACK('M60 36 Q52 42 44 48 Q52 58 60 66 Z M60 36 Q68 42 76 48 Q68 58 60 66 Z'),
+  rear_delts: BACK('M38 47 Q28 49 26 62 Q31 66 36 62 Q40 56 40 50 Z M82 47 Q92 49 94 62 Q89 66 84 62 Q80 56 80 50 Z'),
+  lats: BACK('M58 66 Q48 58 42 58 Q40 74 45 96 Q52 102 58 98 Z M62 66 Q72 58 78 58 Q80 74 75 96 Q68 102 62 98 Z'),
+  triceps: BACK('M34 66 Q27 70 26 82 Q27 90 31 92 Q35 84 36 72 Z M86 66 Q93 70 94 82 Q93 90 89 92 Q85 84 84 72 Z'),
+  forearms_back: BACK('M29 96 Q23 106 21 122 Q23 126 26 124 Q30 110 33 98 Z M91 96 Q97 106 99 122 Q97 126 94 124 Q90 110 87 98 Z'),
+  lower_back: BACK('M54 100 L66 100 L66 116 Q60 119 54 116 Z'),
+  glutes: BACK('M59 118 Q47 116 42 126 Q43 140 58 140 Z M61 118 Q73 116 78 126 Q77 140 62 140 Z'),
+  hamstrings: BACK('M44 144 Q39 162 42 178 Q48 182 54 178 Q57 160 57 144 Z M76 144 Q81 162 78 178 Q72 182 66 178 Q63 160 63 144 Z'),
+  calves: BACK('M43 188 Q38 204 43 222 Q47 226 51 222 Q55 204 51 188 Z M77 188 Q82 204 77 222 Q73 226 69 222 Q65 204 69 188 Z'),
 };
+const BODY_FIGURE_BASE = `
+  <ellipse cx="60" cy="20" rx="10" ry="12"/>
+  <path d="M55 30 L65 30 L66 40 L54 40 Z"/>
+  <path d="M40 44 Q60 38 80 44 Q84 60 80 76 L78 120 Q60 128 42 120 L40 76 Q36 60 40 44 Z"/>
+  <path d="M38 48 Q26 50 24 66 L20 96 Q16 116 17 130 Q20 140 25 136 Q28 120 32 100 L37 70 Z M82 48 Q94 50 96 66 L100 96 Q104 116 103 130 Q100 140 95 136 Q92 120 88 100 L83 70 Z"/>
+  <path d="M42 120 Q36 150 40 184 Q38 210 42 240 L50 244 Q54 214 53 186 Q58 152 59 124 Z M78 120 Q84 150 80 184 Q82 210 78 240 L70 244 Q66 214 67 186 Q62 152 61 124 Z"/>`;
+const BODY_BASE_SVG = `<g class="body-base">${BODY_FIGURE_BASE}<g transform="translate(125 0)">${BODY_FIGURE_BASE}</g></g>`;
+const BODY_DECO_SVG = '<path class="body-deco" d="M53 86 L67 86 M53 98 L67 98 M60 74 L60 116"/>';
+const BODY_VIEWBOX = '0 0 245 250';
 
 const MUSCLE_ZONE_LABEL = {
   neck_traps: 'Nacken', shoulders: 'Schultern', chest: 'Brust', biceps: 'Bizeps',
@@ -6998,10 +7081,10 @@ function bodyMapSvg(primary, secondary) {
   };
   const zones = Object.entries(MUSCLE_ZONES_SVG).map(([id, shape]) => zoneEl(id, shape)).join('');
   return `
-    <svg viewBox="0 0 190 160" class="muscle-map">
-      <circle class="muscle-head" cx="45" cy="13" r="9"/>
-      <circle class="muscle-head" cx="145" cy="13" r="9"/>
+    <svg viewBox="${BODY_VIEWBOX}" class="muscle-map">
+      ${BODY_BASE_SVG}
       ${zones}
+      ${BODY_DECO_SVG}
     </svg>
   `;
 }

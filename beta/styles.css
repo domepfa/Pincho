@@ -976,7 +976,7 @@ html, body {
 /* Faultier-Strichzeichnung, oben rechts hinter allem */
 .sloth-bg {
   position: fixed; top: 58px; right: -26px; width: 230px; z-index: 0;
-  color: var(--accent); opacity: .07; pointer-events: none;
+  color: var(--accent); opacity: .16; pointer-events: none;
 }
 .sloth-bg svg { width: 100%; height: auto; display: block; }
 @media (prefers-reduced-motion: no-preference) {
@@ -1088,3 +1088,89 @@ html, body {
 /* Navigation ist mit Symbolen höher geworden — Trainings-Leiste darüber */
 #fs-dock { bottom: calc(62px + var(--safe-bottom)); }
 body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
+
+/* ---------- BETA Schritt 2: Übungsauswahl mit Körperkarte ---------- */
+.ex-search {
+  display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; margin-bottom: 12px;
+  border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-faint);
+}
+.ex-search-input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  color: var(--ink); font-family: 'Barlow', sans-serif; font-size: 16px;
+}
+.ex-search-input::placeholder { color: var(--ink-faint); }
+.ex-search:focus-within { border-color: var(--accent); }
+
+.ex-body-wrap {
+  background: #0c1116; border: 1px solid var(--line-soft); border-radius: 20px;
+  padding: 10px 8px 6px; margin-bottom: 10px;
+}
+.ex-body-map { width: 100%; max-width: 340px; margin: 0 auto; display: block; }
+.ex-body-labels {
+  display: flex; justify-content: space-around; max-width: 340px; margin: 2px auto 0;
+  font-size: 11px; font-weight: 700; letter-spacing: .14em; color: var(--ink-faint);
+}
+.muscle-map .body-base > *, .muscle-map .body-base g > * { fill: #161b22; }
+.muscle-map .body-deco { fill: none; stroke: var(--bg); stroke-width: 1.2; pointer-events: none; }
+.muscle-map .muscle-zone path, .muscle-map .body-zone path {
+  fill: #2b333e; stroke: var(--bg); stroke-width: 1.4; opacity: 1;
+  transition: fill .2s ease;
+}
+.muscle-map .muscle-zone.secondary path { fill: #1f6d94; }
+.muscle-map .muscle-zone.primary path { fill: var(--accent); }
+.muscle-map .body-zone { cursor: pointer; }
+.muscle-map .body-zone.in-group path { fill: #1f6d94; }
+.muscle-map .body-zone.active path { fill: var(--accent); }
+.muscle-map .body-zone:active path { opacity: .75; }
+.muscle-map { width: clamp(150px, 26vh, 260px); }
+
+.ex-muscle-row { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
+.ex-muscle-pill {
+  padding: 6px 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink);
+  font-weight: 700; font-size: 14px;
+}
+.ex-muscle-clear {
+  background: none; border: none; color: var(--ink); font-family: 'Barlow', sans-serif;
+  font-size: 14px; font-weight: 600; text-decoration: underline; cursor: pointer; padding: 8px 4px;
+}
+.ex-supergroup-row .chip { font-size: 13px; padding: 8px 12px; flex: 0 0 auto; }
+
+.ex-card-list { display: flex; flex-direction: column; gap: 8px; }
+.ex-card {
+  display: flex; align-items: stretch; gap: 6px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--line-soft);
+  transition: border-color .15s ease, transform .12s ease;
+}
+.ex-card.active { border-color: var(--accent); background: rgba(var(--accent-rgb), .08); }
+.ex-card:active { transform: scale(.99); }
+.ex-card-main.ex-pick-btn {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  padding: 12px 4px 12px 14px; border: none; background: none; text-align: left; color: var(--ink);
+}
+.ex-card-main.ex-pick-btn.active { background: none; color: var(--ink); }
+.ex-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ex-card-name { font-size: 16px; font-weight: 600; line-height: 1.2; }
+.ex-card-star { color: var(--accent); }
+.ex-card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.ex-card-tag {
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+  background: #1a2530; color: #a9dcf7;
+}
+.ex-card-last { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+.ex-card-last strong { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 17px; color: var(--ink); }
+.ex-card-last small { font-size: 11px; color: var(--ink-faint); }
+.ex-card .ex-pick-info {
+  flex: 0 0 auto; width: 40px; margin: 8px 8px 8px 0; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+  font-family: 'Barlow', sans-serif; font-weight: 700; font-size: 15px;
+}
+.muscle-map.ex-body-map { width: 100%; }
+/* Suchfeld liegt in einem .field — dessen Eingabefeld-Regel hier aufheben */
+.ex-search input.ex-search-input {
+  width: auto; flex: 1; padding: 0; border: none; background: transparent; outline: none; border-radius: 0;
+}
+.ex-search { cursor: text; }
+.ex-body-map, .ex-body-labels { max-width: 250px; }
+.field label.ex-search {
+  display: flex; margin-bottom: 12px; font-size: 16px; letter-spacing: 0; text-transform: none; color: var(--ink-faint);
+}
