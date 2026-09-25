@@ -529,6 +529,7 @@ const NAV_ITEMS = [
   { route: 'fingerboard', label: 'Board', icon: 'M3 8a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2z M7 10h.01 M12 10h.01 M17 10h.01' },
   { route: 'log', label: 'Gym', icon: 'M6 8v8 M3 10v4 M18 8v8 M21 10v4 M6 12h12' },
   { route: 'plan', label: 'Agenda', icon: 'M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z M3 10h18 M8 3v4 M16 3v4' },
+  { route: 'progress', label: 'Fortschritt', icon: 'M4 19h16 M5 15l4-5 4 3 6-8' },
   { route: 'challenges', label: 'Challenges', icon: 'M5 21V4 M5 4h11l-2 4 2 4H5' },
 ];
 function navIconSvg(d) {
@@ -645,6 +646,7 @@ function render() {
     case 'log': renderLog(); break;
     case 'fingerboard': renderFingerboard(); break;
     case 'challenges': renderChallenges(); break;
+    case 'progress': renderProgress(); break;
     case 'plan':
     default: renderPlan(); break;
   }
@@ -9309,6 +9311,245 @@ async function finishAblauf(blocksOverride, resultsOverride, isPartial) {
   };
   await fbPush(`fingerboardSessions/${state.member.id}`, session);
   toast('Ablauf gespeichert 💪', 'ok');
+}
+
+
+/* ================================================================
+   FORTSCHRITT (Beta)
+   Eigene Kurve im Mittelpunkt: pro Übung der beste Satz je Training,
+   dazu Wochenübersicht (Gym / Board / Anderes), ein paar Kennzahlen und
+   eine grobe Erholungs-Anzeige pro Körperbereich. Kein Vergleich mit
+   anderen — nur der eigene Verlauf.
+   ================================================================= */
+const PROGRESS_COLORS = { gym: '#2f95cf', board: '#c4851c', other: '#9b7be6' }; // validiert (dark, #10151b)
+const PROGRESS_RANGES = [['4w', '4W', 28], ['3m', '3M', 91], ['1y', '1J', 365], ['all', 'Alle', 100000]];
+let progressRange = '3m';
+let progressExerciseId = null;
+let progressFbSessions = [];
+
+function dayKey(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function mondayOf(d) { const m = new Date(d); m.setHours(0, 0, 0, 0); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m; }
+function entryTime(e) { return e.createdAt || new Date(e.date + 'T12:00').getTime(); }
+
+/* Bester Satz einer Übung in einem Training: mit Gewicht = schwerstes
+   Gewicht (bei Gleichstand mehr Wdh.), ohne Gewicht = meiste Wdh./Sekunden. */
+function bestSetOf(exerciseId, sets) {
+  let best = null;
+  sets.forEach((st) => {
+    const w = st.weight !== '' && st.weight != null ? Number(st.weight) : 0;
+    const r = Number(st.reps) || 0;
+    const score = w > 0 ? w * 1000 + r : r;
+    if (!best || score > best.score) best = { w, r, score, suffix: setUnitSuffix(exerciseId, st) };
+  });
+  if (!best) return null;
+  return { ...best, value: best.w > 0 ? best.w : best.r, label: best.w > 0 ? `${best.w} kg × ${best.r}${best.suffix}` : `${best.r}${best.suffix || ' Wdh.'}` };
+}
+
+function progressSeries(exerciseId, days) {
+  const since = Date.now() - days * 86400000;
+  const pts = [];
+  state.logs.forEach((e) => {
+    if (entryTime(e) < since) return;
+    const ex = (e.exercises || []).find((x) => x.exerciseId === exerciseId && Array.isArray(x.sets) && x.sets.length);
+    if (!ex) return;
+    const best = bestSetOf(exerciseId, ex.sets);
+    if (best) pts.push({ t: entryTime(e), date: e.date, ...best });
+  });
+  return pts.sort((a, b) => a.t - b.t);
+}
+
+/* Einfaches Linien-Diagramm (eine Serie, keine Legende nötig — der Titel
+   benennt sie). Punkte antippbar: Wert erscheint in der Zeile darunter. */
+function progressLineChart(id, pts, unitLabel) {
+  if (!pts.length) return '<div class="list-empty">Noch keine Daten in diesem Zeitraum.</div>';
+  const W = 340, H = 160, padL = 34, padR = 12, padT = 14, padB = 22;
+  const vals = pts.map((p) => p.value);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const span = hi - lo; lo -= span * 0.1; hi += span * 0.1;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  const x = (t) => (t1 === t0 ? (padL + W - padR) / 2 : padL + ((t - t0) / (t1 - t0)) * (W - padL - padR));
+  const y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
+  const maxVal = Math.max(...vals);
+  const prIdx = vals.lastIndexOf(maxVal);
+  const fmt = (v) => (Math.round(v * 10) / 10).toString();
+  const minVal = Math.min(...vals);
+  const ticks = maxVal === minVal ? [maxVal] : [maxVal, (maxVal + minVal) / 2, minVal];
+  const grid = ticks.map((v) =>
+    `<line class="pg-grid" x1="${padL}" x2="${W - padR}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text class="pg-axis" x="${padL - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${fmt(v)}</text>`).join('');
+  const line = pts.map((p) => `${x(p.t).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+  const dots = pts.map((p, i) => `
+    <circle class="pg-hit" cx="${x(p.t).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="16" data-chart="${id}" data-i="${i}"><title>${esc(fmtShortDate(p.date))}: ${esc(p.label)}</title></circle>
+    <circle class="pg-dot ${i === prIdx ? 'pr' : ''}" cx="${x(p.t).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="${i === prIdx ? 6 : 4}"/>`).join('');
+  const dateLabels = [pts[0], pts[pts.length - 1]].filter((p, i, arr) => i === 0 || p !== arr[0])
+    .map((p, i) => `<text class="pg-axis" x="${x(p.t).toFixed(1)}" y="${H - 5}" text-anchor="${i === 0 ? 'start' : 'end'}">${esc(fmtShortDate(p.date))}</text>`).join('');
+  return `
+    <svg class="pg-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(unitLabel)}: ${pts.map((p) => fmtShortDate(p.date) + ' ' + p.label).join(', ')}">
+      ${grid}
+      <polyline class="pg-line" points="${line}"/>
+      ${dots}${dateLabels}
+    </svg>
+    <div class="pg-readout" id="${id}-readout">Punkt antippen für Details · Rekord: <b>${esc(pts[prIdx].label)}</b> (${esc(fmtShortDate(pts[prIdx].date))})</div>`;
+}
+
+function progressWeekGridHtml() {
+  const byDay = {};
+  const mark = (key, kind) => {
+    const order = { board: 3, gym: 2, other: 1 };
+    if (!byDay[key] || order[kind] > order[byDay[key]]) byDay[key] = kind;
+  };
+  state.logs.forEach((e) => mark(dayKey(new Date(entryTime(e))), e.type === 'gym' || (e.exercises || []).length ? 'gym' : 'other'));
+  progressFbSessions.forEach((sn) => mark(dayKey(new Date(entryTime(sn))), 'board'));
+  const thisMonday = mondayOf(new Date());
+  const cols = [];
+  for (let w = 7; w >= 0; w--) {
+    const mon = new Date(thisMonday); mon.setDate(mon.getDate() - w * 7);
+    const cells = [];
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(mon); day.setDate(day.getDate() + d);
+      const kind = byDay[dayKey(day)];
+      const future = day > new Date();
+      cells.push(`<span class="pg-cell ${kind || ''} ${future ? 'future' : ''}" title="${pad2(day.getDate())}.${pad2(day.getMonth() + 1)}.${kind ? ' · ' + ({ gym: 'Gym', board: 'Board', other: 'Anderes' })[kind] : ''}"></span>`);
+    }
+    cols.push(`<div class="pg-week">${cells.join('')}<span class="pg-week-label">${pad2(mon.getDate())}.${pad2(mon.getMonth() + 1)}.</span></div>`);
+  }
+  return `<div class="pg-weeks">${cols.join('')}</div>
+    <div class="pg-legend"><span><i class="gym"></i>Gym</span><span><i class="board"></i>Board</span><span><i class="other"></i>Anderes</span></div>`;
+}
+
+function progressStats() {
+  const times = [...state.logs.map(entryTime), ...progressFbSessions.map(entryTime)];
+  const last30 = times.filter((t) => t > Date.now() - 30 * 86400000).length;
+  const weeksWith = new Set(times.map((t) => mondayOf(new Date(t)).getTime()));
+  let streak = 0;
+  const cur = mondayOf(new Date());
+  if (!weeksWith.has(cur.getTime())) cur.setDate(cur.getDate() - 7);
+  while (weeksWith.has(cur.getTime())) { streak++; cur.setDate(cur.getDate() - 7); }
+  const weekStart = mondayOf(new Date()).getTime();
+  let kg = 0;
+  state.logs.filter((e) => entryTime(e) >= weekStart).forEach((e) => (e.exercises || []).forEach((ex) => (ex.sets || []).forEach((st) => {
+    const w = Number(st.weight); const r = Number(st.reps);
+    if (w > 0 && r > 0 && setUnitSuffix(ex.exerciseId, st) !== 's') kg += w * r;
+  })));
+  return { last30, streak, kg };
+}
+
+const RECOVERY_AREAS = [
+  { id: 'finger', label: 'Finger', readyH: 72 },
+  { id: 'zug', label: 'Zug', readyH: 48, muscles: ['lats', 'traps', 'rear_delts', 'biceps', 'forearms_front', 'forearms_back', 'neck_traps'] },
+  { id: 'druck', label: 'Druck', readyH: 48, muscles: ['chest', 'shoulders', 'triceps'] },
+  { id: 'beine', label: 'Beine', readyH: 48, muscles: ['quads', 'hamstrings', 'glutes', 'calves', 'shins'] },
+  { id: 'rumpf', label: 'Rumpf', readyH: 36, muscles: ['abs', 'obliques', 'lower_back'] },
+];
+function progressRecoveryHtml() {
+  const lastT = {};
+  const touch = (id, t) => { if (!lastT[id] || t > lastT[id]) lastT[id] = t; };
+  progressFbSessions.forEach((sn) => touch('finger', entryTime(sn)));
+  state.logs.forEach((e) => {
+    if (e.type === 'klettern') touch('finger', entryTime(e));
+    (e.exercises || []).forEach((ex) => {
+      const m = exerciseMuscles(ex.exerciseId);
+      RECOVERY_AREAS.forEach((a) => { if (a.muscles && m.primary.some((x) => a.muscles.includes(x))) touch(a.id, entryTime(e)); });
+    });
+  });
+  return RECOVERY_AREAS.map((a) => {
+    const t = lastT[a.id];
+    const h = t ? (Date.now() - t) / 3600000 : null;
+    const ratio = h == null ? 1 : Math.min(1, h / a.readyH);
+    const ready = h == null || h >= a.readyH;
+    const ago = h == null ? 'noch nie' : h < 24 ? 'heute' : `vor ${Math.floor(h / 24)} ${Math.floor(h / 24) === 1 ? 'Tag' : 'Tagen'}`;
+    return `<div class="pg-rec">
+      <div class="pg-rec-head"><span>${a.label}</span><span class="${ready ? 'ok' : 'wait'}">${ago} · ${ready ? 'bereit' : 'noch schonen'}</span></div>
+      <div class="pg-rec-bar"><span class="${ready ? 'ok' : 'wait'}" style="width:${Math.round(ratio * 100)}%"></span></div>
+    </div>`;
+  }).join('');
+}
+
+function fbSessionHangSeconds(sn) {
+  let sec = 0;
+  (sn.blocks || []).forEach((b, i) => {
+    if (b.type !== 'hang') return;
+    const r = (sn.results || [])[i];
+    const done = r && Array.isArray(r.doneReps) ? r.doneReps.filter(Boolean).length : Number(b.reps) || 0;
+    sec += done * (Number(b.hangSec) || 0);
+  });
+  return sec;
+}
+
+async function renderProgress() {
+  renderShell(`<div class="sec-head"><h2 class="sec-title">Fortschritt</h2><div class="sec-rule"></div></div><div id="pg-root"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>`);
+  const [rawLogs, rawFb] = await Promise.all([fbGet(`logs/${state.member.id}`), fbGet(`fingerboardSessions/${state.member.id}`)]);
+  state.logs = Object.values(rawLogs || {}).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  progressFbSessions = Object.values(rawFb || {}).sort((a, b) => entryTime(a) - entryTime(b));
+  drawProgress();
+}
+
+function drawProgress() {
+  const root = document.getElementById('pg-root');
+  if (!root) return;
+  const exIds = [];
+  state.logs.forEach((e) => (e.exercises || []).forEach((ex) => {
+    if (Array.isArray(ex.sets) && ex.sets.length && !exIds.includes(ex.exerciseId) && !['warmup_general', 'cooldown_general'].includes(ex.exerciseId)) exIds.push(ex.exerciseId);
+  }));
+  if (!progressExerciseId || !exIds.includes(progressExerciseId)) progressExerciseId = exIds[0] || null;
+  const days = PROGRESS_RANGES.find((r) => r[0] === progressRange)[2];
+  const pts = progressExerciseId ? progressSeries(progressExerciseId, days) : [];
+  let headline = '';
+  if (pts.length >= 2) {
+    const first = pts[0].value, last = pts[pts.length - 1].value;
+    const pct = first ? Math.round(((last - first) / first) * 100) : 0;
+    headline = `<div class="pg-hero"><span class="pg-hero-num ${pct >= 0 ? 'up' : 'down'}">${pct > 0 ? '+' : ''}${pct} %</span><span class="pg-hero-sub">${esc(pts[0].label)} → ${esc(pts[pts.length - 1].label)}</span></div>`;
+  }
+  const isNewPr = pts.length >= 2 && pts[pts.length - 1].value > Math.max(...pts.slice(0, -1).map((p) => p.value));
+  const stats = progressStats();
+  const fbRecent = progressFbSessions.filter((sn) => entryTime(sn) > Date.now() - days * 86400000);
+  const fbPts = fbRecent.map((sn) => { const v = fbSessionHangSeconds(sn); return { t: entryTime(sn), date: sn.date, value: v, label: `${v} s Hängezeit` }; }).filter((p) => p.value > 0);
+
+  root.innerHTML = `
+    <div class="pg-tiles">
+      <div class="pg-tile"><b>${stats.last30}</b><span>Einheiten in 30 Tagen</span></div>
+      <div class="pg-tile"><b class="accent">${stats.streak}</b><span>${stats.streak === 1 ? 'Woche' : 'Wochen'} in Folge</span></div>
+      <div class="pg-tile"><b>${stats.kg >= 1000 ? (stats.kg / 1000).toFixed(1).replace('.', ',') + ' t' : Math.round(stats.kg) + ' kg'}</b><span>bewegt diese Woche</span></div>
+    </div>
+
+    <div class="pg-card">
+      <div class="pg-card-head">
+        <h3>Übung</h3>
+        <div class="chip-row pg-ranges">${PROGRESS_RANGES.map(([k, l]) => `<button type="button" class="chip small ${k === progressRange ? 'active' : ''}" data-range="${k}">${l}</button>`).join('')}</div>
+      </div>
+      ${exIds.length ? `<select class="pg-select" id="pg-exercise" aria-label="Übung wählen">${exIds.map((id) => `<option value="${id}" ${id === progressExerciseId ? 'selected' : ''}>${esc(exerciseName(id))}</option>`).join('')}</select>` : ''}
+      ${isNewPr ? `<div class="pg-pr">Neuer Rekord: <b>${esc(pts[pts.length - 1].label)}</b></div>` : ''}
+      ${headline}
+      ${exIds.length ? progressLineChart('pg-ex', pts, 'Bester Satz je Training') : '<div class="list-empty">Noch keine Gym-Sätze geloggt.</div>'}
+    </div>
+
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Board · Hängezeit je Einheit</h3></div>
+      ${progressLineChart('pg-fb', fbPts, 'Hängezeit je Einheit')}
+    </div>
+
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Letzte 8 Wochen</h3><span class="pg-muted">Mo – So</span></div>
+      ${progressWeekGridHtml()}
+    </div>
+
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Erholung</h3><span class="pg-muted">seit letzter Belastung</span></div>
+      ${progressRecoveryHtml()}
+      <p class="pg-muted" style="margin:8px 0 0;">Grobe Richtwerte (Finger 72 h, Rumpf 36 h, sonst 48 h), kein medizinischer Rat.</p>
+    </div>
+  `;
+  root.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => { progressRange = b.dataset.range; drawProgress(); }; });
+  const sel = document.getElementById('pg-exercise');
+  if (sel) sel.onchange = () => { progressExerciseId = sel.value; drawProgress(); };
+  const series = { 'pg-ex': pts, 'pg-fb': fbPts };
+  root.querySelectorAll('.pg-hit').forEach((c) => {
+    c.onclick = () => {
+      const p = series[c.dataset.chart][Number(c.dataset.i)];
+      const out = document.getElementById(`${c.dataset.chart}-readout`);
+      if (out && p) out.innerHTML = `<b>${esc(fmtShortDate(p.date))}</b> · ${esc(p.label)}`;
+    };
+  });
 }
 
 /* ================================================================
