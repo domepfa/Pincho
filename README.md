@@ -98,6 +98,13 @@ wird erst nach dem Testen in die Haupt-App übernommen.
   Offline-Speicher (`pinchobeta_…`-Keys, Cache `pincho-beta-…`) — beide
   Service Worker löschen nur ihre eigenen alten Caches.
 - Neuer Look als Überschreib-Schicht am Ende von `beta/styles.css`.
+- **Übernehmen in die Haupt-App:** `tools/promote-beta.sh` kopiert
+  `app.js`, `data.js`, `firebase.js`, `styles.css` und `index.html` aus
+  `beta/` in die Wurzel, stellt Pfade (`../assets/` → `./assets/`),
+  Speicher-Keys (`pinchobeta_` → `pincho_`), Titel und Icons zurück und
+  zählt die Cache-Version der Haupt-App hoch. `manifest.json`/`sw.js` der
+  Haupt-App bleiben eigenständig. Das BETA-Schild erscheint automatisch nur
+  unter `/beta/`.
 
 ## Offene Punkte / bewusst nicht in v1
 
@@ -105,9 +112,11 @@ wird erst nach dem Testen in die Haupt-App übernommen.
   freiwillig und nur für die Person selbst sichtbar. Wegen des gemeinsamen
   Team-Accounts nur lokal auf dem Gerät oder verschlüsselt mit eigener PIN
   speichern, nie im Klartext in Firebase.
-- **App-Icons**: Aktuell ein einfaches SVG (`icon.svg`). Für optimale
-  iOS/Android-Installierbarkeit später durch echte PNG-Icons (192×192,
-  512×512) ersetzen.
+- **App-Icons**: Logo `assets/icon-512-any.png` (Original, auch im Login).
+  Daraus erzeugt: `icon-512-transparent.png`/`icon-192-any.png` (ohne weissen
+  Hintergrund) und `icon-512-maskable.png` (dunkler Hintergrund, Logo im
+  sicheren Bereich, damit Android beim runden Zuschneiden nichts abschneidet);
+  Beta-Varianten `icon-beta-*` mit BETA-Schild.
 - **Wearables (COROS etc.)**: bewusst nicht angebunden — siehe Chat-Verlauf,
   Aufwand/Nutzen für dieses Projekt aktuell nicht sinnvoll.
 - **Fingerboard-Ablauf**: Zwischen den Sätzen wird bewusst nicht automatisch

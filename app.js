@@ -68,20 +68,25 @@ function exerciseSupergroup(ex) {
   return MUSCLE_SUPERGROUP[ex.muscles.primary[0]] || 'rumpf';
 }
 
-/* Dasselbe Körper-Umriss-SVG wie bei der Zielmuskel-Anzeige (bodyMapSvg),
-   hier aber pro Körperregion antippbar statt nur zur Anzeige. */
-function clickableBodyMapSvg(activeSupergroup) {
+/* Dieselbe anatomische Körperkarte wie bei der Zielmuskel-Anzeige
+   (bodyMapSvg), hier aber pro Muskel antippbar. Der gewählte Muskel
+   leuchtet voll, die übrigen Muskeln derselben Körperregion schwächer. */
+function clickableBodyMapSvg(activeSupergroup, activeMuscle) {
   const zoneEl = (id, shape) => {
     const sg = MUSCLE_SUPERGROUP[id];
-    return `<g class="body-zone ${sg === activeSupergroup ? 'active' : ''}" data-supergroup="${sg}">${shape}</g>`;
+    const cls = id === activeMuscle ? 'active' : sg === activeSupergroup ? 'in-group' : '';
+    return `<g class="body-zone ${cls}" data-supergroup="${sg}" data-muscle="${id}">${shape}</g>`;
   };
   const zones = Object.entries(MUSCLE_ZONES_SVG).map(([id, shape]) => zoneEl(id, shape)).join('');
   return `
-    <svg viewBox="0 0 190 160" class="muscle-map ex-body-map">
-      <circle class="muscle-head" cx="45" cy="13" r="9"/>
-      <circle class="muscle-head" cx="145" cy="13" r="9"/>
-      ${zones}
-    </svg>
+    <div class="ex-body-wrap">
+      <svg viewBox="${BODY_VIEWBOX}" class="muscle-map ex-body-map" role="group" aria-label="Muskel antippen">
+        ${BODY_BASE_SVG}
+        ${zones}
+        ${BODY_DECO_SVG}
+      </svg>
+      <div class="ex-body-labels"><span>VORNE</span><span>HINTEN</span></div>
+    </div>
   `;
 }
 
@@ -105,41 +110,110 @@ function recentExerciseIdsForSupergroup(sg, limit) {
   return ids;
 }
 
-function exercisePickerBodyHtml(list, selectedId, sg, useRecents, showAll) {
-  const groupList = sg ? list.filter((e) => exerciseSupergroup(e) === sg) : [];
-  let visibleList = groupList;
-  let showAllToggle = false;
-  if (sg && useRecents && !showAll) {
+/* Welche Übungen zeigt die Auswahl gerade? Suche schlägt alles (über alle
+   Regionen hinweg), sonst der angetippte Muskel (Hauptmuskel zuerst, dann
+   Übungen, die ihn nur mittrainieren), sonst die Körperregion mit
+   Kurzliste (Favoriten + zuletzt geloggte) und "Alle anzeigen". */
+/* Die zuletzt geloggten Übungen über alle Regionen (neueste zuerst). */
+function recentExerciseIds(limit) {
+  const ids = [];
+  for (const entry of state.logs) {
+    for (const ex of entry.exercises || []) {
+      if (!ids.includes(ex.exerciseId)) ids.push(ex.exerciseId);
+      if (ids.length >= limit) return ids;
+    }
+  }
+  return ids;
+}
+
+function exercisePickerSelection(list, sg, muscle, query, useRecents, showAll) {
+  // Zuletzt gemachte Übungen (max. 5) stehen in jeder Auswahl zuoberst,
+  // in Reihenfolge der letzten Nutzung — danach alphabetisch.
+  const recent = useRecents ? recentExerciseIds(5) : [];
+  const rank = (e) => { const i = recent.indexOf(e.id); return i === -1 ? 99 : i; };
+  const byName = (a, b) => (rank(a) - rank(b)) || a.name.localeCompare(b.name, 'de');
+  const q = (query || '').trim().toLowerCase();
+  if (q) return { visible: list.filter((e) => e.name.toLowerCase().includes(q)).sort(byName), total: 0 };
+  if (muscle) {
+    const prim = list.filter((e) => e.muscles && e.muscles.primary.includes(muscle));
+    const sec = list.filter((e) => e.muscles && !e.muscles.primary.includes(muscle) && e.muscles.secondary.includes(muscle));
+    // Zuletzt gemachte zuerst, dann Hauptmuskel vor Nebenmuskel.
+    const isPrim = (e) => (prim.includes(e) ? 0 : 1);
+    return { visible: [...prim, ...sec].sort((a, b) => (rank(a) - rank(b)) || (isPrim(a) - isPrim(b)) || a.name.localeCompare(b.name, 'de')), total: 0 };
+  }
+  if (!sg) {
+    // Noch nichts gewählt: direkt die zuletzt gemachten Übungen anbieten.
+    return { visible: recent.map((id) => list.find((e) => e.id === id)).filter(Boolean), total: 0, recentOnly: true };
+  }
+  const groupList = list.filter((e) => exerciseSupergroup(e) === sg);
+  let visible = groupList;
+  if (useRecents && !showAll) {
     const recentIds = recentExerciseIdsForSupergroup(sg, 10);
     // Favoriten IMMER mit in die Kurzliste, auch ohne kürzlich geloggten
     // Satz — sonst müsste man sie trotz Sternchen jedes Mal unter "Alle
-    // anzeigen" neu suchen, was den Zweck des Favorisierens untergräbt.
+    // anzeigen" neu suchen.
     const favIds = groupList.filter((e) => isExerciseFavorite(e.id)).map((e) => e.id);
     const shortlistIds = Array.from(new Set([...favIds, ...recentIds]));
-    if (shortlistIds.length) {
-      visibleList = groupList.filter((e) => shortlistIds.includes(e.id));
-      showAllToggle = groupList.length > visibleList.length;
-    }
-    // Noch keine geloggte/favorisierte Übung dieser Region — dann direkt
-    // die volle Liste zeigen, sonst stünde man vor einer leeren Auswahl.
+    if (shortlistIds.length) visible = groupList.filter((e) => shortlistIds.includes(e.id));
   }
-  visibleList = visibleList.slice().sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  return { visible: visible.slice().sort(byName), total: visible.length < groupList.length ? groupList.length : 0 };
+}
+
+function exerciseCardHtml(e, selectedId) {
+  const last = lastValueForExercise(e.id);
+  const lastText = last && last.reps !== '' && last.reps != null
+    ? `${last.weight !== '' && last.weight != null ? esc(String(last.weight)) + ' kg × ' : ''}${esc(String(last.reps))}`
+    : '';
+  const tags = (e.muscles ? e.muscles.primary : []).map((m) => `<span class="ex-card-tag">${esc(MUSCLE_ZONE_LABEL[m] || m)}</span>`).join('');
+  const active = e.id === selectedId ? 'active' : '';
+  const isRecent = recentExerciseIds(5).includes(e.id);
   return `
-    ${clickableBodyMapSvg(sg)}
+    <div class="ex-card ${active} ${isRecent ? 'recent' : ''}">
+      <button type="button" class="ex-pick-btn ex-card-main ${active}" data-exercise="${e.id}">
+        <span class="ex-card-text">
+          <span class="ex-card-name">${isExerciseFavorite(e.id) ? '<span class="ex-card-star">★</span> ' : ''}${esc(e.name)}</span>
+          ${tags ? `<span class="ex-card-tags">${tags}</span>` : ''}
+        </span>
+        ${lastText ? `<span class="ex-card-last"><strong>${lastText}</strong><small>zuletzt</small></span>` : ''}
+      </button>
+      <button type="button" class="ex-pick-info" data-info-exercise="${e.id}" title="Info zur Übung" aria-label="Info zu ${esc(e.name)}">i</button>
+    </div>
+  `;
+}
+
+function exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents, showAll) {
+  const { visible, total, recentOnly } = exercisePickerSelection(list, sg, muscle, query, useRecents, showAll);
+  const hasFilter = sg || muscle || (query || '').trim();
+  if (!hasFilter && !visible.length) return '<p class="login-hint ex-pick-hint">Muskel antippen, Bereich wählen oder oben suchen.</p>';
+  if (recentOnly) {
+    return `
+      <div class="ex-recent-label">Zuletzt gemacht</div>
+      <div class="ex-card-list">${visible.map((e) => exerciseCardHtml(e, selectedId)).join('')}</div>
+      <p class="login-hint ex-pick-hint">Oder Muskel antippen, Bereich wählen bzw. suchen.</p>
+    `;
+  }
+  if (!visible.length) return '<p class="login-hint ex-pick-hint">Keine Übung gefunden.</p>';
+  return `
+    <div class="ex-card-list">${visible.map((e) => exerciseCardHtml(e, selectedId)).join('')}</div>
+    ${total ? `<button type="button" class="btn ghost small" id="ex-show-all" style="width:100%;margin-top:8px;">Alle anzeigen (${total})</button>` : ''}
+  `;
+}
+
+function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll) {
+  const muscleLabel = muscle ? (MUSCLE_ZONE_LABEL[muscle] || muscle) : '';
+  return `
+    <label class="ex-search">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" class="ex-search-input" placeholder="Übung suchen …" aria-label="Übung suchen" value="${esc(query || '')}">
+    </label>
+    ${clickableBodyMapSvg(sg, muscle)}
+    ${muscle ? `<div class="ex-muscle-row"><span class="ex-muscle-pill">${esc(muscleLabel)}</span><button type="button" class="ex-muscle-clear" id="ex-muscle-clear">ganzer Bereich</button></div>` : ''}
     <div class="chip-row ex-supergroup-row">
       ${Object.entries(EX_SUPERGROUP_LABEL).filter(([key]) => list.some((e) => exerciseSupergroup(e) === key)).map(([key, label]) => `
-        <button type="button" class="chip ${key === sg ? 'active' : ''}" data-supergroup-btn="${key}">${esc(label)}</button>
+        <button type="button" class="chip ${key === sg && !muscle ? 'active' : ''}" data-supergroup-btn="${key}">${esc(label)}</button>
       `).join('')}
     </div>
-    <div class="ex-pick-grid">
-      ${sg ? visibleList.map((e) => `
-        <div class="ex-pick-cell">
-          <button type="button" class="ex-pick-btn ${e.id === selectedId ? 'active' : ''}" data-exercise="${e.id}">${isExerciseFavorite(e.id) ? '★ ' : ''}${esc(e.name)}</button>
-          <button type="button" class="ex-pick-info" data-info-exercise="${e.id}" title="Info zur Übung">ℹ</button>
-        </div>
-      `).join('') : '<p class="login-hint ex-pick-hint">Körperbereich oben antippen, um Übungen zu sehen.</p>'}
-    </div>
-    ${showAllToggle ? `<button type="button" class="btn ghost small" id="ex-show-all" style="width:100%;margin-top:6px;">Alle anzeigen (${groupList.length})</button>` : ''}
+    <div class="ex-pick-list">${exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents, showAll)}</div>
   `;
 }
 function ensureExerciseInfoSheet() {
@@ -193,23 +267,25 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
   const holder = document.getElementById(containerId);
   if (!holder) return;
   let selectedId = initialSelectedId;
-  // Bewusst immer geschlossen starten, statt anhand von initialSelectedId
-  // (das ist oft nur ein nie benutzter Default-Wert, kein echter Vorwahl)
-  // schon eine Körperregion aufzuklappen — man soll erst bewusst antippen.
+  // Bewusst immer geschlossen starten — man soll erst bewusst einen Muskel
+  // oder Bereich antippen (initialSelectedId ist oft nur ein Default).
   let sg = '';
+  let muscle = '';
+  let query = '';
   let showAll = false;
 
-  const render = () => {
-    holder.innerHTML = exercisePickerBodyHtml(list, selectedId, sg, useRecents, showAll);
-    holder.querySelectorAll('[data-supergroup-btn], .body-zone').forEach((el) => {
-      el.onclick = () => { sg = el.dataset.supergroup || el.dataset.supergroupBtn; showAll = false; render(); };
-    });
-    const showAllBtn = document.getElementById('ex-show-all');
-    if (showAllBtn) showAllBtn.onclick = () => { showAll = true; render(); };
-    holder.querySelectorAll('.ex-pick-btn').forEach((btn) => {
+  // Nur die Liste neu zeichnen (z. B. beim Tippen in der Suche) — sonst
+  // würde das Suchfeld bei jedem Buchstaben neu erzeugt und die Tastatur
+  // ginge zu.
+  const wireList = () => {
+    const listHolder = holder.querySelector('.ex-pick-list');
+    const showAllBtn = listHolder.querySelector('#ex-show-all');
+    if (showAllBtn) showAllBtn.onclick = () => { showAll = true; renderList(); };
+    listHolder.querySelectorAll('.ex-pick-btn').forEach((btn) => {
       btn.onclick = () => {
         selectedId = btn.dataset.exercise;
-        holder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
+        listHolder.querySelectorAll('.ex-card').forEach((c) => c.classList.toggle('active', c.contains(btn)));
+        listHolder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
         onSelect(selectedId);
         if (scrollTargetId) {
           document.getElementById(scrollTargetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -217,15 +293,35 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
       };
     });
     // Info-Button NEBEN der Übung, nicht Teil ihres Auswahl-Buttons — so
-    // kann man die Ausführung/Zielmuskeln nachschauen, ohne die Übung schon
-    // auszuwählen (wichtig bei uneindeutigen Namen wie "Rudern Kabel" vs.
-    // "Rudern Langhantel").
-    holder.querySelectorAll('.ex-pick-info').forEach((btn) => {
-      // render als Callback übergeben, damit ein Favoriten-Toggle in der
-      // Info-Ansicht sofort die dahinterliegende Kurzliste/Sternchen
-      // aktualisiert, statt erst beim nächsten Öffnen des Rasters.
-      btn.onclick = () => showExerciseInfoSheet(btn.dataset.infoExercise, render);
+    // kann man Ausführung/Zielmuskeln nachschauen, ohne sie auszuwählen.
+    listHolder.querySelectorAll('.ex-pick-info').forEach((btn) => {
+      btn.onclick = () => showExerciseInfoSheet(btn.dataset.infoExercise, renderList);
     });
+  };
+  const renderList = () => {
+    holder.querySelector('.ex-pick-list').innerHTML = exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents, showAll);
+    wireList();
+  };
+  const render = () => {
+    holder.innerHTML = exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll);
+    holder.querySelectorAll('.body-zone').forEach((el) => {
+      el.onclick = () => {
+        const m = el.dataset.muscle;
+        muscle = muscle === m ? '' : m;
+        sg = el.dataset.supergroup;
+        query = '';
+        showAll = false;
+        render();
+      };
+    });
+    holder.querySelectorAll('[data-supergroup-btn]').forEach((el) => {
+      el.onclick = () => { sg = el.dataset.supergroupBtn; muscle = ''; query = ''; showAll = false; render(); };
+    });
+    const clearBtn = holder.querySelector('#ex-muscle-clear');
+    if (clearBtn) clearBtn.onclick = () => { muscle = ''; showAll = false; render(); };
+    const search = holder.querySelector('.ex-search-input');
+    search.oninput = () => { query = search.value; renderList(); };
+    wireList();
   };
   render();
 }
@@ -428,19 +524,26 @@ function markChallengesSeenNow() {
 /* ================================================================
    SHELL + ROUTER
    ================================================================= */
+/* icon = Pfad-Daten eines 24er-Strich-Icons (stroke, kein fill). */
 const NAV_ITEMS = [
-  { route: 'fingerboard', label: 'Board' },
-  { route: 'log', label: 'Gym' },
-  { route: 'plan', label: 'Agenda' },
-  { route: 'challenges', label: 'Challenges' },
+  { route: 'fingerboard', label: 'Board', icon: 'M3 8a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2z M7 10h.01 M12 10h.01 M17 10h.01' },
+  { route: 'log', label: 'Gym', icon: 'M6 8v8 M3 10v4 M18 8v8 M21 10v4 M6 12h12' },
+  { route: 'plan', label: 'Agenda', icon: 'M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z M3 10h18 M8 3v4 M16 3v4' },
+  { route: 'progress', label: 'Fortschritt', icon: 'M4 19h16 M5 15l4-5 4 3 6-8' },
+  { route: 'challenges', label: 'Challenges', icon: 'M5 21V4 M5 4h11l-2 4 2 4H5' },
 ];
+function navIconSvg(d) {
+  return `<svg class="nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+}
 
+// Beta läuft unter /beta/ — dort das BETA-Schild zeigen, sonst nicht.
+const IS_BETA = location.pathname.includes('/beta/');
 function renderShell(contentHtml) {
   const memberName = state.member ? esc(state.member.name) : '';
   APP_ROOT.innerHTML = `
     <div class="topbar">
       <div class="brand">
-        <span class="mark">PIN<em>CHO</em></span>
+        <span class="mark">PIN<em>CHO</em>${IS_BETA ? ' <span class="beta-badge">BETA</span>' : ''}</span>
         <p class="app-tagline mono" id="app-tagline">${appTaglineTyped ? esc(APP_TAGLINE) : ''}</p>
       </div>
       <div class="who">
@@ -450,7 +553,7 @@ function renderShell(contentHtml) {
     </div>
     <div class="shell">${contentHtml}</div>
     <nav class="bottomnav">
-      ${NAV_ITEMS.map((n) => `<a href="#${n.route}" class="${state.route === n.route ? 'active' : ''}">${n.label}${n.route === 'challenges' ? `<span class="nav-dot" id="nav-challenge-dot" ${challengeUnseenCount ? '' : 'hidden'}></span>` : ''}</a>`).join('')}
+      ${NAV_ITEMS.map((n) => `<a href="#${n.route}" class="${state.route === n.route ? 'active' : ''}"><span class="nav-pill">${navIconSvg(n.icon)}</span><span class="nav-label">${n.label}</span>${n.route === 'challenges' ? `<span class="nav-dot" id="nav-challenge-dot" ${challengeUnseenCount ? '' : 'hidden'}></span>` : ''}</a>`).join('')}
       <span class="nav-indicator" id="nav-indicator"></span>
     </nav>
   `;
@@ -502,7 +605,9 @@ function hideFabStart() {
 function showFabStart(label, targetId) {
   const el = ensureFabStart();
   const target = document.getElementById(targetId);
-  if (!target) { hideFabStart(); return; }
+  // Ohne startbaren Inhalt (z. B. leerer Ablauf) gar nicht erst zeigen —
+  // ein ausgegrauter, schwebender Knopf wirkte nur kaputt.
+  if (!target || target.disabled) { hideFabStart(); return; }
   el.textContent = label;
   el.disabled = target.disabled;
   el.classList.remove('hidden');
@@ -543,6 +648,7 @@ function render() {
     case 'log': renderLog(); break;
     case 'fingerboard': renderFingerboard(); break;
     case 'challenges': renderChallenges(); break;
+    case 'progress': renderProgress(); break;
     case 'plan':
     default: renderPlan(); break;
   }
@@ -1364,7 +1470,7 @@ function renderWallOverlay() {
       <div class="phase mono">${isPausedNow ? 'PAUSIERT' : working ? 'Wand' : 'Pause'}</div>
       <div class="fb-stage-next mono">${esc(nextText)}</div>
       <div class="fb-transport">
-        <button type="button" class="fb-transport-btn fb-play" id="wall-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? '▶' : '⏸'}</button>
+        <button type="button" class="fb-transport-btn fb-play" id="wall-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? TRANSPORT_ICON.play : TRANSPORT_ICON.pause}</button>
       </div>
       <button class="btn fb-stage-btn" id="wall-done-btn">FERTIG</button>
       <button class="btn ghost fb-stage-btn" id="wall-cancel-btn">ABBRECHEN</button>
@@ -1867,7 +1973,7 @@ function renderFlowOverlay() {
       <div class="phase mono" id="flow-phase">${isPausedNow ? 'PAUSIERT' : working ? 'Halten' : 'Wechsel'}</div>
       <div class="fb-stage-next mono">${nextText}</div>
       <div class="fb-transport">
-        <button type="button" class="fb-transport-btn fb-play" id="flow-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? '▶' : '⏸'}</button>
+        <button type="button" class="fb-transport-btn fb-play" id="flow-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? TRANSPORT_ICON.play : TRANSPORT_ICON.pause}</button>
       </div>
       ${flow.blockIndex > 0 ? '<button class="btn ghost fb-stage-btn" id="flow-finish-early">Vorzeitig beenden & speichern</button>' : ''}
       <button class="btn ghost fb-stage-btn" id="flow-cancel-btn">ABBRECHEN</button>
@@ -2904,14 +3010,34 @@ const fb = {
    data.js, in % von Bildbreite/-höhe — funktioniert responsiv). Da es sich
    bislang um eine Illustration handelt, ist die Zuordnung Zone↔Kategorie
    nach bestem Augenmass gewählt, nicht pixelgenau vermessen. */
+/* Welche Seite des Boards ein Loch ist — bei "pro Hand unterschiedlich"
+   gehört das linke Loch zur linken Hand, das rechte zur rechten (mittige
+   Griffe wie die grosse Kante zu beiden). */
+function hotspotSide(h) {
+  const x = h.hx != null ? h.hx : h.x;
+  return x < 47 ? 'left' : x > 53 ? 'right' : 'center';
+}
+function hotspotHandClass(gripState, h) {
+  const side = hotspotSide(h);
+  return [
+    h.grip === gripState.selectedGripLeft && side !== 'right' ? 'active-left' : '',
+    h.grip === gripState.selectedGripRight && side !== 'left' ? 'active-right' : '',
+  ].filter(Boolean).join(' ');
+}
+function holeStyle(h) {
+  if (h.hw == null) return `left:${h.x}%;top:${h.y}%;`;
+  return `left:${h.hx}%;top:${h.hy}%;width:${h.hw}%;height:${h.hh}%;`;
+}
 function renderBoardImage(gripState = fb, photoId = 'fb-board-photo') {
   const board = BOARDS[gripState.board];
   const spots = board.hotspots.map((h) => {
     const grip = board.grips.find((g) => g.id === h.grip);
     const cls = gripState.gripMode === 'different'
-      ? [h.grip === gripState.selectedGripLeft ? 'active-left' : '', h.grip === gripState.selectedGripRight ? 'active-right' : ''].filter(Boolean).join(' ')
+      ? hotspotHandClass(gripState, h)
       : (gripState.selectedGrip === h.grip ? 'active' : '');
-    return `<button type="button" class="board-hotspot ${cls}" style="left:${h.x}%;top:${h.y}%;" data-grip="${h.grip}" title="${esc(grip.label)}${grip.note ? ' · ' + esc(grip.note) : ''}"></button>`;
+    // Form des echten Lochs (hx/hy/hw/hh in % des Bildes, siehe data.js);
+    // Sloper oben sind Flächen statt Löcher (surface).
+    return `<button type="button" class="board-hotspot hole ${h.surface ? 'surface' : ''} ${cls}" style="${holeStyle(h)}" data-grip="${h.grip}" data-side="${hotspotSide(h)}" data-hx="${h.hx != null ? h.hx : h.x}" title="${esc(grip.label)}${grip.note ? ' · ' + esc(grip.note) : ''}" aria-label="${esc(grip.label)}"></button>`;
   }).join('');
   return `<div class="board-photo-wrap" id="${photoId}">
     <img src="${board.image}" alt="${esc(board.label)}">
@@ -2942,7 +3068,7 @@ function fbSelectedGripHint(gripState = fb) {
   if (gripState.gripMode === 'different') {
     const left = gripState.selectedGripLeft ? esc(gripLabel(gripState.board, gripState.selectedGripLeft)) : '—';
     const right = gripState.selectedGripRight ? esc(gripLabel(gripState.board, gripState.selectedGripRight)) : '—';
-    return `Links: ${left} · Rechts: ${right}`;
+    return `<span class="hand-l">Links: ${left}</span> · <span class="hand-r">Rechts: ${right}</span>`;
   }
   return gripState.selectedGrip
     ? 'Gewählt: ' + esc(gripLabel(gripState.board, gripState.selectedGrip))
@@ -2957,10 +3083,13 @@ function fbSelectedGripHint(gripState = fb) {
    gripMode==='different' schreibt ein Tap auf die gerade aktive Hand
    (fb.pickingHand), beide Hände bleiben gleichzeitig am Board sichtbar
    (unterschiedlich eingefärbt), damit man den Unterschied sofort sieht. */
-function selectFbGrip(gripId) {
-  // Nach der linken Hand automatisch zur rechten weiterschalten — ein Klick
-  // weniger, da als Nächstes ohnehin der rechte Griff drankommt.
-  const advanceToRight = fb.gripMode === 'different' && fb.pickingHand === 'left';
+function selectFbGrip(gripId, side) {
+  // Loch links/rechts am Board angetippt: bestimmt direkt die Hand. Nur bei
+  // mittigen Griffen oder Auswahl aus der Liste zählt die gerade aktive
+  // Hand — dann nach links automatisch zu rechts weiterschalten.
+  const bySide = fb.gripMode === 'different' && (side === 'left' || side === 'right');
+  if (bySide) fb.pickingHand = side;
+  const advanceToRight = fb.gripMode === 'different' && !bySide && fb.pickingHand === 'left';
   if (fb.gripMode === 'different') {
     if (fb.pickingHand === 'left') fb.selectedGripLeft = gripId;
     else fb.selectedGripRight = gripId;
@@ -2969,11 +3098,12 @@ function selectFbGrip(gripId) {
     fb.selectedGrip = gripId;
   }
   const hint = document.getElementById('fb-selected-hint');
-  if (hint) hint.textContent = fbSelectedGripHint();
+  if (hint) hint.innerHTML = fbSelectedGripHint();
   document.querySelectorAll('#fb-board-visual .board-hotspot').forEach((el) => {
     if (fb.gripMode === 'different') {
-      el.classList.toggle('active-left', el.dataset.grip === fb.selectedGripLeft);
-      el.classList.toggle('active-right', el.dataset.grip === fb.selectedGripRight);
+      const h = { grip: el.dataset.grip, hx: Number(el.dataset.hx) };
+      el.classList.remove('active-left', 'active-right');
+      hotspotHandClass(fb, h).split(' ').filter(Boolean).forEach((c) => el.classList.add(c));
     } else {
       el.classList.toggle('active', el.dataset.grip === gripId);
     }
@@ -2987,12 +3117,10 @@ function selectFbGrip(gripId) {
     const rightBtn = handLabels.querySelector('[data-hand="right"]');
     if (leftBtn) leftBtn.textContent = 'Links' + (fb.selectedGripLeft ? ': ' + gripLabel(fb.board, fb.selectedGripLeft) : ' wählen');
     if (rightBtn) rightBtn.textContent = 'Rechts' + (fb.selectedGripRight ? ': ' + gripLabel(fb.board, fb.selectedGripRight) : ' wählen');
-    if (advanceToRight) {
-      leftBtn.classList.remove('active');
-      rightBtn.classList.add('active');
-      const label = document.querySelector('#fb-add-panel .field label');
-      if (label) label.textContent = 'Oder aus der Liste wählen (für rechts)';
-    }
+    leftBtn.classList.toggle('active', fb.pickingHand === 'left');
+    rightBtn.classList.toggle('active', fb.pickingHand === 'right');
+    const label = document.querySelector('#fb-add-panel .field label');
+    if (label) label.textContent = `Oder aus der Liste wählen (für ${fb.pickingHand === 'left' ? 'links' : 'rechts'})`;
   }
 }
 
@@ -3040,10 +3168,12 @@ function openFbGripEditor(index) {
   };
   renderFbGripEditorSheet();
 }
-function selectFbEditorGrip(gripId) {
+function selectFbEditorGrip(gripId, side) {
   const st = fbGripEditor;
   if (!st) return;
-  const advanceToRight = st.gripMode === 'different' && st.pickingHand === 'left';
+  const bySide = st.gripMode === 'different' && (side === 'left' || side === 'right');
+  if (bySide) st.pickingHand = side;
+  const advanceToRight = st.gripMode === 'different' && !bySide && st.pickingHand === 'left';
   if (st.gripMode === 'different') {
     if (st.pickingHand === 'left') st.selectedGripLeft = gripId;
     else st.selectedGripRight = gripId;
@@ -3071,8 +3201,8 @@ function renderFbGripEditorSheet() {
       </div>
       ${st.gripMode === 'different' ? `
         <div class="chip-row" id="fbge-hand-toggle">
-          <button type="button" class="chip ${st.pickingHand === 'left' ? 'active' : ''}" data-hand="left">Links${st.selectedGripLeft ? ': ' + esc(gripLabel(st.board, st.selectedGripLeft)) : ' wählen'}</button>
-          <button type="button" class="chip ${st.pickingHand === 'right' ? 'active' : ''}" data-hand="right">Rechts${st.selectedGripRight ? ': ' + esc(gripLabel(st.board, st.selectedGripRight)) : ' wählen'}</button>
+          <button type="button" class="chip ${st.pickingHand === 'left' ? 'active' : ''}" data-hand="left" data-hand-color="l">Links${st.selectedGripLeft ? ': ' + esc(gripLabel(st.board, st.selectedGripLeft)) : ' wählen'}</button>
+          <button type="button" class="chip ${st.pickingHand === 'right' ? 'active' : ''}" data-hand="right" data-hand-color="r">Rechts${st.selectedGripRight ? ': ' + esc(gripLabel(st.board, st.selectedGripRight)) : ' wählen'}</button>
         </div>
       ` : ''}
       <div class="board-visual">${renderBoardImage(st, 'fbge-board-photo')}</div>
@@ -3108,7 +3238,7 @@ function renderFbGripEditorSheet() {
     });
   }
   el.querySelectorAll('.board-hotspot').forEach((btn) => {
-    btn.onclick = () => selectFbEditorGrip(btn.dataset.grip);
+    btn.onclick = () => selectFbEditorGrip(btn.dataset.grip, btn.dataset.side);
   });
   document.getElementById('fbge-grip-select').onchange = (e) => selectFbEditorGrip(e.target.value || null);
   document.getElementById('fbge-save').onclick = () => {
@@ -3236,8 +3366,8 @@ function renderFbAddPanel() {
       </div>
       ${fb.gripMode === 'different' ? `
         <div class="chip-row" id="fb-hand-toggle">
-          <button class="chip ${fb.pickingHand === 'left' ? 'active' : ''}" data-hand="left">Links${fb.selectedGripLeft ? ': ' + esc(gripLabel(fb.board, fb.selectedGripLeft)) : ' wählen'}</button>
-          <button class="chip ${fb.pickingHand === 'right' ? 'active' : ''}" data-hand="right">Rechts${fb.selectedGripRight ? ': ' + esc(gripLabel(fb.board, fb.selectedGripRight)) : ' wählen'}</button>
+          <button class="chip ${fb.pickingHand === 'left' ? 'active' : ''}" data-hand="left" data-hand-color="l">Links${fb.selectedGripLeft ? ': ' + esc(gripLabel(fb.board, fb.selectedGripLeft)) : ' wählen'}</button>
+          <button class="chip ${fb.pickingHand === 'right' ? 'active' : ''}" data-hand="right" data-hand-color="r">Rechts${fb.selectedGripRight ? ': ' + esc(gripLabel(fb.board, fb.selectedGripRight)) : ' wählen'}</button>
         </div>
       ` : ''}
       <div class="board-visual" id="fb-board-visual">${renderBoardImage()}</div>
@@ -3293,7 +3423,7 @@ function renderFbAddPanel() {
       });
     }
     document.getElementById('fb-board-visual').querySelectorAll('.board-hotspot').forEach((el) => {
-      el.onclick = () => selectFbGrip(el.dataset.grip);
+      el.onclick = () => selectFbGrip(el.dataset.grip, el.dataset.side);
     });
     document.getElementById('fb-grip-select').onchange = (e) => selectFbGrip(e.target.value || null);
     document.getElementById('fb-new-reps').oninput = (e) => { fb.newHang.reps = Number(e.target.value) || 1; };
@@ -3563,6 +3693,109 @@ function campusRoundTripPreview(c) {
   return { stops: [...out.stops, ...back.stops.slice(1)], pattern };
 }
 
+/* Beta: Sprossen direkt am Campus-Bild antippen. Die Route wird in den
+   bestehenden Feldern gespeichert (2 Stationen = "Von → Zu", mehr =
+   Muster mit startRung + pattern), die Zahlen-Stepper darunter bleiben
+   als Alternative. */
+function campusBuilderStops(c) {
+  if (c.routeFresh) return [];
+  if (c.moveMode === 'pattern') return campusStopsOf(c);
+  const pv = campusRoundTripPreview(c);
+  return pv.error ? [c.fromRung, c.toRung] : pv.stops;
+}
+function campusSetStops(c, stops) {
+  c.routeFresh = false;
+  c.returnEnabled = false;
+  if (stops.length === 2) {
+    c.moveMode = 'direct';
+    c.fromRung = stops[0]; c.toRung = stops[1];
+    c.stepSize = Math.max(1, Math.abs(stops[1] - stops[0]));
+  } else {
+    c.moveMode = 'pattern';
+    c.startRung = stops[0];
+    c.pattern = stops.slice(1).map((r, i) => r - stops[i]);
+  }
+}
+function campusPickerSvg(c) {
+  const stops = campusBuilderStops(c);
+  const typeL = c.rungType;
+  const typeR = c.rungSides === 'different' ? (c.rungTypeRight || c.rungType) : c.rungType;
+  const stopSet = new Set(stops);
+  let shapes = '';
+  Object.keys(CAMPUS_GEOMETRY).forEach((t) => {
+    const inUse = t === typeL || t === typeR;
+    for (let r = 1; r <= 10; r++) {
+      const cls = `cr ${inUse ? 'cr-col' : ''} ${inUse && stopSet.has(r) ? 'cr-stop' : ''} ${CAMPUS_GEOMETRY[t].virtual && CAMPUS_GEOMETRY[t].virtual.includes(r) ? 'cr-virtual' : ''}`;
+      shapes += campusRungShapes(t, r, cls, `data-type="${t}" data-rung="${r}"`);
+    }
+  });
+  const numbers = {};
+  stops.forEach((r, i) => { (numbers[r] = numbers[r] || []).push(i + 1); });
+  const [, xR] = campusTypeXRange(typeR);
+  const labels = Object.entries(numbers).map(([r, nums]) => {
+    const y = campusRungPoint(typeR, Number(r), 'r').y;
+    return `<text class="cr-num" x="${Math.min(xR + 8, CAMPUS_IMG_W - 60)}" y="${y + 10}">${nums.join('·')}</text>`;
+  }).join('');
+  const path = stops.length > 1 ? `<polyline class="cr-path" points="${stops.map((r) => { const pt = campusRungPoint(typeL, r, 'l'); return `${pt.x},${pt.y}`; }).join(' ')}"/>` : '';
+  return `<svg class="campus-pick" viewBox="0 0 ${CAMPUS_IMG_W} ${CAMPUS_IMG_H}" role="group" aria-label="Campusboard: Sprossen antippen">
+    <image href="${CAMPUS_BOARD_IMAGE}" x="0" y="0" width="${CAMPUS_IMG_W}" height="${CAMPUS_IMG_H}"/>
+    ${shapes}${path}${labels}
+  </svg>`;
+}
+function wireCampusPicker(c) {
+  document.querySelectorAll('.campus-pick .cr[data-rung]').forEach((el) => {
+    el.onclick = () => {
+      const type = el.dataset.type;
+      const rung = Number(el.dataset.rung);
+      const stops = campusBuilderStops(c);
+      const typeR = c.rungTypeRight || c.rungType;
+      if (c.rungSides === 'different') {
+        if (type !== c.rungType && type !== typeR) {
+          // Neue Spalte für die gerade gewählte Hand
+          if (c.pickHand === 'r') c.rungTypeRight = type;
+          else { c.rungType = type; c.pickHand = 'r'; }
+          if (!stops.length) { c.routeFresh = false; c.moveMode = 'pattern'; c.startRung = rung; c.pattern = []; }
+          renderFbAddPanel();
+          return;
+        }
+      } else if (type !== c.rungType) {
+        // Andere Spalte: Typ wechseln und neue Route an dieser Sprosse starten
+        c.rungType = type;
+        c.routeFresh = false; c.moveMode = 'pattern'; c.startRung = rung; c.pattern = []; c.returnEnabled = false;
+        renderFbAddPanel();
+        return;
+      }
+      if (!stops.length) {
+        c.routeFresh = false; c.moveMode = 'pattern'; c.startRung = rung; c.pattern = []; c.returnEnabled = false;
+      } else if (stops[stops.length - 1] !== rung) {
+        campusSetStops(c, [...stops, rung]);
+      }
+      renderFbAddPanel();
+    };
+  });
+  const sides = document.getElementById('campus-sides-toggle');
+  if (sides) sides.querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => {
+      c.rungSides = btn.dataset.sides;
+      if (c.rungSides === 'different') { c.rungTypeRight = c.rungTypeRight || c.rungType; c.pickHand = 'l'; }
+      renderFbAddPanel();
+    };
+  });
+  const pick = document.getElementById('campus-pickhand-toggle');
+  if (pick) pick.querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => { c.pickHand = btn.dataset.pick; renderFbAddPanel(); };
+  });
+  const undo = document.getElementById('campus-route-undo');
+  if (undo) undo.onclick = () => {
+    const stops = campusBuilderStops(c).slice(0, -1);
+    if (stops.length >= 2) campusSetStops(c, stops);
+    else if (stops.length === 1) { c.moveMode = 'pattern'; c.startRung = stops[0]; c.pattern = []; }
+    else c.routeFresh = true;
+    renderFbAddPanel();
+  };
+  document.getElementById('campus-route-new').onclick = () => { c.routeFresh = true; c.pattern = []; renderFbAddPanel(); };
+}
+
 /* Campus-Board: keine Foto-Hotspots wie beim Hangboard (Sprossen sind
    durchnummeriert, immer in einer Spalte) — stattdessen Sprossen-TYP per
    Chip + die Bewegung rein über Zahlen/Stepper, entweder als direkter
@@ -3576,12 +3809,21 @@ function renderCampusAddPanel(holder) {
       <div class="chip-row" id="campus-rung-toggle" style="margin-bottom:6px;">
         ${CAMPUS_RUNG_TYPES.map((t) => `<button type="button" class="chip ${c.rungType === t.id ? 'active' : ''}" data-rung="${t.id}">${esc(t.label)}</button>`).join('')}
       </div>
-      <div class="campus-ref" id="campus-ref">
-        <img src="${CAMPUS_BOARD_IMAGE}" alt="">
-        ${campusRefLinesHtml(c.rungType)}
-        <div class="campus-ref-label">Antippen wählt den passenden Sprossen-Typ</div>
+      <div class="chip-row" id="campus-sides-toggle" style="margin:8px 0 8px;">
+        <button type="button" class="chip ${c.rungSides !== 'different' ? 'active' : ''}" data-sides="same">Beide Hände gleich</button>
+        <button type="button" class="chip ${c.rungSides === 'different' ? 'active' : ''}" data-sides="different">Unterschiedlich</button>
       </div>
-      <p class="mono" id="campus-ref-calib" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:4px 0 0;min-height:14px;"></p>
+      ${c.rungSides === 'different' ? `
+        <div class="chip-row" id="campus-pickhand-toggle" style="margin-bottom:8px;">
+          <button type="button" class="chip ${c.pickHand !== 'r' ? 'active' : ''}" data-hand-color="l" data-pick="l">Links: ${esc(campusRungLabel(c.rungType))}</button>
+          <button type="button" class="chip ${c.pickHand === 'r' ? 'active' : ''}" data-hand-color="r" data-pick="r">Rechts: ${esc(campusRungLabel(c.rungTypeRight || c.rungType))}</button>
+        </div>` : ''}
+      <div class="campus-pick-wrap">${campusPickerSvg(c)}</div>
+      <div class="campus-pick-bar">
+        <span class="campus-pick-route">${(() => { const st = campusBuilderStops(c); return st.length ? st.join(' → ') : 'Sprossen der Reihe nach antippen: 1. Tipp = Start'; })()}</span>
+        <button type="button" class="btn ghost small" id="campus-route-undo" ${campusBuilderStops(c).length ? '' : 'disabled'}>Zurück</button>
+        <button type="button" class="btn ghost small" id="campus-route-new">Neu</button>
+      </div>
     </div>
 
     <div class="field">
@@ -3694,7 +3936,7 @@ function renderCampusAddPanel(holder) {
   document.getElementById('campus-rung-toggle').querySelectorAll('.chip').forEach((btn) => {
     btn.onclick = () => { c.rungType = btn.dataset.rung; renderFbAddPanel(); };
   });
-  wireCampusRefCalibration(c);
+  wireCampusPicker(c);
   document.getElementById('campus-mode-toggle').querySelectorAll('.chip').forEach((btn) => {
     btn.onclick = () => { c.moveMode = btn.dataset.mode; renderFbAddPanel(); };
   });
@@ -3745,7 +3987,13 @@ function renderCampusAddPanel(holder) {
   document.getElementById('campus-restsec').oninput = (e) => { c.restSec = Number(e.target.value) || 0; };
   document.getElementById('campus-blockrestsec').oninput = (e) => { c.blockRestSec = Number(e.target.value) || 0; };
   document.getElementById('fb-add-campus').onclick = () => {
-    if (c.moveMode === 'pattern' && !c.pattern.length) { toast('Zuerst ein Muster antippen.', 'err'); return; }
+    if (c.routeFresh || (c.moveMode === 'pattern' && !c.pattern.length)) { toast('Zuerst mindestens zwei Sprossen antippen (oder ein Muster wählen).', 'err'); return; }
+    const pushCampus = (blk) => {
+      const out = { ...blk };
+      delete out.rungSides; delete out.pickHand; delete out.routeFresh;
+      if (c.rungSides !== 'different' || !out.rungTypeRight || out.rungTypeRight === out.rungType) delete out.rungTypeRight;
+      fb.blocks.push(out);
+    };
     if (c.moveMode === 'direct') {
       const preview = campusRoundTripPreview(c);
       if (preview.error) { toast(preview.error, 'err'); return; }
@@ -3754,12 +4002,12 @@ function renderCampusAddPanel(holder) {
         // Zwischenstopps: intern als 'pattern'-Satz gespeichert (kein
         // neuer Datentyp nötig, exakt dieselbe Struktur wie ein von Hand
         // gebautes Muster).
-        fb.blocks.push({ type: 'campus', ...c, moveMode: 'pattern', startRung: c.fromRung, pattern: preview.pattern });
+        pushCampus({ type: 'campus', ...c, moveMode: 'pattern', startRung: c.fromRung, pattern: preview.pattern });
         renderFbBlocksList();
         return;
       }
     }
-    fb.blocks.push({ type: 'campus', ...c, pattern: c.pattern.slice() });
+    pushCampus({ type: 'campus', ...c, pattern: c.pattern.slice() });
     renderFbBlocksList();
   };
 }
@@ -4004,6 +4252,14 @@ function fbBlocksWithCurrentBoard(blocks) {
   return blocks.map((b) => (b.type === 'hang' && b.board == null ? { ...b, board: fb.board } : { ...b }));
 }
 
+/* Ablauf-Balken auf der Schnelltraining-Karte: pro Satz ein Stück, Breite
+   nach Dauer, Farbe nach Art (Hang/Lifting Pin blau, Übung weiss, Campus
+   dunkelblau, Pause grau) — zeigt den Aufbau auf einen Blick. */
+function qsBlockBarHtml(blocks) {
+  const color = (b) => (b.type === 'pause' ? 'pause' : b.type === 'exercise' ? 'exercise' : b.type === 'campus' ? 'campus' : 'hang');
+  return `<div class="qs-bar" aria-hidden="true">${blocks.map((b) => `<span class="qs-bar-seg ${color(b)}" style="flex-grow:${Math.max(1, Math.round(fbBlockSeconds(b)))}"></span>`).join('')}</div>`;
+}
+
 function renderFbQuickstart() {
   const holder = document.getElementById('fb-quickstart');
   if (!holder) return;
@@ -4055,8 +4311,11 @@ function renderFbQuickstart() {
           </div>
         </div>
         ${t.note ? `<div class="qs-note">${esc(t.note)}</div>` : ''}
-        <div class="qs-meta mono">${t.blocks.length} Sätze · ~${fmtMinSec(totalSec)}</div>
-        <button type="button" class="btn qs-start" data-tpl="${t.id}">Los</button>
+        <div class="qs-bottom">
+          <div class="qs-meta mono">${t.blocks.length} Sätze · ~${fmtMinSec(totalSec)}</div>
+          <button type="button" class="btn qs-start" data-tpl="${t.id}" aria-label="${esc(t.name)} starten"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 001.5.9l10.2-6.5a1 1 0 000-1.8L9.5 4.6A1 1 0 008 5.5z"/></svg></button>
+        </div>
+        ${qsBlockBarHtml(t.blocks)}
       </div>
     `;
   }).join('') : `<div class="list-empty">${empty}</div>`);
@@ -6958,26 +7217,42 @@ function exerciseFigureSvg(exerciseId) {
    Bild selbst bleibt immer dasselbe. Positionen sind bewusst schematisch
    (Rechtecke/Ellipsen wie bei den Strichmännchen), keine anatomische
    Illustration. */
+/* Anatomische Zonen (Beta): Vorderansicht links, Rückansicht rechts
+   (um 125 nach rechts verschoben). Jede Zone ist ein Pfad, links und
+   rechts gespiegelt; die Form orientiert sich grob am echten Muskel statt
+   an Rechtecken. BODY_BASE_SVG ist der dunkle Körperumriss darunter,
+   BODY_DECO_SVG feine Linien darüber (nicht antippbar). */
+const BACK = (d) => `<path transform="translate(125 0)" d="${d}"/>`;
+const FRONT = (d) => `<path d="${d}"/>`;
 const MUSCLE_ZONES_SVG = {
-  neck_traps: '<rect x="33" y="25" width="24" height="8" rx="3"/>',
-  shoulders: '<ellipse cx="24" cy="34" rx="8" ry="7"/><ellipse cx="66" cy="34" rx="8" ry="7"/>',
-  chest: '<rect x="30" y="32" width="30" height="18" rx="4"/>',
-  biceps: '<rect x="14" y="38" width="9" height="20" rx="4"/><rect x="67" y="38" width="9" height="20" rx="4"/>',
-  forearms_front: '<rect x="10" y="60" width="8" height="24" rx="4"/><rect x="72" y="60" width="8" height="24" rx="4"/>',
-  abs: '<rect x="34" y="52" width="22" height="26" rx="4"/>',
-  obliques: '<rect x="26" y="54" width="7" height="22" rx="3"/><rect x="57" y="54" width="7" height="22" rx="3"/>',
-  quads: '<rect x="28" y="80" width="16" height="34" rx="5"/><rect x="46" y="80" width="16" height="34" rx="5"/>',
-  shins: '<rect x="30" y="116" width="11" height="28" rx="4"/><rect x="49" y="116" width="11" height="28" rx="4"/>',
-  traps: '<rect x="133" y="21" width="24" height="14" rx="4"/>',
-  rear_delts: '<ellipse cx="124" cy="34" rx="8" ry="7"/><ellipse cx="166" cy="34" rx="8" ry="7"/>',
-  lats: '<rect x="128" y="38" width="34" height="24" rx="5"/>',
-  triceps: '<rect x="112" y="38" width="9" height="20" rx="4"/><rect x="169" y="38" width="9" height="20" rx="4"/>',
-  forearms_back: '<rect x="108" y="60" width="8" height="24" rx="4"/><rect x="174" y="60" width="8" height="24" rx="4"/>',
-  lower_back: '<rect x="133" y="62" width="24" height="18" rx="4"/>',
-  glutes: '<rect x="128" y="80" width="34" height="18" rx="6"/>',
-  hamstrings: '<rect x="128" y="98" width="16" height="30" rx="5"/><rect x="146" y="98" width="16" height="30" rx="5"/>',
-  calves: '<rect x="130" y="130" width="11" height="26" rx="4"/><rect x="149" y="130" width="11" height="26" rx="4"/>',
+  neck_traps: FRONT('M55 38 Q48 43 41 46 Q46 49 52 47 Q56 44 56 40 Z M65 38 Q72 43 79 46 Q74 49 68 47 Q64 44 64 40 Z'),
+  shoulders: FRONT('M38 47 Q28 49 26 62 Q31 66 36 62 Q40 56 40 50 Z M82 47 Q92 49 94 62 Q89 66 84 62 Q80 56 80 50 Z'),
+  chest: FRONT('M59 50 Q48 48 41 52 Q38 62 42 70 Q52 74 59 70 Z M61 50 Q72 48 79 52 Q82 62 78 70 Q68 74 61 70 Z'),
+  biceps: FRONT('M34 66 Q27 70 26 82 Q27 90 31 92 Q35 84 36 72 Z M86 66 Q93 70 94 82 Q93 90 89 92 Q85 84 84 72 Z'),
+  forearms_front: FRONT('M29 96 Q23 106 21 122 Q23 126 26 124 Q30 110 33 98 Z M91 96 Q97 106 99 122 Q97 126 94 124 Q90 110 87 98 Z'),
+  abs: FRONT('M53 74 L67 74 Q68 96 66 116 Q60 120 54 116 Q52 96 53 74 Z'),
+  obliques: FRONT('M42 74 Q41 90 44 110 Q48 114 51 112 Q50 92 51 76 Z M78 74 Q79 90 76 110 Q72 114 69 112 Q70 92 69 76 Z'),
+  quads: FRONT('M44 124 Q38 148 42 174 Q47 180 53 177 Q58 152 58 128 Q52 122 44 124 Z M76 124 Q82 148 78 174 Q73 180 67 177 Q62 152 62 128 Q68 122 76 124 Z'),
+  shins: FRONT('M43 190 Q40 210 43 232 Q46 236 49 234 Q52 212 51 192 Z M77 190 Q80 210 77 232 Q74 236 71 234 Q68 212 69 192 Z'),
+  traps: BACK('M60 36 Q52 42 44 48 Q52 58 60 66 Z M60 36 Q68 42 76 48 Q68 58 60 66 Z'),
+  rear_delts: BACK('M38 47 Q28 49 26 62 Q31 66 36 62 Q40 56 40 50 Z M82 47 Q92 49 94 62 Q89 66 84 62 Q80 56 80 50 Z'),
+  lats: BACK('M58 66 Q48 58 42 58 Q40 74 45 96 Q52 102 58 98 Z M62 66 Q72 58 78 58 Q80 74 75 96 Q68 102 62 98 Z'),
+  triceps: BACK('M34 66 Q27 70 26 82 Q27 90 31 92 Q35 84 36 72 Z M86 66 Q93 70 94 82 Q93 90 89 92 Q85 84 84 72 Z'),
+  forearms_back: BACK('M29 96 Q23 106 21 122 Q23 126 26 124 Q30 110 33 98 Z M91 96 Q97 106 99 122 Q97 126 94 124 Q90 110 87 98 Z'),
+  lower_back: BACK('M54 100 L66 100 L66 116 Q60 119 54 116 Z'),
+  glutes: BACK('M59 118 Q47 116 42 126 Q43 140 58 140 Z M61 118 Q73 116 78 126 Q77 140 62 140 Z'),
+  hamstrings: BACK('M44 144 Q39 162 42 178 Q48 182 54 178 Q57 160 57 144 Z M76 144 Q81 162 78 178 Q72 182 66 178 Q63 160 63 144 Z'),
+  calves: BACK('M43 188 Q38 204 43 222 Q47 226 51 222 Q55 204 51 188 Z M77 188 Q82 204 77 222 Q73 226 69 222 Q65 204 69 188 Z'),
 };
+const BODY_FIGURE_BASE = `
+  <ellipse cx="60" cy="20" rx="10" ry="12"/>
+  <path d="M55 30 L65 30 L66 40 L54 40 Z"/>
+  <path d="M40 44 Q60 38 80 44 Q84 60 80 76 L78 120 Q60 128 42 120 L40 76 Q36 60 40 44 Z"/>
+  <path d="M38 48 Q26 50 24 66 L20 96 Q16 116 17 130 Q20 140 25 136 Q28 120 32 100 L37 70 Z M82 48 Q94 50 96 66 L100 96 Q104 116 103 130 Q100 140 95 136 Q92 120 88 100 L83 70 Z"/>
+  <path d="M42 120 Q36 150 40 184 Q38 210 42 240 L50 244 Q54 214 53 186 Q58 152 59 124 Z M78 120 Q84 150 80 184 Q82 210 78 240 L70 244 Q66 214 67 186 Q62 152 61 124 Z"/>`;
+const BODY_BASE_SVG = `<g class="body-base">${BODY_FIGURE_BASE}<g transform="translate(125 0)">${BODY_FIGURE_BASE}</g></g>`;
+const BODY_DECO_SVG = '<path class="body-deco" d="M53 86 L67 86 M53 98 L67 98 M60 74 L60 116"/>';
+const BODY_VIEWBOX = '0 0 245 250';
 
 const MUSCLE_ZONE_LABEL = {
   neck_traps: 'Nacken', shoulders: 'Schultern', chest: 'Brust', biceps: 'Bizeps',
@@ -6994,10 +7269,10 @@ function bodyMapSvg(primary, secondary) {
   };
   const zones = Object.entries(MUSCLE_ZONES_SVG).map(([id, shape]) => zoneEl(id, shape)).join('');
   return `
-    <svg viewBox="0 0 190 160" class="muscle-map">
-      <circle class="muscle-head" cx="45" cy="13" r="9"/>
-      <circle class="muscle-head" cx="145" cy="13" r="9"/>
+    <svg viewBox="${BODY_VIEWBOX}" class="muscle-map">
+      ${BODY_BASE_SVG}
       ${zones}
+      ${BODY_DECO_SVG}
     </svg>
   `;
 }
@@ -7070,12 +7345,12 @@ function miniBoardThumb(boardId, gripId, gripId2) {
   // zweiter, andersfarbig markierter Griff für Sätze mit unterschiedlichem
   // Griff pro Hand (siehe hangBoardThumb).
   const dots = board.hotspots
-    .filter((h) => h.grip === gripId)
-    .map((s) => `<span class="dot" style="left:${s.x}%;top:${s.y}%;"></span>`)
+    .filter((h) => h.grip === gripId && (!gripId2 || hotspotSide(h) !== 'right'))
+    .map((s) => `<span class="dot hole ${s.surface ? 'surface' : ''}" style="${holeStyle(s)}"></span>`)
     .join('');
   const dots2 = gripId2 ? board.hotspots
-    .filter((h) => h.grip === gripId2)
-    .map((s) => `<span class="dot dot-alt" style="left:${s.x}%;top:${s.y}%;"></span>`)
+    .filter((h) => h.grip === gripId2 && hotspotSide(h) !== 'left')
+    .map((s) => `<span class="dot dot-alt hole ${s.surface ? 'surface' : ''}" style="${holeStyle(s)}"></span>`)
     .join('') : '';
   return `<div class="timeline-thumb"><img src="${board.image}" alt="">${dots}${dots2}</div>`;
 }
@@ -7169,7 +7444,13 @@ function isHoldModeBlock(b) { return b.type === 'hang' || (b.type === 'block' &&
 function holdBlockArmNote(b, activeRep) { return b.type === 'block' ? blockArmNote(b, activeRep) : hangArmNote(b); }
 function holdBlockThumb(b) { return b.type === 'block' ? blockThumb() : hangBoardThumb(b); }
 function holdBlockTitle(b) {
-  return b.type === 'block' ? `Lifting Pin @ ${esc(blockGripLabel(b))}` : `Hang @ ${esc(hangGripLabel(b))}`;
+  if (b.type === 'block') return `Lifting Pin @ ${esc(blockGripLabel(b))}`;
+  // Pro Hand unterschiedlich: gleiche Farben wie am Board (links blau,
+  // rechts orange), damit sofort klar ist, welche Hand wohin gehört.
+  if (hangIsAsymmetric(b)) {
+    return `Hang @ <span class="hand-l">L: ${esc(gripLabel(b.board, b.gripLeft))}</span> · <span class="hand-r">R: ${esc(gripLabel(b.board, b.gripRight))}</span>`;
+  }
+  return `Hang @ ${esc(hangGripLabel(b))}`;
 }
 
 /* Campus-Sätze brauchen keine Foto-Hotspots wie beim Hangboard — die
@@ -7194,7 +7475,10 @@ function campusArmIcons(b) {
   return `${armIcon}${handIcon}`;
 }
 function campusLabel(b) {
-  return `${campusArmIcons(b)} Campus (${esc(campusRungLabel(b.rungType))}) · ${esc(campusMoveText(b))}`;
+  const rungs = b.rungTypeRight && b.rungTypeRight !== b.rungType
+    ? `<span class="hand-l">L: ${esc(campusRungLabel(b.rungType))}</span> · <span class="hand-r">R: ${esc(campusRungLabel(b.rungTypeRight))}</span>`
+    : esc(campusRungLabel(b.rungType));
+  return `${campusArmIcons(b)} Campus (${rungs}) · ${esc(campusMoveText(b))}`;
 }
 /* Bewegungsart als Klartext statt reiner Symbol-Kombo ("🔃🫲") — musste man
    erst entschlüsseln, "Übergreifen · Links zuerst" liest sich von selbst.
@@ -7314,7 +7598,7 @@ function campusLadderSvgMarkup(b) {
     const textColor = outDir > 0 ? '#04141c' : '#2b0a02';
     const y = yFor(w.rung).toFixed(1);
     svg += `<circle cx="45" cy="${y}" r="${r}" fill="${color}"/>`;
-    svg += `<text x="45" y="${(yFor(w.rung) + r * 0.35).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="${r + 1}" font-weight="700" fill="${textColor}">${w.rung}</text>`;
+    svg += `<text x="45" y="${(yFor(w.rung) + r * 0.35).toFixed(1)}" text-anchor="middle" font-family="Barlow Condensed, sans-serif" font-size="${r + 1}" font-weight="700" fill="${textColor}">${w.rung}</text>`;
   });
 
   return `<svg viewBox="0 0 90 220" class="campus-ladder-svg">${svg}</svg>`;
@@ -7323,11 +7607,130 @@ function campusLadderSvgMarkup(b) {
 /* Ersetzt das reine Deko-Strichmännchen während des Campus-Arbeitssatzes.
    Direkt-Sätze bleiben ein kompakter Pfeil ("1→4"), Muster-Sätze bekommen
    die Leiter-Grafik + den Wegtext statt der Zahlen-Kacheln von früher. */
-function campusWorkFigureSvg(b) {
-  const moveHtml = b.moveMode === 'pattern'
-    ? `<div class="campus-ladder-row">${campusLadderSvgMarkup(b)}<div class="campus-route">${campusRouteStepsHtml(b)}</div></div>`
-    : `<div class="campus-work-move mono">${b.fromRung}<span class="campus-work-arrow">→</span>${b.toRung}</div>`;
-  return `<div class="campus-work-figure">${campusArmLabelHtml(b)}${moveHtml}</div>`;
+/* Beta: Campus-Satz als Ausschnitt des echten Boards mit der Route —
+   nummerierte Sprossen, Linie dazwischen und (animate) zwei Hand-Punkte,
+   die den Ablauf vorspielen: gleichzeitig, nachziehen oder übergreifen.
+   Gedacht vor allem für die Pause VOR dem Satz (Überblick holen, dann zur
+   Wand); während des Satzes selbst ruhig ohne Animation. */
+function campusWorkFigureSvg(b, animate = true) {
+  const stops = campusStopsOf(b);
+  const text = stops.length === 2
+    ? `<div class="campus-route-step"><span class="campus-route-dot up"></span>Start <b>Sprosse ${stops[0]}</b></div><div class="campus-route-step"><span class="campus-route-dot ${stops[1] > stops[0] ? 'up' : 'down'}"></span>${stops[1] > stops[0] ? 'Rauf' : 'Runter'} bis <b>Sprosse ${stops[1]}</b></div>`
+    : campusRouteStepsHtml({ ...b, pattern: stops.slice(1).map((r, i) => r - stops[i]), startRung: stops[0] });
+  return `<div class="campus-work-figure">${campusArmLabelHtml(b)}<div class="campus-anim-row">${campusRouteAnimSvg(b, animate)}<div class="campus-route">${text}</div></div></div>`;
+}
+
+/* Alle Stationen eines Campus-Satzes (Sprossennummern in Reihenfolge). */
+function campusStopsOf(b) {
+  if (b.moveMode !== 'pattern') return [b.fromRung, b.toRung];
+  const stops = [b.startRung];
+  (b.pattern || []).forEach((p) => stops.push(stops[stops.length - 1] + p));
+  return stops;
+}
+/* Mittelpunkt einer Sprosse für eine Hand ('l'/'r') im Campus-Bild. */
+function campusRungPoint(typeId, rung, hand) {
+  const g = CAMPUS_GEOMETRY[typeId];
+  if (!g) return null;
+  const y = g.ys[Math.min(Math.max(rung, 1), g.ys.length) - 1];
+  if (g.kind === 'ball') return { x: hand === 'r' ? g.cols[1] : g.cols[0], y };
+  const w = g.x1 - g.x0;
+  return { x: hand === 'r' ? g.x0 + w * 0.72 : g.x0 + w * 0.28, y };
+}
+function campusTypeXRange(typeId) {
+  const g = CAMPUS_GEOMETRY[typeId];
+  if (!g) return [0, CAMPUS_IMG_W];
+  return g.kind === 'ball' ? [g.cols[0] - g.r, g.cols[1] + g.r] : [g.x0, g.x1];
+}
+/* Form einer Sprosse als SVG (Leiste = abgerundetes Rechteck, Kugel = Kreis
+   pro Spalte). cls/attrs werden an jede Form gehängt. */
+function campusRungShapes(typeId, rung, cls, attrs = '') {
+  const g = CAMPUS_GEOMETRY[typeId];
+  const y = g.ys[rung - 1];
+  if (g.kind === 'ball') {
+    return g.cols.map((cx, i) => `<circle class="${cls}" cx="${cx}" cy="${y}" r="${g.r + 3}" ${attrs} data-side="${i ? 'r' : 'l'}"/>`).join('');
+  }
+  return `<rect class="${cls}" x="${g.x0 - 3}" y="${y - g.h / 2 - 3}" width="${g.x1 - g.x0 + 6}" height="${g.h + 6}" rx="${g.h / 2 + 3}" ${attrs}/>`;
+}
+
+/* Zeitplan der Hand-Bewegungen: Liste [{t0, t1, rung}] je Hand. */
+function campusHandEvents(b, stops) {
+  const armMode = b.armMode || 'both';
+  const lead = b.startHand === 'right' ? 'r' : 'l';
+  const other = lead === 'l' ? 'r' : 'l';
+  const ev = { l: [], r: [] };
+  for (let i = 1; i < stops.length; i++) {
+    const t = i - 1;
+    if (armMode === 'both') {
+      ev.l.push({ t0: t + 0.1, t1: t + 0.6, rung: stops[i] });
+      ev.r.push({ t0: t + 0.1, t1: t + 0.6, rung: stops[i] });
+    } else if (armMode === 'match') {
+      ev[lead].push({ t0: t + 0.05, t1: t + 0.45, rung: stops[i] });
+      ev[other].push({ t0: t + 0.5, t1: t + 0.9, rung: stops[i] });
+    } else {
+      const hand = i % 2 === 1 ? lead : other;
+      ev[hand].push({ t0: t + 0.1, t1: t + 0.6, rung: stops[i] });
+    }
+  }
+  return ev;
+}
+
+function campusRouteAnimSvg(b, animate) {
+  const typeL = b.rungType;
+  const typeR = b.rungTypeRight || b.rungType;
+  if (!CAMPUS_GEOMETRY[typeL] || !CAMPUS_GEOMETRY[typeR]) return campusLadderSvgMarkup(b.moveMode === 'pattern' ? b : { ...b, moveMode: 'pattern', startRung: b.fromRung, pattern: [b.toRung - b.fromRung] });
+  const stops = campusStopsOf(b);
+  const [ax0, ax1] = campusTypeXRange(typeL);
+  const [bx0, bx1] = campusTypeXRange(typeR);
+  const x0 = Math.max(0, Math.min(ax0, bx0) - 40);
+  const x1 = Math.max(ax1, bx1) + 90; // Platz rechts für die Nummern
+  // Nur der benutzte Höhenbereich (plus eine Sprosse Luft), damit die Route
+  // gross genug erscheint.
+  const ysUsed = stops.flatMap((r) => [campusRungPoint(typeL, r, 'l').y, campusRungPoint(typeR, r, 'r').y]);
+  const y0 = Math.max(0, Math.min(...ysUsed) - 70);
+  const y1 = Math.min(CAMPUS_IMG_H, Math.max(...ysUsed) + 70);
+  const types = typeL === typeR ? [typeL] : [typeL, typeR];
+  const stopSet = new Set(stops);
+  let shapes = '';
+  types.forEach((t) => {
+    for (let r = 1; r <= 10; r++) {
+      if (stopSet.has(r)) shapes += campusRungShapes(t, r, 'cr-stop');
+    }
+  });
+  // Nummern (Reihenfolge) neben den Stationen
+  const labelX = Math.max(ax1, bx1) + 12;
+  const labels = {};
+  stops.forEach((r, i) => { (labels[r] = labels[r] || []).push(i + 1); });
+  const labelSvg = Object.entries(labels).map(([r, nums]) => {
+    const y = campusRungPoint(typeR, Number(r), 'r').y;
+    return `<text class="cr-num" x="${labelX}" y="${y + 9}">${nums.join('·')}</text>`;
+  }).join('');
+  const T = Math.max(1, stops.length - 1) + 1.2;
+  const dur = (T * 0.9).toFixed(2);
+  const ev = campusHandEvents(b, stops);
+  const handSvg = ['l', 'r'].map((hand) => {
+    const type = hand === 'l' ? typeL : typeR;
+    const p0 = campusRungPoint(type, stops[0], hand);
+    if (!animate) return `<circle class="cr-hand ${hand}" cx="${p0.x}" cy="${p0.y}" r="17"/>`;
+    const pts = [[0, stops[0]]];
+    let last = stops[0];
+    ev[hand].forEach((e) => { pts.push([e.t0, last], [e.t1, e.rung]); last = e.rung; });
+    pts.push([T, last]);
+    // keyTimes streng steigend halten
+    const times = [];
+    pts.forEach(([t], i) => { times.push(Math.max(t, i ? times[i - 1] + 0.001 : 0)); });
+    const keyTimes = times.map((t) => Math.min(1, t / T).toFixed(4)).join(';');
+    const values = pts.map(([, r]) => campusRungPoint(type, r, hand).y).join(';');
+    return `<circle class="cr-hand ${hand}" cx="${p0.x}" cy="${p0.y}" r="17"><animate attributeName="cy" dur="${dur}s" repeatCount="indefinite" values="${values}" keyTimes="${keyTimes}"/></circle>`;
+  }).join('');
+  const lineL = stops.map((r) => { const p = campusRungPoint(typeL, r, 'l'); return `${p.x},${p.y}`; }).join(' ');
+  return `
+    <svg class="campus-anim" viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}" preserveAspectRatio="xMidYMid meet" aria-label="Route ${stops.join(' → ')}">
+      <image href="${CAMPUS_BOARD_IMAGE}" x="0" y="0" width="${CAMPUS_IMG_W}" height="${CAMPUS_IMG_H}" opacity=".55"/>
+      ${shapes}
+      <polyline class="cr-path" points="${lineL}"/>
+      ${labelSvg}
+      ${handSvg}
+    </svg>`;
 }
 
 /* Senkrechter Strich (zwei bei den Kugeln, da im Zickzack statt einer
@@ -7407,7 +7810,7 @@ function fbBlockTitle(b) {
   if (b.type === 'pause') return 'Pause';
   if (isHangLikeBlock(b)) return holdBlockTitle(b);
   if (b.type === 'campus') return campusLabel(b);
-  return exerciseName(b.exerciseId);
+  return esc(exerciseName(b.exerciseId));
 }
 
 /* Letzte 3 Sekunden einer Pause (rest-tense, siehe renderFbOverlay/
@@ -7508,7 +7911,7 @@ function fbOverviewHtml() {
       <div class="fb-overview-item fb-overview-${state}">
         <div class="fb-overview-idx mono">${state === 'done' ? '✓' : i + 1}</div>
         <div>
-          <div class="fb-overview-title">${esc(fbBlockTitle(b))}</div>
+          <div class="fb-overview-title">${fbBlockTitle(b)}</div>
           <div class="fb-overview-sub mono">${esc(fbBlockSub(b))}</div>
         </div>
       </div>
@@ -7683,29 +8086,45 @@ function renderFbRuntime() {
    grosse Zahl füllt sich dabei mit dem Fortschritt INNERHALB des
    aktuellen Hang-/Pause-Schritts (nicht des ganzen Ablaufs). */
 const FB_RING_CIRCUMFERENCE = 326.7; // 2 * PI * r(52)
+/* Beta: Faultier statt Strichmännchen (Pincho = Fingerkraft wie ein
+   Faultier). Beim Hängen hängt es mit den Krallen an der Leiste und
+   schwingt leicht, in der Pause sitzt es mit hängenden Armen und atmet
+   durch (Animationen in styles.css, .sloth-*). */
+const SLOTH_FACE = `
+  <circle class="sloth-head" cx="100" cy="64" r="19"/>
+  <path class="sloth-mask" d="M86 62 q6 -7 12 1 q-6 7 -12 -1z M114 62 q-6 -7 -12 1 q6 7 12 -1z"/>
+  <path class="sloth-line" d="M97 71 h6 M94 76 q6 4 12 0"/>`;
 const FB_HANG_FIGURE_SVG = `
-  <svg viewBox="0 0 200 200" class="ex-figure fb-hang-figure">
-    <line class="fig-rig" x1="40" y1="20" x2="160" y2="20"/>
-    <g class="fig-pose">
-      <line x1="78" y1="20" x2="94" y2="58"/>
-      <line x1="122" y1="20" x2="106" y2="58"/>
-      <circle cx="100" cy="42" r="14"/>
-      <line x1="100" y1="58" x2="100" y2="120"/>
-      <line x1="100" y1="120" x2="90" y2="180"/>
-      <line x1="100" y1="120" x2="110" y2="180"/>
+  <svg viewBox="0 0 200 200" class="ex-figure fb-hang-figure sloth-fig">
+    <line class="fig-rig sloth-bar" x1="36" y1="20" x2="164" y2="20"/>
+    <g class="sloth-swing">
+      <path class="sloth-limb" d="M72 22 Q70 50 88 76"/>
+      <path class="sloth-limb" d="M128 22 Q130 50 112 76"/>
+      <path class="sloth-claw" d="M66 20 q4 -8 10 -2 M70 22 q6 -8 11 0 M124 22 q5 -8 11 -2 M128 22 q6 -8 10 0"/>
+      <ellipse class="sloth-body" cx="100" cy="118" rx="27" ry="36"/>
+      <path class="sloth-line" d="M86 108 q14 9 28 0 M88 124 q12 7 24 0"/>
+      ${SLOTH_FACE}
+      <circle class="sloth-eye" cx="93" cy="62" r="2.4"/>
+      <circle class="sloth-eye" cx="107" cy="62" r="2.4"/>
+      <path class="sloth-limb" d="M88 148 Q82 164 84 182 M112 148 Q118 164 116 182"/>
+      <path class="sloth-claw" d="M80 184 q-2 7 -8 8 M85 185 q0 7 -4 10 M120 184 q2 7 8 8 M115 185 q0 7 4 10"/>
     </g>
   </svg>
 `;
 const FB_REST_FIGURE_SVG = `
-  <svg viewBox="0 0 200 200" class="ex-figure fb-rest-figure">
-    <g class="fig-pose">
-      <circle cx="99" cy="42" r="15"/>
-      <line x1="99" y1="60" x2="99" y2="138"/>
-      <line x1="99" y1="138" x2="86" y2="196"/>
-      <line x1="99" y1="138" x2="114" y2="196"/>
+  <svg viewBox="0 0 200 200" class="ex-figure fb-rest-figure sloth-fig">
+    <g class="sloth-breathe">
+      <ellipse class="sloth-body" cx="100" cy="134" rx="32" ry="34"/>
+      <path class="sloth-line" d="M84 124 q16 10 32 0 M86 142 q14 8 28 0"/>
+      <circle class="sloth-head" cx="100" cy="84" r="19"/>
+      <path class="sloth-mask" d="M86 82 q6 -7 12 1 q-6 7 -12 -1z M114 82 q-6 -7 -12 1 q6 7 12 -1z"/>
+      <path class="sloth-line" d="M89 82 q4 3 8 0 M103 82 q4 3 8 0 M97 91 h6 M95 96 q5 3 10 0"/>
+      <path class="sloth-limb" d="M82 170 q-10 10 -24 12 M118 170 q10 10 24 12"/>
     </g>
-    <line class="fig-pose fb-arm-shake" x1="99" y1="65" x2="80" y2="112"/>
-    <line class="fig-pose fb-arm-shake" x1="99" y1="65" x2="118" y2="112"/>
+    <path class="sloth-limb fb-arm-shake" d="M72 116 Q60 140 64 164"/>
+    <path class="sloth-limb fb-arm-shake" d="M128 116 Q140 140 136 164"/>
+    <text class="sloth-z" x="128" y="58">z</text>
+    <text class="sloth-z sloth-z2" x="142" y="42">z</text>
   </svg>
 `;
 /* Lifting Pin ist kein Hängen (FB_HANG_FIGURE_SVG), sondern ein einarmiges
@@ -7855,14 +8274,22 @@ function updateFbUpcomingUI() {
    Zurück/Weiter springen direkt in den Nachbar-Satz (inkl. dessen eigenem
    Vorbereitungs-Countdown bei Hang-Sätzen), Play/Pause hält den gerade
    laufenden Timer an, ohne den Bildschirm auszuschalten. */
+/* Transport-Symbole als SVG statt Emoji-Zeichen (⏮⏸⏭ werden auf Android
+   als bunte Emoji-Kacheln gezeichnet). */
+const TRANSPORT_ICON = {
+  prev: '<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M6 5h2v14H6zM20 6.2v11.6a1 1 0 01-1.5.9L10 12.9a1 1 0 010-1.8l8.5-5.8a1 1 0 011.5.9z"/></svg>',
+  next: '<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM4 6.2v11.6a1 1 0 001.5.9L14 12.9a1 1 0 000-1.8L5.5 5.3A1 1 0 004 6.2z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 001.5.9l10.2-6.5a1 1 0 000-1.8L9.5 4.6A1 1 0 008 5.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>',
+};
 function fbTransportRow() {
   const canPause = fb.running;
   const isPaused = canPause && !fb.intervalId;
   return `
     <div class="fb-transport">
-      <button type="button" class="fb-transport-btn" id="fb-prev" ${fb.blockIndex === 0 && fb.stepIndex === 0 ? 'disabled' : ''} title="Zurück">⏮</button>
-      <button type="button" class="fb-transport-btn fb-play" id="fb-playpause" ${canPause ? '' : 'disabled'} title="${isPaused ? 'Weiter' : 'Pause'}">${isPaused ? '▶' : '⏸'}</button>
-      <button type="button" class="fb-transport-btn" id="fb-skip" title="Einen Schritt weiter">⏭</button>
+      <button type="button" class="fb-transport-btn" id="fb-prev" ${fb.blockIndex === 0 && fb.stepIndex === 0 ? 'disabled' : ''} title="Zurück" aria-label="Zurück">${TRANSPORT_ICON.prev}</button>
+      <button type="button" class="fb-transport-btn fb-play" id="fb-playpause" ${canPause ? '' : 'disabled'} title="${isPaused ? 'Weiter' : 'Pause'}">${isPaused ? TRANSPORT_ICON.play : TRANSPORT_ICON.pause}</button>
+      <button type="button" class="fb-transport-btn" id="fb-skip" title="Einen Schritt weiter" aria-label="Einen Schritt weiter">${TRANSPORT_ICON.next}</button>
     </div>
   `;
 }
@@ -8080,8 +8507,8 @@ function renderFbOverlay() {
              </div>
            </div>`
         : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:">${working
-            ? (isCampus ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId))
-            : (isTrailingPause ? (displayIsCampus ? campusWorkFigureSvg(displayBlock) : displayIsPause ? FB_REST_FIGURE_SVG : exerciseFigureSvg(displayBlock.exerciseId)) : FB_REST_FIGURE_SVG)}</div>
+            ? (isCampus ? campusWorkFigureSvg(block, false) : exerciseFigureSvg(block.exerciseId))
+            : (isTrailingPause ? (displayIsCampus ? campusWorkFigureSvg(displayBlock) : displayIsPause ? FB_REST_FIGURE_SVG : exerciseFigureSvg(displayBlock.exerciseId)) : isCampus ? campusWorkFigureSvg(block) : FB_REST_FIGURE_SVG)}</div>
            <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}${restTense ? ' rest-tense' : ''}">
              <div class="fb-timer-ring">
                <svg viewBox="0 0 120 120">
@@ -8741,7 +9168,7 @@ function updateTimerUI() {
   const kind = (working ? 'work' : 'rest') + ':' + (activeRep != null ? activeRep : '') + (isTrailingPauseNow ? ':next' : '');
   if (figureHolder && figureHolder.dataset.kind !== kind) {
     if (working) {
-      figureHolder.innerHTML = isHangLikeBlock(block) ? holdBlockWorkFigure(block, activeRep) : block.type === 'campus' ? campusWorkFigureSvg(block) : exerciseFigureSvg(block.exerciseId);
+      figureHolder.innerHTML = isHangLikeBlock(block) ? holdBlockWorkFigure(block, activeRep) : block.type === 'campus' ? campusWorkFigureSvg(block, false) : exerciseFigureSvg(block.exerciseId);
     } else if (displayIsHangNow) {
       // Layout mit separatem Board-Thumb oben (schon beim vollen Rendern
       // gesetzt, hier unberührt) — die kleine Figur bleibt die Ruhefigur.
@@ -8751,7 +9178,7 @@ function updateTimerUI() {
       // abschliessenden Pause die Vorschau des nächsten Blocks zeigen.
       figureHolder.innerHTML = isTrailingPauseNow
         ? (displayBlockNow.type === 'campus' ? campusWorkFigureSvg(displayBlockNow) : displayBlockNow.type === 'pause' ? FB_REST_FIGURE_SVG : exerciseFigureSvg(displayBlockNow.exerciseId))
-        : FB_REST_FIGURE_SVG;
+        : block.type === 'campus' ? campusWorkFigureSvg(block) : FB_REST_FIGURE_SVG;
     }
     figureHolder.dataset.kind = kind;
   }
@@ -8886,6 +9313,245 @@ async function finishAblauf(blocksOverride, resultsOverride, isPartial) {
   };
   await fbPush(`fingerboardSessions/${state.member.id}`, session);
   toast('Ablauf gespeichert 💪', 'ok');
+}
+
+
+/* ================================================================
+   FORTSCHRITT (Beta)
+   Eigene Kurve im Mittelpunkt: pro Übung der beste Satz je Training,
+   dazu Wochenübersicht (Gym / Board / Anderes), ein paar Kennzahlen und
+   eine grobe Erholungs-Anzeige pro Körperbereich. Kein Vergleich mit
+   anderen — nur der eigene Verlauf.
+   ================================================================= */
+const PROGRESS_COLORS = { gym: '#2f95cf', board: '#c4851c', other: '#9b7be6' }; // validiert (dark, #10151b)
+const PROGRESS_RANGES = [['4w', '4W', 28], ['3m', '3M', 91], ['1y', '1J', 365], ['all', 'Alle', 100000]];
+let progressRange = '3m';
+let progressExerciseId = null;
+let progressFbSessions = [];
+
+function dayKey(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function mondayOf(d) { const m = new Date(d); m.setHours(0, 0, 0, 0); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m; }
+function entryTime(e) { return e.createdAt || new Date(e.date + 'T12:00').getTime(); }
+
+/* Bester Satz einer Übung in einem Training: mit Gewicht = schwerstes
+   Gewicht (bei Gleichstand mehr Wdh.), ohne Gewicht = meiste Wdh./Sekunden. */
+function bestSetOf(exerciseId, sets) {
+  let best = null;
+  sets.forEach((st) => {
+    const w = st.weight !== '' && st.weight != null ? Number(st.weight) : 0;
+    const r = Number(st.reps) || 0;
+    const score = w > 0 ? w * 1000 + r : r;
+    if (!best || score > best.score) best = { w, r, score, suffix: setUnitSuffix(exerciseId, st) };
+  });
+  if (!best) return null;
+  return { ...best, value: best.w > 0 ? best.w : best.r, label: best.w > 0 ? `${best.w} kg × ${best.r}${best.suffix}` : `${best.r}${best.suffix || ' Wdh.'}` };
+}
+
+function progressSeries(exerciseId, days) {
+  const since = Date.now() - days * 86400000;
+  const pts = [];
+  state.logs.forEach((e) => {
+    if (entryTime(e) < since) return;
+    const ex = (e.exercises || []).find((x) => x.exerciseId === exerciseId && Array.isArray(x.sets) && x.sets.length);
+    if (!ex) return;
+    const best = bestSetOf(exerciseId, ex.sets);
+    if (best) pts.push({ t: entryTime(e), date: e.date, ...best });
+  });
+  return pts.sort((a, b) => a.t - b.t);
+}
+
+/* Einfaches Linien-Diagramm (eine Serie, keine Legende nötig — der Titel
+   benennt sie). Punkte antippbar: Wert erscheint in der Zeile darunter. */
+function progressLineChart(id, pts, unitLabel) {
+  if (!pts.length) return '<div class="list-empty">Noch keine Daten in diesem Zeitraum.</div>';
+  const W = 340, H = 160, padL = 34, padR = 12, padT = 14, padB = 22;
+  const vals = pts.map((p) => p.value);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const span = hi - lo; lo -= span * 0.1; hi += span * 0.1;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  const x = (t) => (t1 === t0 ? (padL + W - padR) / 2 : padL + ((t - t0) / (t1 - t0)) * (W - padL - padR));
+  const y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
+  const maxVal = Math.max(...vals);
+  const prIdx = vals.lastIndexOf(maxVal);
+  const fmt = (v) => (Math.round(v * 10) / 10).toString();
+  const minVal = Math.min(...vals);
+  const ticks = maxVal === minVal ? [maxVal] : [maxVal, (maxVal + minVal) / 2, minVal];
+  const grid = ticks.map((v) =>
+    `<line class="pg-grid" x1="${padL}" x2="${W - padR}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text class="pg-axis" x="${padL - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${fmt(v)}</text>`).join('');
+  const line = pts.map((p) => `${x(p.t).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+  const dots = pts.map((p, i) => `
+    <circle class="pg-hit" cx="${x(p.t).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="16" data-chart="${id}" data-i="${i}"><title>${esc(fmtShortDate(p.date))}: ${esc(p.label)}</title></circle>
+    <circle class="pg-dot ${i === prIdx ? 'pr' : ''}" cx="${x(p.t).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="${i === prIdx ? 6 : 4}"/>`).join('');
+  const dateLabels = [pts[0], pts[pts.length - 1]].filter((p, i, arr) => i === 0 || p !== arr[0])
+    .map((p, i) => `<text class="pg-axis" x="${x(p.t).toFixed(1)}" y="${H - 5}" text-anchor="${i === 0 ? 'start' : 'end'}">${esc(fmtShortDate(p.date))}</text>`).join('');
+  return `
+    <svg class="pg-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(unitLabel)}: ${pts.map((p) => fmtShortDate(p.date) + ' ' + p.label).join(', ')}">
+      ${grid}
+      <polyline class="pg-line" points="${line}"/>
+      ${dots}${dateLabels}
+    </svg>
+    <div class="pg-readout" id="${id}-readout">Punkt antippen für Details · Rekord: <b>${esc(pts[prIdx].label)}</b> (${esc(fmtShortDate(pts[prIdx].date))})</div>`;
+}
+
+function progressWeekGridHtml() {
+  const byDay = {};
+  const mark = (key, kind) => {
+    const order = { board: 3, gym: 2, other: 1 };
+    if (!byDay[key] || order[kind] > order[byDay[key]]) byDay[key] = kind;
+  };
+  state.logs.forEach((e) => mark(dayKey(new Date(entryTime(e))), e.type === 'gym' || (e.exercises || []).length ? 'gym' : 'other'));
+  progressFbSessions.forEach((sn) => mark(dayKey(new Date(entryTime(sn))), 'board'));
+  const thisMonday = mondayOf(new Date());
+  const cols = [];
+  for (let w = 7; w >= 0; w--) {
+    const mon = new Date(thisMonday); mon.setDate(mon.getDate() - w * 7);
+    const cells = [];
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(mon); day.setDate(day.getDate() + d);
+      const kind = byDay[dayKey(day)];
+      const future = day > new Date();
+      cells.push(`<span class="pg-cell ${kind || ''} ${future ? 'future' : ''}" title="${pad2(day.getDate())}.${pad2(day.getMonth() + 1)}.${kind ? ' · ' + ({ gym: 'Gym', board: 'Board', other: 'Anderes' })[kind] : ''}"></span>`);
+    }
+    cols.push(`<div class="pg-week">${cells.join('')}<span class="pg-week-label">${pad2(mon.getDate())}.${pad2(mon.getMonth() + 1)}.</span></div>`);
+  }
+  return `<div class="pg-weeks">${cols.join('')}</div>
+    <div class="pg-legend"><span><i class="gym"></i>Gym</span><span><i class="board"></i>Board</span><span><i class="other"></i>Anderes</span></div>`;
+}
+
+function progressStats() {
+  const times = [...state.logs.map(entryTime), ...progressFbSessions.map(entryTime)];
+  const last30 = times.filter((t) => t > Date.now() - 30 * 86400000).length;
+  const weeksWith = new Set(times.map((t) => mondayOf(new Date(t)).getTime()));
+  let streak = 0;
+  const cur = mondayOf(new Date());
+  if (!weeksWith.has(cur.getTime())) cur.setDate(cur.getDate() - 7);
+  while (weeksWith.has(cur.getTime())) { streak++; cur.setDate(cur.getDate() - 7); }
+  const weekStart = mondayOf(new Date()).getTime();
+  let kg = 0;
+  state.logs.filter((e) => entryTime(e) >= weekStart).forEach((e) => (e.exercises || []).forEach((ex) => (ex.sets || []).forEach((st) => {
+    const w = Number(st.weight); const r = Number(st.reps);
+    if (w > 0 && r > 0 && setUnitSuffix(ex.exerciseId, st) !== 's') kg += w * r;
+  })));
+  return { last30, streak, kg };
+}
+
+const RECOVERY_AREAS = [
+  { id: 'finger', label: 'Finger', readyH: 72 },
+  { id: 'zug', label: 'Zug', readyH: 48, muscles: ['lats', 'traps', 'rear_delts', 'biceps', 'forearms_front', 'forearms_back', 'neck_traps'] },
+  { id: 'druck', label: 'Druck', readyH: 48, muscles: ['chest', 'shoulders', 'triceps'] },
+  { id: 'beine', label: 'Beine', readyH: 48, muscles: ['quads', 'hamstrings', 'glutes', 'calves', 'shins'] },
+  { id: 'rumpf', label: 'Rumpf', readyH: 36, muscles: ['abs', 'obliques', 'lower_back'] },
+];
+function progressRecoveryHtml() {
+  const lastT = {};
+  const touch = (id, t) => { if (!lastT[id] || t > lastT[id]) lastT[id] = t; };
+  progressFbSessions.forEach((sn) => touch('finger', entryTime(sn)));
+  state.logs.forEach((e) => {
+    if (e.type === 'klettern') touch('finger', entryTime(e));
+    (e.exercises || []).forEach((ex) => {
+      const m = exerciseMuscles(ex.exerciseId);
+      RECOVERY_AREAS.forEach((a) => { if (a.muscles && m.primary.some((x) => a.muscles.includes(x))) touch(a.id, entryTime(e)); });
+    });
+  });
+  return RECOVERY_AREAS.map((a) => {
+    const t = lastT[a.id];
+    const h = t ? (Date.now() - t) / 3600000 : null;
+    const ratio = h == null ? 1 : Math.min(1, h / a.readyH);
+    const ready = h == null || h >= a.readyH;
+    const ago = h == null ? 'noch nie' : h < 24 ? 'heute' : `vor ${Math.floor(h / 24)} ${Math.floor(h / 24) === 1 ? 'Tag' : 'Tagen'}`;
+    return `<div class="pg-rec">
+      <div class="pg-rec-head"><span>${a.label}</span><span class="${ready ? 'ok' : 'wait'}">${ago} · ${ready ? 'bereit' : 'noch schonen'}</span></div>
+      <div class="pg-rec-bar"><span class="${ready ? 'ok' : 'wait'}" style="width:${Math.round(ratio * 100)}%"></span></div>
+    </div>`;
+  }).join('');
+}
+
+function fbSessionHangSeconds(sn) {
+  let sec = 0;
+  (sn.blocks || []).forEach((b, i) => {
+    if (b.type !== 'hang') return;
+    const r = (sn.results || [])[i];
+    const done = r && Array.isArray(r.doneReps) ? r.doneReps.filter(Boolean).length : Number(b.reps) || 0;
+    sec += done * (Number(b.hangSec) || 0);
+  });
+  return sec;
+}
+
+async function renderProgress() {
+  renderShell(`<div class="sec-head"><h2 class="sec-title">Fortschritt</h2><div class="sec-rule"></div></div><div id="pg-root"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>`);
+  const [rawLogs, rawFb] = await Promise.all([fbGet(`logs/${state.member.id}`), fbGet(`fingerboardSessions/${state.member.id}`)]);
+  state.logs = Object.values(rawLogs || {}).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  progressFbSessions = Object.values(rawFb || {}).sort((a, b) => entryTime(a) - entryTime(b));
+  drawProgress();
+}
+
+function drawProgress() {
+  const root = document.getElementById('pg-root');
+  if (!root) return;
+  const exIds = [];
+  state.logs.forEach((e) => (e.exercises || []).forEach((ex) => {
+    if (Array.isArray(ex.sets) && ex.sets.length && !exIds.includes(ex.exerciseId) && !['warmup_general', 'cooldown_general'].includes(ex.exerciseId)) exIds.push(ex.exerciseId);
+  }));
+  if (!progressExerciseId || !exIds.includes(progressExerciseId)) progressExerciseId = exIds[0] || null;
+  const days = PROGRESS_RANGES.find((r) => r[0] === progressRange)[2];
+  const pts = progressExerciseId ? progressSeries(progressExerciseId, days) : [];
+  let headline = '';
+  if (pts.length >= 2) {
+    const first = pts[0].value, last = pts[pts.length - 1].value;
+    const pct = first ? Math.round(((last - first) / first) * 100) : 0;
+    headline = `<div class="pg-hero"><span class="pg-hero-num ${pct >= 0 ? 'up' : 'down'}">${pct > 0 ? '+' : ''}${pct} %</span><span class="pg-hero-sub">${esc(pts[0].label)} → ${esc(pts[pts.length - 1].label)}</span></div>`;
+  }
+  const isNewPr = pts.length >= 2 && pts[pts.length - 1].value > Math.max(...pts.slice(0, -1).map((p) => p.value));
+  const stats = progressStats();
+  const fbRecent = progressFbSessions.filter((sn) => entryTime(sn) > Date.now() - days * 86400000);
+  const fbPts = fbRecent.map((sn) => { const v = fbSessionHangSeconds(sn); return { t: entryTime(sn), date: sn.date, value: v, label: `${v} s Hängezeit` }; }).filter((p) => p.value > 0);
+
+  root.innerHTML = `
+    <div class="pg-tiles">
+      <div class="pg-tile"><b>${stats.last30}</b><span>Einheiten in 30 Tagen</span></div>
+      <div class="pg-tile"><b class="accent">${stats.streak}</b><span>${stats.streak === 1 ? 'Woche' : 'Wochen'} in Folge</span></div>
+      <div class="pg-tile"><b>${stats.kg >= 1000 ? (stats.kg / 1000).toFixed(1).replace('.', ',') + ' t' : Math.round(stats.kg) + ' kg'}</b><span>bewegt diese Woche</span></div>
+    </div>
+
+    <div class="pg-card">
+      <div class="pg-card-head">
+        <h3>Übung</h3>
+        <div class="chip-row pg-ranges">${PROGRESS_RANGES.map(([k, l]) => `<button type="button" class="chip small ${k === progressRange ? 'active' : ''}" data-range="${k}">${l}</button>`).join('')}</div>
+      </div>
+      ${exIds.length ? `<select class="pg-select" id="pg-exercise" aria-label="Übung wählen">${exIds.map((id) => `<option value="${id}" ${id === progressExerciseId ? 'selected' : ''}>${esc(exerciseName(id))}</option>`).join('')}</select>` : ''}
+      ${isNewPr ? `<div class="pg-pr">Neuer Rekord: <b>${esc(pts[pts.length - 1].label)}</b></div>` : ''}
+      ${headline}
+      ${exIds.length ? progressLineChart('pg-ex', pts, 'Bester Satz je Training') : '<div class="list-empty">Noch keine Gym-Sätze geloggt.</div>'}
+    </div>
+
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Board · Hängezeit je Einheit</h3></div>
+      ${progressLineChart('pg-fb', fbPts, 'Hängezeit je Einheit')}
+    </div>
+
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Letzte 8 Wochen</h3><span class="pg-muted">Mo – So</span></div>
+      ${progressWeekGridHtml()}
+    </div>
+
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Erholung</h3><span class="pg-muted">seit letzter Belastung</span></div>
+      ${progressRecoveryHtml()}
+      <p class="pg-muted" style="margin:8px 0 0;">Grobe Richtwerte (Finger 72 h, Rumpf 36 h, sonst 48 h), kein medizinischer Rat.</p>
+    </div>
+  `;
+  root.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => { progressRange = b.dataset.range; drawProgress(); }; });
+  const sel = document.getElementById('pg-exercise');
+  if (sel) sel.onchange = () => { progressExerciseId = sel.value; drawProgress(); };
+  const series = { 'pg-ex': pts, 'pg-fb': fbPts };
+  root.querySelectorAll('.pg-hit').forEach((c) => {
+    c.onclick = () => {
+      const p = series[c.dataset.chart][Number(c.dataset.i)];
+      const out = document.getElementById(`${c.dataset.chart}-readout`);
+      if (out && p) out.innerHTML = `<b>${esc(fmtShortDate(p.date))}</b> · ${esc(p.label)}`;
+    };
+  });
 }
 
 /* ================================================================
