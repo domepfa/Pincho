@@ -1223,3 +1223,12 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .qs-bar-seg.exercise { background: var(--ink); }
 .qs-bar-seg.campus { background: #2f7fa8; }
 .qs-bar-seg.pause { background: #2b333e; }
+
+/* Pro Hand unterschiedlich: links blau, rechts orange — Board, Chips,
+   Hinweis und Ablauf-Titel in denselben Farben. */
+.hand-l { color: var(--accent); }
+.hand-r { color: #ff8a66; }
+.chip[data-hand-color="l"] { border-color: rgba(var(--accent-rgb), .6); }
+.chip[data-hand-color="r"] { border-color: rgba(255, 107, 71, .6); }
+.chip[data-hand-color="l"].active { background: var(--accent) !important; border-color: var(--accent) !important; color: var(--accent-ink) !important; }
+.chip[data-hand-color="r"].active { background: #ff6b47 !important; border-color: #ff6b47 !important; color: #2a0d05 !important; }
