@@ -1176,3 +1176,50 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 }
 .ex-recent-label { font-size: 12px; font-weight: 700; letter-spacing: .12em; color: var(--ink-faint); margin: 2px 0 8px; text-transform: uppercase; }
 .ex-card.recent:not(.active) { border-color: #24425a; }
+
+/* ---------- BETA Schritt 3: Board mit echten Loch-Formen ---------- */
+.board-visual { background: #0c1116; border-color: var(--line-soft); }
+.board-hotspot.hole {
+  width: auto; aspect-ratio: auto; border-radius: 999px;
+  border: 1.5px solid rgba(244, 246, 248, .28); background: rgba(7, 9, 12, .12);
+  transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.board-hotspot.hole.surface { border-style: dashed; border-radius: 40% / 50%; }
+.board-hotspot.hole:hover { border-color: rgba(var(--accent-rgb), .8); }
+.board-hotspot.hole.active,
+.board-hotspot.hole.active-left {
+  border: 2px solid var(--ink); background: rgba(var(--accent-rgb), .55);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .35), 0 0 18px 2px rgba(var(--accent-rgb), .55);
+}
+.board-hotspot.hole.active-right {
+  border: 2px solid var(--ink); background: rgba(255, 107, 71, .55);
+  box-shadow: 0 0 0 3px rgba(255, 107, 71, .35), 0 0 18px 2px rgba(255, 107, 71, .5);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .board-hotspot.hole.active, .board-hotspot.hole.active-left, .board-hotspot.hole.active-right {
+    animation: hole-glow 1.8s ease-in-out infinite;
+  }
+}
+@keyframes hole-glow { 50% { box-shadow: 0 0 0 5px rgba(var(--accent-rgb), .15), 0 0 26px 4px rgba(var(--accent-rgb), .35); } }
+
+.timeline-thumb { border-radius: 8px; background: #0c1116; border-color: var(--line-soft); }
+.timeline-thumb .dot.hole {
+  border-radius: 999px; background: rgba(var(--accent-rgb), .8); border: 1px solid var(--ink);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), .8);
+}
+.timeline-thumb .dot.hole.surface { border-radius: 40% / 50%; }
+.timeline-thumb .dot.dot-alt.hole { background: rgba(255, 107, 71, .85); box-shadow: 0 0 6px rgba(255, 107, 71, .8); }
+.qs-card { padding: 14px 14px 12px; }
+.qs-name { font-size: 17px; font-weight: 600; }
+.qs-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.qs-meta { font-size: 13px; color: var(--ink-faint); }
+.qs-card .btn.qs-start {
+  width: 52px; height: 52px; padding: 0; border-radius: 26px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.qs-bar { display: flex; gap: 3px; height: 8px; margin-top: 12px; }
+.qs-bar-seg { border-radius: 3px; min-width: 4px; }
+.qs-bar-seg.hang { background: var(--accent); }
+.qs-bar-seg.exercise { background: var(--ink); }
+.qs-bar-seg.campus { background: #2f7fa8; }
+.qs-bar-seg.pause { background: #2b333e; }
