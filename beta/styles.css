@@ -1324,3 +1324,56 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .fb-transport { gap: 18px; }
 .fb-transport-btn { width: 54px; height: 54px; border-radius: 27px; }
 .fb-transport-btn.fb-play { width: 72px; height: 72px; border-radius: 36px; }
+
+/* ---------- BETA Schritt 5: Fortschritt ---------- */
+.bottomnav a { font-size: 10px; letter-spacing: .03em; padding-left: 2px; padding-right: 2px; }
+.nav-pill { padding: 3px 14px; }
+
+.pg-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.pg-tile { display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line-soft); }
+.pg-tile b { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px; line-height: 1; color: var(--ink); }
+.pg-tile b.accent { color: var(--accent); }
+.pg-tile span { font-size: 12px; color: var(--ink-faint); }
+
+.pg-card { padding: 14px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line-soft); margin-bottom: 12px; }
+.pg-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.pg-card-head h3 { margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; }
+.pg-muted { font-size: 12px; color: var(--ink-faint); }
+.pg-ranges { margin: 0; flex-wrap: nowrap; gap: 4px; }
+.pg-ranges .chip.small { padding: 5px 10px; }
+.pg-select { width: 100%; margin-bottom: 10px; padding: 11px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); font-family: 'Barlow', sans-serif; font-size: 16px; }
+.pg-hero { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.pg-hero-num { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 44px; line-height: 1; }
+.pg-hero-num.up { color: var(--accent); }
+.pg-hero-num.down { color: #ffb49b; }
+.pg-hero-sub { font-size: 13px; color: var(--ink-faint); }
+.pg-pr { display: inline-block; margin-bottom: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(var(--accent-rgb), .14); color: var(--ink); font-size: 14px; }
+.pg-pr::before { content: '★ '; color: var(--accent); }
+
+.pg-chart { width: 100%; height: auto; display: block; overflow: visible; }
+.pg-grid { stroke: var(--line-soft); stroke-width: 1; }
+.pg-axis { fill: var(--ink-faint); font-family: 'Barlow', sans-serif; font-size: 11px; }
+.pg-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.pg-dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; pointer-events: none; }
+.pg-dot.pr { fill: var(--accent); stroke: var(--surface); }
+.pg-hit { fill: transparent; cursor: pointer; }
+.pg-readout { margin-top: 6px; font-size: 13px; color: var(--ink-dim); min-height: 18px; }
+
+.pg-weeks { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; }
+.pg-week { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pg-cell { width: 100%; max-width: 28px; height: 15px; border-radius: 4px; background: #1a212a; }
+.pg-cell.future { background: transparent; border: 1px dashed #1f2731; }
+.pg-cell.gym { background: #2f95cf; }
+.pg-cell.board { background: #c4851c; }
+.pg-cell.other { background: #9b7be6; }
+.pg-week-label { font-size: 10px; color: var(--ink-faint); margin-top: 2px; }
+.pg-legend { display: flex; gap: 14px; margin-top: 10px; font-size: 12px; color: var(--ink-dim); }
+.pg-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.pg-legend i.gym { background: #2f95cf; } .pg-legend i.board { background: #c4851c; } .pg-legend i.other { background: #9b7be6; }
+
+.pg-rec { margin-bottom: 10px; }
+.pg-rec-head { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+.pg-rec-head .ok { color: #a9dcf7; } .pg-rec-head .wait { color: #ffb49b; }
+.pg-rec-bar { height: 8px; border-radius: 4px; background: #1a212a; overflow: hidden; }
+.pg-rec-bar span { display: block; height: 100%; border-radius: 4px; }
+.pg-rec-bar span.ok { background: var(--accent); } .pg-rec-bar span.wait { background: #ff8a66; }
