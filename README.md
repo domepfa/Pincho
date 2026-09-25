@@ -98,12 +98,14 @@ Die App startet auch ohne bzw. mit sehr schlechtem Netz (z. B. im Gym):
   weitergezählt — nach jedem Satz erscheint "Los" für den nächsten, damit
   Zeit zum Ablesen/Chalken bleibt. "Abbrechen" verwirft den laufenden Satz,
   kein Pause/Resume innerhalb eines Hang-Satzes.
-- **Fingerboard-Vorlagen**: `FINGERBOARD_TEMPLATES` in `data.js` liefert fest
-  eingebaute Abläufe (u. a. einen wissenschaftlich hergeleiteten 45-Min-Flow
-  für Fortgeschrittene). Eigene, per "Als Vorlage speichern" gesicherte
-  Abläufe landen pro Mitglied unter `fingerboardTemplates/{memberId}` in
-  Firebase — Ablauf-Zeit inkl. Übungspausen wird über `restSec` bei
-  Exercise-Sätzen mitgerechnet (siehe `fbEstimateSeconds` in `app.js`).
+- **Fingerboard-Vorlagen**: Keine fest eingebauten Vorlagen mehr. Eigene,
+  per "Als Vorlage speichern" gesicherte Abläufe landen pro Mitglied unter
+  `fingerboardTemplates/{memberId}`, geteilte als Kopie in `sharedTemplates`.
+  Im Schnelltraining getrennt als Tabs **Eigene** (löschbar, inkl. geteilter
+  Kopie) und **Crew** (Filter nach Ersteller, pro Person ausblendbar über
+  `hiddenTemplates/{memberId}`). Ablauf-Zeit inkl. Übungspausen wird über
+  `restSec` bei Exercise-Sätzen mitgerechnet (siehe `fbEstimateSeconds` in
+  `app.js`).
 - **Ablauf-Vollbild**: Sobald ein Ablauf startet, übernimmt `#fb-overlay`
   (an `document.body` gehängt, nicht Teil von `#app`) den ganzen Bildschirm
   — inkl. Best-effort `requestFullscreen()` (fällt auf iOS o. Ä. einfach auf
