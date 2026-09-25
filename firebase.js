@@ -287,6 +287,18 @@ async function sendOp(op) {
   return res;
 }
 
+/* Kürzlich hochgeladene Schreibzugriffe (nur im Speicher): Eine Lese-
+   Anfrage, die schon lief, BEVOR ein Schreibzugriff beim Server ankam, kann
+   noch den alten Stand liefern — und die Warteschlange ist zu dem Zeitpunkt
+   schon leer, also würde nichts mehr darübergelegt. Solche Zugriffe werden
+   darum zusätzlich über jede Antwort gelegt, die vor ihrem Upload gestartet
+   wurde (siehe fetchFresh). */
+let recentOps = [];
+function recentOpsSince(startedAt) {
+  recentOps = recentOps.filter((r) => Date.now() - r.sentAt < 120000);
+  return recentOps.filter((r) => r.sentAt >= startedAt).map((r) => r.op);
+}
+
 let flushing = false;
 async function flushQueue() {
   if (flushing) return;
@@ -310,7 +322,7 @@ async function flushQueue() {
       if (res.status >= 500) break;
       if (!res.ok) console.error('Firebase: Schreibzugriff abgelehnt, verworfen', q[0].path, res.status);
       q = loadQueue();
-      q.shift();
+      recentOps.push({ op: q.shift(), sentAt: Date.now() });
       saveQueue(q);
       sentAny = true;
     }
@@ -339,11 +351,12 @@ if (typeof window !== 'undefined') {
 const CACHE_GRACE_MS = 2500;
 
 async function fetchFresh(path) {
+  const startedAt = Date.now();
   await ensureValidAuthToken();
   const res = await fetchWithTimeout(`${FIREBASE_URL}/${path}.json${authQuery()}`);
   if (!res.ok) throw new Error('HTTP ' + res.status);
   let value = await res.json();
-  loadQueue().forEach((op) => { value = applyOp(path, value, op); });
+  [...recentOpsSince(startedAt), ...loadQueue()].forEach((op) => { value = applyOp(path, value, op); });
   writeCache(path, value);
   if (pendingWriteCount()) flushQueue();
   return value;

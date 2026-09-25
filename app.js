@@ -2709,6 +2709,19 @@ function renderLogExerciseRows() {
    FINGERBOARD
    ================================================================= */
 let fbQuickstartOpen = false; // Schnelltraining-Karten sind standardmässig eingeklappt
+/* Schnelltraining: 'own' = eigene Vorlagen, 'crew' = von anderen geteilte.
+   Tab-Wahl pro Gerät gemerkt; Ersteller-Filter/"Ausgeblendete zeigen" nur
+   für die aktuelle Ansicht. */
+let fbQsTab = (() => { try { return localStorage.getItem('pincho_fb_qs_tab') || 'own'; } catch (e) { return 'own'; } })();
+let fbQsCreator = 'all';
+let fbQsShowHidden = false;
+/* Pro Mitglied ausgeblendete Crew-Vorlagen ({sharedTemplateId: true}) —
+   nur für einen selbst unsichtbar, die Vorlage bleibt für alle anderen. */
+let hiddenTemplates = {};
+async function loadHiddenTemplates() {
+  const raw = await fbGet(`hiddenTemplates/${state.member.id}`);
+  hiddenTemplates = raw || {};
+}
 let fbCheckinTyping = false; // während der Wdh./Gewicht-Eingabe im Check-in steht der Countdown still
 let fbCheckinPausedAt = null; // Date.now() seit wann (siehe fbCheckinTyping) — verschiebt fb.stepStartedAt beim Verlassen des Felds um die getippte Dauer (Ring-Sync)
 let fbImportOpen = false; // JSON-Import-Panel ist standardmässig eingeklappt
@@ -2867,7 +2880,7 @@ const fb = {
   },
   newPause: { seconds: 60 },
   blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec, blockRestSec} | {type:'block', grip, fingers, weight, reps, hangSec, restSec, blockRestSec} | {type:'exercise', exerciseId, reps, workSec, restSec} | {type:'campus', rungType, moveMode, reps, workSec, restSec, blockRestSec, fromRung/toRung ODER startRung/pattern, armMode, startHand} | {type:'pause', seconds}
-  templates: [],         // eigene, in Firebase gespeicherte Abläufe (zusätzlich zu FINGERBOARD_TEMPLATES)
+  templates: [],         // eigene, in Firebase gespeicherte Abläufe
   weight: '',
   blockIndex: 0,
   running: false,
@@ -3878,7 +3891,7 @@ async function renderFingerboard() {
   };
 
   wireFbTemplatePicker();
-  Promise.all([loadFbTemplates(), loadSharedTemplates(), loadExerciseFavorites()]).then(() => {
+  Promise.all([loadFbTemplates(), loadSharedTemplates(), loadExerciseFavorites(), loadHiddenTemplates()]).then(() => {
     if (state.route !== 'fingerboard') return;
     refreshFbTemplateOptions();
     renderFbQuickstart();
@@ -3931,10 +3944,48 @@ async function renderFbHistory() {
 
 /* Ein Tap auf "Los" lädt die Vorlage UND startet den Ablauf sofort —
    kein Umweg über "in den Builder laden, runterscrollen, ABLAUF STARTEN
-   antippen". Zeigt fest eingebaute (FINGERBOARD_TEMPLATES) und eigene,
-   in Firebase gespeicherte (fb.templates) Abläufe zusammen als Karten. */
+   antippen". Zeigt eigene (fb.templates) bzw. von der Crew geteilte
+   Abläufe als Karten, getrennt über die Tabs Eigene/Crew. */
 function findFbTemplateById(id) {
-  return FINGERBOARD_TEMPLATES.find((r) => r.id === id) || fb.templates.find((r) => r.id === id) || sharedTemplatesOfKind('fingerboard').find((r) => r.id === id);
+  return fb.templates.find((r) => r.id === id) || sharedTemplatesOfKind('fingerboard').find((r) => r.id === id);
+}
+
+/* Beim Teilen entsteht eine KOPIE in sharedTemplates — die eigene Vorlage
+   erschien dadurch bisher doppelt (als "Eigene" und als "von dome"). Die
+   Kopie wird jetzt der eigenen Vorlage zugeordnet (gleicher Ersteller +
+   Name) und nur dort als "geteilt" markiert. */
+function ownSharedFbCopy(t) {
+  return sharedTemplatesOfKind('fingerboard').find((s) => s.createdBy === state.member.id && s.name === t.name);
+}
+function ownFbEntries() {
+  const own = fb.templates.map((t) => ({ ...t, sharedCopy: ownSharedFbCopy(t) || null }));
+  // Geteilte Kopien ohne passende eigene Vorlage (z. B. eigene schon
+  // gelöscht oder umbenannt) trotzdem unter "Eigene" zeigen — nur so
+  // lassen sie sich noch aus der Crew-Liste entfernen.
+  const orphans = sharedTemplatesOfKind('fingerboard')
+    .filter((s) => s.createdBy === state.member.id && !fb.templates.some((t) => t.name === s.name))
+    .map((s) => ({ ...s, sharedOnly: true }));
+  return [...own, ...orphans];
+}
+function crewFbTemplates() {
+  return sharedTemplatesOfKind('fingerboard').filter((s) => s.createdBy !== state.member.id);
+}
+
+/* Löscht eine eigene Vorlage (mit Rückfrage) — inkl. ihrer geteilten Kopie,
+   damit sie nicht bei der Crew stehen bleibt. true, wenn gelöscht. */
+async function deleteOwnFbTemplate(entry) {
+  const sharedCopy = entry.sharedOnly ? entry : entry.sharedCopy;
+  const msg = entry.sharedOnly
+    ? `Geteilte Vorlage "${entry.name}" für die ganze Crew löschen?`
+    : `Vorlage "${entry.name}" unwiderruflich löschen?${sharedCopy ? ' Sie wird auch für die Crew entfernt.' : ''}`;
+  if (!confirm(msg)) return false;
+  if (!entry.sharedOnly) await fbDelete(`fingerboardTemplates/${state.member.id}/${entry.id}`);
+  if (sharedCopy) await fbDelete(`sharedTemplates/${sharedCopy.id}`);
+  await Promise.all([loadFbTemplates(), loadSharedTemplates()]);
+  refreshFbTemplateOptions();
+  renderFbQuickstart();
+  toast('Vorlage gelöscht.', 'ok');
+  return true;
 }
 
 /* Beim Übernehmen von Hang-Sätzen aus einer Vorlage/Challenge (Schnell-
@@ -3956,25 +4007,51 @@ function fbBlocksWithCurrentBoard(blocks) {
 function renderFbQuickstart() {
   const holder = document.getElementById('fb-quickstart');
   if (!holder) return;
-  const all = [...FINGERBOARD_TEMPLATES, ...fb.templates, ...sharedTemplatesOfKind('fingerboard')];
-  if (!all.length) {
-    holder.innerHTML = '<div class="list-empty">Noch keine Vorlagen — unten selbst einen Ablauf bauen und speichern.</div>';
-    return;
-  }
-  holder.innerHTML = all.map((t, i) => {
+  const isCrew = fbQsTab === 'crew';
+  const crewAll = crewFbTemplates();
+  const creators = [...new Map(crewAll.map((t) => [t.createdBy, t.createdByName])).entries()];
+  if (fbQsCreator !== 'all' && !creators.some(([id]) => id === fbQsCreator)) fbQsCreator = 'all';
+  const crewFiltered = crewAll.filter((t) => fbQsCreator === 'all' || t.createdBy === fbQsCreator);
+  const hiddenCount = crewFiltered.filter((t) => hiddenTemplates[t.id]).length;
+  const list = isCrew
+    ? crewFiltered.filter((t) => fbQsShowHidden || !hiddenTemplates[t.id])
+    : ownFbEntries();
+
+  const tabs = `
+    <div class="chip-row" style="margin-bottom:8px;">
+      <button type="button" class="chip ${!isCrew ? 'active' : ''}" data-qs-tab="own">Eigene</button>
+      <button type="button" class="chip ${isCrew ? 'active' : ''}" data-qs-tab="crew">Crew${crewAll.length ? ` (${crewAll.length})` : ''}</button>
+    </div>`;
+  const creatorFilter = isCrew && creators.length > 1 ? `
+    <div class="chip-row qs-filter-row">
+      <button type="button" class="chip small ${fbQsCreator === 'all' ? 'active' : ''}" data-qs-creator="all">Alle</button>
+      ${creators.map(([id, name]) => `<button type="button" class="chip small ${fbQsCreator === id ? 'active' : ''}" data-qs-creator="${esc(id)}">${esc(name)}</button>`).join('')}
+    </div>` : '';
+  const hiddenToggle = isCrew && (hiddenCount || fbQsShowHidden) ? `
+    <button type="button" class="btn ghost small" id="qs-toggle-hidden" style="width:100%;margin-bottom:10px;">
+      ${fbQsShowHidden ? 'Ausgeblendete verbergen' : `Ausgeblendete anzeigen (${hiddenCount})`}
+    </button>` : '';
+  const empty = isCrew
+    ? (crewAll.length ? 'Alles ausgeblendet.' : 'Noch hat niemand aus der Crew eine Vorlage geteilt.')
+    : 'Noch keine eigenen Vorlagen — unten einen Ablauf bauen und "Als Vorlage speichern".';
+
+  holder.innerHTML = tabs + creatorFilter + hiddenToggle + (list.length ? list.map((t, i) => {
     const totalSec = t.blocks.reduce((total, b) => total + fbBlockSeconds(b), 0);
-    // Info-Button nur bei Vorlagen, deren Inhalt man vorher nicht schon aus
-    // dem Namen kennt (eigene oder von der Crew geteilte) — bei den fest
-    // eingebauten Vorlagen ist der Ablauf über den Namen bereits bekannt.
-    const isCustomOrShared = t.custom || t.kind === 'fingerboard';
-    const badge = t.custom ? '<span class="qs-badge">Eigene</span>' : t.kind === 'fingerboard' ? `<span class="qs-badge">von ${esc(t.createdByName)}</span>` : '';
+    const isHidden = isCrew && !!hiddenTemplates[t.id];
+    const badge = isCrew
+      ? `<span class="qs-badge">von ${esc(t.createdByName)}</span>`
+      : (t.sharedCopy || t.sharedOnly) ? '<span class="qs-badge">geteilt</span>' : '';
+    const actionBtn = isCrew
+      ? `<button type="button" class="ex-pick-info" data-qs-hide="${t.id}" title="${isHidden ? 'Wieder einblenden' : 'Für mich ausblenden'}">${isHidden ? '👁' : '🙈'}</button>`
+      : `<button type="button" class="ex-pick-info" data-qs-delete="${t.id}" title="Vorlage löschen">🗑</button>`;
     return `
-      <div class="qs-card anim-in" style="animation-delay:${i * 55}ms">
+      <div class="qs-card anim-in ${isHidden ? 'qs-hidden' : ''}" style="animation-delay:${i * 55}ms">
         <div class="qs-top">
           <div class="qs-name">${esc(t.name)}</div>
           <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
             ${badge}
-            ${isCustomOrShared ? `<button type="button" class="ex-pick-info" data-tpl-info="${t.id}" title="Enthaltenen Ablauf ansehen">ℹ</button>` : ''}
+            <button type="button" class="ex-pick-info" data-tpl-info="${t.id}" title="Enthaltenen Ablauf ansehen">ℹ</button>
+            ${actionBtn}
           </div>
         </div>
         ${t.note ? `<div class="qs-note">${esc(t.note)}</div>` : ''}
@@ -3982,7 +4059,41 @@ function renderFbQuickstart() {
         <button type="button" class="btn qs-start" data-tpl="${t.id}">Los</button>
       </div>
     `;
-  }).join('');
+  }).join('') : `<div class="list-empty">${empty}</div>`);
+
+  holder.querySelectorAll('[data-qs-tab]').forEach((btn) => {
+    btn.onclick = () => {
+      fbQsTab = btn.dataset.qsTab;
+      try { localStorage.setItem('pincho_fb_qs_tab', fbQsTab); } catch (e) { /* ignorieren */ }
+      renderFbQuickstart();
+    };
+  });
+  holder.querySelectorAll('[data-qs-creator]').forEach((btn) => {
+    btn.onclick = () => { fbQsCreator = btn.dataset.qsCreator; renderFbQuickstart(); };
+  });
+  const hiddenBtn = document.getElementById('qs-toggle-hidden');
+  if (hiddenBtn) hiddenBtn.onclick = () => { fbQsShowHidden = !fbQsShowHidden; renderFbQuickstart(); };
+  holder.querySelectorAll('[data-qs-hide]').forEach((btn) => {
+    btn.onclick = () => {
+      const id = btn.dataset.qsHide;
+      if (hiddenTemplates[id]) {
+        delete hiddenTemplates[id];
+        fbDelete(`hiddenTemplates/${state.member.id}/${id}`);
+      } else {
+        hiddenTemplates[id] = true;
+        fbPut(`hiddenTemplates/${state.member.id}/${id}`, true);
+        toast('Ausgeblendet — über "Ausgeblendete anzeigen" wieder holbar.');
+      }
+      refreshFbTemplateOptions();
+      renderFbQuickstart();
+    };
+  });
+  holder.querySelectorAll('[data-qs-delete]').forEach((btn) => {
+    btn.onclick = () => {
+      const entry = ownFbEntries().find((t) => t.id === btn.dataset.qsDelete);
+      if (entry) deleteOwnFbTemplate(entry);
+    };
+  });
   holder.querySelectorAll('.qs-start').forEach((btn) => {
     btn.onclick = () => {
       const t = findFbTemplateById(btn.dataset.tpl);
@@ -4041,10 +4152,9 @@ function showFbTemplateInfoSheet(templateId) {
 }
 
 /* ---------- Fingerboard-Vorlagen (laden/speichern) ----------
-   FINGERBOARD_TEMPLATES (data.js) sind feste, mitgelieferte Abläufe;
-   fb.templates sind eigene, in Firebase gespeicherte — beide landen in
-   derselben Auswahl. Ids eigener Vorlagen sind ihre Firebase-Push-Keys,
-   fest eingebaute behalten ihre id aus data.js. */
+   fb.templates sind eigene, in Firebase gespeicherte Abläufe (Ids = ihre
+   Firebase-Push-Keys); dazu kommen die Vorlagen der Crew (sharedTemplates,
+   ohne die eigenen geteilten Kopien und ohne ausgeblendete). */
 async function loadFbTemplates() {
   const raw = await fbGet(`fingerboardTemplates/${state.member.id}`);
   fb.templates = raw ? Object.entries(raw).map(([key, t]) => ({ ...t, id: key, custom: true })) : [];
@@ -4053,14 +4163,13 @@ async function loadFbTemplates() {
 function refreshFbTemplateOptions() {
   const select = document.getElementById('fb-template-picker');
   if (!select) return;
-  const shared = sharedTemplatesOfKind('fingerboard');
+  const shared = crewFbTemplates().filter((t) => !hiddenTemplates[t.id]);
   select.innerHTML = `
     <option value="">— eigener Ablauf —</option>
-    ${FINGERBOARD_TEMPLATES.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
     ${fb.templates.length ? `<optgroup label="Eigene Vorlagen">
       ${fb.templates.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
     </optgroup>` : ''}
-    ${shared.length ? `<optgroup label="Geteilte Vorlagen">
+    ${shared.length ? `<optgroup label="Von der Crew">
       ${shared.map((t) => `<option value="${t.id}">${esc(t.name)} (${esc(t.createdByName)})</option>`).join('')}
     </optgroup>` : ''}
   `;
@@ -4113,12 +4222,9 @@ function wireFbTemplatePicker() {
     const select = document.getElementById('fb-template-picker');
     const t = fb.templates.find((r) => r.id === select.value);
     if (!t) { toast('Nur eigene Vorlagen lassen sich löschen.', 'err'); return; }
-    if (!confirm(`Gespeicherte Vorlage "${t.name}" unwiderruflich löschen? Das entfernt sie dauerhaft, nicht nur den aktuell angezeigten Ablauf.`)) return;
-    await fbDelete(`fingerboardTemplates/${state.member.id}/${t.id}`);
-    await loadFbTemplates();
-    refreshFbTemplateOptions();
+    const entry = ownFbEntries().find((r) => r.id === t.id);
+    if (!(await deleteOwnFbTemplate(entry || t))) return;
     updateFbDeleteBtnVisibility();
-    toast('Vorlage gelöscht.', 'ok');
   };
 }
 
