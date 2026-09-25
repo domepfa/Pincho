@@ -3006,6 +3006,10 @@ const fb = {
    data.js, in % von Bildbreite/-höhe — funktioniert responsiv). Da es sich
    bislang um eine Illustration handelt, ist die Zuordnung Zone↔Kategorie
    nach bestem Augenmass gewählt, nicht pixelgenau vermessen. */
+function holeStyle(h) {
+  if (h.hw == null) return `left:${h.x}%;top:${h.y}%;`;
+  return `left:${h.hx}%;top:${h.hy}%;width:${h.hw}%;height:${h.hh}%;`;
+}
 function renderBoardImage(gripState = fb, photoId = 'fb-board-photo') {
   const board = BOARDS[gripState.board];
   const spots = board.hotspots.map((h) => {
@@ -3013,7 +3017,9 @@ function renderBoardImage(gripState = fb, photoId = 'fb-board-photo') {
     const cls = gripState.gripMode === 'different'
       ? [h.grip === gripState.selectedGripLeft ? 'active-left' : '', h.grip === gripState.selectedGripRight ? 'active-right' : ''].filter(Boolean).join(' ')
       : (gripState.selectedGrip === h.grip ? 'active' : '');
-    return `<button type="button" class="board-hotspot ${cls}" style="left:${h.x}%;top:${h.y}%;" data-grip="${h.grip}" title="${esc(grip.label)}${grip.note ? ' · ' + esc(grip.note) : ''}"></button>`;
+    // Form des echten Lochs (hx/hy/hw/hh in % des Bildes, siehe data.js);
+    // Sloper oben sind Flächen statt Löcher (surface).
+    return `<button type="button" class="board-hotspot hole ${h.surface ? 'surface' : ''} ${cls}" style="${holeStyle(h)}" data-grip="${h.grip}" title="${esc(grip.label)}${grip.note ? ' · ' + esc(grip.note) : ''}" aria-label="${esc(grip.label)}"></button>`;
   }).join('');
   return `<div class="board-photo-wrap" id="${photoId}">
     <img src="${board.image}" alt="${esc(board.label)}">
@@ -4106,6 +4112,14 @@ function fbBlocksWithCurrentBoard(blocks) {
   return blocks.map((b) => (b.type === 'hang' && b.board == null ? { ...b, board: fb.board } : { ...b }));
 }
 
+/* Ablauf-Balken auf der Schnelltraining-Karte: pro Satz ein Stück, Breite
+   nach Dauer, Farbe nach Art (Hang/Lifting Pin blau, Übung weiss, Campus
+   dunkelblau, Pause grau) — zeigt den Aufbau auf einen Blick. */
+function qsBlockBarHtml(blocks) {
+  const color = (b) => (b.type === 'pause' ? 'pause' : b.type === 'exercise' ? 'exercise' : b.type === 'campus' ? 'campus' : 'hang');
+  return `<div class="qs-bar" aria-hidden="true">${blocks.map((b) => `<span class="qs-bar-seg ${color(b)}" style="flex-grow:${Math.max(1, Math.round(fbBlockSeconds(b)))}"></span>`).join('')}</div>`;
+}
+
 function renderFbQuickstart() {
   const holder = document.getElementById('fb-quickstart');
   if (!holder) return;
@@ -4157,8 +4171,11 @@ function renderFbQuickstart() {
           </div>
         </div>
         ${t.note ? `<div class="qs-note">${esc(t.note)}</div>` : ''}
-        <div class="qs-meta mono">${t.blocks.length} Sätze · ~${fmtMinSec(totalSec)}</div>
-        <button type="button" class="btn qs-start" data-tpl="${t.id}">Los</button>
+        <div class="qs-bottom">
+          <div class="qs-meta mono">${t.blocks.length} Sätze · ~${fmtMinSec(totalSec)}</div>
+          <button type="button" class="btn qs-start" data-tpl="${t.id}" aria-label="${esc(t.name)} starten"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 001.5.9l10.2-6.5a1 1 0 000-1.8L9.5 4.6A1 1 0 008 5.5z"/></svg></button>
+        </div>
+        ${qsBlockBarHtml(t.blocks)}
       </div>
     `;
   }).join('') : `<div class="list-empty">${empty}</div>`);
@@ -7189,11 +7206,11 @@ function miniBoardThumb(boardId, gripId, gripId2) {
   // Griff pro Hand (siehe hangBoardThumb).
   const dots = board.hotspots
     .filter((h) => h.grip === gripId)
-    .map((s) => `<span class="dot" style="left:${s.x}%;top:${s.y}%;"></span>`)
+    .map((s) => `<span class="dot hole ${s.surface ? 'surface' : ''}" style="${holeStyle(s)}"></span>`)
     .join('');
   const dots2 = gripId2 ? board.hotspots
     .filter((h) => h.grip === gripId2)
-    .map((s) => `<span class="dot dot-alt" style="left:${s.x}%;top:${s.y}%;"></span>`)
+    .map((s) => `<span class="dot dot-alt hole ${s.surface ? 'surface' : ''}" style="${holeStyle(s)}"></span>`)
     .join('') : '';
   return `<div class="timeline-thumb"><img src="${board.image}" alt="">${dots}${dots2}</div>`;
 }
