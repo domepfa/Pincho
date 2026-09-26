@@ -125,6 +125,10 @@ wird erst nach dem Testen in die Haupt-App übernommen.
   hängend (Hang-Satz), sitzend mit Flasche (Pausen), winkend („Ablauf
   geschafft!"), Klimmzug unten/oben im Wechsel (Klimmzug-Übungen, Stange an
   derselben Höhe ausgerichtet), flexend (neuer Rekord im Fortschritt).
+- **Nächste Schritte (Stand 26.09.2026)**: Einheitlicher Figuren-Stil —
+  Strichmännchen, animierte Faultier-Gliederpuppe (Prototyp in
+  `tools/sloth-rig/`) und Faultier-Posen nicht wild mischen. Für die
+  Gliederpuppe fehlen eine Seitenansicht-Vorlage und separate Oberarme.
 - **Hilfe** (`#hilfe`, unter KONTO → „So funktioniert Pincho"): ein
   aufklappbarer Abschnitt pro Tab (`HELP_SECTIONS` in `app.js`) — bei neuen
   Funktionen dort mitpflegen.
