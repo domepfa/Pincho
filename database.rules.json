@@ -1,7 +1,11 @@
 {
   "rules": {
     "config": {
-      ".read": "auth != null"
+      ".read": "auth != null",
+      "contact": {
+        ".write": "auth != null && (auth.token.email === 'ADMIN_EMAIL' && auth.token.email_verified === true)",
+        ".validate": "newData.isString() && newData.val().length <= 100"
+      }
     },
     "migration": {
       ".read": "auth != null",

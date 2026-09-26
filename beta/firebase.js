@@ -100,6 +100,13 @@ async function sendPasswordReset(email) {
   return identityCall('sendOobCode', { requestType: 'PASSWORD_RESET', email });
 }
 
+/* Löscht das Login-Konto selbst (die Daten in der Datenbank löscht app.js
+   vorher). Firebase verlangt dafür eine frische Anmeldung. */
+async function deleteAuthAccount() {
+  if (!(await ensureValidAuthToken())) return { ok: false, code: 'NO_TOKEN' };
+  return identityCall('delete', { idToken: authState.idToken });
+}
+
 /* ---------- Netzwerk mit Zeitlimit ----------
    Bei schlechtem Empfang (z. B. im Gym) hängt ein normaler fetch() gerne
    minutenlang, statt sauber zu scheitern. Darum bekommt jede Anfrage ein
