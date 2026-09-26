@@ -121,6 +121,9 @@ wird erst nach dem Testen in die Haupt-App übernommen.
   Eisprung ~14 Tage vorher). Phasen als Bänder hinter den Kurven, Tipp pro
   Phase, „Mehr erfahren" mit Quellen und „Deine Leistung nach Phase"
   (jede Einheit relativ zum eigenen Niveau ±4 Wochen).
+- **Hilfe** (`#hilfe`, unter KONTO → „So funktioniert Pincho"): ein
+  aufklappbarer Abschnitt pro Tab (`HELP_SECTIONS` in `app.js`) — bei neuen
+  Funktionen dort mitpflegen.
 - **Datenschutz** (`#datenschutz`, auch ohne Anmeldung): Betreiber „Dome";
   die Kontakt-Adresse steht nicht im Code, sondern in `config/contact`
   (nur für Angemeldete lesbar, setzt der Admin unter KONTO). Unter KONTO

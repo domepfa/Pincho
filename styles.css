@@ -1472,3 +1472,20 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .cr-move-start { fill: none; stroke-width: 7; pointer-events: none; }
 .cr-move-start.l { stroke: var(--accent); }
 .cr-move-start.r { stroke: #ff6b47; }
+
+/* ---------- Hilfe ---------- */
+.konto-help { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--ink); }
+.konto-help .card-sub { margin: 0; }
+.konto-help-icon { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: rgba(var(--accent-rgb), .15); color: var(--accent); font-weight: 700; font-size: 20px; }
+.help-item { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 16px; margin-bottom: 10px; padding: 0 14px; }
+.help-item summary { display: flex; align-items: baseline; gap: 10px; padding: 14px 0; cursor: pointer; list-style: none; }
+.help-item summary::-webkit-details-marker { display: none; }
+.help-item summary::after { content: '+'; margin-left: auto; color: var(--ink-faint); font-size: 20px; }
+.help-item[open] summary::after { content: '−'; }
+.help-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; color: var(--ink); }
+.help-sub { font-size: 12px; color: var(--ink-faint); }
+.help-body { padding-bottom: 14px; font-size: 14px; line-height: 1.5; color: var(--ink-dim); }
+.help-body p { margin: 0 0 8px; }
+.help-body ul { margin: 0 0 8px; padding-left: 20px; }
+.help-body li { margin-bottom: 6px; }
+.help-body b { color: var(--ink); }
