@@ -1859,7 +1859,7 @@ async function finishWallSession() {
   const el = ensureWallOverlay();
   el.innerHTML = `
     <div class="fb-overlay-inner fb-overlay-done">
-      <div class="fb-done-emoji">🎉</div>
+      <img class="fb-done-sloth" src="../assets/sloth/sloth-wave.png" alt="">
       <div class="fb-stage-title">Ausdauer geschafft!</div>
       <div class="fb-stage-sub mono">${elapsedMin} ${elapsedMin === 1 ? 'Minute' : 'Minuten'} Ausdauer</div>
       ${challengeDurationChipsHtml('wall-share', CHALLENGE_WINDOW_H)}
@@ -2372,7 +2372,7 @@ async function finishFlowSession(blocksOverride) {
   const el = ensureFlowOverlay();
   el.innerHTML = `
     <div class="fb-overlay-inner fb-overlay-done">
-      <div class="fb-done-emoji">${isPartial ? '💪' : '🎉'}</div>
+      <img class="fb-done-sloth" src="../assets/sloth/sloth-wave.png" alt="">
       <div class="fb-stage-title">${isPartial ? 'Vorzeitig beendet & gespeichert' : 'Flow geschafft!'}</div>
       <div class="fb-stage-sub mono">${blocksDone.length} Posen · ${fmtMinSec(totalSec)}</div>
       <div class="fb-summary-list">${blocksDone.map((b) => `<div class="fb-summary-row"><span>${esc(poseName(b.poseId))}</span><span class="mono">${b.holdSec}s</span></div>`).join('')}</div>
@@ -8582,39 +8582,8 @@ const SLOTH_FACE = `
   <circle class="sloth-head" cx="100" cy="64" r="19"/>
   <path class="sloth-mask" d="M86 62 q6 -7 12 1 q-6 7 -12 -1z M114 62 q-6 -7 -12 1 q6 7 12 -1z"/>
   <path class="sloth-line" d="M97 71 h6 M94 76 q6 4 12 0"/>`;
-const FB_HANG_FIGURE_SVG = `
-  <svg viewBox="0 0 200 200" class="ex-figure fb-hang-figure sloth-fig">
-    <line class="fig-rig sloth-bar" x1="36" y1="20" x2="164" y2="20"/>
-    <g class="sloth-swing">
-      <path class="sloth-limb" d="M72 22 Q70 50 88 76"/>
-      <path class="sloth-limb" d="M128 22 Q130 50 112 76"/>
-      <path class="sloth-claw" d="M66 20 q4 -8 10 -2 M70 22 q6 -8 11 0 M124 22 q5 -8 11 -2 M128 22 q6 -8 10 0"/>
-      <ellipse class="sloth-body" cx="100" cy="118" rx="27" ry="36"/>
-      <path class="sloth-line" d="M86 108 q14 9 28 0 M88 124 q12 7 24 0"/>
-      ${SLOTH_FACE}
-      <circle class="sloth-eye" cx="93" cy="62" r="2.4"/>
-      <circle class="sloth-eye" cx="107" cy="62" r="2.4"/>
-      <path class="sloth-limb" d="M88 148 Q82 164 84 182 M112 148 Q118 164 116 182"/>
-      <path class="sloth-claw" d="M80 184 q-2 7 -8 8 M85 185 q0 7 -4 10 M120 184 q2 7 8 8 M115 185 q0 7 4 10"/>
-    </g>
-  </svg>
-`;
-const FB_REST_FIGURE_SVG = `
-  <svg viewBox="0 0 200 200" class="ex-figure fb-rest-figure sloth-fig">
-    <g class="sloth-breathe">
-      <ellipse class="sloth-body" cx="100" cy="134" rx="32" ry="34"/>
-      <path class="sloth-line" d="M84 124 q16 10 32 0 M86 142 q14 8 28 0"/>
-      <circle class="sloth-head" cx="100" cy="84" r="19"/>
-      <path class="sloth-mask" d="M86 82 q6 -7 12 1 q-6 7 -12 -1z M114 82 q-6 -7 -12 1 q6 7 12 -1z"/>
-      <path class="sloth-line" d="M89 82 q4 3 8 0 M103 82 q4 3 8 0 M97 91 h6 M95 96 q5 3 10 0"/>
-      <path class="sloth-limb" d="M82 170 q-10 10 -24 12 M118 170 q10 10 24 12"/>
-    </g>
-    <path class="sloth-limb fb-arm-shake" d="M72 116 Q60 140 64 164"/>
-    <path class="sloth-limb fb-arm-shake" d="M128 116 Q140 140 136 164"/>
-    <text class="sloth-z" x="128" y="58">z</text>
-    <text class="sloth-z sloth-z2" x="142" y="42">z</text>
-  </svg>
-`;
+const FB_HANG_FIGURE_SVG = `<img class="ex-figure fb-hang-figure sloth-img" src="../assets/sloth/sloth-hang.png" alt="">`; // Test: Muskelfaultier statt Strichfigur
+const FB_REST_FIGURE_SVG = `<img class="ex-figure sloth-img sloth-rest" src="../assets/sloth/sloth-rest.png" alt="">`;
 /* Lifting Pin ist kein Hängen (FB_HANG_FIGURE_SVG), sondern ein einarmiges
    Ziehen von unten (Pin auf Hüfthöhe) nach oben (Richtung Schulter) — eigene
    Animation dafür, stehende Fixfigur + EIN animierter Arm (Start/Ende
@@ -9813,7 +9782,7 @@ async function finishAblauf(blocksOverride, resultsOverride, isPartial) {
   const el = ensureFbOverlay();
   el.innerHTML = `
     <div class="fb-overlay-inner fb-overlay-done">
-      <div class="fb-done-emoji">${isPartial ? '💪' : '🎉'}</div>
+      <img class="fb-done-sloth" src="../assets/sloth/sloth-wave.png" alt="">
       <div class="fb-stage-title">${isPartial ? 'Vorzeitig beendet & gespeichert' : 'Ablauf geschafft!'}</div>
       <div class="fb-stage-sub mono">${blocks.length} Sätze · ${fmtMinSec(estimateSeconds)} Trainingszeit</div>
       ${fbResultsSummaryHtml(blocks, results)}

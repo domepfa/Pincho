@@ -1504,3 +1504,15 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 
 /* Suche aktiv: Körperkarte/Gruppen weg, Treffer direkt unter dem Feld */
 .ex-searching .ex-body-wrap, .ex-searching .ex-supergroup-row, .ex-searching .ex-muscle-row { display: none; }
+
+/* ---------- Test: Muskelfaultier-Bilder statt Strichfiguren ---------- */
+.sloth-img { object-fit: contain; }
+.fb-stage-figure .sloth-img, .fb-phase-figure .sloth-img { max-height: 24vh; width: auto; }
+.timeline-thumb .sloth-img { width: 100%; height: auto; }
+.sloth-rest { transform-origin: 50% 90%; animation: slothBreathe 3.2s ease-in-out infinite; }
+@keyframes slothBreathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.015, 1.035) rotate(-.6deg); } }
+.fb-done-sloth { display: block; width: min(52vw, 220px); height: auto; margin: 0 auto 6px; transform-origin: 50% 95%; animation: popIn .5s cubic-bezier(.25, 1.4, .4, 1) both, slothWave 1.6s ease-in-out .5s infinite; }
+@keyframes slothWave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-3deg) translateY(-2px); } 75% { transform: rotate(3deg); } }
+@media (prefers-reduced-motion: reduce) { .sloth-rest, .fb-done-sloth { animation: none; } }
+.fb-phase-figure .sloth-img { width: 100%; height: auto; max-height: none; }
+.fb-phase-figure:has(.sloth-img) { width: clamp(110px, 20vh, 170px); }
