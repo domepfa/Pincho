@@ -9881,12 +9881,123 @@ function fmtDayLong(ms) {
   return `${['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][d.getDay()]} ${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.`;
 }
 
+/* Wissen pro Phase — bewusst vorsichtig formuliert: Die Studienlage zu
+   Leistung und Zyklus ist dünn und uneinheitlich (Quellen in CYCLE_SOURCES). */
+const CYCLE_INFO = {
+  mens: {
+    tip: 'Nach Befinden trainieren — im Schnitt ist die Leistung höchstens minimal tiefer, Beschwerden sind aber sehr individuell.',
+    body: 'Östrogen und Progesteron sind tief.',
+    science: 'Eine grosse Meta-Analyse fand in der frühen Follikelphase (während der Periode) höchstens eine sehr kleine Leistungsminderung — mit grossen Unterschieden zwischen Personen [1].',
+    practice: 'Einheiten nach Krämpfen/Müdigkeit anpassen statt nach Kalender. Starke Blutungen sind bei Sportlerinnen häufig (rund ein Drittel) und erhöhen das Risiko für Eisenmangel [4] — bei anhaltender Müdigkeit Eisenwerte ärztlich prüfen lassen.',
+  },
+  foll: {
+    tip: 'Normal nach Plan trainieren — ein fester Kraftvorteil in dieser Phase ist nicht belegt.',
+    body: 'Östrogen steigt bis kurz vor dem Eisprung an.',
+    science: 'Ein Überblick über alle Meta-Analysen fand keinen verlässlichen Einfluss der Zyklusphase auf Maximalkraft oder Muskelaufbau; die Studien sind meist klein und von geringer Qualität [2].',
+    practice: 'Fühlst du dich stark, ist das ein guter Moment für harte Einheiten — dein Gefühl ist hier aussagekräftiger als die Phase.',
+  },
+  ovu: {
+    tip: 'Nichts Besonderes nötig — die Leistung ändert sich um den Eisprung nicht verlässlich.',
+    body: 'Östrogen erreicht seinen Höhepunkt, kurz darauf folgt der Eisprung.',
+    science: 'Eine Übersicht nur über methodisch hochwertige Studien findet meist keine Phasen-Unterschiede bei Kraft, Schnellkraft und Ausdauer [3].',
+    practice: 'Normal trainieren. Wann genau der Eisprung ist, schätzt die App nur grob.',
+  },
+  lut: {
+    tip: 'Körpertemperatur ist leicht erhöht — bei Wärme mehr trinken und Pausen einplanen.',
+    body: 'Progesteron ist hoch; die Körpertemperatur liegt etwa 0,3–0,7 °C höher.',
+    science: 'Eine Meta-Analyse zeigt eine höhere Körperkerntemperatur in der Lutealphase, vor und nach Belastung in der Wärme [5]. Auf Kraft und Leistung gibt es keinen verlässlichen Effekt [2][3].',
+    practice: 'In warmen Hallen/Sommer auf Trinken und Pausen achten. Vor der Periode (PMS) kann das Befinden schwanken — Einheiten flexibel halten.',
+  },
+};
+const CYCLE_SOURCES = [
+  ['McNulty et al. (2020), Sports Medicine — Meta-Analyse Leistung & Zyklusphase', 'https://doi.org/10.1007/s40279-020-01319-3'],
+  ['Colenso-Semple et al. (2023), Frontiers in Sports and Active Living — Kraft & Muskelaufbau', 'https://doi.org/10.3389/fspor.2023.1054542'],
+  ['Systematische Übersicht hochwertiger Studien (2025), Journal of Applied Physiology', 'https://journals.physiology.org/doi/full/10.1152/japplphysiol.00223.2025'],
+  ['Bruinvels et al. (2016), PLOS One — starke Blutungen bei Sportlerinnen', 'https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0149881'],
+  ['Giersch et al. (2020), J Sci Med Sport — Zyklus & Temperatur bei Belastung in der Wärme', 'https://doi.org/10.1016/j.jsams.2020.05.014'],
+];
+
+function cycleLearnHtml(current) {
+  const order = ['mens', 'foll', 'ovu', 'lut'];
+  return `<details class="pg-cycle-more pg-cycle-learn">
+    <summary>Mehr erfahren: Training &amp; Zyklus</summary>
+    <p class="pg-muted" style="margin:0 0 10px;">Kurz gesagt: Die Forschung findet im Schnitt kaum Leistungsunterschiede zwischen den Phasen, aber grosse Unterschiede zwischen Personen. Empfohlen wird deshalb, <b>auf die eigenen Daten und das eigene Befinden</b> zu achten statt nach festen Phasen-Regeln zu trainieren [1][2].</p>
+    ${order.map((k) => `
+      <div class="pg-cycle-phase ${k === current ? 'current' : ''}">
+        <p class="pg-cycle-phase-title"><i style="background:${CYCLE_PHASES[k].color}"></i>${CYCLE_PHASES[k].label}${k === current ? ' · jetzt' : ''}</p>
+        <p><b>Körper:</b> ${CYCLE_INFO[k].body}</p>
+        <p><b>Studien:</b> ${CYCLE_INFO[k].science}</p>
+        <p><b>Praxis:</b> ${CYCLE_INFO[k].practice}</p>
+      </div>`).join('')}
+    <p class="pg-cycle-phase-title">Quellen</p>
+    <ol class="pg-cycle-sources">${CYCLE_SOURCES.map(([t, u]) => `<li><a href="${u}" target="_blank" rel="noopener">${esc(t)}</a></li>`).join('')}</ol>
+  </details>`;
+}
+
+/* Persönlicher Vergleich: jede Einheit relativ zum eigenen Niveau in den
+   ±4 Wochen darum (gleiche Übung bzw. Hängezeit) — so verfälscht der
+   normale Trainingsfortschritt den Vergleich nicht. Dann Mittel pro Phase. */
+const CYCLE_MIN_PER_PHASE = 3;
+function median(arr) {
+  const s = [...arr].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+function relativeScores() {
+  const series = {}; // key -> [{t, v}]
+  const add = (key, t, v) => { if (v > 0) (series[key] = series[key] || []).push({ t, v }); };
+  state.logs.forEach((e) => (e.exercises || []).forEach((ex) => {
+    if (!Array.isArray(ex.sets) || !ex.sets.length || ['warmup_general', 'cooldown_general'].includes(ex.exerciseId)) return;
+    const best = bestSetOf(ex.exerciseId, ex.sets);
+    if (best) add('ex:' + ex.exerciseId, entryTime(e), best.value);
+  }));
+  progressFbSessions.forEach((sn) => add('fb', entryTime(sn), fbSessionHangSeconds(sn)));
+  const perSession = {}; // Tag -> [ratios]
+  Object.values(series).forEach((pts) => pts.forEach((p) => {
+    const near = pts.filter((q) => q !== p && Math.abs(q.t - p.t) <= 28 * DAY_MS).map((q) => q.v);
+    if (near.length < 2) return;
+    const k = dayKey(new Date(p.t));
+    (perSession[k] = perSession[k] || []).push(p.v / median(near));
+  }));
+  return Object.entries(perSession).map(([k, r]) => ({ t: dayStart(k) + DAY_MS / 2, ratio: r.reduce((a, b) => a + b, 0) / r.length }));
+}
+function cyclePhaseAt(t) {
+  const g = cycleSegments().find((s) => t >= s.from && t < s.to);
+  return g ? g.phase : null;
+}
+function cycleCompareHtml() {
+  const today = Date.now();
+  const byPhase = { mens: [], foll: [], ovu: [], lut: [] };
+  relativeScores().forEach((s) => {
+    if (s.t > today) return;
+    const ph = cyclePhaseAt(s.t);
+    if (ph) byPhase[ph].push(s.ratio);
+  });
+  const total = Object.values(byPhase).reduce((a, b) => a + b.length, 0);
+  const rows = Object.entries(byPhase).map(([k, r]) => {
+    const enough = r.length >= CYCLE_MIN_PER_PHASE;
+    const pct = enough ? Math.round((r.reduce((a, b) => a + b, 0) / r.length - 1) * 100) : null;
+    const w = enough ? Math.min(50, Math.abs(pct) * 5) : 0; // 10 % = volle Halbbreite
+    return `<div class="pg-cmp-row">
+      <span class="pg-cmp-label"><i style="background:${CYCLE_PHASES[k].color}"></i>${CYCLE_PHASES[k].label}</span>
+      <span class="pg-cmp-bar">${enough ? `<span style="${pct >= 0 ? 'left:50%' : `left:${50 - w}%`};width:${w}%;background:${CYCLE_PHASES[k].color}"></span>` : ''}</span>
+      <span class="pg-cmp-val">${enough ? `${pct > 0 ? '+' : ''}${pct} %` : `${r.length}/${CYCLE_MIN_PER_PHASE}`}</span>
+    </div>`;
+  }).join('');
+  return `<div class="pg-cmp">
+    <p class="pg-cycle-phase-title">Deine Leistung nach Phase</p>
+    ${rows}
+    <p class="pg-muted" style="margin:6px 0 0;">Jede Einheit im Vergleich zu deinem Niveau in den Wochen davor/danach (${total} Einheiten). Ab ${CYCLE_MIN_PER_PHASE} Einheiten pro Phase erscheint ein Wert; bei wenigen Einheiten kann ein Unterschied auch Zufall sein.</p>
+  </div>`;
+}
+
 function cycleCardHtml() {
   if (!cycleData) {
     return `<div class="pg-card" id="pg-cycle">
       <div class="pg-card-head"><h3>Zyklus</h3><span class="pg-muted">freiwillig</span></div>
-      <p class="pg-muted" style="margin:0 0 12px;">Zeigt deine Zyklusphasen hinter den Leistungskurven und schätzt die nächste Periode. Nur für dich sichtbar — nie für die Crew oder in Challenges. Jederzeit löschbar.</p>
+      <p class="pg-muted" style="margin:0 0 12px;">Zeigt deine Zyklusphasen hinter den Leistungskurven, schätzt die nächste Periode und vergleicht deine Leistung je Phase. Nur für dich sichtbar — nie für die Crew oder in Challenges. Jederzeit löschbar.</p>
       <button class="btn ghost small" id="cycle-enable">Einschalten</button>
+      ${cycleLearnHtml(null)}
     </div>`;
   }
   const t = cycleToday();
@@ -9896,13 +10007,16 @@ function cycleCardHtml() {
   if (t) {
     const nextTxt = t.inDays > 0 ? `in ${t.inDays} ${t.inDays === 1 ? 'Tag' : 'Tagen'}` : t.inDays === 0 ? 'heute' : `seit ${-t.inDays} ${t.inDays === -1 ? 'Tag' : 'Tagen'} erwartet`;
     now = `<div class="pg-hero"><span class="pg-hero-num" style="color:${t.phase ? CYCLE_PHASES[t.phase].color : 'var(--ink)'}">Tag ${t.day}</span><span class="pg-hero-sub">${t.phase ? CYCLE_PHASES[t.phase].label : 'Periode überfällig?'}</span></div>
-      <p class="pg-muted" style="margin:0 0 12px;">Nächste Periode ca. <b>${fmtDayLong(t.next)}</b> (${nextTxt}) · Ø ${t.avg} Tage</p>`;
+      <p class="pg-muted" style="margin:0 0 12px;">Nächste Periode ca. <b>${fmtDayLong(t.next)}</b> (${nextTxt}) · Ø ${t.avg} Tage</p>
+      ${t.phase ? `<p class="pg-cycle-tip" style="border-color:${CYCLE_PHASES[t.phase].color}">${CYCLE_INFO[t.phase].tip}</p>` : ''}`;
   }
   return `<div class="pg-card" id="pg-cycle">
     <div class="pg-card-head"><h3>Zyklus</h3><span class="pg-muted">nur für dich</span></div>
     ${now}
     ${starts.includes(todayKey) ? '' : '<button class="btn small" id="cycle-today">Periode hat heute begonnen</button>'}
-    <details class="pg-cycle-more">
+    ${starts.length ? cycleCompareHtml() : ''}
+    ${cycleLearnHtml(t && t.phase)}
+    <details class="pg-cycle-more pg-cycle-entries">
       <summary>Einträge &amp; Einstellungen</summary>
       <div class="field-row pg-cycle-add">
         <div class="field"><label>Periodenbeginn nachtragen</label><input type="date" id="cycle-date" max="${todayKey}" value="${todayKey}"></div>
@@ -9942,7 +10056,7 @@ function wireCycleCard() {
       cycleData = { ...cycleData, starts };
       await fbDelete(`${base}/starts/${key}`);
       drawProgress();
-      const more = document.querySelector('.pg-cycle-more');
+      const more = document.querySelector('.pg-cycle-entries');
       if (more) more.open = true;
     };
   });
