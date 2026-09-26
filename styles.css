@@ -1377,3 +1377,30 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .pg-rec-bar { height: 8px; border-radius: 4px; background: #1a212a; overflow: hidden; }
 .pg-rec-bar span { display: block; height: 100%; border-radius: 4px; }
 .pg-rec-bar span.ok { background: var(--accent); } .pg-rec-bar span.wait { background: #ff8a66; }
+
+/* ---------- Login mit eigenem Konto / Konto & Crews ---------- */
+.login-shell .field { text-align: left; }
+.login-shell .login-tag b { color: var(--ink); }
+.auth-tabs { justify-content: center; }
+.link-btn {
+  background: none; border: none; color: var(--ink-dim); font: inherit; font-size: 13px;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer; margin: 14px auto 0; padding: 6px;
+}
+.link-btn.inline { margin: 0; padding: 0 2px; font-size: 12px; }
+.onb-admin-card { margin-top: 22px; text-align: left; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.topbar a.who { text-decoration: none; color: inherit; }
+.topbar .logout.active { border-color: var(--accent); color: var(--accent); }
+.konto-logout { margin-top: 14px; }
+.crew-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.crew-head .card-value { font-size: 24px; overflow-wrap: anywhere; }
+.crew-members .chip { cursor: default; color: var(--ink); display: inline-flex; align-items: center; gap: 4px; }
+.crew-members .chip.legacy { color: var(--ink-faint); border-style: dashed; }
+.chip-x {
+  background: none; border: none; color: var(--ink-faint); font-size: 16px; line-height: 1;
+  padding: 0 0 0 6px; margin: -4px -4px -4px 0; cursor: pointer;
+}
+.chip-x:hover { color: var(--danger); }
+.invite-code { font-size: 28px; font-weight: 700; letter-spacing: .18em; margin: 0 0 12px; color: var(--ink); }
+.card .field-row { align-items: flex-start; }
+.card .field-row .field { margin-bottom: 0; }
+.card .field-row .btn.small { flex-shrink: 0; }

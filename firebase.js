@@ -6,85 +6,98 @@
    FIREBASE_URL und FIREBASE_API_KEY unten durch die echten Werte ersetzen.
    Siehe README.md für die kompletten Setup-Schritte inkl. Security Rules.
 
-   AUTH-MODELL (identisch zu Firnspur/Fixseil):
-   Ein einziger, gemeinsamer Firebase-Auth-Account fürs ganze Team
-   (AUTH_EMAIL ist nur ein technischer Platzhalter, keine echte Adresse).
-   Das "Passwort" dafür ist der Team-Code, den ihr euch teilt. Beim
-   allerersten Login richtet die App diesen Account automatisch ein
-   (signUp), danach genügt signIn. Die Datenbank-Regeln verlangen
-   "auth != null" — wer den Team-Code nicht kennt, kommt nicht rein.
-   Wer welche Person ist (Name), ist davon unabhängig und wird separat
-   pro Gerät gespeichert (siehe app.js).
+   AUTH-MODELL: Jede Person hat ein eigenes Firebase-Auth-Konto (E-Mail +
+   Passwort). Die Datenbank-Regeln (database.rules.json) geben private
+   Daten nur der Person selbst frei und Crew-Daten nur den Mitgliedern der
+   Crew. Registrieren geht nur mit Einladungscode einer Crew (die Regeln
+   prüfen das, nicht nur die App). Welches Profil (members/{id}) zu einem
+   Konto gehört, steht unter users/{uid}/memberId.
    ================================================================= */
 
 const FIREBASE_URL = 'https://pincho-crew-default-rtdb.europe-west1.firebasedatabase.app';
 const FIREBASE_API_KEY = 'AIzaSyDFwqI1f2o03DLM3I8oPXWFQw3nH9ZrQdA';
-const AUTH_EMAIL = 'crew@pincho.app'; // technischer Platzhalter, keine echte Mailadresse
+const AUTH_STORAGE_KEY = 'pincho_uauth'; // bewusst nicht "…_auth": das war der alte Team-Login
 
-let authState = { idToken: null, refreshToken: null, expiresAt: 0 };
+let authState = { idToken: null, refreshToken: null, expiresAt: 0, uid: null, email: null };
 
 function loadAuthFromStorage() {
   try {
-    const raw = localStorage.getItem('pincho_auth');
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
     if (raw) authState = JSON.parse(raw);
   } catch (e) {
-    authState = { idToken: null, refreshToken: null, expiresAt: 0 };
+    authState = { idToken: null, refreshToken: null, expiresAt: 0, uid: null, email: null };
   }
 }
 function saveAuthToStorage() {
-  try { localStorage.setItem('pincho_auth', JSON.stringify(authState)); } catch (e) { /* ignorieren */ }
+  try { localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState)); } catch (e) { /* ignorieren */ }
 }
 function clearAuth() {
-  authState = { idToken: null, refreshToken: null, expiresAt: 0 };
-  try { localStorage.removeItem('pincho_auth'); } catch (e) { /* ignorieren */ }
+  authState = { idToken: null, refreshToken: null, expiresAt: 0, uid: null, email: null };
+  try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch (e) { /* ignorieren */ }
+}
+function authUid() { return authState.uid; }
+function authEmail() { return authState.email; }
+
+/* Inhalt des ID-Tokens (JWT) — nur zum Anzeigen (z. B. ob die E-Mail schon
+   bestätigt ist). Die echte Prüfung machen die Datenbank-Regeln. */
+function authClaims() {
+  try {
+    const part = authState.idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(escape(atob(part))));
+  } catch (e) { return {}; }
 }
 
-/* Meldet den Team-Account an. Gibt bei Erfolg {ok:true} zurück, sonst
-   {ok:false, code} — code z. B. "EMAIL_NOT_FOUND" (Account existiert noch
-   nicht → signUpTeam versuchen) oder "INVALID_LOGIN_CREDENTIALS" (falsches
-   Passwort/Code). */
-async function signInTeam(password) {
+async function identityCall(endpoint, body) {
   try {
-    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`, {
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:${endpoint}?key=${FIREBASE_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: AUTH_EMAIL, password, returnSecureToken: true }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok) return { ok: false, code: (data.error && data.error.message) || 'UNKNOWN' };
-    authState = {
-      idToken: data.idToken,
-      refreshToken: data.refreshToken,
-      expiresAt: Date.now() + Number(data.expiresIn) * 1000 - 60000,
-    };
-    saveAuthToStorage();
-    return { ok: true };
+    return { ok: true, data };
   } catch (e) {
     return { ok: false, code: 'NETWORK_ERROR' };
   }
 }
 
-/* Richtet den gemeinsamen Team-Account einmalig ein (erster Login überhaupt:
-   das eingegebene Passwort wird zum neuen Team-Code). */
-async function signUpTeam(password) {
-  try {
-    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: AUTH_EMAIL, password, returnSecureToken: true }),
-    });
-    const data = await res.json();
-    if (!res.ok) return { ok: false, code: (data.error && data.error.message) || 'UNKNOWN' };
-    authState = {
-      idToken: data.idToken,
-      refreshToken: data.refreshToken,
-      expiresAt: Date.now() + Number(data.expiresIn) * 1000 - 60000,
-    };
-    saveAuthToStorage();
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, code: 'NETWORK_ERROR' };
-  }
+function storeSignIn(data) {
+  authState = {
+    idToken: data.idToken,
+    refreshToken: data.refreshToken,
+    expiresAt: Date.now() + Number(data.expiresIn) * 1000 - 60000,
+    uid: data.localId,
+    email: data.email,
+  };
+  saveAuthToStorage();
+}
+
+/* Anmelden. {ok:true} oder {ok:false, code} — code z. B.
+   "INVALID_LOGIN_CREDENTIALS" (E-Mail/Passwort falsch). */
+async function signInEmail(email, password) {
+  const r = await identityCall('signInWithPassword', { email, password, returnSecureToken: true });
+  if (r.ok) storeSignIn(r.data);
+  return r.ok ? { ok: true } : r;
+}
+
+/* Neues Konto. code z. B. "EMAIL_EXISTS", "WEAK_PASSWORD : …". Schickt
+   gleich die Bestätigungs-Mail mit. */
+async function signUpEmail(email, password) {
+  const r = await identityCall('signUp', { email, password, returnSecureToken: true });
+  if (!r.ok) return r;
+  storeSignIn(r.data);
+  sendVerifyEmail();
+  return { ok: true };
+}
+
+async function sendVerifyEmail() {
+  if (!authState.idToken) return { ok: false, code: 'NO_TOKEN' };
+  return identityCall('sendOobCode', { requestType: 'VERIFY_EMAIL', idToken: authState.idToken });
+}
+
+async function sendPasswordReset(email) {
+  return identityCall('sendOobCode', { requestType: 'PASSWORD_RESET', email });
 }
 
 /* ---------- Netzwerk mit Zeitlimit ----------
@@ -127,14 +140,16 @@ async function refreshAuthToken() {
       body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(authState.refreshToken),
     });
     // Nur ein echtes "Token ungültig" (400) meldet ab — ein Server-/Proxy-
-    // Fehler bei wackligem Netz soll nicht den Team-Code neu verlangen.
+    // Fehler bei wackligem Netz soll nicht zum erneuten Anmelden zwingen.
     if (res.status === 400) { clearAuth(); return false; }
     if (!res.ok) return false;
     const data = await res.json();
     authState = {
+      ...authState,
       idToken: data.id_token,
       refreshToken: data.refresh_token,
       expiresAt: Date.now() + Number(data.expires_in) * 1000 - 60000,
+      uid: data.user_id || authState.uid,
     };
     saveAuthToStorage();
     return true;
@@ -152,7 +167,7 @@ async function ensureValidAuthToken() {
   return await refreshInFlight;
 }
 
-/* Ist dieses Gerät schon einmal mit dem Team-Code angemeldet worden? Dann
+/* Ist dieses Gerät schon einmal angemeldet worden? Dann
    startet die App auch offline direkt — das Token wird im Hintergrund
    erneuert, sobald wieder Netz da ist (siehe boot() in app.js). */
 function hasStoredAuth() {
@@ -196,29 +211,28 @@ function setIn(obj, segs, value) {
   if (child == null) delete o[segs[0]]; else o[segs[0]] = child;
   return normalizeEmpty(o);
 }
-function patchValue(base, data) {
-  let o = base;
-  Object.entries(data || {}).forEach(([k, v]) => { o = setIn(o, pathSegs(k), cloneJson(v)); });
-  return o;
-}
 /* Wendet einen Schreibzugriff (op) auf den Wert an Pfad basePath an. */
 function applyOp(basePath, baseValue, op) {
+  if (op.m === 'patch') {
+    // Ein Patch = mehrere PUTs auf die (ggf. mehrstufigen) Unterpfade.
+    let v = baseValue;
+    Object.entries(op.data || {}).forEach(([k, d]) => {
+      v = applyOp(basePath, v, { m: 'put', path: [...pathSegs(op.path), ...pathSegs(k)].join('/'), data: d });
+    });
+    return v;
+  }
   const bp = pathSegs(basePath);
   const wp = pathSegs(op.path);
   if (startsWithSegs(wp, bp)) {
     // Schreibzugriff liegt an/unter dem gelesenen Pfad.
     const rel = wp.slice(bp.length);
-    if (op.m === 'patch') return setIn(baseValue, rel, patchValue(getIn(baseValue, rel), op.data));
     return setIn(baseValue, rel, op.m === 'delete' ? null : cloneJson(op.data));
   }
   if (startsWithSegs(bp, wp)) {
     // Gelesener Pfad liegt unterhalb des Schreibzugriffs.
     const rel = bp.slice(wp.length);
     if (op.m === 'delete') return null;
-    if (op.m === 'put') return cloneJson(getIn(op.data, rel));
-    const key = rel[0];
-    if (!(key in (op.data || {}))) return baseValue;
-    return cloneJson(getIn(op.data[key], rel.slice(1)));
+    return cloneJson(getIn(op.data, rel));
   }
   return baseValue;
 }
@@ -313,11 +327,13 @@ async function flushQueue() {
       try { res = await sendOp(q[0]); } catch (e) { break; } // kein Netz — später nochmal
       if (res.status === 401 || res.status === 403) {
         // Token abgelaufen o. Ä. — einmal erneuern und nochmal; klappt das
-        // nicht, bleibt der Eintrag in der Warteschlange (Daten nie verwerfen).
+        // Erneuern nicht, bleibt der Eintrag in der Warteschlange (Daten nie
+        // verwerfen). Lehnt Firebase auch mit frischem Token ab, verbieten
+        // es die Regeln — dann verwerfen, sonst blockiert der Eintrag alle
+        // folgenden für immer.
         authState.expiresAt = 0;
         if (!(await ensureValidAuthToken())) break;
         try { res = await sendOp(q[0]); } catch (e) { break; }
-        if (res.status === 401 || res.status === 403) break;
       }
       if (res.status >= 500) break;
       if (!res.ok) console.error('Firebase: Schreibzugriff abgelehnt, verworfen', q[0].path, res.status);
@@ -375,6 +391,48 @@ async function fbGet(path) {
   fresh.catch((e) => console.warn('Firebase GET (Hintergrund) fehlgeschlagen', path, e));
   const grace = new Promise((resolve) => setTimeout(() => resolve(cached), CACHE_GRACE_MS));
   return Promise.race([fresh.catch(() => cached), grace]);
+}
+
+/* Direkt ans Netz, ohne lokale Kopie/Warteschlange — für Schritte, die
+   sofort Bescheid brauchen, ob Firebase sie erlaubt (Registrieren, Crew
+   beitreten, …). fbGetNow: {ok, value} bzw. {ok:false, status}. */
+async function fbGetNow(path) {
+  try {
+    await ensureValidAuthToken();
+    const res = await fetchWithTimeout(`${FIREBASE_URL}/${path}.json${authQuery()}`);
+    if (!res.ok) return { ok: false, status: res.status };
+    return { ok: true, value: await res.json() };
+  } catch (e) {
+    return { ok: false, status: 0 };
+  }
+}
+
+/* Mehrere Pfade auf einmal (Schlüssel relativ zu `path`, z. B.
+   "members/abc/uid") — Firebase schreibt alles oder nichts. */
+async function fbUpdateNow(path, data) {
+  try {
+    await ensureValidAuthToken();
+    const res = await fetchWithTimeout(`${FIREBASE_URL}/${path}.json${authQuery()}`, { method: 'PATCH', body: JSON.stringify(data) }, 15000);
+    if (!res.ok) return { ok: false, status: res.status };
+    applyOpToCache({ m: 'patch', path, data });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, status: 0 };
+  }
+}
+
+/* Beim Abmelden: lokale Kopie und Warteschlange dieses Kontos vergessen
+   (sonst sähe die nächste Person am selben Gerät die Daten offline). */
+function clearLocalData() {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(CACHE_PREFIX)) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+    localStorage.removeItem(QUEUE_KEY);
+  } catch (e) { /* ignorieren */ }
 }
 
 async function fbPut(path, data) {
