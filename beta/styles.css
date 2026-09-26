@@ -1404,3 +1404,13 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .card .field-row { align-items: flex-start; }
 .card .field-row .field { margin-bottom: 0; }
 .card .field-row .btn.small { flex-shrink: 0; }
+
+/* ---------- Zyklus (Fortschritt) ---------- */
+.pg-cycle-band { opacity: .16; }
+.pg-cycle-legend { flex-wrap: wrap; row-gap: 6px; }
+.pg-cycle-more { margin-top: 12px; }
+.pg-cycle-more summary { cursor: pointer; font-size: 13px; color: var(--ink-dim); padding: 6px 0; }
+.pg-cycle-more[open] summary { margin-bottom: 10px; }
+.pg-cycle-add { align-items: flex-end; }
+.pg-cycle-add .field { margin-bottom: 0; }
+.pg-cycle-more .chip-row .chip { cursor: default; color: var(--ink); display: inline-flex; align-items: center; }
