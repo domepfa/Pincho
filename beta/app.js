@@ -7655,7 +7655,15 @@ const EXERCISE_FIGURES = {
    abstrakten Linienfiguren ist "vorne/hinten", "wie steht man zum Boden"
    und "geht's nach innen/aussen bzw. hoch/runter" per Bild allein nicht
    immer eindeutig, ein Satz Text macht es das aber zuverlässig. */
+/* Klimmzüge: zwei Faultier-Bilder (unten/oben) im Wechsel — die Stange
+   steht dabei still (beide Bilder an der Stangenhöhe ausgerichtet). */
+const SLOTH_PULL_IDS = ['pullup', 'pullup_weighted', 'pullup_close_grip'];
+const SLOTH_PULL_FIGURE = `<div class="ex-figure sloth-pull" role="img" aria-label="Klimmzug">
+  <img class="sloth-pull-bottom" src="../assets/sloth/sloth-pull-bottom.png" alt="">
+  <img class="sloth-pull-top" src="../assets/sloth/sloth-pull-top.png" alt="">
+</div>`;
 function exerciseFigureSvg(exerciseId) {
+  if (SLOTH_PULL_IDS.includes(exerciseId)) return SLOTH_PULL_FIGURE;
   const fig = EXERCISE_FIGURES[exerciseId];
   if (!fig) return `<div class="ex-figure-emoji">💪</div>`;
   const svg = `<svg viewBox="0 0 200 200" class="ex-figure ${fig.kind === 'static' ? 'fig-static' : ''}">${fig.svg}</svg>`;
@@ -8582,7 +8590,7 @@ const SLOTH_FACE = `
   <circle class="sloth-head" cx="100" cy="64" r="19"/>
   <path class="sloth-mask" d="M86 62 q6 -7 12 1 q-6 7 -12 -1z M114 62 q-6 -7 -12 1 q6 7 12 -1z"/>
   <path class="sloth-line" d="M97 71 h6 M94 76 q6 4 12 0"/>`;
-const FB_HANG_FIGURE_SVG = `<img class="ex-figure fb-hang-figure sloth-img" src="../assets/sloth/sloth-hang-back.png" alt="">`; // Test: Muskelfaultier statt Strichfigur
+const FB_HANG_FIGURE_SVG = `<img class="ex-figure fb-hang-figure sloth-img" src="../assets/sloth/sloth-hang.png" alt="">`; // Muskelfaultier (assets/sloth)
 const FB_REST_FIGURE_SVG = `<img class="ex-figure sloth-img sloth-rest" src="../assets/sloth/sloth-rest.png" alt="">`;
 /* Lifting Pin ist kein Hängen (FB_HANG_FIGURE_SVG), sondern ein einarmiges
    Ziehen von unten (Pin auf Hüfthöhe) nach oben (Richtung Schulter) — eigene
@@ -10370,7 +10378,7 @@ function drawProgress() {
         <button type="button" class="chip ${progressSource === 'board' ? 'active' : ''}" data-pg-source="board">Board</button>
       </div>
       ${exIds.length ? `<p class="pg-ex-current">${esc(progressExerciseName(progressExerciseId))}</p>` : ''}
-      ${isNewPr ? `<div class="pg-pr">Neuer Rekord: <b>${esc(pts[pts.length - 1].label)}</b></div>` : ''}
+      ${isNewPr ? `<div class="pg-pr-wrap"><img class="pg-pr-sloth" src="../assets/sloth/sloth-flex.png" alt=""><div class="pg-pr">Neuer Rekord: <b>${esc(pts[pts.length - 1].label)}</b></div></div>` : ''}
       ${headline}
       ${exIds.length ? progressLineChart('pg-ex', pts, 'Bester Satz je Training') : `<div class="list-empty">${progressSource === 'board' ? 'Noch keine Übungen im Board-Ablauf erfasst (Wdh./Gewicht im Check-in).' : 'Noch keine Gym-Sätze geloggt.'}</div>`}
       ${exIds.length && pts.length ? cycleLegendHtml() : ''}

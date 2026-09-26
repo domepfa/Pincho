@@ -1504,3 +1504,31 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 
 /* Suche aktiv: Körperkarte/Gruppen weg, Treffer direkt unter dem Feld */
 .ex-searching .ex-body-wrap, .ex-searching .ex-supergroup-row, .ex-searching .ex-muscle-row { display: none; }
+
+/* ---------- Test: Muskelfaultier-Bilder statt Strichfiguren ---------- */
+.sloth-img { object-fit: contain; }
+.fb-stage-figure .sloth-img, .fb-phase-figure .sloth-img { max-height: 24vh; width: auto; }
+.timeline-thumb .sloth-img { width: 100%; height: auto; }
+.sloth-rest { transform-origin: 50% 90%; animation: slothBreathe 3.2s ease-in-out infinite; }
+@keyframes slothBreathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.015, 1.035) rotate(-.6deg); } }
+.fb-done-sloth { display: block; width: min(52vw, 220px); height: auto; margin: 0 auto 6px; transform-origin: 50% 95%; animation: popIn .5s cubic-bezier(.25, 1.4, .4, 1) both, slothWave 1.6s ease-in-out .5s infinite; }
+@keyframes slothWave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-3deg) translateY(-2px); } 75% { transform: rotate(3deg); } }
+@media (prefers-reduced-motion: reduce) { .sloth-rest, .fb-done-sloth { animation: none; } }
+.fb-phase-figure .sloth-img { width: 100%; height: auto; max-height: none; }
+.fb-phase-figure:has(.sloth-img) { width: clamp(110px, 20vh, 170px); }
+
+/* Klimmzug-Faultier: zwei Bilder übereinander, Stange auf gleicher Höhe
+   (Stange im Bild unten bei 38/640 px, oben bei 152/640 px -> 114 px Versatz) */
+.sloth-pull { position: relative; aspect-ratio: 544 / 754; height: 24vh; max-height: 24vh; width: auto; margin: 0 auto; }
+.fb-phase-figure .sloth-pull, .timeline-thumb .sloth-pull { height: auto; width: 100%; }
+.sloth-pull img { position: absolute; left: 0; width: 100%; height: 84.9%; object-fit: contain; }
+.sloth-pull-bottom { top: 15.1%; animation: slothPullBottom 2.4s ease-in-out infinite; }
+.sloth-pull-top { top: 0; animation: slothPullTop 2.4s ease-in-out infinite; }
+@keyframes slothPullBottom { 0%, 38%, 100% { opacity: 1; } 50%, 88% { opacity: 0; } }
+@keyframes slothPullTop { 0%, 38%, 100% { opacity: 0; } 50%, 88% { opacity: 1; } }
+.pg-pr-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.pg-pr-wrap .pg-pr { margin-bottom: 0; }
+.pg-pr-sloth { width: 58px; height: auto; transform-origin: 50% 90%; animation: popIn .5s cubic-bezier(.25, 1.4, .4, 1) both, slothWave 1.6s ease-in-out .5s infinite; }
+@media (prefers-reduced-motion: reduce) { .sloth-pull-top { animation: none; opacity: 0; } .sloth-pull-bottom { animation: none; } .pg-pr-sloth { animation: none; } }
+.fb-stage-figure .sloth-pull { height: 22vh; width: auto; max-height: none; }
+.info-sheet-figure .sloth-pull { height: 220px; width: auto; }
