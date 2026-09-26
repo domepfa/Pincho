@@ -146,6 +146,19 @@
         ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
         ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
       }
+    },
+    "customExercises": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
+    },
+    "exerciseRequests": {
+      ".read": "auth != null && (auth.token.email === 'ADMIN_EMAIL' && auth.token.email_verified === true)",
+      "$id": {
+        ".write": "auth != null && ((auth.token.email === 'ADMIN_EMAIL' && auth.token.email_verified === true) || (!data.exists() && root.child('users/' + auth.uid + '/memberId').isString() && newData.child('fromId').val() === root.child('users/' + auth.uid + '/memberId').val()))",
+        ".validate": "newData.child('name').isString() && newData.child('name').val().length <= 60 && (!newData.child('note').exists() || (newData.child('note').isString() && newData.child('note').val().length <= 120))"
+      }
     }
   }
 }

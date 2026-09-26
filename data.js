@@ -350,8 +350,10 @@ function exerciseName(id) {
   if (id === 'warmup_general') return 'Warm-up';
   if (id === 'cooldown_general') return 'Cooldown';
   const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
-  return ex ? ex.name : id;
+  return ex ? ex.name : (FOREIGN_EX_NAMES[id] || (String(id).startsWith('custom_') ? 'Eigene Übung' : id));
 }
+/* Namen eigener Übungen anderer Leute (aus geteilten Challenges). */
+const FOREIGN_EX_NAMES = {};
 
 function exerciseMuscles(id) {
   const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
