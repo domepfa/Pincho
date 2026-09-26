@@ -8113,6 +8113,18 @@ function campusHandEvents(b, stops) {
   return ev;
 }
 
+/* Frisch eingesetzte Campus-Animation sofort starten: Chrome lässt eine
+   per innerHTML eingefügte SMIL-Animation sonst eine ganze Runde (~5 s)
+   stillstehen, bevor sich die Hand-Punkte bewegen. Zurücksetzen auf 0 im
+   nächsten Frame erzwingt, dass sie von Anfang an läuft. */
+function kickCampusAnims(root) {
+  requestAnimationFrame(() => {
+    (root || document).querySelectorAll('svg.campus-anim').forEach((svg) => {
+      try { svg.setCurrentTime(0); } catch (e) { /* ignorieren */ }
+    });
+  });
+}
+
 function campusRouteAnimSvg(b, animate) {
   const typeL = b.rungType;
   const typeR = b.rungTypeRight || b.rungType;
@@ -9049,6 +9061,7 @@ function renderFbOverlay() {
   }
   updateFbProgressUI();
   syncFbRingAnimation(); // Ring-Element ist hier ggf. frisch neu gebaut worden — Animation entsprechend (neu) ansetzen
+  kickCampusAnims(document.getElementById('fb-overlay'));
 }
 
 /* Kleiner Konfetti-Regen für den "Ablauf geschafft"-Screen — reines CSS/
@@ -9398,7 +9411,14 @@ function tickPreCountdown() {
   fb.preCount--;
   if (fb.preCount <= 0) { finishPreCountdown(); return; }
   if (fb.preCount <= 3) beepTick();
-  setTimeout(renderFbOverlay, FB_AUDIO_LEAD_MS); // siehe FB_AUDIO_LEAD_MS — Ton vor Bild
+  // Nur die Zahl aktualisieren statt alles neu zu zeichnen — sonst startet
+  // die Campus-Routen-Animation jede Sekunde von vorne und läuft nie durch.
+  setTimeout(() => {
+    const num = document.getElementById('fb-precount');
+    if (!num || fb.preCount == null) { renderFbOverlay(); return; }
+    num.textContent = fb.preCount;
+    num.classList.toggle('fb-precount-tense', fb.preCount <= 3);
+  }, FB_AUDIO_LEAD_MS); // siehe FB_AUDIO_LEAD_MS — Ton vor Bild
 }
 
 function startSequence() {
@@ -9654,6 +9674,7 @@ function updateTimerUI() {
         : block.type === 'campus' ? campusWorkFigureSvg(block) : FB_REST_FIGURE_SVG;
     }
     figureHolder.dataset.kind = kind;
+    kickCampusAnims(figureHolder);
   }
   const repsDoneBtn = document.getElementById('fb-reps-done');
   if (repsDoneBtn) repsDoneBtn.hidden = !working;
