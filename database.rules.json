@@ -1,7 +1,5 @@
 {
   "rules": {
-    ".read": "auth != null && auth.token.email === 'crew@pincho.app'",
-    ".write": "auth != null && auth.token.email === 'crew@pincho.app'",
     "config": {
       ".read": "auth != null"
     },

@@ -38,9 +38,9 @@ Pages kostenlos**: Repo-Einstellungen → **Pages** → Branch `main`, Ordner
 erreichbar. Läuft genauso gut lokal per Doppelklick auf `index.html` oder mit
 einem simplen `python3 -m http.server`.
 
-### 3. Erste Anmeldung (Beta mit eigenen Konten)
+### 3. Erste Anmeldung (eigene Konten)
 
-- **Admin zuerst**: In der Beta mit der Admin-E-Mail registrieren (Code-Feld
+- **Admin zuerst**: Mit der Admin-E-Mail registrieren (Code-Feld
   leer lassen), den Bestätigungslink in der Mail antippen, dann „Neu
   prüfen". Danach erscheint **„Bestehende Crew übernehmen"**: eigenes Profil
   antippen — die App legt die erste Crew mit Einladungscode an, nimmt alle
@@ -76,12 +76,8 @@ Der `apiKey` in `firebase.js` ist bei Firebase kein Geheimnis (siehe
 [Google-Doku](https://firebase.google.com/docs/projects/api-keys)) — die
 Sicherheit kommt von den Regeln.
 
-**Übergang**: Die Haupt-App nutzt noch den alten gemeinsamen Team-Login
-(`crew@pincho.app`). Die Regeln lassen ihn vorerst weiter alles lesen und
-schreiben, damit sie bis zur Übernahme der Beta normal läuft. Challenges der
-Haupt-App (`challenges/`) und der Beta (`crewData/…`) sind in dieser Zeit
-getrennt. Nach `tools/promote-beta.sh` die zwei Team-Zeilen ganz oben in den
-Regeln (`".read"`/`".write"` mit `crew@pincho.app`) löschen.
+Der frühere gemeinsame Team-Login (`crew@pincho.app`) hat seit der
+Übernahme der eigenen Konten in die Haupt-App keinen Zugriff mehr.
 
 ## Offline
 
@@ -105,8 +101,8 @@ Unter `https://domepfa.github.io/Pincho/beta/` läuft parallel eine Beta
 wird erst nach dem Testen in die Haupt-App übernommen.
 
 - Eigene Kopie der Dateien in `beta/` (Bilder/Anleitungen aus `../assets/`).
-- Gleiche Firebase-Daten wie die Haupt-App, aber eigene Konten (siehe
-  "Erste Anmeldung") und eigener Offline-Speicher (`pinchobeta_…`-Keys, Cache `pincho-beta-…`) — beide
+- Gleiche Firebase-Daten und gleiche Konten wie die Haupt-App (Anmeldung
+  gilt aber pro App), eigener Offline-Speicher (`pinchobeta_…`-Keys, Cache `pincho-beta-…`) — beide
   Service Worker löschen nur ihre eigenen alten Caches.
 - Neuer Look als Überschreib-Schicht am Ende von `beta/styles.css`.
 - **Übernehmen in die Haupt-App:** `tools/promote-beta.sh` kopiert

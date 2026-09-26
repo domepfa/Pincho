@@ -349,12 +349,20 @@ function todayKey() {
 function pad2(n) { return String(n).padStart(2, '0'); }
 
 /* ---------- State ---------- */
+const PROFILE_KEY = 'pincho_profile';
+const ACTIVE_CREW_KEY = 'pincho_active_crew';
+function loadStoredProfile() {
+  try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); } catch (e) { return null; }
+}
 const state = {
-  member: JSON.parse(localStorage.getItem('pincho_member') || 'null'),
+  member: loadStoredProfile(), // {id, name, uid} — eigenes Profil (members/{id})
   route: (location.hash || '#fingerboard').replace('#', ''),
-  members: {},        // {id: {name, board}}
+  members: {},        // {id: {name}} — alle Leute aus den eigenen Crews (für Namen)
+  memberDoc: null,    // eigenes Profil aus Firebase (board, crews, …)
+  crews: {},          // {crewId: {name, owner, members}}
+  crewId: (() => { try { return localStorage.getItem(ACTIVE_CREW_KEY); } catch (e) { return null; } })(),
   logs: [],           // eigene Logs, neueste zuerst
-  challenges: {},      // {id: {...}}
+  challenges: {},      // {id: {...}} der aktiven Crew
   weekPlan: null,      // Array von 7 Tagen
 };
 
@@ -362,126 +370,419 @@ const state = {
 async function boot() {
   // Einmal angemeldete Geräte starten sofort, auch ohne Netz (z. B. im
   // Gym) — das Token wird im Hintergrund erneuert, Daten kommen bis dahin
-  // aus der lokalen Kopie (siehe fbGet in firebase.js). Nur ein Gerät, das
-  // noch nie angemeldet war, braucht den Team-Code.
-  const storedAuth = typeof hasStoredAuth === 'function' ? hasStoredAuth() : await ensureValidAuthToken();
-  if (!storedAuth) { renderPasswordGate(); return; }
+  // aus der lokalen Kopie (siehe fbGet in firebase.js).
+  if (!hasStoredAuth()) { renderAuthScreen(inviteCodeFromUrl() ? 'signup' : 'login'); return; }
   ensureValidAuthToken();
-  if (!state.member) { renderNamePicker(); return; }
-
-  // Sofort rendern statt auf eine (ggf. langsame/wacklige) Firebase-Antwort
-  // zu warten — die Mitgliederliste wird im Hintergrund nachgeladen und
-  // löst bei Bedarf ein Nachrendern aus (Fingerboard/Challenges nutzen sie).
-  render();
-  await loadMembers();
-  if (state.route === 'fingerboard' || state.route === 'challenges') render();
-
-  // Läuft unabhängig von der gerade offenen Ansicht — nur so kann der
-  // Benachrichtigungspunkt schon beim App-Start stimmen, nicht erst wenn
-  // man zufällig auf "Challenges" tippt.
-  fbGet('challenges').then((raw) => {
-    if (raw === undefined) return;
-    state.challenges = raw || {};
-    setChallengeUnseenCount(countUnseenChallenges(state.challenges));
-  });
-}
-
-async function loadMembers() {
-  const raw = await fbGet('members');
-  state.members = raw || {};
-}
-
-function currentMemberBoard() {
-  const m = state.members[state.member.id];
-  return (m && m.board) || 'bm2000';
-}
-
-/* ================================================================
-   LOGIN — zweistufig:
-   1) gemeinsamer Team-Code (echter Firebase-Auth-Account, sichert die
-      Datenbank ab — siehe firebase.js)
-   2) eigener Name (rein lokal pro Gerät gemerkt, keine echten Accounts)
-   ================================================================= */
-function renderPasswordGate() {
-  APP_ROOT.innerHTML = `
-    <div class="login-shell">
-      <img class="login-logo" src="./assets/icon-512-any.png" alt="Pincho">
-      <p class="login-tag">${APP_TAGLINE}</p>
-      <div class="field">
-        <label>Team-Code</label>
-        <input type="password" id="login-password" placeholder="••••" autofocus>
-      </div>
-      <button class="btn" id="login-password-submit">REIN AN DIE WAND</button>
-      <p class="login-hint" id="login-password-hint">Erste Anmeldung überhaupt? Der hier eingegebene Code wird zum neuen Team-Code.</p>
-    </div>
-  `;
-  document.getElementById('login-password-submit').onclick = submitPasswordGate;
-  document.getElementById('login-password').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') submitPasswordGate();
-  });
-}
-
-async function submitPasswordGate() {
-  const password = document.getElementById('login-password').value;
-  const hint = document.getElementById('login-password-hint');
-  if (!password) { toast('Bitte Team-Code eingeben.', 'err'); return; }
-
-  let result = await signInTeam(password);
-  if (!result.ok && result.code === 'EMAIL_NOT_FOUND') {
-    result = await signUpTeam(password);
-    if (result.ok) toast('Team-Code gesetzt.', 'ok');
-  }
-  if (!result.ok) {
-    hint.textContent = 'Falscher Team-Code — bitte nochmal versuchen.';
-    hint.style.color = 'var(--danger)';
+  if (!state.member || state.member.uid !== authUid()) {
+    state.member = null;
+    await resolveProfile();
     return;
   }
+
+  // Sofort rendern statt auf eine (ggf. langsame/wacklige) Firebase-Antwort
+  // zu warten — Crews/Namen werden im Hintergrund nachgeladen und lösen
+  // bei Bedarf ein Nachrendern aus (Fingerboard/Challenges nutzen sie).
+  render();
+  await loadCrews();
+  if (['fingerboard', 'challenges', 'konto'].includes(state.route)) render();
+  refreshChallengeUnseen();
+}
+
+/* Welches Profil gehört zu diesem Konto? Ohne Profil geht's in den
+   Einstieg (Einladungscode). */
+async function resolveProfile() {
+  renderLoginMessage('Profil wird geladen…');
+  const u = await fbGetNow(`users/${authUid()}`);
+  if (!u.ok) {
+    if (u.status === 401 || u.status === 403) { clearAuth(); renderAuthScreen('login'); return; }
+    renderLoginMessage('Keine Verbindung — bitte später nochmal versuchen.', true);
+    return;
+  }
+  const memberId = u.value && u.value.memberId;
+  if (!memberId) { renderOnboarding(); return; }
+  const m = await fbGetNow(`members/${memberId}`);
+  if (!m.ok || !m.value) { renderLoginMessage('Profil konnte nicht geladen werden.', true); return; }
+  enterWithProfile(memberId, m.value.name);
+}
+
+function enterWithProfile(id, name, crewId) {
+  state.member = { id, name, uid: authUid() };
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(state.member)); } catch (e) { /* ignorieren */ }
+  if (crewId) setActiveCrew(crewId);
   boot();
 }
 
-function renderNamePicker() {
+function setActiveCrew(id) {
+  state.crewId = id;
+  try {
+    if (id) localStorage.setItem(ACTIVE_CREW_KEY, id); else localStorage.removeItem(ACTIVE_CREW_KEY);
+  } catch (e) { /* ignorieren */ }
+}
+
+/* Eigene Crews laden (members/{id}/crews → crews/{crewId}). Die Namen der
+   Mitglieder kommen aus den Crew-Listen — fremde Profile sind privat. */
+async function loadCrews() {
+  const doc = await fbGet(`members/${state.member.id}`);
+  if (doc === undefined) return;
+  state.memberDoc = doc || {};
+  const ids = Object.keys(state.memberDoc.crews || {});
+  const crews = {};
+  await Promise.all(ids.map(async (id) => {
+    const c = await fbGet(`crews/${id}`);
+    if (c) crews[id] = c;
+  }));
+  // Aus einer Crew entfernt? Dann verweigert Firebase das Lesen — den
+  // eigenen Verweis darauf aufräumen (nur wenn das Netz sicher da ist).
+  ids.forEach((id) => {
+    fbGetNow(`crews/${id}`).then((r) => {
+      if (!r.ok && (r.status === 401 || r.status === 403)) {
+        fbDelete(`members/${state.member.id}/crews/${id}`);
+        delete state.crews[id];
+        if (state.crewId === id) setActiveCrew(Object.keys(state.crews)[0] || null);
+      }
+    });
+  });
+  state.crews = crews;
+  if (!state.crewId || !crews[state.crewId]) setActiveCrew(Object.keys(crews)[0] || null);
+  const members = {};
+  Object.values(crews).forEach((c) => {
+    Object.entries(c.members || {}).forEach(([mid, m]) => { members[mid] = { name: m.name }; });
+  });
+  members[state.member.id] = { name: state.member.name };
+  state.members = members;
+}
+
+function activeCrew() {
+  return state.crewId ? state.crews[state.crewId] : null;
+}
+
+function currentMemberBoard() {
+  return (state.memberDoc && state.memberDoc.board) || 'bm2000';
+}
+
+/* ================================================================
+   LOGIN — eigenes Konto pro Person (E-Mail + Passwort). Neu dabei nur
+   mit Einladungscode einer Crew; die drei bisherigen Profile (Team-Login-
+   Zeit) werden beim ersten Anmelden per "Das bin ich" übernommen.
+   ================================================================= */
+const AUTH_ERRORS = {
+  INVALID_LOGIN_CREDENTIALS: 'E-Mail oder Passwort stimmt nicht.',
+  INVALID_PASSWORD: 'E-Mail oder Passwort stimmt nicht.',
+  EMAIL_NOT_FOUND: 'E-Mail oder Passwort stimmt nicht.',
+  EMAIL_EXISTS: 'Zu dieser E-Mail gibt es schon ein Konto — bitte anmelden.',
+  INVALID_EMAIL: 'Das ist keine gültige E-Mail-Adresse.',
+  MISSING_PASSWORD: 'Bitte Passwort eingeben.',
+  TOO_MANY_ATTEMPTS_TRY_LATER: 'Zu viele Versuche — bitte später nochmal.',
+  USER_DISABLED: 'Dieses Konto ist gesperrt.',
+  NETWORK_ERROR: 'Keine Verbindung — bitte später nochmal versuchen.',
+};
+function authErrorText(code) {
+  if (String(code).startsWith('WEAK_PASSWORD')) return 'Passwort zu kurz — mindestens 6 Zeichen.';
+  return AUTH_ERRORS[code] || `Hat nicht geklappt (${code}).`;
+}
+
+function loginShell(inner) {
   APP_ROOT.innerHTML = `
     <div class="login-shell">
       <img class="login-logo" src="./assets/icon-512-any.png" alt="Pincho">
-      <p class="login-tag">Wer trainiert?</p>
-      <div class="chip-row" id="name-picker-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
-      <p class="login-hint">Einmal pro Gerät — danach merkt sich Pincho, wer du bist.</p>
+      ${inner}
     </div>
   `;
-  loadMembers().then(() => {
-    const row = document.getElementById('name-picker-list');
-    if (!row) return; // Nutzer hat inzwischen weiternavigiert
-    const ids = Object.keys(state.members);
-    row.innerHTML = ids.map((id) => `
-      <button type="button" class="chip" data-id="${esc(id)}">${esc(state.members[id].name)}</button>
-    `).join('') + `<button type="button" class="chip" id="name-picker-add">+ Neu</button>`;
+}
 
-    row.querySelectorAll('.chip[data-id]').forEach((btn) => {
-      btn.onclick = () => selectMemberAndEnter(btn.dataset.id, state.members[btn.dataset.id].name);
-    });
-    document.getElementById('name-picker-add').onclick = async () => {
-      const name = prompt('Wie heisst du?');
-      if (!name || !name.trim()) return;
-      const id = await fbPush('members', { name: name.trim(), board: 'bm2000' });
-      if (!id) { toast('Konnte nicht speichern.', 'err'); return; }
-      state.members[id] = { name: name.trim(), board: 'bm2000' };
-      selectMemberAndEnter(id, name.trim());
+function renderLoginMessage(text, withRetry) {
+  loginShell(`
+    <p class="login-tag">${esc(text)}</p>
+    ${withRetry ? '<button class="btn" id="login-retry">NOCHMAL</button><button type="button" class="link-btn" id="login-signout">Abmelden</button>' : ''}
+  `);
+  if (withRetry) {
+    document.getElementById('login-retry').onclick = boot;
+    document.getElementById('login-signout').onclick = () => logout(true);
+  }
+}
+
+function renderAuthScreen(mode) {
+  const isSignup = mode === 'signup';
+  loginShell(`
+    <p class="login-tag">${APP_TAGLINE}</p>
+    <div class="chip-row auth-tabs">
+      <button type="button" class="chip ${isSignup ? '' : 'active'}" data-mode="login">Anmelden</button>
+      <button type="button" class="chip ${isSignup ? 'active' : ''}" data-mode="signup">Neu registrieren</button>
+    </div>
+    <div class="field"><label>E-Mail</label><input type="email" id="auth-email" autocomplete="email" autocapitalize="off"></div>
+    <div class="field"><label>Passwort</label><input type="password" id="auth-password" autocomplete="${isSignup ? 'new-password' : 'current-password'}" placeholder="${isSignup ? 'mindestens 6 Zeichen' : ''}"></div>
+    ${isSignup ? `<div class="field"><label>Einladungscode</label><input type="text" id="auth-code" autocapitalize="characters" autocomplete="off" placeholder="z. B. K7P2QX" value="${esc(inviteCodeFromUrl())}"></div>` : ''}
+    <button class="btn" id="auth-submit">${isSignup ? 'KONTO ERSTELLEN' : 'REIN AN DIE WAND'}</button>
+    <p class="login-hint" id="auth-hint">${isSignup ? 'Den Code bekommst du von der Person, die dich einlädt. Deine Trainings sieht nur du; die Crew sieht nur, was du mit ihr teilst.' : ''}</p>
+    ${isSignup ? '' : '<button type="button" class="link-btn" id="auth-forgot">Passwort vergessen?</button>'}
+  `);
+  document.querySelectorAll('.auth-tabs .chip').forEach((b) => { b.onclick = () => renderAuthScreen(b.dataset.mode); });
+  const submit = async () => {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const codeEl = document.getElementById('auth-code');
+    const code = codeEl ? normalizeInviteCode(codeEl.value) : '';
+    const hint = document.getElementById('auth-hint');
+    const fail = (t) => { hint.textContent = t; hint.style.color = 'var(--danger)'; };
+    if (!email) { fail('Bitte E-Mail eingeben.'); return; }
+    const btn = document.getElementById('auth-submit');
+    btn.disabled = true;
+    const r = isSignup ? await signUpEmail(email, password) : await signInEmail(email, password);
+    btn.disabled = false;
+    if (!r.ok) { fail(authErrorText(r.code)); return; }
+    if (isSignup) { if (code) submitInviteCode(code); else renderOnboarding(); return; }
+    boot();
+  };
+  document.getElementById('auth-submit').onclick = submit;
+  APP_ROOT.querySelectorAll('input').forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); }));
+  const forgot = document.getElementById('auth-forgot');
+  if (forgot) forgot.onclick = async () => {
+    const email = document.getElementById('auth-email').value.trim();
+    const hint = document.getElementById('auth-hint');
+    if (!email) { hint.textContent = 'Zuerst oben die E-Mail eingeben.'; hint.style.color = 'var(--danger)'; return; }
+    const r = await sendPasswordReset(email);
+    hint.style.color = '';
+    hint.textContent = r.ok || r.code === 'EMAIL_NOT_FOUND'
+      ? 'Falls es zu dieser E-Mail ein Konto gibt, ist ein Link zum Zurücksetzen unterwegs.'
+      : authErrorText(r.code);
+  };
+}
+
+/* Einladungslink …/?code=K7P2QX: Code vorausfüllen. */
+function inviteCodeFromUrl() {
+  try { return normalizeInviteCode(new URLSearchParams(location.search).get('code')); } catch (e) { return ''; }
+}
+
+/* ---------- Einstieg: Einladungscode → "Das bin ich" oder neues Profil ---------- */
+const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // ohne 0/O, 1/I
+function normalizeInviteCode(s) {
+  return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+}
+function randomInviteCode() {
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => INVITE_ALPHABET[b % INVITE_ALPHABET.length]).join('');
+}
+async function uniqueInviteCode() {
+  for (let i = 0; i < 5; i++) {
+    const code = randomInviteCode();
+    const r = await fbGetNow(`invites/${code}`);
+    if (r.ok && r.value === null) return code;
+  }
+  return null;
+}
+/* Schlüssel für die Namensliste (names/…): jeder Name nur einmal,
+   Gross/Klein egal. Firebase-Schlüssel dürfen . # $ [ ] / nicht enthalten. */
+function nameKey(name) {
+  return String(name).trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.#$[\]/]/g, '_');
+}
+
+/* Admin = die in den Datenbank-Regeln eingetragene E-Mail (bestätigt).
+   Die App fragt einfach, ob sie die alte Mitgliederliste lesen darf. */
+async function probeAdmin() {
+  const r = await fbGetNow('members');
+  return r.ok ? r.value || {} : null;
+}
+
+async function renderOnboarding(errorText) {
+  const verified = authClaims().email_verified === true;
+  loginShell(`
+    <p class="login-tag">Willkommen! Gib den Einladungscode deiner Crew ein.</p>
+    <div class="field"><label>Einladungscode</label><input type="text" id="onb-code" autocapitalize="characters" autocomplete="off" placeholder="z. B. K7P2QX" value="${esc(inviteCodeFromUrl())}"></div>
+    <button class="btn" id="onb-submit">WEITER</button>
+    <p class="login-hint" id="onb-hint" ${errorText ? 'style="color:var(--danger)"' : ''}>${esc(errorText || `Angemeldet als ${authEmail() || ''}`)}</p>
+    <div id="onb-admin"></div>
+    ${verified ? '' : '<p class="login-hint">E-Mail noch nicht bestätigt — Link im Postfach antippen. <button type="button" class="link-btn inline" id="onb-verify">Nochmal senden</button> · <button type="button" class="link-btn inline" id="onb-recheck">Neu prüfen</button></p>'}
+    <button type="button" class="link-btn" id="onb-signout">Abmelden</button>
+  `);
+  const submit = () => submitInviteCode(normalizeInviteCode(document.getElementById('onb-code').value));
+  document.getElementById('onb-submit').onclick = submit;
+  document.getElementById('onb-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  document.getElementById('onb-signout').onclick = () => logout(true);
+  const recheck = document.getElementById('onb-recheck');
+  if (recheck) recheck.onclick = () => renderOnboarding();
+  const verifyBtn = document.getElementById('onb-verify');
+  if (verifyBtn) verifyBtn.onclick = async () => {
+    const r = await sendVerifyEmail();
+    toast(r.ok ? 'Bestätigungs-Mail gesendet.' : 'Konnte keine Mail senden.', r.ok ? 'ok' : 'err');
+  };
+
+  // Admin-Einstieg: bestehende Crew aus der Team-Login-Zeit übernehmen.
+  // Das Token frisch holen, damit eine eben bestätigte E-Mail zählt.
+  authState.expiresAt = 0;
+  await ensureValidAuthToken();
+  const legacy = await probeAdmin();
+  const holder = document.getElementById('onb-admin');
+  if (!holder || legacy === null) return;
+  const mig = await fbGetNow('migration');
+  const done = mig.ok && mig.value && mig.value.crewId;
+  const unclaimed = Object.entries(legacy).filter(([, m]) => !m.uid);
+  holder.innerHTML = `
+    <div class="card onb-admin-card">
+      <p class="card-title">Admin</p>
+      ${!done && unclaimed.length ? '<button class="btn ghost small" id="onb-migrate">Bestehende Crew übernehmen</button>' : ''}
+      <button class="btn ghost small" id="onb-admin-new">Ohne Code starten</button>
+    </div>
+  `;
+  const migBtn = document.getElementById('onb-migrate');
+  if (migBtn) migBtn.onclick = () => renderMigration(legacy);
+  document.getElementById('onb-admin-new').onclick = () => renderNewProfile(null);
+}
+
+/* Code prüfen: users/{uid}/joinCode setzen (erst dann darf man die Crew
+   sehen), Einladung lesen, dann "Das bin ich"-Liste bzw. neues Profil. */
+async function submitInviteCode(code) {
+  if (!code) { renderOnboarding('Bitte Einladungscode eingeben.'); return; }
+  renderLoginMessage('Code wird geprüft…');
+  const set = await fbUpdateNow(`users/${authUid()}`, { joinCode: code });
+  const inv = set.ok ? await fbGetNow(`invites/${code}`) : { ok: false };
+  if (!set.ok || !inv.ok) { renderOnboarding('Keine Verbindung — bitte nochmal versuchen.'); return; }
+  if (!inv.value || !inv.value.crewId) { renderOnboarding('Diesen Code gibt es nicht (mehr).'); return; }
+  const crew = await fbGetNow(`crews/${inv.value.crewId}`);
+  if (!crew.ok || !crew.value) { renderOnboarding('Crew konnte nicht geladen werden.'); return; }
+  renderJoinChoice(code, inv.value.crewId, crew.value);
+}
+
+function renderJoinChoice(code, crewId, crew) {
+  const legacy = Object.entries(crew.members || {}).filter(([, m]) => m.legacy);
+  if (!legacy.length) { renderNewProfile({ code, crewId, crew }); return; }
+  loginShell(`
+    <p class="login-tag">Crew <b>${esc(crew.name)}</b>. Hast du schon vorher mit Pincho trainiert?</p>
+    <div class="chip-row" id="join-legacy">
+      ${legacy.map(([mid, m]) => `<button type="button" class="chip" data-mid="${esc(mid)}">Das bin ich: ${esc(m.name)}</button>`).join('')}
+    </div>
+    <button class="btn ghost" id="join-new">Ich bin neu</button>
+    <p class="login-hint">"Das bin ich" übernimmt das bisherige Profil mit allen Trainings.</p>
+  `);
+  document.querySelectorAll('#join-legacy .chip').forEach((b) => {
+    b.onclick = async () => {
+      const mid = b.dataset.mid;
+      const name = crew.members[mid].name;
+      if (!confirm(`Profil "${name}" mit deinem Konto verbinden?`)) return;
+      const r = await fbUpdateNow('', {
+        [`members/${mid}/uid`]: authUid(),
+        [`members/${mid}/crews/${crewId}`]: true,
+        [`users/${authUid()}/memberId`]: mid,
+        [`crews/${crewId}/members/${mid}`]: { name, joinedAt: Date.now() },
+      });
+      if (!r.ok) { toast('Hat nicht geklappt — ist das Profil schon vergeben?', 'err'); return; }
+      fbUpdateNow(`users/${authUid()}`, { joinCode: null });
+      enterWithProfile(mid, name, crewId);
+    };
+  });
+  document.getElementById('join-new').onclick = () => renderNewProfile({ code, crewId, crew });
+}
+
+/* Neues Profil (join = {code, crewId, crew}; null = Admin ohne Code). */
+function renderNewProfile(join) {
+  loginShell(`
+    <p class="login-tag">${join ? `Crew <b>${esc(join.crew.name)}</b> — ` : ''}Wie sollen dich die anderen sehen?</p>
+    <div class="field"><label>Name</label><input type="text" id="new-name" maxlength="30" autocomplete="nickname"></div>
+    <button class="btn" id="new-submit">LOS GEHT'S</button>
+    <p class="login-hint" id="new-hint">Jeder Name gibt es nur einmal.</p>
+    <button type="button" class="link-btn" id="new-back">Zurück</button>
+  `);
+  document.getElementById('new-back').onclick = () => renderOnboarding();
+  const submit = async () => {
+    const name = document.getElementById('new-name').value.trim();
+    const hint = document.getElementById('new-hint');
+    const fail = (t) => { hint.textContent = t; hint.style.color = 'var(--danger)'; };
+    if (!name) { fail('Bitte einen Namen eingeben.'); return; }
+    const taken = await fbGetNow(`names/${nameKey(name)}`);
+    if (!taken.ok) { fail('Keine Verbindung — bitte nochmal versuchen.'); return; }
+    if (taken.value) { fail(`"${name}" gibt es schon — bitte einen anderen Namen.`); return; }
+    const mid = generatePushId();
+    const updates = {
+      [`members/${mid}`]: { name, board: 'bm2000', uid: authUid(), createdAt: Date.now(), ...(join ? { crews: { [join.crewId]: true } } : {}) },
+      [`users/${authUid()}/memberId`]: mid,
+      [`names/${nameKey(name)}`]: mid,
+    };
+    if (join) updates[`crews/${join.crewId}/members/${mid}`] = { name, joinedAt: Date.now(), code: join.code };
+    const r = await fbUpdateNow('', updates);
+    if (!r.ok) { fail('Hat nicht geklappt — ist der Code noch gültig?'); return; }
+    fbUpdateNow(`users/${authUid()}`, { joinCode: null });
+    enterWithProfile(mid, name, join && join.crewId);
+  };
+  document.getElementById('new-submit').onclick = submit;
+  document.getElementById('new-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+}
+
+/* Admin, einmalig: die Crew aus der Team-Login-Zeit wird zur ersten Crew.
+   Alle bisherigen Profile kommen als "noch nicht übernommen" hinein,
+   Challenges und geteilte Vorlagen werden in die Crew kopiert. */
+function renderMigration(legacy) {
+  const unclaimed = Object.entries(legacy).filter(([, m]) => !m.uid);
+  loginShell(`
+    <p class="login-tag">Bestehende Crew übernehmen. Welches Profil bist du?</p>
+    <div class="field"><label>Name der Crew</label><input type="text" id="mig-name" value="Pincho Crew" maxlength="40"></div>
+    <div class="chip-row" id="mig-pick">
+      ${unclaimed.map(([mid, m]) => `<button type="button" class="chip" data-mid="${esc(mid)}">${esc(m.name)}</button>`).join('')}
+    </div>
+    <p class="login-hint" id="mig-hint">Die anderen übernehmen ihr Profil später selbst mit dem Einladungscode.</p>
+    <button type="button" class="link-btn" id="mig-back">Zurück</button>
+  `);
+  document.getElementById('mig-back').onclick = () => renderOnboarding();
+  document.querySelectorAll('#mig-pick .chip').forEach((b) => {
+    b.onclick = async () => {
+      const me = b.dataset.mid;
+      const crewName = document.getElementById('mig-name').value.trim() || 'Pincho Crew';
+      const hint = document.getElementById('mig-hint');
+      if (!confirm(`Du bist "${legacy[me].name}" — Crew "${crewName}" anlegen?`)) return;
+      hint.textContent = 'Wird übernommen…';
+      const code = await uniqueInviteCode();
+      if (!code) { hint.textContent = 'Keine Verbindung — bitte nochmal versuchen.'; return; }
+      const crewId = generatePushId();
+      const now = Date.now();
+      const crewMembers = {};
+      const updates = {};
+      unclaimed.forEach(([mid, m]) => {
+        crewMembers[mid] = mid === me ? { name: m.name, joinedAt: now } : { name: m.name, legacy: true };
+        const key = `names/${nameKey(m.name)}`;
+        if (!(key in updates)) updates[key] = mid; // doppelte Namen: nur der erste bekommt den Eintrag
+      });
+      Object.assign(updates, {
+        [`members/${me}/uid`]: authUid(),
+        [`members/${me}/crews/${crewId}`]: true,
+        [`users/${authUid()}/memberId`]: me,
+        [`crews/${crewId}`]: { name: crewName, owner: me, createdAt: now, members: crewMembers },
+        [`crewSecrets/${crewId}`]: { inviteCode: code },
+        [`invites/${code}`]: { crewId, crewName },
+        migration: { crewId, at: now },
+      });
+      const r = await fbUpdateNow('', updates);
+      if (!r.ok) { hint.textContent = 'Hat nicht geklappt (Admin-E-Mail bestätigt?).'; return; }
+      const [ch, st] = await Promise.all([fbGetNow('challenges'), fbGetNow('sharedTemplates')]);
+      const copy = {};
+      if (ch.ok && ch.value) copy.challenges = ch.value;
+      if (st.ok && st.value) copy.sharedTemplates = st.value;
+      if (Object.keys(copy).length && !(await fbUpdateNow(`crewData/${crewId}`, copy)).ok) {
+        toast('Challenges/Vorlagen konnten nicht kopiert werden.', 'err');
+      }
+      toast(`Crew angelegt — Einladungscode ${code}`, 'ok');
+      enterWithProfile(me, legacy[me].name, crewId);
     };
   });
 }
 
-function selectMemberAndEnter(id, name) {
-  state.member = { id, name };
-  localStorage.setItem('pincho_member', JSON.stringify(state.member));
-  boot();
-}
-
-/* "Raus" wechselt nur den lokal gewählten Namen (z. B. anderes Gerät,
-   Kollege trainiert am selben Handy) — der Team-Code bleibt angemeldet. */
-function logout() {
-  localStorage.removeItem('pincho_member');
+/* Abmelden: Konto, lokale Kopie und Warteschlange dieses Geräts vergessen. */
+function logout(skipConfirm) {
+  const pending = pendingWriteCount();
+  if (!skipConfirm) {
+    const msg = pending
+      ? `${pending} Änderung(en) sind noch nicht hochgeladen und gehen beim Abmelden verloren. Trotzdem abmelden?`
+      : 'Abmelden?';
+    if (!confirm(msg)) return;
+  }
+  clearLocalData();
+  clearAuth();
+  try { localStorage.removeItem(PROFILE_KEY); localStorage.removeItem(ACTIVE_CREW_KEY); } catch (e) { /* ignorieren */ }
   state.member = null;
-  renderNamePicker();
+  state.memberDoc = null;
+  state.crews = {};
+  state.members = {};
+  state.crewId = null;
+  setChallengeUnseenCount(0);
+  renderAuthScreen('login');
 }
 
 /* ================================================================
@@ -499,6 +800,15 @@ let challengeUnseenCount = 0;
 
 function getChallengesSeenAt() {
   return Number(localStorage.getItem('pincho_challenges_seen_at') || 0);
+}
+/* Zählt neue Challenges über alle eigenen Crews (nicht nur die aktive). */
+async function refreshChallengeUnseen() {
+  let n = 0;
+  await Promise.all(Object.keys(state.crews).map(async (id) => {
+    const raw = await fbGet(`crewData/${id}/challenges`);
+    if (raw) n += countUnseenChallenges(raw);
+  }));
+  if (state.member) setChallengeUnseenCount(n);
 }
 function countUnseenChallenges(challengesObj) {
   const seenAt = getChallengesSeenAt();
@@ -546,10 +856,10 @@ function renderShell(contentHtml) {
         <span class="mark">PIN<em>CHO</em>${IS_BETA ? ' <span class="beta-badge">BETA</span>' : ''}</span>
         <p class="app-tagline mono" id="app-tagline">${appTaglineTyped ? esc(APP_TAGLINE) : ''}</p>
       </div>
-      <div class="who">
+      <a class="who" href="#konto" title="Konto &amp; Crews">
         <span class="name mono">${memberName}</span>
-        <button class="logout" id="logout-btn">RAUS</button>
-      </div>
+        <span class="logout ${state.route === 'konto' ? 'active' : ''}">KONTO</span>
+      </a>
     </div>
     <div class="shell">${contentHtml}</div>
     <nav class="bottomnav">
@@ -557,7 +867,6 @@ function renderShell(contentHtml) {
       <span class="nav-indicator" id="nav-indicator"></span>
     </nav>
   `;
-  document.getElementById('logout-btn').onclick = logout;
   positionNavIndicator();
   if (!appTaglineTyped) {
     appTaglineTyped = true;
@@ -574,7 +883,8 @@ function positionNavIndicator() {
   const nav = document.querySelector('.bottomnav');
   const active = nav && nav.querySelector('a.active');
   const indicator = document.getElementById('nav-indicator');
-  if (!nav || !active || !indicator) return;
+  if (!nav || !indicator) return;
+  if (!active) { indicator.style.width = '0'; return; } // z. B. Konto-Seite, nicht in der Navigation
   indicator.style.left = active.offsetLeft + 'px';
   indicator.style.width = active.offsetWidth + 'px';
 }
@@ -649,6 +959,7 @@ function render() {
     case 'fingerboard': renderFingerboard(); break;
     case 'challenges': renderChallenges(); break;
     case 'progress': renderProgress(); break;
+    case 'konto': renderKonto(); break;
     case 'plan':
     default: renderPlan(); break;
   }
@@ -797,11 +1108,12 @@ function setUnitSuffix(exerciseId, set) {
    Liste. */
 let sharedTemplates = [];
 async function loadSharedTemplates() {
-  const raw = await fbGet('sharedTemplates');
+  const raw = state.crewId ? await fbGet(`crewData/${state.crewId}/sharedTemplates`) : null;
   sharedTemplates = raw ? Object.entries(raw).map(([key, t]) => ({ ...t, id: key })) : [];
 }
 async function shareTemplate(kind, name, data) {
-  const key = await fbPush('sharedTemplates', {
+  if (!state.crewId) { toast('Du bist in keiner Crew — unter KONTO beitreten.', 'err'); return false; }
+  const key = await fbPush(`crewData/${state.crewId}/sharedTemplates`, {
     kind, name, ...data,
     createdBy: state.member.id,
     createdByName: state.member.name,
@@ -3397,7 +3709,7 @@ function renderFbAddPanel() {
         fb.selectedGrip = null;
         fb.selectedGripLeft = null;
         fb.selectedGripRight = null;
-        state.members[state.member.id] = { ...state.members[state.member.id], board: fb.board };
+        state.memberDoc = { ...(state.memberDoc || {}), board: fb.board };
         fbPatch(`members/${state.member.id}`, { board: fb.board });
         renderFbAddPanel();
       };
@@ -4228,7 +4540,7 @@ async function deleteOwnFbTemplate(entry) {
     : `Vorlage "${entry.name}" unwiderruflich löschen?${sharedCopy ? ' Sie wird auch für die Crew entfernt.' : ''}`;
   if (!confirm(msg)) return false;
   if (!entry.sharedOnly) await fbDelete(`fingerboardTemplates/${state.member.id}/${entry.id}`);
-  if (sharedCopy) await fbDelete(`sharedTemplates/${sharedCopy.id}`);
+  if (sharedCopy && state.crewId) await fbDelete(`crewData/${state.crewId}/sharedTemplates/${sharedCopy.id}`);
   await Promise.all([loadFbTemplates(), loadSharedTemplates()]);
   refreshFbTemplateOptions();
   renderFbQuickstart();
@@ -9594,10 +9906,12 @@ function selectedChallengeHours(prefix) {
 }
 
 async function pushChallenge(fields, hours) {
+  const crew = activeCrew();
+  if (!crew) { toast('Du bist in keiner Crew — unter KONTO beitreten.', 'err'); return null; }
   const now = Date.now();
   const windowH = hours || CHALLENGE_WINDOW_H;
   const participants = {};
-  for (const id of Object.keys(state.members)) {
+  for (const id of Object.keys(crew.members || {})) {
     participants[id] = id === state.member.id ? { status: 'done', completedAt: now } : { status: 'pending' };
   }
   const challenge = {
@@ -9608,8 +9922,8 @@ async function pushChallenge(fields, hours) {
     participants,
     ...fields,
   };
-  const id = await fbPush('challenges', challenge);
-  if (id) toast(`Challenge raus an die Crew (${windowH}h Zeit)!`, 'ok');
+  const id = await fbPush(`crewData/${state.crewId}/challenges`, challenge);
+  if (id) toast(`Challenge raus an ${crew.name} (${windowH}h Zeit)!`, 'ok');
   else toast('Konnte Challenge nicht senden.', 'err');
   return id;
 }
@@ -9628,14 +9942,35 @@ function shareLogEntryAsChallenge(entry, hours) {
   }, hours);
 }
 
+/* Umschalter, wenn man in mehreren Crews ist — Challenges und geteilte
+   Vorlagen gelten immer für die aktive Crew. */
+function crewSwitchHtml() {
+  const ids = Object.keys(state.crews);
+  if (ids.length < 2) return '';
+  return `<div class="chip-row" id="crew-switch">${ids.map((id) => `<button type="button" class="chip ${id === state.crewId ? 'active' : ''}" data-crew="${esc(id)}">${esc(state.crews[id].name)}</button>`).join('')}</div>`;
+}
+function wireCrewSwitch(onChange) {
+  document.querySelectorAll('#crew-switch .chip').forEach((b) => {
+    b.onclick = () => { setActiveCrew(b.dataset.crew); onChange(); };
+  });
+}
+
 async function renderChallenges() {
+  const crew = activeCrew();
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Challenges</h2><div class="sec-rule"></div></div>
-    <p class="login-hint" style="margin:0 0 16px;text-align:left;">Ein Training fertig gemacht? Im Fingerboard (nach "Ablauf geschafft") oder im Log-Verlauf kannst du es der Crew als Challenge vorschlagen — Zeitfenster beim Teilen wählbar (24h bis 1 Woche).</p>
+    ${crewSwitchHtml()}
+    <p class="login-hint" style="margin:0 0 16px;text-align:left;">Ein Training fertig gemacht? Im Fingerboard (nach "Ablauf geschafft") oder im Log-Verlauf kannst du es ${crew ? `<b>${esc(crew.name)}</b>` : 'der Crew'} als Challenge vorschlagen — Zeitfenster beim Teilen wählbar (24h bis 1 Woche).</p>
     <div class="list" id="challenge-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
   `);
+  wireCrewSwitch(() => { loadSharedTemplates(); renderChallenges(); });
+  if (!crew) {
+    document.getElementById('challenge-list').innerHTML = '<div class="list-empty">Du bist noch in keiner Crew — unter <a href="#konto">KONTO</a> mit einem Einladungscode beitreten.</div>';
+    return;
+  }
+  const base = `crewData/${state.crewId}/challenges`;
 
-  const raw = await fbGet('challenges');
+  const raw = await fbGet(base);
   state.challenges = raw || {};
   markChallengesSeenNow();
   const now = Date.now();
@@ -9645,7 +9980,7 @@ async function renderChallenges() {
     if (now > c.expiresAt && c.participants) {
       for (const [pid, p] of Object.entries(c.participants)) {
         if (p.status === 'pending') {
-          fbPatch(`challenges/${id}/participants/${pid}`, { status: 'expired' });
+          fbPatch(`${base}/${id}/participants/${pid}`, { status: 'expired' });
           p.status = 'expired';
         }
       }
@@ -9663,10 +9998,10 @@ async function renderChallenges() {
       const c = state.challenges[id];
       const myStatus = c && c.participants && c.participants[state.member.id] && c.participants[state.member.id].status;
       if (myStatus === 'done') {
-        await fbPatch(`challenges/${id}/participants/${state.member.id}`, { status: 'pending', completedAt: null });
+        await fbPatch(`${base}/${id}/participants/${state.member.id}`, { status: 'pending', completedAt: null });
         toast('Zurückgesetzt.', 'ok');
       } else {
-        await fbPatch(`challenges/${id}/participants/${state.member.id}`, { status: 'done', completedAt: Date.now() });
+        await fbPatch(`${base}/${id}/participants/${state.member.id}`, { status: 'done', completedAt: Date.now() });
         toast('Mitgemacht — stark!', 'ok');
       }
       renderChallenges();
@@ -9702,7 +10037,7 @@ async function renderChallenges() {
   list.querySelectorAll('[data-delete]').forEach((btn) => {
     btn.onclick = async () => {
       if (!confirm('Diese Challenge wirklich löschen?')) return;
-      await fbDelete(`challenges/${btn.dataset.delete}`);
+      await fbDelete(`${base}/${btn.dataset.delete}`);
       toast('Challenge gelöscht.', 'ok');
       renderChallenges();
     };
@@ -9749,6 +10084,196 @@ function renderChallengeCard(id, c, now) {
       </div>
     </div>
   `;
+}
+
+/* ================================================================
+   KONTO + CREWS
+   Eigenes Konto, Crews (aktiv setzen, beitreten, verlassen) und — für
+   wer eine Crew gegründet hat — Einladungscode teilen/erneuern und
+   Mitglieder entfernen. Crew gründen darf vorerst nur der Admin (bis
+   config/crewCreationOpen in Firebase auf true steht).
+   ================================================================= */
+function inviteLink(code) {
+  return `${location.origin}${location.pathname}?code=${encodeURIComponent(code)}`;
+}
+
+async function renderKonto() {
+  renderShell(`
+    <div class="sec-head"><h2 class="sec-title">Konto</h2><div class="sec-rule"></div></div>
+    <div class="card">
+      <p class="card-title">Angemeldet</p>
+      <p class="card-value">${esc(state.member.name)}</p>
+      <p class="card-sub">${esc(authEmail() || '')}</p>
+      <button class="btn ghost small konto-logout" id="konto-logout">Abmelden</button>
+    </div>
+    <div class="sec-head"><h2 class="sec-title">Crews</h2><div class="sec-rule"></div></div>
+    <div id="konto-crews"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
+    <div class="card">
+      <p class="card-title">Crew beitreten</p>
+      <div class="field-row">
+        <div class="field"><input type="text" id="konto-join-code" autocapitalize="characters" autocomplete="off" placeholder="Einladungscode"></div>
+        <button class="btn small" id="konto-join">Beitreten</button>
+      </div>
+    </div>
+    <div id="konto-create"></div>
+  `);
+  document.getElementById('konto-logout').onclick = () => logout();
+  document.getElementById('konto-join').onclick = () => joinCrewWithCode(normalizeInviteCode(document.getElementById('konto-join-code').value));
+
+  await loadCrews(); // frisch: neue Mitglieder sollen ohne Neustart erscheinen
+  const holder = document.getElementById('konto-crews');
+  if (!holder) return; // weiternavigiert
+  const ids = Object.keys(state.crews);
+  const me = state.member.id;
+  const secrets = {};
+  await Promise.all(ids.filter((id) => state.crews[id].owner === me).map(async (id) => {
+    const r = await fbGetNow(`crewSecrets/${id}`);
+    if (r.ok && r.value) secrets[id] = r.value.inviteCode;
+  }));
+  if (!document.getElementById('konto-crews')) return; // weiternavigiert
+  holder.innerHTML = ids.length ? ids.map((id) => {
+    const c = state.crews[id];
+    const isOwner = c.owner === me;
+    const members = Object.entries(c.members || {});
+    return `
+      <div class="card crew-card">
+        <div class="crew-head">
+          <p class="card-value">${esc(c.name)}</p>
+          ${id === state.crewId ? '<span class="tag-pill">AKTIV</span>' : `<button class="btn ghost small" data-activate="${esc(id)}">Aktiv setzen</button>`}
+        </div>
+        <div class="chip-row crew-members">
+          ${members.map(([mid, m]) => `<span class="chip small ${m.legacy ? 'legacy' : ''}">${esc(m.name)}${mid === c.owner ? ' ★' : ''}${m.legacy ? ' · noch nicht dabei' : ''}${isOwner && mid !== me ? ` <button type="button" class="chip-x" data-remove="${esc(id)}|${esc(mid)}" aria-label="${esc(m.name)} entfernen">×</button>` : ''}</span>`).join('')}
+        </div>
+        ${isOwner ? `
+          <p class="card-title">Einladungscode</p>
+          <p class="invite-code mono">${esc(secrets[id] || '—')}</p>
+          <div class="chal-actions">
+            ${secrets[id] ? `<button class="btn small" data-share="${esc(id)}">Einladen</button>` : ''}
+            <button class="btn ghost small" data-regen="${esc(id)}">Neuer Code</button>
+          </div>
+          <p class="card-sub">"Neuer Code" macht den alten ungültig — wer schon drin ist, bleibt drin.</p>
+        ` : `<div class="chal-actions"><button class="btn ghost small" data-leave="${esc(id)}">Crew verlassen</button></div>`}
+      </div>
+    `;
+  }).join('') : '<div class="list-empty">Noch in keiner Crew — unten mit einem Einladungscode beitreten.</div>';
+
+  holder.querySelectorAll('[data-activate]').forEach((b) => {
+    b.onclick = () => { setActiveCrew(b.dataset.activate); loadSharedTemplates(); renderKonto(); };
+  });
+  holder.querySelectorAll('[data-share]').forEach((b) => {
+    b.onclick = () => shareInvite(state.crews[b.dataset.share].name, secrets[b.dataset.share]);
+  });
+  holder.querySelectorAll('[data-regen]').forEach((b) => {
+    b.onclick = () => regenerateInvite(b.dataset.regen, secrets[b.dataset.regen]);
+  });
+  holder.querySelectorAll('[data-remove]').forEach((b) => {
+    b.onclick = async () => {
+      const [crewId, mid] = b.dataset.remove.split('|');
+      const name = state.crews[crewId].members[mid].name;
+      if (!confirm(`${name} aus "${state.crews[crewId].name}" entfernen?`)) return;
+      const r = await fbUpdateNow('', { [`crews/${crewId}/members/${mid}`]: null });
+      toast(r.ok ? `${name} entfernt.` : 'Hat nicht geklappt.', r.ok ? 'ok' : 'err');
+      await loadCrews();
+      renderKonto();
+    };
+  });
+  holder.querySelectorAll('[data-leave]').forEach((b) => {
+    b.onclick = async () => {
+      const crewId = b.dataset.leave;
+      if (!confirm(`"${state.crews[crewId].name}" verlassen? Zurück geht's nur mit einem neuen Einladungscode.`)) return;
+      const r = await fbUpdateNow('', { [`crews/${crewId}/members/${me}`]: null, [`members/${me}/crews/${crewId}`]: null });
+      if (!r.ok) { toast('Hat nicht geklappt.', 'err'); return; }
+      toast('Crew verlassen.', 'ok');
+      await loadCrews();
+      loadSharedTemplates();
+      renderKonto();
+    };
+  });
+
+  // Crew gründen: Admin (Phase 1) oder sobald für alle freigeschaltet.
+  const [cfg, admin] = await Promise.all([fbGetNow('config'), probeAdmin()]);
+  const open = cfg.ok && cfg.value && cfg.value.crewCreationOpen === true;
+  const createHolder = document.getElementById('konto-create');
+  if (!createHolder || !(open || admin !== null)) return;
+  createHolder.innerHTML = `
+    <div class="card">
+      <p class="card-title">Neue Crew gründen</p>
+      <div class="field-row">
+        <div class="field"><input type="text" id="konto-create-name" maxlength="40" placeholder="Name der Crew"></div>
+        <button class="btn small" id="konto-create-btn">Gründen</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('konto-create-btn').onclick = () => createCrew(document.getElementById('konto-create-name').value.trim());
+}
+
+async function shareInvite(crewName, code) {
+  const text = `Komm in meine Pincho-Crew "${crewName}"! Einladungscode: ${code}`;
+  const url = inviteLink(code);
+  try {
+    if (navigator.share) { await navigator.share({ title: 'Pincho', text, url }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  try {
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    toast('Einladung kopiert — z. B. in WhatsApp einfügen.', 'ok');
+  } catch (e) {
+    prompt('Einladung kopieren:', `${text} ${url}`);
+  }
+}
+
+async function regenerateInvite(crewId, oldCode) {
+  if (!confirm('Neuen Code erzeugen? Der alte funktioniert dann nicht mehr.')) return;
+  const code = await uniqueInviteCode();
+  if (!code) { toast('Keine Verbindung.', 'err'); return; }
+  const updates = {
+    [`invites/${code}`]: { crewId, crewName: state.crews[crewId].name },
+    [`crewSecrets/${crewId}/inviteCode`]: code,
+  };
+  if (oldCode) updates[`invites/${oldCode}`] = null;
+  const r = await fbUpdateNow('', updates);
+  toast(r.ok ? `Neuer Code: ${code}` : 'Hat nicht geklappt.', r.ok ? 'ok' : 'err');
+  renderKonto();
+}
+
+async function joinCrewWithCode(code) {
+  if (!code) { toast('Bitte Einladungscode eingeben.', 'err'); return; }
+  const inv = await fbGetNow(`invites/${code}`);
+  if (!inv.ok) { toast('Keine Verbindung.', 'err'); return; }
+  if (!inv.value || !inv.value.crewId) { toast('Diesen Code gibt es nicht (mehr).', 'err'); return; }
+  const crewId = inv.value.crewId;
+  if (state.crews[crewId]) { toast(`Du bist schon in "${state.crews[crewId].name}".`); return; }
+  const me = state.member.id;
+  const r = await fbUpdateNow('', {
+    [`crews/${crewId}/members/${me}`]: { name: state.member.name, joinedAt: Date.now(), code },
+    [`members/${me}/crews/${crewId}`]: true,
+  });
+  if (!r.ok) { toast('Beitreten hat nicht geklappt.', 'err'); return; }
+  await loadCrews();
+  setActiveCrew(crewId);
+  loadSharedTemplates();
+  toast(`Willkommen in "${inv.value.crewName || 'der Crew'}"!`, 'ok');
+  renderKonto();
+}
+
+async function createCrew(name) {
+  if (!name) { toast('Bitte einen Namen für die Crew eingeben.', 'err'); return; }
+  const code = await uniqueInviteCode();
+  if (!code) { toast('Keine Verbindung.', 'err'); return; }
+  const crewId = generatePushId();
+  const me = state.member.id;
+  const now = Date.now();
+  const r = await fbUpdateNow('', {
+    [`crews/${crewId}`]: { name, owner: me, createdAt: now, members: { [me]: { name: state.member.name, joinedAt: now } } },
+    [`crewSecrets/${crewId}`]: { inviteCode: code },
+    [`invites/${code}`]: { crewId, crewName: name },
+    [`members/${me}/crews/${crewId}`]: true,
+  });
+  if (!r.ok) { toast('Crew gründen hat nicht geklappt.', 'err'); return; }
+  await loadCrews();
+  setActiveCrew(crewId);
+  loadSharedTemplates();
+  toast(`Crew "${name}" gegründet — Code ${code}`, 'ok');
+  renderKonto();
 }
 
 /* ---------- Start ---------- */
