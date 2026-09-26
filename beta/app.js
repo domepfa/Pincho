@@ -171,7 +171,7 @@ function exerciseCardHtml(e, selectedId) {
     <div class="ex-card ${active} ${isRecent ? 'recent' : ''}">
       <button type="button" class="ex-pick-btn ex-card-main ${active}" data-exercise="${e.id}">
         <span class="ex-card-text">
-          <span class="ex-card-name">${isExerciseFavorite(e.id) ? '<span class="ex-card-star">★</span> ' : ''}${esc(e.name)}</span>
+          <span class="ex-card-name">${isExerciseFavorite(e.id) ? '<span class="ex-card-star">★</span> ' : ''}${esc(e.name)}${e.custom ? ' <span class="ex-card-own">eigene</span>' : ''}</span>
           ${tags ? `<span class="ex-card-tags">${tags}</span>` : ''}
         </span>
         ${lastText ? `<span class="ex-card-last"><strong>${lastText}</strong><small>zuletzt</small></span>` : ''}
@@ -200,6 +200,7 @@ function exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents,
 }
 
 function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll) {
+  list = list.filter((e) => !e.hidden);
   const muscleLabel = muscle ? (MUSCLE_ZONE_LABEL[muscle] || muscle) : '';
   return `
     <label class="ex-search">
@@ -214,6 +215,10 @@ function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents,
       `).join('')}
     </div>
     <div class="ex-pick-list">${exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents, showAll)}</div>
+    <div class="ex-custom-row">
+      <button type="button" class="btn ghost small" data-custom-ex="custom">+ Eigene Übung</button>
+      <button type="button" class="btn ghost small" data-custom-ex="wish">Übung wünschen</button>
+    </div>
   `;
 }
 function ensureExerciseInfoSheet() {
@@ -248,9 +253,12 @@ function showExerciseInfoSheet(exerciseId, onChange) {
       ${hasFigure ? `<div class="info-sheet-figure">${exerciseFigureSvg(exerciseId)}</div>` : ''}
       ${howTo ? `<div class="ex-howto">${esc(howTo)}</div>` : ''}
       ${muscleText ? `<div class="fb-muscle-block">${bodyMapSvg(muscles.primary, muscles.secondary)}<div class="fb-muscle-label mono">${esc(muscleText)}</div></div>` : ''}
+      ${customExercises[exerciseId] ? '<button type="button" class="btn ghost small" id="info-sheet-hide" style="margin-top:10px;">Aus der Auswahl entfernen</button>' : ''}
     </div>
   `;
   el.classList.remove('hidden');
+  const hideBtn = document.getElementById('info-sheet-hide');
+  if (hideBtn) hideBtn.onclick = async () => { if (await hideCustomExercise(exerciseId)) { el.classList.add('hidden'); if (onChange) onChange(); } };
   document.getElementById('info-sheet-close').onclick = () => el.classList.add('hidden');
   document.getElementById('info-sheet-fav').onclick = () => {
     toggleExerciseFavorite(exerciseId);
@@ -299,7 +307,7 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
     });
   };
   const renderList = () => {
-    holder.querySelector('.ex-pick-list').innerHTML = exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents, showAll);
+    holder.querySelector('.ex-pick-list').innerHTML = exercisePickerListHtml(list.filter((e) => !e.hidden), selectedId, sg, muscle, query, useRecents, showAll);
     wireList();
   };
   const render = () => {
@@ -321,6 +329,18 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
     if (clearBtn) clearBtn.onclick = () => { muscle = ''; showAll = false; render(); };
     const search = holder.querySelector('.ex-search-input');
     search.oninput = () => { query = search.value; renderList(); };
+    holder.querySelectorAll('[data-custom-ex]').forEach((b) => {
+      b.onclick = () => showCustomExerciseSheet(b.dataset.customEx, (newId) => {
+        if (!newId) return;
+        // Neue eigene Übung gleich auswählen und ihre Gruppe zeigen
+        selectedId = newId;
+        const ex = EXERCISE_LIBRARY.find((e) => e.id === newId);
+        sg = ex ? exerciseSupergroup(ex) : sg;
+        muscle = ''; query = ''; showAll = true;
+        render();
+        onSelect(newId);
+      });
+    });
     wireList();
   };
   render();
@@ -384,9 +404,10 @@ async function boot() {
   // zu warten — Crews/Namen werden im Hintergrund nachgeladen und lösen
   // bei Bedarf ein Nachrendern aus (Fingerboard/Challenges nutzen sie).
   render();
-  await loadCrews();
-  if (['fingerboard', 'challenges', 'konto'].includes(state.route)) render();
+  const [, customsLoaded] = await Promise.all([loadCrews(), loadCustomExercises()]);
+  if (['fingerboard', 'challenges', 'konto'].includes(state.route) || (customsLoaded && Object.keys(customExercises).length && ['log', 'progress'].includes(state.route))) render();
   refreshChallengeUnseen();
+  refreshWishDot();
 }
 
 /* Welches Profil gehört zu diesem Konto? Ohne Profil geht's in den
@@ -860,7 +881,7 @@ function renderShell(contentHtml) {
       </div>
       <a class="who" href="#konto" title="Konto &amp; Crews">
         <span class="name mono">${memberName}</span>
-        <span class="logout ${state.route === 'konto' ? 'active' : ''}">KONTO</span>
+        <span class="logout ${state.route === 'konto' ? 'active' : ''}">KONTO<span class="nav-dot konto-dot" id="konto-dot" ${openWishCount ? '' : 'hidden'}></span></span>
       </a>
     </div>
     <div class="shell">${contentHtml}</div>
@@ -10476,11 +10497,14 @@ async function pushChallenge(fields, hours) {
 }
 
 function shareFingerboardAsChallenge(board, blocks, hours) {
-  return pushChallenge({ kind: 'fingerboard', board, blocks }, hours);
+  const names = customNamesFor(blocks.filter((b) => b.exerciseId).map((b) => b.exerciseId));
+  return pushChallenge({ kind: 'fingerboard', board, blocks, ...(Object.keys(names).length ? { customNames: names } : {}) }, hours);
 }
 
 function shareLogEntryAsChallenge(entry, hours) {
+  const names = customNamesFor((entry.exercises || []).map((x) => x.exerciseId));
   return pushChallenge({
+    ...(Object.keys(names).length ? { customNames: names } : {}),
     kind: 'session',
     sessionType: entry.type,
     exercises: entry.exercises,
@@ -10519,6 +10543,7 @@ async function renderChallenges() {
 
   const raw = await fbGet(base);
   state.challenges = raw || {};
+  Object.values(state.challenges).forEach((c) => rememberForeignExerciseNames(c.customNames));
   markChallengesSeenNow();
   const now = Date.now();
 
@@ -10652,9 +10677,9 @@ function inviteLink(code) {
    nur für angemeldete Personen, setzen kann sie nur der Admin.
    ================================================================= */
 const PRIVACY_OPERATOR = 'Dome';
-const PRIVACY_UPDATED = '26.09.2026';
+const PRIVACY_UPDATED = '27.09.2026';
 const PRIVATE_COLLECTIONS = ['logs', 'plans', 'sessionPlans', 'exerciseSettings', 'exerciseFavorites', 'exerciseUnitPrefs',
-  'fingerboardSessions', 'fingerboardTemplates', 'flowTemplates', 'wallTemplates', 'hiddenTemplates', 'cycle'];
+  'fingerboardSessions', 'fingerboardTemplates', 'flowTemplates', 'wallTemplates', 'hiddenTemplates', 'cycle', 'customExercises'];
 
 async function renderPrivacy() {
   const loggedIn = !!(state.member && hasStoredAuth());
@@ -10677,6 +10702,7 @@ async function renderPrivacy() {
         <li><b>Profil:</b> dein Name in der App und deine Board-Wahl.</li>
         <li><b>Training:</b> Logs (Übungen, Sätze, Gewichte, Dauer, Notizen), Pläne, Fingerboard-Einheiten, Vorlagen und Einstellungen.</li>
         <li><b>Crews:</b> in welchen Crews du bist, deine Challenges, dein "Mitgemacht" und Vorlagen, die du mit der Crew teilst.</li>
+        <li><b>Eigene Übungen und Übungswünsche:</b> deine eigenen Übungen sind privat. Einen Übungswunsch (Name, Muskelgruppe, Hinweis, dein Name) sieht nur ${PRIVACY_OPERATOR}.</li>
         <li><b>Zyklus (freiwillig):</b> nur die Daten deines Periodenbeginns. Das sind Gesundheitsdaten — sie werden nur mit deiner ausdrücklichen Einwilligung gespeichert, die du jederzeit widerrufen kannst (Tab Fortschritt → Zyklus → Ausschalten &amp; löschen).</li>
       </ul>
       <h3>Wer sieht was</h3>
@@ -10857,6 +10883,7 @@ const HELP_SECTIONS = [
       <li><b>Ausdauer</b> — Klettern, Jogging, Velo usw. frei mit Stoppuhr oder als geplanter Block-Ablauf (Wand/Pause).</li>
       <li><b>Flow</b> — Yoga-/Pilates-Posen mit Haltezeit als Ablauf.</li>
     </ul>
+    <p><b>Übung fehlt?</b> Unten in der Übungsauswahl: <b>+ Eigene Übung</b> (Name, Muskelgruppe, Wdh. oder Sekunden — nur für dich, funktioniert auch im Board und im Fortschritt) oder <b>Übung wünschen</b> — der Wunsch geht an ${PRIVACY_OPERATOR}.</p>
     <p>Im <b>Verlauf</b> siehst du deine Einheiten; von dort kannst du eine Einheit als Challenge teilen. Das kleine <b>i</b> bei einer Übung zeigt Ausführung, Muskeln und Animation.</p>`],
   ['Agenda', 'Wochenplan', `
     <p>Dein Wochenplan: pro Tag ein Titel und eine Kategorie. Änderungen werden sofort gespeichert; der heutige Tag ist markiert.</p>`],
@@ -10897,6 +10924,144 @@ function renderHelp() {
   `);
 }
 
+/* ================================================================
+   EIGENE ÜBUNGEN + ÜBUNGSWÜNSCHE
+   Eigene Übungen liegen privat unter customExercises/{memberId}/{id} und
+   werden beim Laden in EXERCISE_LIBRARY eingehängt — so funktionieren sie
+   überall wie normale Übungen (Pläne, Board, Fortschritt, Körperkarte,
+   Erholung). "Entfernen" blendet nur aus, damit alte Einträge ihren Namen
+   behalten. Wünsche gehen nach exerciseRequests (lesen kann nur der Admin).
+   ================================================================= */
+const CUSTOM_GROUPS = {
+  brust: { label: 'Brust', muscles: ['chest'] },
+  ruecken: { label: 'Rücken', muscles: ['lats', 'traps'] },
+  rumpf: { label: 'Rumpf', muscles: ['abs', 'obliques'] },
+  arme: { label: 'Arme', muscles: ['biceps', 'triceps'] },
+  beine: { label: 'Beine', muscles: ['quads', 'glutes'] },
+};
+let customExercises = {}; // {id: {name, group, unit, note, hidden}}
+
+function customToLibraryEntry(id, c) {
+  const g = CUSTOM_GROUPS[c.group] || CUSTOM_GROUPS.rumpf;
+  return {
+    id, name: c.name, custom: true, hidden: !!c.hidden, category: c.group, isHold: c.unit === 'time',
+    howTo: `Eigene Übung${c.note ? ` · ${c.note}` : ''}`,
+    muscles: { primary: g.muscles.slice(0, 1), secondary: g.muscles.slice(1) },
+  };
+}
+function mergeCustomExercises() {
+  for (let i = EXERCISE_LIBRARY.length - 1; i >= 0; i--) if (EXERCISE_LIBRARY[i].custom) EXERCISE_LIBRARY.splice(i, 1);
+  Object.entries(customExercises).forEach(([id, c]) => EXERCISE_LIBRARY.push(customToLibraryEntry(id, c)));
+}
+async function loadCustomExercises() {
+  const raw = await fbGet(`customExercises/${state.member.id}`);
+  if (raw === undefined) return false;
+  customExercises = raw || {};
+  mergeCustomExercises();
+  return true;
+}
+/* Namen fremder eigener Übungen (aus Challenges der Crew), damit dort
+   nicht die interne ID steht. */
+function rememberForeignExerciseNames(names) {
+  Object.entries(names || {}).forEach(([id, n]) => { if (!EXERCISE_LIBRARY.some((e) => e.id === id)) FOREIGN_EX_NAMES[id] = n; });
+}
+function customNamesFor(exerciseIds) {
+  const out = {};
+  exerciseIds.forEach((id) => { if (customExercises[id]) out[id] = customExercises[id].name; });
+  return out;
+}
+
+/* Formular als Sheet: mode 'custom' (eigene Übung anlegen) oder 'wish'. */
+function showCustomExerciseSheet(mode, onDone) {
+  const el = ensureExerciseInfoSheet();
+  const isWish = mode === 'wish';
+  let group = 'brust';
+  let unit = 'reps';
+  el.innerHTML = `
+    <div class="info-sheet-card custom-ex-sheet">
+      <button type="button" class="info-sheet-close" id="info-sheet-close">✕</button>
+      <div class="info-sheet-title">${isWish ? 'Übung wünschen' : 'Eigene Übung'}</div>
+      <p class="card-sub" style="margin:0 0 12px;">${isWish ? `Fehlt eine Übung? ${esc(PRIVACY_OPERATOR)} bekommt deinen Wunsch und kann sie für alle einbauen.` : 'Nur für dich sichtbar. Funktioniert wie jede andere Übung — auch im Fortschritt.'}</p>
+      <div class="field"><label>Name</label><input type="text" id="cx-name" maxlength="40" placeholder="z. B. Butterfly"></div>
+      <div class="field"><label>Muskelgruppe</label>
+        <div class="chip-row" id="cx-group">${Object.entries(CUSTOM_GROUPS).map(([k, g]) => `<button type="button" class="chip ${k === group ? 'active' : ''}" data-group="${k}">${g.label}</button>`).join('')}</div>
+      </div>
+      ${isWish ? '' : `<div class="field"><label>Zählt in</label>
+        <div class="chip-row" id="cx-unit"><button type="button" class="chip active" data-unit="reps">Wiederholungen</button><button type="button" class="chip" data-unit="time">Sekunden</button></div>
+      </div>`}
+      <div class="field"><label>Gerät / Hinweis (optional)</label><input type="text" id="cx-note" maxlength="80" placeholder="z. B. Maschine, Kabelzug, Freihantel"></div>
+      ${isWish ? '' : `<label class="cx-check"><input type="checkbox" id="cx-wish"> Auch als Wunsch an ${esc(PRIVACY_OPERATOR)} schicken</label>`}
+      <button class="btn" id="cx-save" style="width:100%;">${isWish ? 'Wunsch senden' : 'Übung anlegen'}</button>
+    </div>`;
+  el.classList.remove('hidden');
+  document.getElementById('info-sheet-close').onclick = () => el.classList.add('hidden');
+  const pick = (holderId, attr, set) => {
+    const h = document.getElementById(holderId);
+    if (!h) return;
+    h.querySelectorAll('.chip').forEach((b) => {
+      b.onclick = () => { set(b.dataset[attr]); h.querySelectorAll('.chip').forEach((x) => x.classList.toggle('active', x === b)); };
+    });
+  };
+  pick('cx-group', 'group', (v) => { group = v; });
+  pick('cx-unit', 'unit', (v) => { unit = v; });
+  document.getElementById('cx-save').onclick = async () => {
+    const name = document.getElementById('cx-name').value.trim();
+    const note = document.getElementById('cx-note').value.trim();
+    if (!name) { toast('Bitte einen Namen eingeben.', 'err'); return; }
+    const sendWish = isWish || document.getElementById('cx-wish').checked;
+    let newId = null;
+    if (!isWish) {
+      newId = 'custom_' + generatePushId();
+      customExercises[newId] = { name, group, unit, ...(note ? { note } : {}), createdAt: Date.now() };
+      mergeCustomExercises();
+      await fbPut(`customExercises/${state.member.id}/${newId}`, customExercises[newId]);
+    }
+    if (sendWish) {
+      const r = await fbUpdateNow(`exerciseRequests/${generatePushId()}`, {
+        name, group, ...(note ? { note } : {}), fromId: state.member.id, fromName: state.member.name, at: Date.now(),
+      });
+      if (!r.ok) toast('Wunsch konnte nicht gesendet werden (offline?).', 'err');
+      else if (isWish) toast(`Danke! Wunsch an ${PRIVACY_OPERATOR} gesendet.`, 'ok');
+    }
+    if (!isWish) toast(`"${name}" angelegt${sendWish ? ' und gewünscht' : ''}.`, 'ok');
+    el.classList.add('hidden');
+    if (onDone) onDone(newId);
+  };
+}
+
+async function hideCustomExercise(id) {
+  if (!customExercises[id] || !confirm(`"${customExercises[id].name}" aus der Auswahl entfernen? Bisherige Einträge bleiben erhalten.`)) return false;
+  customExercises[id] = { ...customExercises[id], hidden: true };
+  mergeCustomExercises();
+  await fbPut(`customExercises/${state.member.id}/${id}/hidden`, true);
+  return true;
+}
+
+/* Admin: offene Wünsche unter KONTO + Punkt am KONTO-Knopf. */
+let openWishCount = 0;
+async function refreshWishDot() {
+  const r = await fbGetNow('exerciseRequests');
+  if (!r.ok) return null; // kein Admin (oder offline)
+  const list = Object.entries(r.value || {});
+  openWishCount = list.filter(([, w]) => !w.done).length;
+  const dot = document.getElementById('konto-dot');
+  if (dot) dot.hidden = !openWishCount;
+  return list;
+}
+function wishesCardHtml(list) {
+  const sorted = list.sort((a, b) => (a[1].done ? 1 : 0) - (b[1].done ? 1 : 0) || (b[1].at || 0) - (a[1].at || 0));
+  return `
+    <div class="sec-head"><h2 class="sec-title">Übungswünsche</h2><div class="sec-rule"></div></div>
+    <div class="card">
+      ${sorted.length ? sorted.map(([id, w]) => `
+        <div class="wish-row ${w.done ? 'done' : ''}">
+          <div><b>${esc(w.name)}</b> <span class="card-sub">· ${esc((CUSTOM_GROUPS[w.group] || {}).label || w.group || '')}${w.note ? ` · ${esc(w.note)}` : ''}</span><br>
+          <span class="card-sub">von ${esc(w.fromName || '?')} · ${w.at ? fmtShortDate(dayKey(new Date(w.at))) : ''}</span></div>
+          <button class="btn ghost small" data-wish-done="${esc(id)}">${w.done ? 'Wieder offen' : 'Erledigt'}</button>
+        </div>`).join('') : '<p class="card-sub" style="margin:0;">Noch keine Wünsche.</p>'}
+    </div>`;
+}
+
 async function renderKonto() {
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Konto</h2><div class="sec-rule"></div></div>
@@ -10917,6 +11082,7 @@ async function renderKonto() {
       </div>
     </div>
     <div id="konto-create"></div>
+    <div id="konto-wishes"></div>
     <div id="konto-cycle"></div>
     <div id="konto-data"></div>
   `);
@@ -11000,6 +11166,21 @@ async function renderKonto() {
   if (rawCycle !== undefined) cycleData = rawCycle && rawCycle.consentAt ? rawCycle : null;
   const cycleHolder = document.getElementById('konto-cycle');
   if (cycleHolder && rawCycle !== undefined) { cycleHolder.innerHTML = cycleKontoCardHtml(); wireCycleKonto(); }
+  if (admin !== null) {
+    const wishes = await refreshWishDot();
+    const wh = document.getElementById('konto-wishes');
+    if (wh && wishes) {
+      wh.innerHTML = wishesCardHtml(wishes);
+      wh.querySelectorAll('[data-wish-done]').forEach((b) => {
+        b.onclick = async () => {
+          const w = wishes.find(([id]) => id === b.dataset.wishDone);
+          const r = await fbUpdateNow(`exerciseRequests/${b.dataset.wishDone}`, { done: !(w && w[1].done) });
+          if (!r.ok) { toast('Hat nicht geklappt.', 'err'); return; }
+          renderKonto();
+        };
+      });
+    }
+  }
   const dataHolder = document.getElementById('konto-data');
   if (dataHolder) {
     dataHolder.innerHTML = privacyCardHtml(admin !== null, cfg.ok && cfg.value && typeof cfg.value.contact === 'string' ? cfg.value.contact : '');

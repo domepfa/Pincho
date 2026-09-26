@@ -1489,3 +1489,15 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .help-body ul { margin: 0 0 8px; padding-left: 20px; }
 .help-body li { margin-bottom: 6px; }
 .help-body b { color: var(--ink); }
+
+/* ---------- Eigene Übungen / Wünsche ---------- */
+.ex-custom-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.ex-card-own { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); border: 1px solid rgba(var(--accent-rgb), .5); border-radius: 999px; padding: 1px 6px; vertical-align: 2px; }
+.custom-ex-sheet .field { text-align: left; }
+.cx-check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-dim); margin: 0 0 14px; }
+.cx-check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.topbar .logout { position: relative; }
+.konto-dot { position: absolute; top: -3px; right: -3px; }
+.wish-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
+.wish-row:last-child { border-bottom: none; }
+.wish-row.done { opacity: .55; }
