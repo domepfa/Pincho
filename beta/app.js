@@ -11260,6 +11260,14 @@ async function createCrew(name) {
   renderKonto();
 }
 
+/* Hintergrund-Faultier: Falls das Handy noch die alte index.html (mit der
+   Strich-SVG) aus dem Offline-Speicher zeigt, das Bild hier selbst einsetzen
+   — sonst passen alte Seite und neues CSS nicht zusammen. */
+(() => {
+  const bg = document.querySelector('.sloth-bg');
+  if (bg && !bg.querySelector('img')) bg.innerHTML = '<img src="../assets/sloth/sloth-bg.png" alt="">';
+})();
+
 /* ---------- Start ---------- */
 window.addEventListener('hashchange', () => {
   state.route = (location.hash || '#fingerboard').replace('#', '');
