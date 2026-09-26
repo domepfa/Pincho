@@ -328,6 +328,20 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
     const clearBtn = holder.querySelector('#ex-muscle-clear');
     if (clearBtn) clearBtn.onclick = () => { muscle = ''; showAll = false; render(); };
     const search = holder.querySelector('.ex-search-input');
+    // Beim Suchen Körperkarte und Gruppen wegklappen, damit die Treffer
+    // direkt unter dem Feld stehen und nicht hinter der Tastatur liegen.
+    const setSearching = (on) => holder.classList.toggle('ex-searching', on);
+    setSearching(!!query);
+    search.onfocus = () => {
+      setSearching(true);
+      setTimeout(() => {
+        // Feld knapp unter die feste Kopfzeile holen (scrollIntoView landete dahinter)
+        const bar = document.querySelector('.topbar');
+        const top = search.getBoundingClientRect().top - (bar ? bar.getBoundingClientRect().bottom : 0) - 12;
+        window.scrollBy({ top, behavior: 'smooth' });
+      }, 250);
+    };
+    search.onblur = () => { if (!search.value.trim()) setSearching(false); };
     search.oninput = () => { query = search.value; renderList(); };
     holder.querySelectorAll('[data-custom-ex]').forEach((b) => {
       b.onclick = () => showCustomExerciseSheet(b.dataset.customEx, (newId) => {
