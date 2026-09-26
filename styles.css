@@ -1532,3 +1532,7 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 @media (prefers-reduced-motion: reduce) { .sloth-pull-top { animation: none; opacity: 0; } .sloth-pull-bottom { animation: none; } .pg-pr-sloth { animation: none; } }
 .fb-stage-figure .sloth-pull { height: 22vh; width: auto; max-height: none; }
 .info-sheet-figure .sloth-pull { height: 220px; width: auto; }
+
+/* Hintergrund-Faultier: Bild statt Strichzeichnung, dezent und dunkel */
+.sloth-bg { top: 100px; right: -44px; width: 250px; color: inherit; opacity: .24; }
+.sloth-bg img { width: 100%; height: auto; display: block; filter: brightness(.55) saturate(.5); }
