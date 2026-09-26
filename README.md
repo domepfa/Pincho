@@ -115,10 +115,12 @@ wird erst nach dem Testen in die Haupt-App übernommen.
 
 ## Offene Punkte / bewusst nicht in v1
 
-- **Zyklus-Tracking (geplant)**: Leistungskurve mit Zyklusphasen vergleichen,
-  freiwillig (Schalter, standardmässig aus) und nur für die Person selbst
-  sichtbar — mit den eigenen Konten einfach im privaten Bereich
-  (`…/{memberId}`), ausdrückliche Zustimmung beim Einschalten.
+- **Zyklus-Tracking** (Tab Fortschritt): freiwillig (Schalter mit
+  Zustimmung), privat unter `cycle/{memberId}`. Nur Periodenbeginn wird
+  eingetragen; Phasen/nächste Periode sind eine Schätzung (Ø-Länge,
+  Eisprung ~14 Tage vorher). Phasen als Bänder hinter den Kurven, Tipp pro
+  Phase, „Mehr erfahren" mit Quellen und „Deine Leistung nach Phase"
+  (jede Einheit relativ zum eigenen Niveau ±4 Wochen).
 - **Konto löschen + Datenschutz-Info** (geplant, vor dem Freischalten von
   Crew-Gründen für alle).
 - **App-Icons**: Logo `assets/icon-512-any.png` (Original, auch im Login).
