@@ -1501,3 +1501,6 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .wish-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
 .wish-row:last-child { border-bottom: none; }
 .wish-row.done { opacity: .55; }
+
+/* Suche aktiv: Körperkarte/Gruppen weg, Treffer direkt unter dem Feld */
+.ex-searching .ex-body-wrap, .ex-searching .ex-supergroup-row, .ex-searching .ex-muscle-row { display: none; }
