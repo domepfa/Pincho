@@ -380,6 +380,9 @@ async function fetchFresh(path) {
   if (!res.ok) throw new Error('HTTP ' + res.status);
   let value = await res.json();
   [...recentOpsSince(startedAt), ...loadQueue()].forEach((op) => { value = applyOp(path, value, op); });
+  // Inzwischen abgemeldet? Dann nichts mehr lokal ablegen (sonst läge nach
+  // dem Abmelden wieder eine Kopie auf dem Gerät).
+  if (!hasStoredAuth()) return value;
   writeCache(path, value);
   if (pendingWriteCount()) flushQueue();
   return value;
