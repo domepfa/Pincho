@@ -121,6 +121,10 @@ wird erst nach dem Testen in die Haupt-App übernommen.
   Eisprung ~14 Tage vorher). Phasen als Bänder hinter den Kurven, Tipp pro
   Phase, „Mehr erfahren" mit Quellen und „Deine Leistung nach Phase"
   (jede Einheit relativ zum eigenen Niveau ±4 Wochen).
+- **Muskelfaultier** (`assets/sloth/`, freigestellte PNGs, 640 px hoch):
+  hängend (Hang-Satz), sitzend mit Flasche (Pausen), winkend („Ablauf
+  geschafft!"), Klimmzug unten/oben im Wechsel (Klimmzug-Übungen, Stange an
+  derselben Höhe ausgerichtet), flexend (neuer Rekord im Fortschritt).
 - **Hilfe** (`#hilfe`, unter KONTO → „So funktioniert Pincho"): ein
   aufklappbarer Abschnitt pro Tab (`HELP_SECTIONS` in `app.js`) — bei neuen
   Funktionen dort mitpflegen.
