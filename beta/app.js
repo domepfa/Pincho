@@ -8618,23 +8618,51 @@ function fbTransportRow() {
    dorthin (mit dessen voller Dauer, genau wie beim Vorspulen); nur wenn
    man schon beim allerersten Schritt dieses Satzes ist, geht's zum
    vorherigen Satz. */
-function fbStepBack() {
+/* EIN Timer für den ganzen Ablauf: vor jedem neuen Intervall wird das alte
+   gestoppt. Vorher setzten startSequence()/Vor-/Zurückspulen teils ein
+   neues Intervall, ohne das alte zu beenden — nach mehrmaligem schnellem
+   Vorspulen liefen dann mehrere Timer parallel und die Uhr raste. */
+function fbSetTimer(fn) {
   clearInterval(fb.intervalId);
-  fb.intervalId = null;
+  fb.intervalId = fn ? setInterval(fn, 1000) : null;
+}
+
+/* Vor-/Zurückspulen vor dem eigentlichen Start: "Weiter" startet sofort
+   (ohne Vorbereitungs-Countdown), statt in einer noch gar nicht
+   aufgebauten Sequenz zu springen. true = erledigt. */
+function fbSkipStartPhase() {
+  if (fb.awaitingNext) { fb.awaitingNext = false; requestWakeLock(); startSequence(); return true; }
+  if (fb.preCount != null) { finishPreCountdown(); return true; }
+  return false;
+}
+/* War der Ablauf pausiert, bleibt er es auch nach dem Springen. */
+function fbKeepPaused(wasPaused) {
+  if (!wasPaused) return;
+  fbSetTimer(null);
+  fb.pausedAt = Date.now();
+  renderFbOverlay();
+}
+
+function fbStepBack() {
+  if (fb.awaitingNext || fb.preCount != null) return;
+  const wasPaused = fb.running && !fb.intervalId;
+  fbSetTimer(null);
   fbCheckinTyping = false; // Feld ist beim Block-/Schrittwechsel weg — sonst bliebe die Zeit angehalten
   if (fb.stepIndex > 0) {
     fb.stepIndex--;
     fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
     fb.stepStartedAt = Date.now();
-    fb.intervalId = setInterval(tickBlock, 1000);
+    fbSetTimer(tickBlock);
     renderFbOverlay();
+    fbKeepPaused(wasPaused);
     return;
   }
   if (fb.blockIndex === 0) {
     // Ganz am Anfang des Ablaufs — nichts mehr davor (Button ist in diesem
     // Zustand ohnehin disabled, Wischen kann aber trotzdem hier landen).
-    fb.intervalId = setInterval(tickBlock, 1000);
+    fbSetTimer(tickBlock);
     renderFbOverlay();
+    fbKeepPaused(wasPaused);
     return;
   }
   // War bisher der eigentliche Bug: sprang über beginBlock() immer zum
@@ -8650,8 +8678,9 @@ function fbStepBack() {
   fb.stepIndex = fb.sequence.length - 1;
   fb.secondsLeft = fb.sequence[fb.stepIndex].seconds;
   fb.stepStartedAt = Date.now();
-  fb.intervalId = setInterval(tickBlock, 1000);
+  fbSetTimer(tickBlock);
   renderFbOverlay();
+  fbKeepPaused(wasPaused);
 }
 
 /* Transport "Weiter" (⏭) sowie Wischen nach links: laut Nutzer-Feedback
@@ -8661,12 +8690,15 @@ function fbStepBack() {
    nächsten Übung". Jeder Schritt einzeln, wie tickBlock() es bei Ablauf
    der Zeit auch tut — siehe advanceToNextStep(). */
 function fbStepForward() {
-  clearInterval(fb.intervalId);
-  fb.intervalId = null;
+  if (fbSkipStartPhase()) return;
+  const wasPaused = fb.running && !fb.intervalId;
+  fbSetTimer(null);
   fbCheckinTyping = false; // Feld ist beim Blockwechsel weg — sonst bliebe die Zeit im neuen Block angehalten
-  if (advanceToNextStep()) return; // Block war zu Ende -> beginBlock()/finishAblauf() haben schon gerendert
-  fb.intervalId = setInterval(tickBlock, 1000);
-  renderFbOverlay();
+  if (!advanceToNextStep()) { // sonst hat beginBlock()/finishAblauf() schon gerendert
+    fbSetTimer(tickBlock);
+    renderFbOverlay();
+  }
+  if (fb.blockIndex < fb.blocks.length) fbKeepPaused(wasPaused);
 }
 
 function fbTogglePause() {
@@ -8681,7 +8713,7 @@ function fbTogglePause() {
     // syncFbRingAnimation), ohne das würde die Pause fälschlich mitzählen
     // und der Ring springt beim Fortsetzen ein Stück nach vorne.
     if (fb.pausedAt) { fb.stepStartedAt += Date.now() - fb.pausedAt; fb.pausedAt = null; }
-    fb.intervalId = setInterval(tickBlock, 1000);
+    fbSetTimer(tickBlock);
   }
   renderFbOverlay();
 }
@@ -9219,7 +9251,7 @@ function beginBlock() {
   if (needsPrecount) {
     fb.preCount = FB_PRECOUNT_SECONDS;
     renderFbOverlay();
-    fb.intervalId = setInterval(tickPreCountdown, 1000);
+    fbSetTimer(tickPreCountdown);
   } else {
     startSequence();
   }
@@ -9251,7 +9283,7 @@ function startSequence() {
   fb.secondsLeft = fb.sequence[0].seconds;
   fb.stepStartedAt = Date.now();
   fb.pausedAt = null;
-  fb.intervalId = setInterval(tickBlock, 1000);
+  fbSetTimer(tickBlock);
   beepStart();
   // "LOS!" blitzt auch hier kurz auf (siehe advanceToNextStep) — gilt für
   // JEDEN Satzstart über diesen Weg: nach dem Vorbereitungs-Countdown vorm
