@@ -8582,7 +8582,7 @@ const SLOTH_FACE = `
   <circle class="sloth-head" cx="100" cy="64" r="19"/>
   <path class="sloth-mask" d="M86 62 q6 -7 12 1 q-6 7 -12 -1z M114 62 q-6 -7 -12 1 q6 7 12 -1z"/>
   <path class="sloth-line" d="M97 71 h6 M94 76 q6 4 12 0"/>`;
-const FB_HANG_FIGURE_SVG = `<img class="ex-figure fb-hang-figure sloth-img" src="../assets/sloth/sloth-hang.png" alt="">`; // Test: Muskelfaultier statt Strichfigur
+const FB_HANG_FIGURE_SVG = `<img class="ex-figure fb-hang-figure sloth-img" src="../assets/sloth/sloth-hang-back.png" alt="">`; // Test: Muskelfaultier statt Strichfigur
 const FB_REST_FIGURE_SVG = `<img class="ex-figure sloth-img sloth-rest" src="../assets/sloth/sloth-rest.png" alt="">`;
 /* Lifting Pin ist kein Hängen (FB_HANG_FIGURE_SVG), sondern ein einarmiges
    Ziehen von unten (Pin auf Hüfthöhe) nach oben (Richtung Schulter) — eigene
