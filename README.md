@@ -121,8 +121,11 @@ wird erst nach dem Testen in die Haupt-App übernommen.
   Eisprung ~14 Tage vorher). Phasen als Bänder hinter den Kurven, Tipp pro
   Phase, „Mehr erfahren" mit Quellen und „Deine Leistung nach Phase"
   (jede Einheit relativ zum eigenen Niveau ±4 Wochen).
-- **Konto löschen + Datenschutz-Info** (geplant, vor dem Freischalten von
-  Crew-Gründen für alle).
+- **Datenschutz** (`#datenschutz`, auch ohne Anmeldung): Betreiber „Dome";
+  die Kontakt-Adresse steht nicht im Code, sondern in `config/contact`
+  (nur für Angemeldete lesbar, setzt der Admin unter KONTO). Unter KONTO
+  zudem „Meine Daten herunterladen" (JSON) und „Konto löschen" (mit
+  Passwort; wer eine Crew mit anderen gegründet hat, muss sie zuerst leeren).
 - **App-Icons**: Logo `assets/icon-512-any.png` (Original, auch im Login).
   Daraus erzeugt: `icon-512-transparent.png`/`icon-192-any.png` (ohne weissen
   Hintergrund) und `icon-512-maskable.png` (dunkler Hintergrund, Logo im
