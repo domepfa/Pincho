@@ -1414,3 +1414,19 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .pg-cycle-add { align-items: flex-end; }
 .pg-cycle-add .field { margin-bottom: 0; }
 .pg-cycle-more .chip-row .chip { cursor: default; color: var(--ink); display: inline-flex; align-items: center; }
+.pg-cycle-tip { margin: 0 0 12px; padding: 8px 12px; border-left: 3px solid var(--accent); border-radius: 4px; background: var(--surface-2, rgba(255,255,255,.04)); font-size: 14px; color: var(--ink); }
+.pg-cycle-learn { font-size: 14px; color: var(--ink-dim); }
+.pg-cycle-phase { padding: 10px 0; border-top: 1px solid var(--line-soft); }
+.pg-cycle-phase p { margin: 4px 0; line-height: 1.45; }
+.pg-cycle-phase.current .pg-cycle-phase-title { color: var(--accent); }
+.pg-cycle-phase-title { font-weight: 700; color: var(--ink); margin: 6px 0 4px; }
+.pg-cycle-phase-title i, .pg-cmp-label i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.pg-cycle-sources { margin: 0; padding-left: 20px; font-size: 12px; }
+.pg-cycle-sources a { color: var(--ink-dim); overflow-wrap: anywhere; }
+.pg-cmp { margin: 14px 0 4px; }
+.pg-cmp-row { display: grid; grid-template-columns: 118px 1fr 52px; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+.pg-cmp-label { color: var(--ink-dim); white-space: nowrap; }
+.pg-cmp-bar { position: relative; height: 10px; border-radius: 5px; background: #1a212a; }
+.pg-cmp-bar::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ink-faint); }
+.pg-cmp-bar span { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+.pg-cmp-val { text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
