@@ -1536,3 +1536,10 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 /* Hintergrund-Faultier: Bild statt Strichzeichnung, dezent und dunkel */
 .sloth-bg { top: 100px; right: -44px; width: 250px; color: inherit; opacity: .24; }
 .sloth-bg img { width: 100%; height: auto; display: block; filter: brightness(.55) saturate(.5); }
+/* heller, ganz sichtbar (rechte Hand nicht mehr abgeschnitten), Ast links ausblenden */
+.sloth-bg { right: 6px; width: 250px; opacity: .34; }
+.sloth-bg img {
+  filter: brightness(.75) saturate(.6);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 38%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 38%);
+}
