@@ -3297,7 +3297,9 @@ const fb = {
     // returnStepSize eigenständig, nicht an stepSize gekoppelt: rauf in
     // 2er-Schritten, aber einzeln wieder runter soll möglich sein.
     reps: 4, workSec: 3, restSec: 15, blockRestSec: 90,
-    armMode: 'both', startHand: 'left', // armMode: 'both' | 'match' | 'skip' — 'match'/'skip' zeigen zusätzlich startHand
+    armMode: 'both', startHand: 'left', // armMode: 'both' | 'match' | 'skip' | 'free' — 'match'/'skip' zeigen zusätzlich startHand
+    skipEnd: 'one', // nur 'skip': am Ende einhändig ('one') oder die andere Hand nachziehen ('match')
+    hands: [], // nur 'free' ("Hand für Hand"): Hand ('l'/'r') je Zug, parallel zu pattern
   },
   newPause: { seconds: 60 },
   blocks: loadDraft('fb_blocks') || [], // Ablauf: {type:'hang', board, grip, reps, hangSec, restSec, blockRestSec} | {type:'block', grip, fingers, weight, reps, hangSec, restSec, blockRestSec} | {type:'exercise', exerciseId, reps, workSec, restSec} | {type:'campus', rungType, moveMode, reps, workSec, restSec, blockRestSec, fromRung/toRung ODER startRung/pattern, armMode, startHand} | {type:'pause', seconds}
@@ -4051,15 +4053,73 @@ function campusPickerSvg(c) {
     const y = campusRungPoint(typeR, Number(r), 'r').y;
     return `<text class="cr-num" x="${Math.min(xR + 8, CAMPUS_IMG_W - 60)}" y="${y + 10}">${nums.join('·')}</text>`;
   }).join('');
+  if (c.armMode === 'free') return campusFreePickerSvg(c, shapes, stops, typeL, typeR);
   const path = stops.length > 1 ? `<polyline class="cr-path" points="${stops.map((r) => { const pt = campusRungPoint(typeL, r, 'l'); return `${pt.x},${pt.y}`; }).join(' ')}"/>` : '';
   return `<svg class="campus-pick" viewBox="0 0 ${CAMPUS_IMG_W} ${CAMPUS_IMG_H}" role="group" aria-label="Campusboard: Sprossen antippen">
     <image href="${CAMPUS_BOARD_IMAGE}" x="0" y="0" width="${CAMPUS_IMG_W}" height="${CAMPUS_IMG_H}"/>
     ${shapes}${path}${labels}
   </svg>`;
 }
+/* "Hand für Hand": Start (S, beide Hände) und jeder Zug als nummerierter
+   Punkt auf der Seite der Hand; dezente L/R-Markierung über der Spalte. */
+function campusFreePickerSvg(c, shapes, stops, typeL, typeR) {
+  const marks = [];
+  if (stops.length) {
+    ['l', 'r'].forEach((h) => {
+      const p = campusRungPoint(h === 'l' ? typeL : typeR, stops[0], h);
+      marks.push(`<circle class="cr-move-start ${h}" cx="${p.x}" cy="${p.y}" r="18"/>`); // Start: leerer Ring, beide Hände
+    });
+  }
+  (c.hands || []).forEach((h, i) => {
+    const p = campusRungPoint(h === 'l' ? typeL : typeR, stops[i + 1], h);
+    marks.push(`<circle class="cr-move ${h}" cx="${p.x}" cy="${p.y}" r="20"/><text class="cr-move-num" x="${p.x}" y="${p.y + 9}">${i + 1}</text>`);
+  });
+  const guide = [['l', typeL], ['r', typeR]].map(([h, t]) => {
+
+    const p = campusRungPoint(t, 1, h);
+    return `<text class="cr-side ${h}" x="${p.x}" y="${CAMPUS_IMG_H + 62}">${h === 'l' ? 'L' : 'R'}</text>`;
+  }).join('');
+  return `<svg class="campus-pick" viewBox="0 0 ${CAMPUS_IMG_W} ${CAMPUS_IMG_H + 100}" role="group" aria-label="Campusboard: linke oder rechte Hälfte einer Sprosse antippen">
+    <image href="${CAMPUS_BOARD_IMAGE}" x="0" y="0" width="${CAMPUS_IMG_W}" height="${CAMPUS_IMG_H}"/>
+    ${shapes}${guide}${marks.join('')}
+  </svg>`;
+}
+/* Welche Hand ein Tipp meint: bei unterschiedlichen Spalten die Spalte,
+   sonst die Hälfte der Sprosse (Kugeln haben ohnehin eine Seite). */
+function campusTapHand(c, el, type, clientX) {
+  if (c.rungSides === 'different' && (c.rungTypeRight || c.rungType) !== c.rungType) return type === c.rungType ? 'l' : 'r';
+  if (el.dataset.side) return el.dataset.side;
+  const r = el.getBoundingClientRect();
+  return clientX < r.left + r.width / 2 ? 'l' : 'r';
+}
+function campusFreeTap(c, el, type, rung, clientX) {
+  const stops = campusBuilderStops(c);
+  const typeR = c.rungTypeRight || c.rungType;
+  if (type !== c.rungType && type !== typeR) {
+    if (c.rungSides === 'different') { if (c.pickHand === 'r') c.rungTypeRight = type; else c.rungType = type; }
+    else { c.rungType = type; c.routeFresh = true; c.pattern = []; c.hands = []; }
+    renderFbAddPanel();
+    return;
+  }
+  if (!stops.length) {
+    c.routeFresh = false; c.moveMode = 'pattern'; c.startRung = rung; c.pattern = []; c.hands = [];
+    renderFbAddPanel();
+    return;
+  }
+  const hand = campusTapHand(c, el, type, clientX);
+  // Wo ist diese Hand gerade? Gleiche Sprosse nochmals = kein Zug.
+  let at = stops[0];
+  (c.hands || []).forEach((h, i) => { if (h === hand) at = stops[i + 1]; });
+  if (at === rung) { toast(`${hand === 'l' ? 'Linke' : 'Rechte'} Hand ist schon an Sprosse ${rung}.`); return; }
+  c.pattern = [...c.pattern, rung - stops[stops.length - 1]];
+  c.hands = [...(c.hands || []), hand];
+  renderFbAddPanel();
+}
+
 function wireCampusPicker(c) {
   document.querySelectorAll('.campus-pick .cr[data-rung]').forEach((el) => {
-    el.onclick = () => {
+    el.onclick = (e) => {
+      if (c.armMode === 'free') { campusFreeTap(c, el, el.dataset.type, Number(el.dataset.rung), e.clientX); return; }
       const type = el.dataset.type;
       const rung = Number(el.dataset.rung);
       const stops = campusBuilderStops(c);
@@ -4102,13 +4162,18 @@ function wireCampusPicker(c) {
   });
   const undo = document.getElementById('campus-route-undo');
   if (undo) undo.onclick = () => {
+    if (c.armMode === 'free') {
+      if (c.hands.length) { c.hands = c.hands.slice(0, -1); c.pattern = c.pattern.slice(0, -1); } else c.routeFresh = true;
+      renderFbAddPanel();
+      return;
+    }
     const stops = campusBuilderStops(c).slice(0, -1);
     if (stops.length >= 2) campusSetStops(c, stops);
     else if (stops.length === 1) { c.moveMode = 'pattern'; c.startRung = stops[0]; c.pattern = []; }
     else c.routeFresh = true;
     renderFbAddPanel();
   };
-  document.getElementById('campus-route-new').onclick = () => { c.routeFresh = true; c.pattern = []; renderFbAddPanel(); };
+  document.getElementById('campus-route-new').onclick = () => { c.routeFresh = true; c.pattern = []; c.hands = []; renderFbAddPanel(); };
 }
 
 /* Campus-Board: keine Foto-Hotspots wie beim Hangboard (Sprossen sind
@@ -4135,13 +4200,20 @@ function renderCampusAddPanel(holder) {
         </div>` : ''}
       <div class="campus-pick-wrap">${campusPickerSvg(c)}</div>
       <div class="campus-pick-bar">
-        <span class="campus-pick-route">${(() => { const st = campusBuilderStops(c); return st.length ? st.join(' → ') : 'Sprossen der Reihe nach antippen: 1. Tipp = Start'; })()}</span>
+        <span class="campus-pick-route">${(() => {
+          const st = campusBuilderStops(c);
+          if (c.armMode === 'free') {
+            if (!st.length) return '1. Tipp = Start (beide Hände), dann links/rechts auf die Sprosse tippen';
+            return c.hands.length ? `S${st[0]} · ${campusFreeMovesText({ ...c, moveMode: 'pattern' })}` : `Start ${st[0]} (beide) · jetzt linke oder rechte Hälfte antippen`;
+          }
+          return st.length ? st.join(' → ') : 'Sprossen der Reihe nach antippen: 1. Tipp = Start';
+        })()}</span>
         <button type="button" class="btn ghost small" id="campus-route-undo" ${campusBuilderStops(c).length ? '' : 'disabled'}>Zurück</button>
         <button type="button" class="btn ghost small" id="campus-route-new">Neu</button>
       </div>
     </div>
 
-    <div class="field">
+    ${c.armMode === 'free' ? '' : `<div class="field">
       <label>Bewegung</label>
       <div class="chip-row" id="campus-mode-toggle" style="margin-bottom:10px;">
         <button type="button" class="chip ${c.moveMode === 'direct' ? 'active' : ''}" data-mode="direct">Von → Zu</button>
@@ -4219,7 +4291,7 @@ function renderCampusAddPanel(holder) {
           ${c.pattern.length ? '<span class="pattern-clear" id="campus-pattern-clear">Zurücksetzen ×</span>' : ''}
         </div>
       `}
-    </div>
+    </div>`}
 
     <div class="field">
       <label>Bewegungsart</label>
@@ -4227,8 +4299,16 @@ function renderCampusAddPanel(holder) {
         <button type="button" class="chip ${c.armMode === 'both' ? 'active' : ''}" data-arm="both"><span class="emoji">🙌</span>${campusArmModeLabel('both')}</button>
         <button type="button" class="chip ${c.armMode === 'match' ? 'active' : ''}" data-arm="match"><span class="emoji">🔄</span>${campusArmModeLabel('match')}</button>
         <button type="button" class="chip ${c.armMode === 'skip' ? 'active' : ''}" data-arm="skip"><span class="emoji">🔃</span>${campusArmModeLabel('skip')}</button>
+        <button type="button" class="chip ${c.armMode === 'free' ? 'active' : ''}" data-arm="free"><span class="emoji">✋</span>${campusArmModeLabel('free')}</button>
       </div>
-      ${c.armMode !== 'both' ? `
+      ${c.armMode === 'free' ? '<div class="campus-step-hint">Im Bild oben: erster Tipp = Start mit beiden Händen, danach die <b>linke oder rechte Hälfte</b> einer Sprosse antippen — das ist die Hand, die greift.</div>' : ''}
+      ${c.armMode === 'skip' ? `
+        <div class="fb-checkin-label" style="text-align:left;margin-bottom:6px;">Am Ende</div>
+        <div class="chip-row" id="campus-skipend-toggle" style="margin-bottom:10px;">
+          <button type="button" class="chip ${c.skipEnd !== 'match' ? 'active' : ''}" data-skipend="one">Einhändig halten</button>
+          <button type="button" class="chip ${c.skipEnd === 'match' ? 'active' : ''}" data-skipend="match">Nachziehen (beide am Ziel)</button>
+        </div>` : ''}
+      ${c.armMode !== 'both' && c.armMode !== 'free' ? `
         <div class="fb-checkin-label" style="text-align:left;margin-bottom:6px;">Starthand</div>
         <div class="chip-row" id="campus-starthand-toggle" style="margin-bottom:0;">
           <button type="button" class="chip ${c.startHand === 'left' ? 'active' : ''}" data-hand="left"><span class="emoji">🫲</span>Links zuerst</button>
@@ -4252,11 +4332,29 @@ function renderCampusAddPanel(holder) {
     btn.onclick = () => { c.rungType = btn.dataset.rung; renderFbAddPanel(); };
   });
   wireCampusPicker(c);
-  document.getElementById('campus-mode-toggle').querySelectorAll('.chip').forEach((btn) => {
+  const modeToggle = document.getElementById('campus-mode-toggle');
+  if (modeToggle) modeToggle.querySelectorAll('.chip').forEach((btn) => {
     btn.onclick = () => { c.moveMode = btn.dataset.mode; renderFbAddPanel(); };
   });
   document.getElementById('campus-armmode-toggle').querySelectorAll('.chip').forEach((btn) => {
-    btn.onclick = () => { c.armMode = btn.dataset.arm; renderFbAddPanel(); };
+    btn.onclick = () => {
+      const next = btn.dataset.arm;
+      if (next === c.armMode) return;
+      const stops = campusBuilderStops(c);
+      if (next === 'free') {
+        // Route neu Hand für Hand aufbauen — nur den Start übernehmen.
+        c.moveMode = 'pattern'; c.pattern = []; c.hands = [];
+        if (stops.length) { c.startRung = stops[0]; c.routeFresh = false; } else c.routeFresh = true;
+      } else if (c.armMode === 'free') {
+        c.hands = []; c.pattern = []; c.routeFresh = !stops.length;
+      }
+      c.armMode = next;
+      renderFbAddPanel();
+    };
+  });
+  const skipEnd = document.getElementById('campus-skipend-toggle');
+  if (skipEnd) skipEnd.querySelectorAll('.chip').forEach((btn) => {
+    btn.onclick = () => { c.skipEnd = btn.dataset.skipend; renderFbAddPanel(); };
   });
   const startHandToggle = document.getElementById('campus-starthand-toggle');
   if (startHandToggle) {
@@ -4302,10 +4400,13 @@ function renderCampusAddPanel(holder) {
   document.getElementById('campus-restsec').oninput = (e) => { c.restSec = Number(e.target.value) || 0; };
   document.getElementById('campus-blockrestsec').oninput = (e) => { c.blockRestSec = Number(e.target.value) || 0; };
   document.getElementById('fb-add-campus').onclick = () => {
+    if (c.armMode === 'free' && (c.routeFresh || !(c.hands || []).length)) { toast('Zuerst Start und mindestens einen Zug im Bild antippen.', 'err'); return; }
     if (c.routeFresh || (c.moveMode === 'pattern' && !c.pattern.length)) { toast('Zuerst mindestens zwei Sprossen antippen (oder ein Muster wählen).', 'err'); return; }
     const pushCampus = (blk) => {
       const out = { ...blk };
       delete out.rungSides; delete out.pickHand; delete out.routeFresh;
+      if (out.armMode === 'free') out.hands = (c.hands || []).slice(); else delete out.hands;
+      if (out.armMode !== 'skip') delete out.skipEnd;
       if (c.rungSides !== 'different' || !out.rungTypeRight || out.rungTypeRight === out.rungType) delete out.rungTypeRight;
       fb.blocks.push(out);
     };
@@ -7772,7 +7873,13 @@ function holdBlockTitle(b) {
    Sprossen sind durchnummeriert, deshalb reicht die Bewegung als reiner
    Zahlen-Text ("Sprosse 1→4" bzw. "Start 1 · Muster +2/-1" fürs
    Wiederholmuster, siehe fb.newCampus.moveMode). */
+/* "Hand für Hand": Züge als L2 · R3 … (Start = beide Hände). */
+function campusFreeMovesText(b) {
+  const stops = campusStopsOf(b);
+  return (b.hands || []).map((h, i) => `${h === 'r' ? 'R' : 'L'}${stops[i + 1]}`).join(' · ');
+}
 function campusMoveText(b) {
+  if (b.armMode === 'free') return `Start ${b.startRung} · ${campusFreeMovesText(b)}`;
   return b.moveMode === 'pattern'
     ? `Start ${b.startRung} · Muster ${b.pattern.map((p) => (p > 0 ? '+' + p : String(p))).join('/')}`
     : `Sprosse ${b.fromRung}→${b.toRung}`;
@@ -7785,6 +7892,7 @@ function campusMoveText(b) {
 function campusArmIcons(b) {
   const armMode = b.armMode || 'both';
   if (armMode === 'both') return '🙌';
+  if (armMode === 'free') return '✋';
   const armIcon = armMode === 'skip' ? '🔃' : '🔄';
   const handIcon = b.startHand === 'right' ? '🫱' : '🫲';
   return `${armIcon}${handIcon}`;
@@ -7800,13 +7908,15 @@ function campusLabel(b) {
    Dieselben drei Begriffe wie die Chips im Baukasten (campusArmModeLabel),
    damit Aufbau und Ausführung dieselbe Sprache sprechen. */
 function campusArmModeLabel(armMode) {
+  if (armMode === 'free') return 'Hand für Hand';
   if (armMode === 'match') return 'Nachziehen';
   if (armMode === 'skip') return 'Übergreifen';
   return 'Gleichzeitig';
 }
 function campusArmLabelHtml(b) {
   const armMode = b.armMode || 'both';
-  const handText = armMode !== 'both' ? (b.startHand === 'right' ? 'Rechts zuerst' : 'Links zuerst') : '';
+  let handText = armMode !== 'both' && armMode !== 'free' ? (b.startHand === 'right' ? 'Rechts zuerst' : 'Links zuerst') : '';
+  if (armMode === 'skip' && b.skipEnd === 'match') handText += ' · am Ende nachziehen';
   return `<div class="campus-armline"><span class="campus-armline-mode">${esc(campusArmModeLabel(armMode))}</span>${handText ? `<span class="campus-armline-hand">${esc(handText)}</span>` : ''}</div>`;
 }
 
@@ -7929,7 +8039,9 @@ function campusLadderSvgMarkup(b) {
    Wand); während des Satzes selbst ruhig ohne Animation. */
 function campusWorkFigureSvg(b, animate = true) {
   const stops = campusStopsOf(b);
-  const text = stops.length === 2
+  const text = b.armMode === 'free'
+    ? `<div class="campus-route-step"><span class="campus-route-dot up"></span>Start <b>Sprosse ${stops[0]}</b> (beide Hände)</div>${(b.hands || []).map((h, i) => `<div class="campus-route-step"><span class="campus-route-dot ${h === 'r' ? 'hand-r-dot' : 'up'}"></span>${h === 'r' ? 'Rechts' : 'Links'} an <b>Sprosse ${stops[i + 1]}</b></div>`).join('')}`
+    : stops.length === 2
     ? `<div class="campus-route-step"><span class="campus-route-dot up"></span>Start <b>Sprosse ${stops[0]}</b></div><div class="campus-route-step"><span class="campus-route-dot ${stops[1] > stops[0] ? 'up' : 'down'}"></span>${stops[1] > stops[0] ? 'Rauf' : 'Runter'} bis <b>Sprosse ${stops[1]}</b></div>`
     : campusRouteStepsHtml({ ...b, pattern: stops.slice(1).map((r, i) => r - stops[i]), startRung: stops[0] });
   return `<div class="campus-work-figure">${campusArmLabelHtml(b)}<div class="campus-anim-row">${campusRouteAnimSvg(b, animate)}<div class="campus-route">${text}</div></div></div>`;
@@ -7973,6 +8085,10 @@ function campusHandEvents(b, stops) {
   const lead = b.startHand === 'right' ? 'r' : 'l';
   const other = lead === 'l' ? 'r' : 'l';
   const ev = { l: [], r: [] };
+  if (armMode === 'free') {
+    (b.hands || []).forEach((h, i) => { ev[h === 'r' ? 'r' : 'l'].push({ t0: i + 0.1, t1: i + 0.6, rung: stops[i + 1] }); });
+    return ev;
+  }
   for (let i = 1; i < stops.length; i++) {
     const t = i - 1;
     if (armMode === 'both') {
@@ -7985,6 +8101,13 @@ function campusHandEvents(b, stops) {
       const hand = i % 2 === 1 ? lead : other;
       ev[hand].push({ t0: t + 0.1, t1: t + 0.6, rung: stops[i] });
     }
+  }
+  // Übergreifen, "am Ende nachziehen": die zweite Hand kommt zum Schluss
+  // ebenfalls an die Zielsprosse (sonst hält man den letzten Griff einhändig).
+  if (armMode === 'skip' && b.skipEnd === 'match' && stops.length > 1) {
+    const n = stops.length - 1;
+    const lastHand = n % 2 === 1 ? lead : other;
+    ev[lastHand === 'l' ? 'r' : 'l'].push({ t0: n + 0.1, t1: n + 0.6, rung: stops[n] });
   }
   return ev;
 }
@@ -8019,7 +8142,7 @@ function campusRouteAnimSvg(b, animate) {
     const y = campusRungPoint(typeR, Number(r), 'r').y;
     return `<text class="cr-num" x="${labelX}" y="${y + 9}">${nums.join('·')}</text>`;
   }).join('');
-  const T = Math.max(1, stops.length - 1) + 1.2;
+  const T = Math.max(1, stops.length - 1) + (b.armMode === 'skip' && b.skipEnd === 'match' ? 2.2 : 1.2);
   const dur = (T * 0.9).toFixed(2);
   const ev = campusHandEvents(b, stops);
   const handSvg = ['l', 'r'].map((hand) => {
@@ -8207,9 +8330,11 @@ function fbFactArmText(b, activeRep) {
 function fbFactCampusModeText(b) {
   const armMode = b.armMode || 'both';
   const modeLabel = campusArmModeLabel(armMode);
-  return armMode === 'both' ? modeLabel : `${modeLabel}, ${b.startHand === 'right' ? 'Rechts' : 'Links'} zuerst`;
+  if (armMode === 'both' || armMode === 'free') return modeLabel;
+  return `${modeLabel}, ${b.startHand === 'right' ? 'Rechts' : 'Links'} zuerst${armMode === 'skip' && b.skipEnd === 'match' ? ', am Ende nachziehen' : ''}`;
 }
 function fbFactCampusMusterText(b) {
+  if (b.armMode === 'free') return `Start ${b.startRung} · ${campusFreeMovesText(b)}`;
   if (b.moveMode !== 'pattern') return `Sprosse ${b.fromRung} → ${b.toRung}`;
   const end = b.pattern.reduce((r, p) => r + p, b.startRung);
   return `${b.startRung} → ${end}, ${b.pattern.length} Züge`;

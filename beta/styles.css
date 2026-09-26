@@ -1459,3 +1459,16 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .pg-ex-chg { text-align: right; font-variant-numeric: tabular-nums; }
 .pg-ex-chg .up { color: var(--accent); }
 .pg-ex-chg .down { color: #ffb49b; }
+
+/* ---------- Campus "Hand für Hand" ---------- */
+.cr-move { stroke: var(--bg); stroke-width: 4; pointer-events: none; }
+.cr-move.l { fill: var(--accent); }
+.cr-move.r { fill: #ff6b47; }
+.cr-move-num { fill: #04141c; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; text-anchor: middle; pointer-events: none; }
+.cr-side { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 44px; text-anchor: middle; opacity: .8; pointer-events: none; }
+.cr-side.l { fill: var(--accent); }
+.cr-side.r { fill: #ff6b47; }
+.campus-route-dot.hand-r-dot { background: #ff6b47; }
+.cr-move-start { fill: none; stroke-width: 7; pointer-events: none; }
+.cr-move-start.l { stroke: var(--accent); }
+.cr-move-start.r { stroke: #ff6b47; }
