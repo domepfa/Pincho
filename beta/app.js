@@ -9674,6 +9674,7 @@ const PROGRESS_COLORS = { gym: '#2f95cf', board: '#c4851c', other: '#9b7be6' }; 
 const PROGRESS_RANGES = [['4w', '4W', 28], ['3m', '3M', 91], ['1y', '1J', 365], ['all', 'Alle', 100000]];
 let progressRange = '3m';
 let progressExerciseId = null;
+let progressSource = (() => { try { return localStorage.getItem('pinchobeta_pg_source') || 'gym'; } catch (e) { return 'gym'; } })(); // 'gym' | 'board'
 let progressFbSessions = [];
 
 function dayKey(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
@@ -9694,17 +9695,70 @@ function bestSetOf(exerciseId, sets) {
   return { ...best, value: best.w > 0 ? best.w : best.r, label: best.w > 0 ? `${best.w} kg × ${best.r}${best.suffix}` : `${best.r}${best.suffix || ' Wdh.'}` };
 }
 
-function progressSeries(exerciseId, days) {
+/* Übungen im Board-Ablauf (Fixübungen wie Kniebeugen, Lifting-Pin mit
+   Wiederholungen): pro Einheit die im Check-in erfassten Wdh./Gewichte als
+   "Sätze" — so lässt sich derselbe bestSetOf-Vergleich wie im Gym nutzen. */
+const PG_BLOCK_ID = '__liftingpin';
+function boardExerciseSets(sn) {
+  const out = {};
+  (sn.blocks || []).forEach((b, i) => {
+    const r = (sn.results || [])[i];
+    if (!r || r.reps === '' || r.reps == null) return;
+    let id = null;
+    if (b.type === 'exercise' && r.type === 'exercise') id = b.exerciseId;
+    else if (b.type === 'block' && b.mode === 'reps') id = PG_BLOCK_ID;
+    if (!id) return;
+    (out[id] = out[id] || []).push({ reps: r.reps, weight: r.weight });
+  });
+  return out;
+}
+function progressExerciseName(id) {
+  return id === PG_BLOCK_ID ? 'Lifting Pin (Wiederholungen)' : exerciseName(id);
+}
+/* Alle Übungen der gewählten Quelle (Gym-Logs bzw. Board-Einheiten). */
+function progressSessionsBySource(source) {
+  if (source === 'board') {
+    return progressFbSessions.map((sn) => ({ t: entryTime(sn), date: sn.date, byEx: boardExerciseSets(sn) }));
+  }
+  return state.logs.map((e) => {
+    const byEx = {};
+    (e.exercises || []).forEach((x) => {
+      if (Array.isArray(x.sets) && x.sets.length && !['warmup_general', 'cooldown_general'].includes(x.exerciseId)) byEx[x.exerciseId] = x.sets;
+    });
+    return { t: entryTime(e), date: e.date, byEx };
+  });
+}
+function progressExerciseIds(source) {
+  const ids = [];
+  progressSessionsBySource(source).sort((a, b) => b.t - a.t).forEach((s) => Object.keys(s.byEx).forEach((id) => { if (!ids.includes(id)) ids.push(id); }));
+  return ids; // zuletzt trainierte zuerst
+}
+function progressSeries(exerciseId, days, source = progressSource) {
   const since = Date.now() - days * 86400000;
   const pts = [];
-  state.logs.forEach((e) => {
-    if (entryTime(e) < since) return;
-    const ex = (e.exercises || []).find((x) => x.exerciseId === exerciseId && Array.isArray(x.sets) && x.sets.length);
-    if (!ex) return;
-    const best = bestSetOf(exerciseId, ex.sets);
-    if (best) pts.push({ t: entryTime(e), date: e.date, ...best });
+  progressSessionsBySource(source).forEach((s) => {
+    if (s.t < since || !s.byEx[exerciseId]) return;
+    const best = bestSetOf(exerciseId === PG_BLOCK_ID ? 'x' : exerciseId, s.byEx[exerciseId]);
+    if (best) pts.push({ t: s.t, date: s.date, ...best });
   });
   return pts.sort((a, b) => a.t - b.t);
+}
+/* Übersicht: jede Übung mit letztem Bestwert und Veränderung im Zeitraum. */
+function progressOverviewHtml(exIds, days) {
+  return `<div class="pg-ex-list">${exIds.map((id) => {
+    const pts = progressSeries(id, days);
+    const last = pts[pts.length - 1];
+    let change = '<span class="pg-muted">—</span>';
+    if (pts.length >= 2 && pts[0].value) {
+      const pct = Math.round(((last.value - pts[0].value) / pts[0].value) * 100);
+      change = `<span class="${pct > 0 ? 'up' : pct < 0 ? 'down' : ''}">${pct > 0 ? '+' : ''}${pct} %</span>`;
+    }
+    return `<button type="button" class="pg-ex-row ${id === progressExerciseId ? 'active' : ''}" data-pg-ex="${esc(id)}">
+      <span class="pg-ex-name">${esc(progressExerciseName(id))}</span>
+      <span class="pg-ex-last">${last ? esc(last.label) : '<span class="pg-muted">nicht im Zeitraum</span>'}</span>
+      <span class="pg-ex-chg">${change}</span>
+    </button>`;
+  }).join('')}</div>`;
 }
 
 /* Einfaches Linien-Diagramm (eine Serie, keine Legende nötig — der Titel
@@ -9986,7 +10040,13 @@ function relativeScores() {
     const best = bestSetOf(ex.exerciseId, ex.sets);
     if (best) add('ex:' + ex.exerciseId, entryTime(e), best.value);
   }));
-  progressFbSessions.forEach((sn) => add('fb', entryTime(sn), fbSessionHangSeconds(sn)));
+  progressFbSessions.forEach((sn) => {
+    add('fb', entryTime(sn), fbSessionHangSeconds(sn));
+    Object.entries(boardExerciseSets(sn)).forEach(([id, sets]) => {
+      const best = bestSetOf(id === PG_BLOCK_ID ? 'x' : id, sets);
+      if (best) add('bx:' + id, entryTime(sn), best.value);
+    });
+  });
   const perSession = {}; // Tag -> [ratios]
   Object.values(series).forEach((pts) => pts.forEach((p) => {
     const near = pts.filter((q) => q !== p && Math.abs(q.t - p.t) <= 28 * DAY_MS).map((q) => q.v);
@@ -10027,14 +10087,7 @@ function cycleCompareHtml() {
 }
 
 function cycleCardHtml() {
-  if (!cycleData) {
-    return `<div class="pg-card" id="pg-cycle">
-      <div class="pg-card-head"><h3>Zyklus</h3><span class="pg-muted">freiwillig</span></div>
-      <p class="pg-muted" style="margin:0 0 12px;">Zeigt deine Zyklusphasen hinter den Leistungskurven, schätzt die nächste Periode und vergleicht deine Leistung je Phase. Nur für dich sichtbar — nie für die Crew oder in Challenges. Jederzeit löschbar.</p>
-      <button class="btn ghost small" id="cycle-enable">Einschalten</button>
-      ${cycleLearnHtml(null)}
-    </div>`;
-  }
+  if (!cycleData) return ''; // aus: im Fortschritt gar nicht sichtbar (Ein-/Ausschalten unter KONTO)
   const t = cycleToday();
   const starts = cycleStarts();
   const todayKey = dayKey(new Date());
@@ -10058,21 +10111,46 @@ function cycleCardHtml() {
         <button class="btn ghost small" id="cycle-add">Eintragen</button>
       </div>
       <div class="chip-row">${starts.slice().reverse().map((k) => `<span class="chip small">${esc(fmtShortDate(k))} <button type="button" class="chip-x" data-cycle-del="${esc(k)}" aria-label="${esc(fmtShortDate(k))} löschen">×</button></span>`).join('') || '<span class="pg-muted">Noch keine Einträge.</span>'}</div>
-      <button class="btn ghost small" id="cycle-off">Ausschalten &amp; alle Zyklusdaten löschen</button>
+      <p class="pg-muted" style="margin:10px 0 0;">Ausschalten &amp; alle Zyklusdaten löschen: unter KONTO.</p>
     </details>
     <p class="pg-muted" style="margin:10px 0 0;">Schätzung aus deinen Einträgen — kein medizinischer Rat und keine Verhütungsmethode.</p>
   </div>`;
 }
 
+async function cycleEnable() {
+  if (!confirm('Zyklusdaten sind Gesundheitsdaten. Sie werden in deinem privaten Bereich gespeichert, den nur du sehen kannst (nicht die Crew). Du kannst sie jederzeit löschen. Einverstanden?')) return false;
+  cycleData = { consentAt: Date.now() };
+  await fbPut(`cycle/${state.member.id}`, cycleData);
+  return true;
+}
+async function cycleDisable() {
+  if (!confirm('Zyklus-Tracking ausschalten und alle Zyklusdaten endgültig löschen?')) return false;
+  cycleData = null;
+  await fbDelete(`cycle/${state.member.id}`);
+  toast('Zyklusdaten gelöscht.', 'ok');
+  return true;
+}
+function cycleKontoCardHtml() {
+  return `
+    <div class="sec-head"><h2 class="sec-title">Zyklus</h2><div class="sec-rule"></div></div>
+    <div class="card konto-data">
+      <p class="card-sub" style="margin:0;">${cycleData
+        ? 'Eingeschaltet. Karte und Phasen findest du im Tab Fortschritt.'
+        : 'Freiwillig: zeigt deine Zyklusphasen hinter den Leistungskurven, schätzt die nächste Periode und vergleicht deine Leistung je Phase. Nur für dich sichtbar — nie für die Crew. Jederzeit löschbar.'}</p>
+      ${cycleData
+        ? '<button class="btn ghost small" id="konto-cycle-off">Ausschalten &amp; alle Zyklusdaten löschen</button>'
+        : '<button class="btn ghost small" id="konto-cycle-on">Zyklus-Tracking einschalten</button>'}
+    </div>`;
+}
+function wireCycleKonto() {
+  const on = document.getElementById('konto-cycle-on');
+  if (on) on.onclick = async () => { if (await cycleEnable()) { toast('Eingeschaltet — trag im Tab Fortschritt deinen Periodenbeginn ein.', 'ok'); renderKonto(); } };
+  const off = document.getElementById('konto-cycle-off');
+  if (off) off.onclick = async () => { if (await cycleDisable()) renderKonto(); };
+}
+
 function wireCycleCard() {
   const base = `cycle/${state.member.id}`;
-  const enable = document.getElementById('cycle-enable');
-  if (enable) enable.onclick = async () => {
-    if (!confirm('Zyklusdaten sind Gesundheitsdaten. Sie werden in deinem privaten Bereich gespeichert, den nur du sehen kannst (nicht die Crew). Du kannst sie jederzeit löschen. Einverstanden?')) return;
-    cycleData = { consentAt: Date.now() };
-    await fbPut(base, cycleData);
-    drawProgress();
-  };
   const addStart = async (key) => {
     if (!key || key > dayKey(new Date())) { toast('Bitte ein Datum bis heute wählen.', 'err'); return; }
     cycleData = { ...cycleData, starts: { ...(cycleData.starts || {}), [key]: true } };
@@ -10095,14 +10173,6 @@ function wireCycleCard() {
       if (more) more.open = true;
     };
   });
-  const off = document.getElementById('cycle-off');
-  if (off) off.onclick = async () => {
-    if (!confirm('Zyklus-Tracking ausschalten und alle Zyklusdaten endgültig löschen?')) return;
-    cycleData = null;
-    await fbDelete(base);
-    toast('Zyklusdaten gelöscht.', 'ok');
-    drawProgress();
-  };
 }
 
 async function renderProgress() {
@@ -10117,10 +10187,7 @@ async function renderProgress() {
 function drawProgress() {
   const root = document.getElementById('pg-root');
   if (!root) return;
-  const exIds = [];
-  state.logs.forEach((e) => (e.exercises || []).forEach((ex) => {
-    if (Array.isArray(ex.sets) && ex.sets.length && !exIds.includes(ex.exerciseId) && !['warmup_general', 'cooldown_general'].includes(ex.exerciseId)) exIds.push(ex.exerciseId);
-  }));
+  const exIds = progressExerciseIds(progressSource);
   if (!progressExerciseId || !exIds.includes(progressExerciseId)) progressExerciseId = exIds[0] || null;
   const days = PROGRESS_RANGES.find((r) => r[0] === progressRange)[2];
   const pts = progressExerciseId ? progressSeries(progressExerciseId, days) : [];
@@ -10144,14 +10211,19 @@ function drawProgress() {
 
     <div class="pg-card">
       <div class="pg-card-head">
-        <h3>Übung</h3>
+        <h3>Übungen</h3>
         <div class="chip-row pg-ranges">${PROGRESS_RANGES.map(([k, l]) => `<button type="button" class="chip small ${k === progressRange ? 'active' : ''}" data-range="${k}">${l}</button>`).join('')}</div>
       </div>
-      ${exIds.length ? `<select class="pg-select" id="pg-exercise" aria-label="Übung wählen">${exIds.map((id) => `<option value="${id}" ${id === progressExerciseId ? 'selected' : ''}>${esc(exerciseName(id))}</option>`).join('')}</select>` : ''}
+      <div class="chip-row pg-source">
+        <button type="button" class="chip ${progressSource === 'gym' ? 'active' : ''}" data-pg-source="gym">Gym</button>
+        <button type="button" class="chip ${progressSource === 'board' ? 'active' : ''}" data-pg-source="board">Board</button>
+      </div>
+      ${exIds.length ? `<p class="pg-ex-current">${esc(progressExerciseName(progressExerciseId))}</p>` : ''}
       ${isNewPr ? `<div class="pg-pr">Neuer Rekord: <b>${esc(pts[pts.length - 1].label)}</b></div>` : ''}
       ${headline}
-      ${exIds.length ? progressLineChart('pg-ex', pts, 'Bester Satz je Training') : '<div class="list-empty">Noch keine Gym-Sätze geloggt.</div>'}
+      ${exIds.length ? progressLineChart('pg-ex', pts, 'Bester Satz je Training') : `<div class="list-empty">${progressSource === 'board' ? 'Noch keine Übungen im Board-Ablauf erfasst (Wdh./Gewicht im Check-in).' : 'Noch keine Gym-Sätze geloggt.'}</div>`}
       ${exIds.length && pts.length ? cycleLegendHtml() : ''}
+      ${exIds.length ? progressOverviewHtml(exIds, days) : ''}
     </div>
 
     <div class="pg-card">
@@ -10175,8 +10247,15 @@ function drawProgress() {
   `;
   root.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => { progressRange = b.dataset.range; drawProgress(); }; });
   wireCycleCard();
-  const sel = document.getElementById('pg-exercise');
-  if (sel) sel.onchange = () => { progressExerciseId = sel.value; drawProgress(); };
+  root.querySelectorAll('[data-pg-source]').forEach((b) => {
+    b.onclick = () => {
+      progressSource = b.dataset.pgSource;
+      try { localStorage.setItem('pinchobeta_pg_source', progressSource); } catch (e) { /* ignorieren */ }
+      progressExerciseId = null;
+      drawProgress();
+    };
+  });
+  root.querySelectorAll('[data-pg-ex]').forEach((b) => { b.onclick = () => { progressExerciseId = b.dataset.pgEx; drawProgress(); }; });
   const series = { 'pg-ex': pts, 'pg-fb': fbPts };
   root.querySelectorAll('.pg-hit').forEach((c) => {
     c.onclick = () => {
@@ -10625,6 +10704,7 @@ async function renderKonto() {
       </div>
     </div>
     <div id="konto-create"></div>
+    <div id="konto-cycle"></div>
     <div id="konto-data"></div>
   `);
   document.getElementById('konto-logout').onclick = () => logout();
@@ -10703,6 +10783,10 @@ async function renderKonto() {
   // Crew gründen: Admin (Phase 1) oder sobald für alle freigeschaltet.
   const [cfg, admin] = await Promise.all([fbGetNow('config'), probeAdmin()]);
   const open = cfg.ok && cfg.value && cfg.value.crewCreationOpen === true;
+  const rawCycle = await fbGet(`cycle/${state.member.id}`);
+  if (rawCycle !== undefined) cycleData = rawCycle && rawCycle.consentAt ? rawCycle : null;
+  const cycleHolder = document.getElementById('konto-cycle');
+  if (cycleHolder && rawCycle !== undefined) { cycleHolder.innerHTML = cycleKontoCardHtml(); wireCycleKonto(); }
   const dataHolder = document.getElementById('konto-data');
   if (dataHolder) {
     dataHolder.innerHTML = privacyCardHtml(admin !== null, cfg.ok && cfg.value && typeof cfg.value.contact === 'string' ? cfg.value.contact : '');
