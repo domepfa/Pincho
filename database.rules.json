@@ -136,6 +136,12 @@
         ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
         ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
       }
+    },
+    "cycle": {
+      "$mid": {
+        ".read": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid",
+        ".write": "auth != null && root.child('members/' + $mid + '/uid').val() === auth.uid"
+      }
     }
   }
 }
