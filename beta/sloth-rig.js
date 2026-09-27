@@ -561,7 +561,7 @@ const SLOTH_POSES = {
     view: 'side', pin: 'hip', dur: 2.6, floor: 170, label: 'Beinbeuger liegend',
     props: [{ img: 'legcurl', at: [40, 50], a: [1040, 168], k: 2.8, flip: true, layer: 'back' }],
     a: { torso: -4, uarm: 70, farm: 0, thigh: 180, calf: 182 },
-    b: { torso: -4, uarm: 70, farm: 0, thigh: 184, calf: -76 },
+    b: { torso: -4, uarm: 70, farm: 0, thigh: 184, calf: 284 }, // über 270° (nach oben) zum Gesäss, nicht durch den Boden
   },
   pecdeck: {
     view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, label: 'Butterfly',
@@ -662,7 +662,7 @@ const SLOTH_POSES = {
     b: { torso: -90, head: -93, uarm_l: 104, farm_l: 94, uarm_r: 76, farm_r: 86, ...STAND_LEGS, tail: 0 },
   },
   wave: {
-    view: 'front', pin: 'feet', dur: 1.4, label: 'Faultier winkt',
+    view: 'front', pin: 'feet', dur: 1.4, mirror: ['farm_r'], label: 'Faultier winkt',
     a: { torso: -90, head: -92, uarm_l: 106, farm_l: 95, uarm_r: -30, farm_r: -70, ...STAND_LEGS, tail: 0 },
     b: { torso: -91, head: -88, uarm_l: 106, farm_l: 95, uarm_r: -34, farm_r: -110, ...STAND_LEGS, tail: 0 },
   },
@@ -736,6 +736,8 @@ function slothRigBuild(pose) {
       q['calf_' + x] = place('calf_' + x, q['thigh_' + x].end, leg('calf_' + x));
       if (view === 'back') q['elbow_' + x] = ball('back_elbow_' + x, q['uarm_' + x].end);
     }
+    // mirror: Teile an ihrer Knochenachse spiegeln (z. B. Hand beim Winken mit Krallen nach innen)
+    for (const k of pose.mirror || []) q[k].k = [1, -1];
     const hand = (x) => (q['grip_' + x] || q['farm_' + x]).end;
     return { q, pts: {
       hand_l: hand('l'), hand_r: hand('r'), foot_l: q.calf_l.end, foot_r: q.calf_r.end, elbow_l: q.uarm_l.end, elbow_r: q.uarm_r.end,
