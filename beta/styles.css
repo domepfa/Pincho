@@ -877,6 +877,9 @@ body.has-fs-dock { padding-bottom: calc(64px + 200px + var(--safe-bottom)); }
    Zonen werden je Übung ein-/ausgeblendet statt neu gezeichnet. */
 .fb-muscle-block { margin-top: 0; text-align: center; }
 .muscle-map { width: clamp(70px, 11vh, 150px); margin: 0 auto; display: block; }
+/* Im Ablauf klein halten: die allgemeine .muscle-map-Breite weiter unten (bis 260 px)
+   würde sonst gewinnen und Knöpfe unter den Bildschirmrand schieben. */
+.fb-muscle-block .muscle-map { width: clamp(70px, 11vh, 150px); }
 .muscle-head { fill: var(--ink-faint); opacity: .3; }
 .muscle-zone rect, .muscle-zone ellipse { fill: var(--ink-faint); opacity: .28; transition: fill .2s, opacity .2s; }
 .muscle-zone.secondary rect, .muscle-zone.secondary ellipse { fill: var(--accent); opacity: .5; }
@@ -1519,9 +1522,10 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .pg-pr-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .pg-pr-wrap .pg-pr { margin-bottom: 0; }
 .pg-pr-sloth { width: 64px; height: auto; flex-shrink: 0; transform-origin: 50% 90%; animation: popIn .5s cubic-bezier(.25, 1.4, .4, 1) both; }
-.fb-hang-visual.fb-paused .sloth-rig g { animation-play-state: paused; }
+.fb-hang-visual.fb-paused .sloth-rig g, .fb-hang-visual.fb-paused .sloth-rig image { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
-  .sloth-rig g { animation: none !important; }
+  .sloth-rig g, .sloth-rig image { animation: none !important; }
+  .sloth-rig .sw-1 { opacity: 0; }
   .fb-done-sloth, .pg-pr-sloth { animation: none; }
 }
 

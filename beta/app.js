@@ -7688,6 +7688,9 @@ const SLOTH_EXERCISE_POSES = {
   hip_abduction_cable: 'abduction', calf_raise_seated: 'calfseated', calf_raise_machine: 'calfmachine',
   back_extension: 'backext', pullover_machine: 'pullovermachine', t_bar_row: 'barbellrow', ab_wheel_rollout: 'abwheel',
   jump_rope: 'jumprope', agility_ladder_run: 'ladder', zercher_squat_rotation: 'goblet', carioca: 'shuffle',
+  russian_twist: 'russian', hip_9090: 'ninety', frog_stretch: 'frog', ext_rotation: 'extrot',
+  tibialis_raise: 'tibialis', wrist_curl: 'wristcurl', wrist_ext: 'wristcurl', wrist_mobility: 'wristmob',
+  doorway_pec_stretch: 'doorway',
 };
 const SLOTH_VIEW_WORD = { side: 'Seitenansicht', back: 'Rückansicht', front: 'Vorderansicht' };
 function exerciseFigureSvg(exerciseId) {
@@ -7697,7 +7700,8 @@ function exerciseFigureSvg(exerciseId) {
     const svg = slothFigure(pose, 'ex-figure sloth-img');
     if (!fig || !fig.caption) return svg;
     // Beschriftung stammt von der Strichfigur: Ansicht an die Puppe anpassen
-    const caption = fig.caption.replace(/^(Vorderansicht|Seitenansicht|Rückansicht)/, SLOTH_VIEW_WORD[SLOTH_POSES[pose].view]);
+    const view = SLOTH_POSES[pose] ? SLOTH_POSES[pose].view : 'front';
+    const caption = fig.caption.replace(/^(Vorderansicht|Seitenansicht|Rückansicht)/, SLOTH_VIEW_WORD[view]);
     return `${svg}<div class="ex-figure-caption">${esc(caption)}</div>`;
   }
   if (!fig) return `<div class="ex-figure-emoji">💪</div>`;

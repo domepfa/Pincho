@@ -30,13 +30,19 @@ SHEETS = {
 SIDE = [
     ('side.jpg', {'torso': [35], 'tail': [85], 'uarm': [36], 'elbow': [39], 'farm': [55], 'hand': [84],
                   'thigh': [89], 'knee': [132], 'calf': [172]}),
-    ('side_extra.jpg', {'fist': [32]}),
+    ('side_extra.jpg', {'fist': [32], 'foot': [38]}),
     ('arms_extra.jpg', {'flat': [104]}),
 ]
-SIDE_FAR = ['uarm', 'elbow', 'farm', 'hand', 'fist', 'flat', 'thigh', 'knee', 'calf']
+SIDE_FAR = ['uarm', 'elbow', 'farm', 'hand', 'fist', 'flat', 'thigh', 'knee', 'calf', 'shin', 'foot']
 FAR_DARK = 0.5
+# Unterschenkel ohne Fuss: alles unterhalb des Knöchels wegschneiden
+SIDE_SHIN_CUT = [(1000, 792, 1200, 900)]
 # Weisse Ringe der Gelenk-Pfannen am Rumpf dunkel füllen: (Mitte, Radius)
 SIDE_SOCKETS = [((544, 295), 40), ((586, 513), 40)]
+
+# Ganze Posen (Überblendung zwischen zwei Bildern) für Übungen, die die Puppe nicht zeigen kann
+POSES = ('poses_extra.jpg', {'russian_a': [2], 'russian_b': [1], 'ninety': [5], 'frog_a': [8], 'frog_b': [9],
+                             'extrot_a': [15], 'extrot_b': [14]})
 
 # Geräte (Requisiten), Teil-Nummern je Blatt in sheets/equipment/
 EQUIP = {
@@ -102,6 +108,10 @@ def main():
         g = gray(rgb)
         for name, ids in comps.items():
             parts[f'{view}_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'{view}_{name}.png'))
+    rgb, lab = label(os.path.join(HERE, 'sheets', POSES[0]))
+    g = gray(rgb)
+    for name, ids in POSES[1].items():
+        parts[f'pose_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'pose_{name}.png'))
     for fname, comps in EQUIP.items():
         rgb, lab = label(os.path.join(HERE, 'sheets', 'equipment', fname))
         g = gray(rgb)
@@ -110,11 +120,14 @@ def main():
     for fname, comps in SIDE:
         rgb, lab = label(os.path.join(HERE, 'sheets', fname))
         g = gray(rgb)
+        if fname == 'side.jpg':  # Unterschenkel ohne Fuss (für ein bewegliches Fussgelenk)
+            comps = {**comps, 'shin': comps['calf']}
         for name, ids in comps.items():
             fix = SIDE_SOCKETS if name == 'torso' else None
-            parts[f'side_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}.png'), fix)
+            er = SIDE_SHIN_CUT if name == 'shin' else ()
+            parts[f'side_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}.png'), fix, erase=er)
             if name in SIDE_FAR:
-                parts[f'side_{name}_far'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}_far.png'), dark=FAR_DARK)
+                parts[f'side_{name}_far'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}_far.png'), dark=FAR_DARK, erase=er)
     js = open(RIG_JS).read()
     block = 'const SLOTH_PARTS = ' + json.dumps(parts, separators=(',', ':')) + ';'
     js = re.sub(r'/\* PARTS:BEGIN \*/.*?/\* PARTS:END \*/', '/* PARTS:BEGIN */\n' + block + '\n/* PARTS:END */', js, flags=re.S)
