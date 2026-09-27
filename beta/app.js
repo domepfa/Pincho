@@ -3315,7 +3315,8 @@ const fb = {
   selectedGripLeft: null,
   selectedGripRight: null,
   addType: 'hang',       // 'hang' | 'block' | 'exercise' | 'campus' | 'pause' — welches Add-Panel gerade offen ist
-  newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
+  newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },
+  newHangHand: { handMode: 'alternate', startHand: 'left' }, // nur bei Einarm-Griffen (siehe fbHangHandHtml)      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
   newBlock: { gripType: 'leiste', leisteWidth: 15, fingers: 4, weight: 0, mode: 'hold', reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60, workSec: 40, handMode: 'fixed', startHand: 'left' },
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
   newCampus: {
@@ -3452,6 +3453,8 @@ function selectFbGrip(gripId, side) {
   }
   const hint = document.getElementById('fb-selected-hint');
   if (hint) hint.innerHTML = fbSelectedGripHint();
+  const handHolder = document.getElementById('fb-hang-hand');
+  if (handHolder) { handHolder.innerHTML = fbHangHandHtml(); wireFbHangHand(); }
   document.querySelectorAll('#fb-board-visual .board-hotspot').forEach((el) => {
     if (fb.gripMode === 'different') {
       const h = { grip: el.dataset.grip, hx: Number(el.dataset.hx) };
@@ -3703,6 +3706,39 @@ function renderFbBlockGripEditorSheet() {
    darunter, dann Sätze/Zeiten, dann der Hinzufügen-Button. Nach dem
    Hinzufügen bleibt man auf derselben Stelle stehen (kein Re-Render der
    ganzen Seite) und kann direkt den nächsten Satz konfigurieren. */
+/* Handwahl für Hang-Sätze an Einarm-Griffen (z. B. BM2000 Grosse Kante):
+   gleiche Muster wie beim Lifting Pin — fix, abwechselnd oder erst alle
+   Sätze mit der einen, dann mit der anderen Hand. */
+function fbHangHandHtml() {
+  if (fb.gripMode !== 'same' || !fb.selectedGrip || gripArmNote(fb.board, fb.selectedGrip) !== 'einarmig') return '';
+  const h = fb.newHangHand;
+  const first = h.handMode === 'fixed' ? '' : ' zuerst';
+  return `
+    <div class="field">
+      <label>Hand (Griff ist einarmig)</label>
+      <div class="chip-row" id="fb-hang-handmode-row">
+        <button type="button" class="chip ${h.handMode === 'fixed' ? 'active' : ''}" data-hand-mode="fixed">Immer gleiche</button>
+        <button type="button" class="chip ${h.handMode === 'alternate' ? 'active' : ''}" data-hand-mode="alternate">Abwechselnd</button>
+        <button type="button" class="chip ${h.handMode === 'block' ? 'active' : ''}" data-hand-mode="block">Erst eine, dann andere</button>
+      </div>
+    </div>
+    <div class="chip-row" id="fb-hang-starthand-row">
+      <button type="button" class="chip ${h.startHand === 'left' ? 'active' : ''}" data-start-hand="left" data-hand-color="l">Links${first}</button>
+      <button type="button" class="chip ${h.startHand === 'right' ? 'active' : ''}" data-start-hand="right" data-hand-color="r">Rechts${first}</button>
+    </div>
+  `;
+}
+function wireFbHangHand() {
+  const holder = document.getElementById('fb-hang-hand');
+  if (!holder) return;
+  holder.querySelectorAll('[data-hand-mode]').forEach((btn) => {
+    btn.onclick = () => { fb.newHangHand.handMode = btn.dataset.handMode; holder.innerHTML = fbHangHandHtml(); wireFbHangHand(); };
+  });
+  holder.querySelectorAll('[data-start-hand]').forEach((btn) => {
+    btn.onclick = () => { fb.newHangHand.startHand = btn.dataset.startHand; holder.innerHTML = fbHangHandHtml(); wireFbHangHand(); };
+  });
+}
+
 function renderFbAddPanel() {
   const holder = document.getElementById('fb-add-panel');
   if (!holder) return;
@@ -3741,8 +3777,10 @@ function renderFbAddPanel() {
         <div class="field"><label>Pause zw. Sätzen (s)</label><input type="number" id="fb-new-restsec" value="${fb.newHang.restSec}" min="0"></div>
         <div class="field"><label>Pause danach (s)</label><input type="number" id="fb-new-blockrestsec" value="${fb.newHang.blockRestSec}" min="0"></div>
       </div>
+      <div id="fb-hang-hand">${fbHangHandHtml()}</div>
       <button type="button" class="btn" id="fb-add-hang" style="width:100%;">+ Hang-Satz hinzufügen</button>
     `;
+    wireFbHangHand();
     wireCalibration();
     document.getElementById('fb-board-toggle').querySelectorAll('.chip').forEach((btn) => {
       btn.onclick = () => {
@@ -3790,7 +3828,8 @@ function renderFbAddPanel() {
         fb.blocks.push({ type: 'hang', board: fb.board, gripLeft: fb.selectedGripLeft, gripRight: fb.selectedGripRight, ...fb.newHang });
       } else {
         if (!fb.selectedGrip) { toast('Zuerst einen Griff wählen.', 'err'); return; }
-        fb.blocks.push({ type: 'hang', board: fb.board, grip: fb.selectedGrip, ...fb.newHang });
+        const oneArm = gripArmNote(fb.board, fb.selectedGrip) === 'einarmig';
+        fb.blocks.push({ type: 'hang', board: fb.board, grip: fb.selectedGrip, ...fb.newHang, ...(oneArm ? fb.newHangHand : {}) });
       }
       renderFbBlocksList();
     };
@@ -7924,7 +7963,7 @@ function blockArmNote(b, activeRep) {
    Hänge-Figur reicht als Vorschau-"Thumb" (klein genug, dass die
    abweichende Bewegung dort nicht ins Gewicht fällt). */
 function blockThumb() {
-  return `<div class="timeline-thumb fb-block-thumb">${FB_HANG_FIGURE_SVG}</div>`;
+  return `<div class="timeline-thumb fb-block-thumb">${blockPinFigureSvg('left')}</div>`;
 }
 /* Dispatcher: an den meisten Stellen sind Hang- und Griffblock-Sätze
    austauschbar (gleicher Timer/gleiche Vorlaufzeit) — nur Titel/Figur
@@ -8329,7 +8368,7 @@ function fbBlockSub(b) {
   if (isHoldModeBlock(b)) {
     const blockRestSec = b.blockRestSec != null ? b.blockRestSec : b.restSec;
     const prefix = b.type === 'block' ? 'Halten' : 'Hang';
-    const handSuffix = b.type === 'block' ? ' · ' + blockHandPatternText(b) : '';
+    const handSuffix = (b.type === 'block' || b.handMode) ? ' · ' + blockHandPatternText(b) : '';
     return `${b.hangSec}s ${prefix} · ${b.restSec}s zw. Sätzen · ${blockRestSec}s danach · ×${b.reps}${handSuffix}`;
   }
   if (b.type === 'campus') {
@@ -8631,42 +8670,20 @@ const SLOTH_FACE = `
   <path class="sloth-line" d="M97 71 h6 M94 76 q6 4 12 0"/>`;
 const FB_HANG_FIGURE_SVG = slothFigure('hang', 'ex-figure sloth-img'); // Faultier-Puppe (sloth-rig.js)
 const FB_REST_FIGURE_SVG = slothFigure('rest', 'ex-figure sloth-img');
-/* Lifting Pin ist kein Hängen (FB_HANG_FIGURE_SVG), sondern ein einarmiges
-   Ziehen von unten (Pin auf Hüfthöhe) nach oben (Richtung Schulter) — eigene
-   Animation dafür, stehende Fixfigur + EIN animierter Arm (Start/Ende
-   überblenden wie bei den dynamischen Übungs-Strichmännchen), der andere
-   Arm hängt ruhig/gedämpft daneben. Standardzeichnung ist die rechte Hand;
-   für "links" wird die ganze Figur per CSS horizontal gespiegelt. */
-function blockPullFigureSvg(hand) {
-  const flip = hand === 'left' ? ' style="transform:scaleX(-1);"' : '';
-  return `
-  <svg viewBox="0 0 200 200" class="ex-figure fb-block-pull-figure"${flip}>
-    <path class="fig-motion" d="M138,148 L138,76"/>
-    <polygon class="fig-arrow" points="138,76 130,90 146,90"/>
-    <g class="fig-pose fig-fixed">
-      <circle cx="100" cy="42" r="14"/>
-      <line x1="100" y1="56" x2="100" y2="128"/>
-      <line x1="100" y1="128" x2="86" y2="190"/>
-      <line x1="100" y1="128" x2="114" y2="190"/>
-      <line x1="100" y1="60" x2="76" y2="108"/>
-    </g>
-    <g class="fig-pose fig-a" style="animation-duration:1.6s;">
-      <line x1="100" y1="60" x2="138" y2="148"/>
-      <circle class="fig-joint fig-hi" cx="138" cy="148" r="6"/>
-    </g>
-    <g class="fig-pose fig-b" style="animation-duration:1.6s;">
-      <line x1="100" y1="60" x2="130" y2="76"/>
-      <circle class="fig-joint fig-hi" cx="130" cy="76" r="6"/>
-    </g>
-  </svg>
-  `;
+/* Lifting Pin: Faultier steht seitlich und hält den Griffblock mit dem Pin
+   und der Scheibe darunter (statisch, siehe Pose 'pinlift' in sloth-rig.js).
+   Die Figur schaut nach rechts, man sieht also ihre linke Seite — für die
+   rechte Hand wird sie gespiegelt. */
+function blockPinFigureSvg(hand) {
+  const svg = slothFigure('pinlift', 'ex-figure sloth-img');
+  return hand === 'right' ? svg.replace('<svg ', '<svg style="transform:scaleX(-1)" ') : svg;
 }
 /* Dispatcher fürs "Work"-Strichmännchen während des laufenden Timers:
    Hang bleibt die Hänge-Figur, Griffblock/Lifting Pin zeigt stattdessen
    das Zieh-Strichmännchen mit der gerade aktiven Hand (activeRep kommt
    aus dem rep-Feld des laufenden Sequenz-Schritts, siehe buildBlockSequence). */
 function holdBlockWorkFigure(b, activeRep) {
-  return b.type === 'block' ? blockPullFigureSvg(blockHandForRep(b, activeRep || 0)) : FB_HANG_FIGURE_SVG;
+  return b.type === 'block' ? blockPinFigureSvg(blockHandForRep(b, activeRep || 0)) : FB_HANG_FIGURE_SVG;
 }
 
 function ensureFbOverlay() {
@@ -8758,22 +8775,32 @@ function fbUpcomingLabel() {
 }
 
 function updateFbProgressUI() {
-  const text = document.getElementById('fb-progress-text');
-  if (!text) return;
-  text.textContent = `Satz ${Math.min(fb.blockIndex + 1, fb.blocks.length)}/${fb.blocks.length} · ${fmtMinSec(fbElapsedSeconds())} / ${fmtMinSec(fbEstimateSeconds())}`;
+  const segs = document.getElementById('fbx-segs');
+  if (!segs) return;
+  const cur = fb.blocks[fb.blockIndex];
+  let frac = 0;
+  if (cur && fb.running && fb.sequence.length) {
+    const done = fb.sequence.slice(0, fb.stepIndex).reduce((s, p) => s + p.seconds, 0);
+    const curTotal = fb.sequence[fb.stepIndex] ? fb.sequence[fb.stepIndex].seconds : 0;
+    frac = Math.min(1, (done + curTotal - fb.secondsLeft) / Math.max(fbBlockSeconds(cur), 1));
+  }
+  Array.from(segs.children).forEach((seg, i) => {
+    const f = i < fb.blockIndex ? 1 : i > fb.blockIndex ? 0 : frac;
+    seg.firstChild.style.transform = `scaleX(${f})`;
+    seg.classList.toggle('current', i === fb.blockIndex);
+  });
 }
 
 function updateFbUpcomingUI() {
   const el = document.getElementById('fb-upcoming');
   if (!el) return;
-  // Während der abschliessenden Pause zeigt schon der grosse Titel "GLEICH:
-  // ..." (siehe renderFbOverlay/fbIsTrailingPause) genau das, was diese
-  // Zeile sonst ankündigen würde — Wiederholung hier weglassen.
-  el.textContent = fbIsTrailingPause() ? '' : 'Danach: ' + fbUpcomingLabel();
+  // In der abschliessenden Pause steht dort schon die Vorschau des nächsten Blocks (renderFbOverlay).
+  if (fbIsTrailingPause()) return;
+  el.textContent = 'Danach: ' + fbUpcomingLabel();
 }
 
 /* ---------- Transport-Leiste (Zurück / Play-Pause / Weiter) ----------
-   Der Ablauf läuft nach dem ersten "LOS" von allein durch alle Sätze
+   Der Ablauf läuft nach dem Start von allein durch alle Sätze
    (Hang- wie Übungs-Sätze) — kein Antippen zwischen den Sätzen mehr nötig.
    Zurück/Weiter springen direkt in den Nachbar-Satz (inkl. dessen eigenem
    Vorbereitungs-Countdown bei Hang-Sätzen), Play/Pause hält den gerade
@@ -8786,18 +8813,6 @@ const TRANSPORT_ICON = {
   play: '<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 001.5.9l10.2-6.5a1 1 0 000-1.8L9.5 4.6A1 1 0 008 5.5z"/></svg>',
   pause: '<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>',
 };
-function fbTransportRow() {
-  const canPause = fb.running;
-  const isPaused = canPause && !fb.intervalId;
-  return `
-    <div class="fb-transport">
-      <button type="button" class="fb-transport-btn" id="fb-prev" ${fb.blockIndex === 0 && fb.stepIndex === 0 ? 'disabled' : ''} title="Zurück" aria-label="Zurück">${TRANSPORT_ICON.prev}</button>
-      <button type="button" class="fb-transport-btn fb-play" id="fb-playpause" ${canPause ? '' : 'disabled'} title="${isPaused ? 'Weiter' : 'Pause'}">${isPaused ? TRANSPORT_ICON.play : TRANSPORT_ICON.pause}</button>
-      <button type="button" class="fb-transport-btn" id="fb-skip" title="Einen Schritt weiter" aria-label="Einen Schritt weiter">${TRANSPORT_ICON.next}</button>
-    </div>
-  `;
-}
-
 /* Transport "Zurück" (⏮) sowie Wischen nach rechts: sollte wie "Weiter"
    nur EINEN Schritt zurückspulen, sprang bisher aber immer einen ganzen
    Satz zurück (fb.blockIndex - 1) — bei einem Block mit mehreren
@@ -8907,212 +8922,364 @@ function fbTogglePause() {
   renderFbOverlay();
 }
 
+/* ---------- Ablauf-Vollbild (Beta: ruhiges Layout) ----------
+   Feste Zeilen: Kopf (✕ · Fortschritt · Übersicht) · Phase · Bühne · Zahl ·
+   Info · Steuerung. Zwischen den Phasen springt nichts, alles passt ohne
+   Scrollen, die Knöpfe stehen immer an derselben Stelle. Bei Hang-Sätzen
+   hängt das Faultier direkt am gewählten Griff (fbLayoutBoardStage), in
+   der Pause steht es darunter und der nächste Griff ist markiert.
+   Entwurf dazu: beta/entwurf-timer.html. */
+
+/* Was gerade zu sehen ist: 'ready' (vor dem Start / Vorbereitung), 'work'
+   oder 'rest'. In der abschliessenden Pause eines Blocks zeigt die Bühne
+   schon den NÄCHSTEN Block (displayBlock). */
+function fbRunState() {
+  const block = fb.blocks[fb.blockIndex];
+  if (fb.awaitingNext || fb.preCount != null) {
+    return { mode: 'ready', block, displayBlock: block, step: null, working: false, trailing: false, activeRep: null };
+  }
+  const step = fb.sequence[fb.stepIndex];
+  const working = isWorkPhase(step);
+  const trailing = fbIsTrailingPause();
+  const displayBlock = (trailing && fb.blocks[fb.blockIndex + 1]) || block;
+  return { mode: working ? 'work' : 'rest', block, displayBlock, step, working, trailing, activeRep: working && step ? step.rep : null };
+}
+/* Wechselt dieser Schlüssel, wird das Vollbild neu aufgebaut (Phasen-/
+   Schrittwechsel), sonst werden nur Zahl und Balken nachgezogen. */
+function fbStageKey(st) {
+  return [st.mode, fb.blockIndex, fb.awaitingNext ? 'a' : '', fb.preCount != null ? 'p' : '', st.mode === 'ready' ? '' : fb.stepIndex].join(':');
+}
+
+function fbPhaseWord(st) {
+  if (st.mode === 'ready') return 'Bereit';
+  const b = st.block;
+  if (st.mode === 'rest') return st.step && st.step.phase === 'Zeit zum Loggen' ? 'Loggen' : 'Pause';
+  if (b.type === 'pause') return 'Pause';
+  if (b.type === 'hang') return 'Hang';
+  if (b.type === 'block') return b.mode === 'reps' ? 'Ziehen' : 'Halten';
+  if (b.type === 'campus') return 'Campus';
+  return 'Übung';
+}
+function fbRepText(st) {
+  const n = fb.blocks.length;
+  if (st.trailing) return n > 1 ? `Block ${fb.blockIndex + 2}/${n}` : '';
+  const b = st.block;
+  const blockPart = n > 1 ? `Block ${fb.blockIndex + 1}/${n}` : '';
+  let repPart = '';
+  if (st.step && st.step.rep != null) repPart = `Satz ${st.step.rep + 1}/${b.reps}`;
+  else if (st.mode === 'ready' && (isHoldModeBlock(b) || b.type === 'campus')) repPart = `Satz 1/${b.reps}`;
+  else if (isRepsStyleBlock(b)) repPart = `Ziel ${b.reps}×`;
+  return [repPart, blockPart].filter(Boolean).join(' · ');
+}
+
+function fbGripNote(boardId, gripId) {
+  const board = BOARDS[boardId];
+  const g = board && board.grips.find((x) => x.id === gripId);
+  return g && g.note ? g.note.replace(/(\d)mm/g, '$1 mm') : '';
+}
+/* Erste Info-Zeile (fett): Griff/Übung des gezeigten Blocks. Liefert HTML. */
+function fbInfoMainHtml(b, activeRep) {
+  if (b.type === 'pause') return `${b.seconds} s Pause`;
+  if (b.type === 'hang') {
+    if (hangIsAsymmetric(b)) {
+      return `<span class="hand-l">L: ${esc(gripLabel(b.board, b.gripLeft))}</span> · <span class="hand-r">R: ${esc(gripLabel(b.board, b.gripRight))}</span>`;
+    }
+    const arm = hangArmNote(b);
+    const armText = arm !== 'einarmig' ? arm
+      : activeRep != null ? `einarmig ${handLabel(fbHangHandForRep(b, activeRep)).toLowerCase()}`
+      : b.handMode ? `einarmig, ${blockHandPatternText(b)}` : arm;
+    const parts = [gripLabel(b.board, b.grip), fbGripNote(b.board, b.grip), armText].filter(Boolean);
+    return esc(parts.join(' · '));
+  }
+  if (b.type === 'block') {
+    const hand = activeRep != null ? `${handLabel(blockHandForRep(b, activeRep))} (einarmig)` : `einarmig, ${blockHandPatternText(b)}`;
+    return `${esc(blockGripLabel(b))} · ${esc(hand)}`;
+  }
+  if (b.type === 'campus') {
+    // Ohne die Emoji-Symbole aus campusLabel (Android zeichnet sie als bunte Kacheln)
+    const rungs = b.rungTypeRight && b.rungTypeRight !== b.rungType
+      ? `<span class="hand-l">L: ${esc(campusRungLabel(b.rungType))}</span> · <span class="hand-r">R: ${esc(campusRungLabel(b.rungTypeRight))}</span>`
+      : esc(campusRungLabel(b.rungType));
+    return `${rungs} · ${esc(campusMoveText(b))}`;
+  }
+  return esc(exerciseName(b.exerciseId));
+}
+/* Kurzfassung eines Blocks für die Vorschau in der Pause davor. */
+function fbShortSub(b) {
+  if (b.type === 'pause') return 'Pause';
+  if (isHoldModeBlock(b)) return `${b.reps}× ${b.hangSec} s ${b.type === 'block' ? 'Halten' : 'Hang'}${b.reps > 1 && b.restSec > 0 ? ` · ${b.restSec} s Pause` : ''}`;
+  if (b.type === 'campus') return `${b.reps}× ${campusMoveText(b)}`;
+  return `Ziel ${b.reps}× · ${b.workSec || 40} s`;
+}
+
+/* ---- Board mit Faultier am Griff ---- */
+/* Griffe eines Hang-Satzes als [x, y, w, h] in Prozent des Board-Bilds,
+   dazu welche Hand wohin gehört (für Farben bei L/R unterschiedlich). */
+function fbHangSpots(b) {
+  const board = BOARDS[b.board];
+  if (!board) return [];
+  const box = (h, hand) => ({ x: h.hx != null ? h.hx : h.x, y: h.hy != null ? h.hy : h.y, w: h.hw != null ? h.hw : 5, h: h.hh != null ? h.hh : 5, hand });
+  if (hangIsAsymmetric(b)) {
+    const l = board.hotspots.filter((h) => h.grip === b.gripLeft && hotspotSide(h) !== 'right').sort((p, q) => (p.hx ?? p.x) - (q.hx ?? q.x))[0];
+    const r = board.hotspots.filter((h) => h.grip === b.gripRight && hotspotSide(h) !== 'left').sort((p, q) => (q.hx ?? q.x) - (p.hx ?? p.x))[0];
+    return [l && box(l, 'l'), r && box(r, 'r')].filter(Boolean);
+  }
+  return board.hotspots.filter((h) => h.grip === b.grip).map((h) => box(h, ''));
+}
+function fbBoardStageHtml(b, hanging, tag) {
+  const board = BOARDS[b.board];
+  const spots = fbHangSpots(b);
+  const rings = spots.map((s) => `<rect class="fbx-ring${s.hand ? ' fbx-ring-' + s.hand : ''}" x="${s.x - s.w / 2}" y="${s.y - s.h / 2}" width="${s.w}" height="${s.h}" rx="2.5" vector-effect="non-scaling-stroke"/>`).join('');
+  const clip = spots.map((s) => `<rect x="${(s.x - s.w / 2) / 100}" y="${(s.y - s.h / 2) / 100}" width="${s.w / 100}" height="${s.h / 100}" rx=".02"/>`).join('');
+  const top = spots.length ? Math.min(...spots.map((s) => s.y - s.h / 2)) : 0;
+  const cx = spots.length ? spots.reduce((sum, s) => sum + s.x, 0) / spots.length : 50;
+  return `
+    <div class="fbx-board" id="fbx-board">
+      <img class="fbx-board-dim" src="${board.image}" alt="${esc(board.label)}">
+      <img class="fbx-board-lit" src="${board.image}" alt="" aria-hidden="true">
+      <svg class="fbx-board-rings" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${rings}</svg>
+      <svg width="0" height="0" class="fbx-clipdef" aria-hidden="true"><clipPath id="fbx-grip-clip" clipPathUnits="objectBoundingBox">${clip}</clipPath></svg>
+      ${tag ? `<div class="fbx-tag" style="left:${cx}%;top:${top}%">${esc(tag)}</div>` : ''}
+    </div>
+    <div class="fbx-fig" id="fbx-fig" data-fit="${hanging ? 'hang' : 'stand'}">${hanging ? '' : FB_REST_FIGURE_SVG}</div>
+  `;
+}
+
+/* Hang-Pose mit einstellbarer Armspreizung f (0 = Hände fast zusammen,
+   1 = wie an der Stange). Pro Griff wird f so gesucht, dass die Hände
+   genau auf dem Griff bzw. den zwei Löchern liegen. */
+const FB_HANG_NARROW = { uarm_l: -97, farm_l: -93, grip_l: -91, uarm_r: -83, farm_r: -87, grip_r: -89 };
+function fbHangPose(f) {
+  const name = 'boardhang' + Math.round(f * 1000);
+  if (!SLOTH_POSES[name]) {
+    const base = SLOTH_POSES.hang;
+    // len_farm ~0: Greifhand bringt schon Unterarm mit (sonst ein Glied zu viel)
+    const a = { ...base.a, len_farm_l: 0.001, len_farm_r: 0.001 }, b = { ...base.b, len_farm_l: 0.001, len_farm_r: 0.001 };
+    for (const k of Object.keys(FB_HANG_NARROW)) {
+      a[k] = FB_HANG_NARROW[k] + f * (base.a[k] - FB_HANG_NARROW[k]);
+      b[k] = a[k] + (base.b[k] - base.a[k]);
+    }
+    SLOTH_POSES[name] = { ...base, bar: false, a, b, label: 'Faultier hängt am Griff' };
+  }
+  return name;
+}
+const fbHangSpreadCache = {};
+/* Griff nur einarmig nutzbar (z. B. BM2000 Grosse Kante, siehe GRIP_ARM_OVERRIDE). */
+function fbHangOneArm(b) {
+  return b.type === 'hang' && !hangIsAsymmetric(b) && hangArmNote(b) === 'einarmig';
+}
+/* Welche Hand bei einem Einarm-Hang dran ist: gewählt beim Hinzufügen
+   (handMode/startHand wie beim Lifting Pin); ältere Sätze ohne Wahl
+   wechseln einfach ab, links zuerst. */
+function fbHangHandForRep(b, rep) {
+  return b.handMode ? blockHandForRep(b, rep) : (rep % 2 ? 'right' : 'left');
+}
+function fbOneArmHand(st) {
+  return fbHangHandForRep(st.displayBlock, st.activeRep || 0);
+}
+function fbLayoutBoardStage() {
+  const stageEl = document.getElementById('fbx-stage');
+  const boardEl = document.getElementById('fbx-board');
+  const figEl = document.getElementById('fbx-fig');
+  if (!stageEl || !boardEl || !figEl) return;
+  const stage = stageEl.getBoundingClientRect();
+  const board = boardEl.getBoundingClientRect();
+  if (!stage.height || !board.height) return;
+  const bx = board.left - stage.left, by = board.top - stage.top;
+  if (figEl.dataset.fit === 'stand') {
+    const svg = figEl.querySelector('svg');
+    if (!svg) return;
+    const [sx, , sw, sh] = svg.getAttribute('viewBox').split(' ').map(Number);
+    const room = stage.height - (by + board.height) - 10;
+    const k = Math.max(room, 40) / sh;
+    Object.assign(figEl.style, { width: sw * k + 'px', height: sh * k + 'px', left: (stage.width / 2 + sx * k) + 'px', top: (stage.height - 8 - sh * k) + 'px' });
+    return;
+  }
+  const st = fbRunState();
+  const b = st.displayBlock;
+  const spots = fbHangSpots(b);
+  if (!spots.length) return;
+  // Einarm-Griff: Faultier hängt an einer Hand (abwechselnd je Satz), die andere hängt locker
+  if (fbHangOneArm(b)) {
+    const sp = spots[0];
+    const gx1 = bx + board.width * sp.x / 100;
+    const gy1 = by + board.height * sp.y / 100;
+    figEl.innerHTML = slothFigure(fbOneArmHand(st) === 'right' ? 'hang1r' : 'hang1l', 'sloth-img');
+    const [vx, vy, vw, vh] = figEl.querySelector('svg').getAttribute('viewBox').split(' ').map(Number);
+    const s1 = (stage.height - gy1 - 6) / (vh + vy);
+    Object.assign(figEl.style, { width: vw * s1 + 'px', height: vh * s1 + 'px', left: (gx1 + vx * s1) + 'px', top: (gy1 + vy * s1) + 'px' });
+    return;
+  }
+  const cx = spots.reduce((s, p) => s + p.x, 0) / spots.length;
+  const cy = spots.reduce((s, p) => s + p.y, 0) / spots.length;
+  const gx = bx + board.width * cx / 100;
+  const gy = by + board.height * cy / 100;
+  const place = (f) => {
+    figEl.innerHTML = slothFigure(fbHangPose(f), 'sloth-img');
+    const [vx, vy, vw, vh] = figEl.querySelector('svg').getAttribute('viewBox').split(' ').map(Number);
+    const s = (stage.height - gy - 6) / (vh + vy);
+    Object.assign(figEl.style, { width: vw * s + 'px', height: vh * s + 'px', left: (gx + vx * s) + 'px', top: (gy + vy * s) + 'px' });
+  };
+  // Zielabstand der Hände: zwei Löcher = deren Abstand, ein Griff = Hände nebeneinander darauf
+  const xs = spots.map((p) => p.x);
+  const target = spots.length > 1
+    ? board.width * (Math.max(...xs) - Math.min(...xs)) / 100
+    : board.width * spots[0].w / 100 * 0.55;
+  const key = `${b.board}:${spots.map((p) => p.x.toFixed(1)).join('/')}@${Math.round(board.width)}x${Math.round(stage.height)}`;
+  if (fbHangSpreadCache[key] == null) {
+    figEl.classList.add('fbx-measuring');
+    let lo = -1, hi = 1.6;
+    for (let i = 0; i < 9; i++) {
+      const mid = (lo + hi) / 2;
+      place(mid);
+      const l = figEl.querySelector('.sp-grip_l image');
+      const r = figEl.querySelector('.sp-grip_r image');
+      if (!l || !r) break;
+      const lr = l.getBoundingClientRect(), rr = r.getBoundingClientRect();
+      const span = (rr.left + rr.width / 2) - (lr.left + lr.width / 2);
+      if (span < target) lo = mid; else hi = mid;
+    }
+    fbHangSpreadCache[key] = (lo + hi) / 2;
+    figEl.classList.remove('fbx-measuring');
+  }
+  place(fbHangSpreadCache[key]);
+}
+window.addEventListener('resize', () => { if (document.getElementById('fbx-board')) fbLayoutBoardStage(); });
+
+/* Bühne: Board mit Faultier (Hang), sonst die passende Figur mittig. */
+function fbStageInnerHtml(st) {
+  const d = st.displayBlock;
+  const onBoard = d.type === 'hang' && BOARDS[d.board];
+  const tag = st.mode === 'ready' ? (onBoard ? 'Hier hängen' : '') : st.trailing ? 'Als Nächstes' : '';
+  if (onBoard) return fbBoardStageHtml(d, st.mode === 'work', tag);
+  let fig;
+  if (st.mode === 'work') {
+    const b = st.block;
+    fig = isHangLikeBlock(b) ? holdBlockWorkFigure(b, st.activeRep) : b.type === 'campus' ? campusWorkFigureSvg(b, false) : b.type === 'pause' ? FB_REST_FIGURE_SVG : exerciseFigureSvg(b.exerciseId);
+  } else if (st.mode === 'ready' || st.trailing) {
+    fig = d.type === 'campus' ? campusWorkFigureSvg(d) : d.type === 'pause' ? FB_REST_FIGURE_SVG : isHangLikeBlock(d) ? holdBlockWorkFigure(d, 0) : exerciseFigureSvg(d.exerciseId);
+  } else {
+    fig = st.block.type === 'campus' ? campusWorkFigureSvg(st.block) : FB_REST_FIGURE_SVG;
+  }
+  return `<div class="fbx-center">${fig}</div>${tag ? `<div class="fbx-tag fbx-tag-top">${esc(tag)}</div>` : ''}`;
+}
+
+function fbMainButtonHtml(st) {
+  const showTarget = isRepsStyleBlock(st.block);
+  if (fb.awaitingNext || fb.preCount != null) return '<button type="button" class="fbx-main fbx-main-wide" id="fbx-start">START</button>';
+  if (showTarget && st.working) return '<button type="button" class="fbx-main fbx-main-wide" id="fb-reps-done">GESCHAFFT</button>';
+  const isPaused = fb.running && !fb.intervalId;
+  return `<button type="button" class="fbx-main" id="fb-playpause" aria-label="${isPaused ? 'Weiter' : 'Anhalten'}">${isPaused ? TRANSPORT_ICON.play : TRANSPORT_ICON.pause}</button>`;
+}
+
+function fbQuitSheetHtml() {
+  return `
+    <div class="fbx-sheet-bg" id="fbx-sheet">
+      <div class="fbx-sheet">
+        <div class="fbx-sheet-title">Training beenden?</div>
+        <div class="fbx-sheet-text">${fb.blockIndex > 0 ? 'Fertige Blöcke kannst du speichern.' : 'Es ist noch kein Block fertig.'}</div>
+        <button type="button" class="btn" id="fbx-stay">Weitermachen</button>
+        ${fb.blockIndex > 0 ? '<button type="button" class="btn ghost" id="fb-finish-early">Beenden &amp; speichern</button>' : ''}
+        <button type="button" class="btn ghost fbx-danger" id="fb-cancel">Verwerfen</button>
+      </div>
+    </div>
+  `;
+}
+/* ✕ hält den Timer an und fragt nach; "Weitermachen" läuft weiter. */
+function fbOpenQuit() {
+  fb.showQuit = true;
+  fb.quitResume = null;
+  if (fb.preCount != null && fb.intervalId) { fbSetTimer(null); fb.quitResume = 'pre'; }
+  else if (fb.running && fb.intervalId) { fbTogglePause(); fb.quitResume = 'run'; }
+  renderFbOverlay();
+}
+function fbCloseQuit() {
+  fb.showQuit = false;
+  const resume = fb.quitResume;
+  fb.quitResume = null;
+  if (resume === 'pre') { fbSetTimer(tickPreCountdown); renderFbOverlay(); }
+  else if (resume === 'run') fbTogglePause(); // rendert selbst
+  else renderFbOverlay();
+}
+
 function renderFbOverlay() {
   const el = ensureFbOverlay();
   if (!fb.running && !fb.awaitingNext && fb.preCount == null) { closeFbOverlay(); return; }
-
-  let stage = '';
-  if (fb.awaitingNext) {
-    const next = fb.blocks[fb.blockIndex];
-    if (!next) { closeFbOverlay(); return; }
-    const isHang = isHangLikeBlock(next);
-    const isCampus = next.type === 'campus';
-    const isPause = next.type === 'pause';
-    const nextArmNote = isHang ? holdBlockArmNote(next) : '';
-    stage = `
-      <div class="fb-stage-label mono">NÄCHSTER SATZ (${fb.blockIndex + 1}/${fb.blocks.length})</div>
-      <div class="fb-stage-figure">${isPause ? FB_REST_FIGURE_SVG : isHang ? holdBlockThumb(next) : isCampus ? campusWorkFigureSvg(next) : exerciseFigureSvg(next.exerciseId)}</div>
-      <div class="fb-stage-title">${isPause ? 'Pause' : isHang ? holdBlockTitle(next) : isCampus ? campusLabel(next) : esc(exerciseName(next.exerciseId))}</div>
-      <div class="fb-stage-sub mono">${esc(fbBlockSub(next))}${nextArmNote ? ' · ' + nextArmNote : ''}</div>
-      ${fbTransportRow()}
-      <button class="btn fb-stage-btn" id="fb-continue">LOS</button>
-    `;
-  } else if (fb.preCount != null) {
-    const block = fb.blocks[fb.blockIndex];
-    const isHang = isHangLikeBlock(block);
-    const armNote = isHang ? holdBlockArmNote(block) : '';
-    const tense = fb.preCount <= 3;
-    stage = `
-      <div class="fb-stage-label mono">SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${isHang ? holdBlockTitle(block) : campusLabel(block)}${armNote ? ' · ' + armNote : ''}</div>
-      <div class="fb-stage-figure">${isHang ? holdBlockThumb(block) : campusWorkFigureSvg(block)}</div>
-      <div class="fb-precount-heading mono">ALLEZ${state.member && state.member.name ? `, ${esc(state.member.name)}` : ''}!</div>
-      <div class="fb-precount-subheading mono">GET READY!</div>
-      <div class="fb-precount ${tense ? 'fb-precount-tense' : ''}" id="fb-precount">${fb.preCount}</div>
-      <div class="fb-stage-sub mono">Hände ans Board — Zeit zum Vorbereiten!</div>
-      <button class="btn fb-stage-btn" id="fb-precount-skip">Jetzt starten</button>
-      ${fb.blockIndex > 0 ? '<button class="btn ghost fb-stage-btn" id="fb-finish-early">Vorzeitig beenden & speichern</button>' : ''}
-      <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
-    `;
-  } else {
-    // Ein einziges Template für Hang-, Griffblock-, Übungs- UND Campus-
-    // Sätze — alle laufen über dieselbe fb.sequence/tickBlock-Uhr,
-    // unterscheiden sich nur darin, was während "Work" gezeigt wird
-    // (Board-Punkt, generische Hänge-Figur, animiertes Strichmännchen der
-    // Übung, oder das Campus-Symbol).
-    const block = fb.blocks[fb.blockIndex];
-    const isExercise = block.type === 'exercise';
-    // Wiederholungen-Griffblock zeigt wie eine Übung ein Ziel + den
-    // manuellen "geschafft"-Button, aber OHNE Zielmuskel-Anzeige (dafür
-    // bleibt isExercise oben strikt auf echte Übungen begrenzt).
-    const showTarget = isExercise || (block.type === 'block' && block.mode === 'reps');
-    const isCampus = block.type === 'campus';
-    const step = fb.sequence[fb.stepIndex];
-    const working = isWorkPhase(step);
-    const phaseTotal = step ? step.seconds : 1;
-    const frac = phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 0;
-    const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
-    const isPausedNow = fb.running && !fb.intervalId;
-    const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 5;
-    const restTense = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
-    // Letzte 3 Sekunden eines ARBEITS-Satzes (Hang/Work/Halten): eigener,
-    // schlichterer Effekt (Blinken statt Rausfliegen) — warnt, dass die
-    // Arbeitsphase gleich endet, ohne mit dem Pausen-Effekt zu verwechseln.
-    const workTense = working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
-    const activeRep = working && step ? step.rep : null;
-
-    // Während der ABSCHLIESSENDEN Pause dieses Blocks (danach kommt ein
-    // anderer Block oder der Ablauf ist fertig) interessiert nicht mehr,
-    // was gerade erledigt wurde — Titel und grosses Bild zeigen deshalb
-    // schon den NÄCHSTEN Block ("GLEICH: ..."), statt weiter den bereits
-    // fertigen aktuellen zu zeigen. Pausen MIT verbleibenden Wiederholungen
-    // desselben Blocks (z. B. zwischen Hang-Wiederholung 1 und 2) sind
-    // davon nicht betroffen, dort bleibt es ja ohnehin derselbe Satz/Griff.
-    // isLastBlock (buildBlockSequence) sorgt schon dafür, dass der
-    // ALLERLETZTE Block im Ablauf keine abschliessende Pause mehr bekommt,
-    // weshalb nextBlockRef hier praktisch immer existiert.
-    const isTrailingPause = fbIsTrailingPause();
-    const nextBlockRef = isTrailingPause ? fb.blocks[fb.blockIndex + 1] : null;
-    const displayBlock = nextBlockRef || block;
-    const displayIsHang = isHangLikeBlock(displayBlock);
-    const displayIsCampus = displayBlock.type === 'campus';
-    const displayIsPause = displayBlock.type === 'pause';
-    const displayIsExercise = displayBlock.type === 'exercise';
-    // Bei Hang ist armNote (Griff-Notiz) übers ganze Satz-Vollbild fix, bei
-    // Lifting Pin ändert sich die aktive Hand aber pro Wiederholung — ein
-    // eigenes Element dafür, das updateTimerUI() bei jedem Tick auffrischen
-    // kann, statt es nur einmal beim vollen Rendern dieses Bildschirms
-    // (renderFbOverlay) reinzuschreiben und dann bis zum nächsten Satz
-    // eingefroren zu lassen. Während der Vorschau (isTrailingPause) gibt es
-    // noch keine "aktive" Wiederholung des NÄCHSTEN Blocks, deshalb dort
-    // activeRep bewusst null (zeigt das statische Hand-Muster statt einer
-    // konkreten Hand).
-    const displayArmNote = displayIsHang ? holdBlockArmNote(displayBlock, isTrailingPause ? null : activeRep) : '';
-    const displayLabel = displayIsPause
-      ? 'Pause'
-      : displayIsHang
-        ? `${holdBlockTitle(displayBlock)}${displayArmNote ? ` · <span id="fb-hand-note">${displayArmNote}</span>` : ''}`
-        : displayIsCampus ? campusLabel(displayBlock) : esc(exerciseName(displayBlock.exerciseId));
-    const muscles = isTrailingPause
-      ? (displayIsExercise ? exerciseMuscles(displayBlock.exerciseId) : null)
-      : (isExercise ? exerciseMuscles(block.exerciseId) : null);
-    const muscleText = muscles ? muscleLabelsText(muscles.primary, muscles.secondary) : '';
-    const headerText = isTrailingPause
-      ? `NEXT: ${displayLabel}`
-      : `SATZ ${fb.blockIndex + 1}/${fb.blocks.length} · ${displayLabel}${showTarget ? ' · Ziel ' + esc(String(block.reps)) + '×' : ''}`;
-    // "Schritt X/Y" zählte bisher auch die Pausen-Schritte mit (z. B.
-    // "Schritt 2/6" bei nur 3 Wiederholungen), das war verwirrend — bei
-    // Blöcken mit rep-Feld pro Schritt (Hang/Griffblock/Campus) jetzt
-    // stattdessen die tatsächliche, noch kommende Wiederholungszahl zeigen.
-    // Während der abschliessenden Pause reicht "Pause" allein, der Titel
-    // oben zeigt ja schon, was als Nächstes kommt.
-    let phaseText = '';
-    if (step) {
-      if (isTrailingPause) {
-        phaseText = 'Pause';
-      } else if (step.rep != null) {
-        const remaining = block.reps - step.rep - 1;
-        phaseText = working ? `${step.phase} · Satz ${step.rep + 1}/${block.reps}` : `Pause · noch ${remaining} ${remaining === 1 ? 'Satz' : 'Sätze'}`;
-      } else {
-        phaseText = step.phase;
-      }
-      if (isPausedNow) phaseText += ' · PAUSIERT';
-    }
-    stage = `
-      <div class="fb-stage-label mono${!working ? (isTrailingPause ? ' fb-stage-label-next' : ' fb-stage-label-readable') : ''}" id="fb-stage-label">${headerText}</div>
-      ${fbFactChipsHtml(displayBlock, isTrailingPause ? null : activeRep)}
-      ${displayIsHang
-        ? `<div class="fb-stage-figure">${holdBlockThumb(displayBlock)}</div>
-           <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}${restTense ? ' rest-tense' : ''}">
-             <div class="fb-phase-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:${activeRep != null ? activeRep : ''}">${working ? holdBlockWorkFigure(block, activeRep) : FB_REST_FIGURE_SVG}</div>
-             <div class="fb-timer-ring">
-               <svg viewBox="0 0 120 120">
-                 <circle class="ring-bg" cx="60" cy="60" r="52"/>
-                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
-               </svg>
-               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}${fb.showLos ? ' los-flash' : ''}" id="fb-big">${fbBigContent(restTense)}</div>
-             </div>
-           </div>`
-        : `<div class="fb-stage-figure" id="fb-phase-figure" data-kind="${working ? 'work' : 'rest'}:">${working
-            ? (isCampus ? campusWorkFigureSvg(block, false) : exerciseFigureSvg(block.exerciseId))
-            : (isTrailingPause ? (displayIsCampus ? campusWorkFigureSvg(displayBlock) : displayIsPause ? FB_REST_FIGURE_SVG : exerciseFigureSvg(displayBlock.exerciseId)) : isCampus ? campusWorkFigureSvg(block) : FB_REST_FIGURE_SVG)}</div>
-           <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}${restTense ? ' rest-tense' : ''}">
-             <div class="fb-timer-ring">
-               <svg viewBox="0 0 120 120">
-                 <circle class="ring-bg" cx="60" cy="60" r="52"/>
-                 <circle class="ring-fg ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}" id="fb-ring-fg" cx="60" cy="60" r="52" style="stroke-dashoffset:${ringOffset}"/>
-               </svg>
-               <div class="big ${working ? '' : 'rest'}${restWarn ? ' rest-warn' : ''}${restTense ? ' rest-tense' : ''}${workTense ? ' work-tense' : ''}${fb.showLos ? ' los-flash' : ''}" id="fb-big">${fbBigContent(restTense)}</div>
-             </div>
-           </div>`}
-      <div class="phase mono" id="fb-phase">${esc(phaseText)}</div>
-      ${muscleText ? `
-        <div class="fb-muscle-block">
-          ${bodyMapSvg(muscles.primary, muscles.secondary)}
-          <div class="fb-muscle-label mono">${esc(muscleText)}</div>
-        </div>
-      ` : ''}
-      <div class="fb-stage-next mono" id="fb-upcoming"></div>
-      <div class="fb-checkin" id="fb-checkin" ${isTrailingPause ? '' : 'hidden'}>${isTrailingPause ? checkinPanelHtml(fb.blockIndex) : ''}</div>
-      ${showTarget ? `<button class="btn fb-stage-btn" id="fb-reps-done" ${working ? '' : 'hidden'}>Wiederholungen geschafft — weiter</button>` : ''}
-      ${fbTransportRow()}
-      ${fb.blockIndex > 0 ? '<button class="btn ghost fb-stage-btn" id="fb-finish-early">Vorzeitig beenden & speichern</button>' : ''}
-      <button class="btn ghost fb-stage-btn" id="fb-cancel">ABBRECHEN</button>
-    `;
-  }
+  if (!fb.blocks[fb.blockIndex]) { closeFbOverlay(); return; }
+  const st = fbRunState();
+  const isPaused = fb.running && !fb.intervalId;
+  const segs = fb.blocks.map((b) => `<div class="fbx-seg" style="flex:${Math.max(fbBlockSeconds(b), 1)}"><i></i></div>`).join('');
+  const muscles = (st.mode === 'work' && st.block.type === 'exercise') ? exerciseMuscles(st.block.exerciseId)
+    : (st.trailing && st.displayBlock.type === 'exercise') ? exerciseMuscles(st.displayBlock.exerciseId) : null;
+  const showMuscles = muscles && muscleLabelsText(muscles.primary, muscles.secondary);
+  const upcoming = st.trailing ? fbShortSub(st.displayBlock) : fb.preCount != null ? 'Hände ans Board — gleich geht\'s los' : fb.awaitingNext ? fbShortSub(st.block) : '';
+  const bigNum = fb.preCount != null
+    ? `<div class="fbx-num${fb.preCount <= 3 ? ' fb-precount-tense' : ''}" id="fb-precount">${fb.preCount}</div>`
+    : fb.awaitingNext
+      ? `<div class="fbx-num" id="fb-big">${pad2(buildBlockSequence(st.block)[0].seconds)}</div>`
+      : `<div class="fbx-num" id="fb-big">${fbBigContent(false)}</div>`;
+  const canBack = !(fb.blockIndex === 0 && fb.stepIndex === 0) && !fb.awaitingNext && fb.preCount == null;
 
   el.innerHTML = `
-    <button type="button" class="fb-overlay-close" id="fb-overlay-close" title="Abbrechen">✕</button>
-    <button type="button" class="fb-overlay-overview-btn" id="fb-overview-btn" title="Restprogramm ansehen">☰</button>
-    <div class="fb-overlay-inner">
-      <div class="fb-progress-text mono" id="fb-progress-text"></div>
-      <div class="fb-overlay-stage">${stage}</div>
+    <div class="fbx fbx-${st.mode}${isPaused ? ' paused' : ''}" data-key="${fbStageKey(st)}">
+      <div class="fbx-top">
+        <button type="button" class="fbx-icon" id="fb-overlay-close" aria-label="Beenden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <div class="fbx-segs" id="fbx-segs">${segs}</div>
+        <button type="button" class="fbx-icon" id="fb-overview-btn" aria-label="Restprogramm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
+      </div>
+      <div class="fbx-title">
+        <div class="fbx-phase" id="fb-phase">${fbPhaseWord(st)}${isPaused ? '<span class="fbx-paused-tag">angehalten</span>' : ''}</div>
+        <div class="fbx-rep" id="fb-rep">${esc(fbRepText(st))}</div>
+      </div>
+      <div class="fbx-stage${isPaused ? ' fb-paused' : ''}" id="fbx-stage">
+        ${fbStageInnerHtml(st)}
+        ${showMuscles ? `<div class="fbx-muscles">${bodyMapSvg(muscles.primary, muscles.secondary)}</div>` : ''}
+        ${st.trailing ? `<div class="fbx-checkin fb-checkin" id="fb-checkin">${fb.runResults[fb.blockIndex] ? checkinPanelHtml(fb.blockIndex) : ''}</div>` : ''}
+      </div>
+      <div class="fbx-count">
+        ${bigNum}
+        <div class="fbx-bar"><i id="fb-bar-fg"></i></div>
+      </div>
+      <div class="fbx-info">
+        <b id="fbx-info-main">${fbInfoMainHtml(st.displayBlock, st.activeRep)}</b>
+        <span id="fb-upcoming">${esc(upcoming)}</span>
+      </div>
+      <div class="fbx-controls">
+        <button type="button" class="fbx-ctl" id="fb-prev" ${canBack ? '' : 'disabled'} aria-label="Zurück">${TRANSPORT_ICON.prev}</button>
+        ${fbMainButtonHtml(st)}
+        <button type="button" class="fbx-ctl" id="fb-skip" aria-label="Weiter">${TRANSPORT_ICON.next}</button>
+      </div>
     </div>
+    ${fb.showQuit ? fbQuitSheetHtml() : ''}
     ${fb.showOverview ? fbOverviewHtml() : ''}
   `;
 
-  document.getElementById('fb-overlay-close').onclick = cancelAblauf;
+  document.getElementById('fb-overlay-close').onclick = fbOpenQuit;
   document.getElementById('fb-overview-btn').onclick = () => toggleFbOverview(true);
   if (fb.showOverview) wireFbOverviewPanel();
-  const prevBtn = document.getElementById('fb-prev');
-  if (prevBtn) prevBtn.onclick = fbStepBack;
-  const skipBtn = document.getElementById('fb-skip');
-  if (skipBtn) skipBtn.onclick = fbStepForward;
-  const ppBtn = document.getElementById('fb-playpause');
-  if (ppBtn && !ppBtn.disabled) ppBtn.onclick = fbTogglePause;
-  if (fb.awaitingNext) {
-    document.getElementById('fb-continue').onclick = startCurrentBlock;
-  } else if (fb.preCount != null) {
-    document.getElementById('fb-precount-skip').onclick = finishPreCountdown;
-    const finishEarlyBtn1 = document.getElementById('fb-finish-early');
-    if (finishEarlyBtn1) finishEarlyBtn1.onclick = finishAblaufEarly;
-    document.getElementById('fb-cancel').onclick = cancelAblauf;
-  } else {
-    const finishEarlyBtn2 = document.getElementById('fb-finish-early');
-    if (finishEarlyBtn2) finishEarlyBtn2.onclick = finishAblaufEarly;
-    document.getElementById('fb-cancel').onclick = cancelAblauf;
-    const repsDoneBtn = document.getElementById('fb-reps-done');
-    if (repsDoneBtn) repsDoneBtn.onclick = fbFinishRepsWork;
-    // Nur verdrahten, wenn das Check-in-Markup gerade tatsächlich im DOM
-    // steht (exakt dieselbe Bedingung wie beim Einbetten oben) — sonst
-    // existiert z. B. nach "Zurück" zu einem bereits abgeschlossenen Block
-    // (der schon ein Ergebnis hat, aber gerade nicht in der Schluss-Pause
-    // steht) kein #fb-checkin-Inhalt zum Verdrahten.
-    if (fbIsTrailingPause() && fb.runResults[fb.blockIndex]) wireCheckinPanel(fb.blockIndex);
-    updateFbUpcomingUI();
+  document.getElementById('fb-prev').onclick = fbStepBack;
+  document.getElementById('fb-skip').onclick = fbStepForward;
+  const start = document.getElementById('fbx-start');
+  if (start) start.onclick = fb.awaitingNext ? startCurrentBlock : finishPreCountdown;
+  const pp = document.getElementById('fb-playpause');
+  if (pp) pp.onclick = fbTogglePause;
+  const repsDone = document.getElementById('fb-reps-done');
+  if (repsDone) repsDone.onclick = fbFinishRepsWork;
+  if (fb.showQuit) {
+    document.getElementById('fbx-stay').onclick = fbCloseQuit;
+    document.getElementById('fb-cancel').onclick = () => { fb.showQuit = false; cancelAblauf(); };
+    const early = document.getElementById('fb-finish-early');
+    if (early) early.onclick = () => { fb.showQuit = false; finishAblaufEarly(); };
   }
+  if (st.trailing && fb.runResults[fb.blockIndex]) wireCheckinPanel(fb.blockIndex);
+  if (!st.trailing && !fb.awaitingNext && fb.preCount == null) updateFbUpcomingUI();
   updateFbProgressUI();
-  syncFbRingAnimation(); // Ring-Element ist hier ggf. frisch neu gebaut worden — Animation entsprechend (neu) ansetzen
-  kickCampusAnims(document.getElementById('fb-overlay'));
+  syncFbRingAnimation();
+  fbLayoutBoardStage();
+  // Board-Bild evtl. noch nicht geladen: nach dem Laden nochmal ausrichten
+  const img = el.querySelector('.fbx-board-dim');
+  if (img && !img.complete) img.addEventListener('load', fbLayoutBoardStage, { once: true });
+  kickCampusAnims(el);
 }
 
 /* Kleiner Konfetti-Regen für den "Ablauf geschafft"-Screen — reines CSS/
@@ -9210,11 +9377,17 @@ function audioKeepWarm() {
 function beepTick() {
   beep(1400, 90);
 }
+/* Kurze Vibration zum Ton (Android; iOS kennt navigator.vibrate nicht). */
+function fbBuzz(pattern) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* ignorieren */ }
+}
 function beepStart() {
+  fbBuzz([60, 40, 60]);
   beep(1568, 110);
   setTimeout(() => beep(1976, 170), 130);
 }
 function beepEnd() {
+  fbBuzz(200);
   beep(1046, 380);
 }
 
@@ -9294,7 +9467,15 @@ function startAblauf() {
   fb.showOverview = false;
   clearTimeout(fb.losTimeoutId);
   fb.showLos = false;
+  fb.showQuit = false;
   fbCheckinTyping = false;
+  // Beginnt der Ablauf mit Hang/Campus/Lifting Pin, ist der Vorbereitungs-
+  // Countdown selbst der Bereit-Bildschirm (kein extra "LOS" davor).
+  const first = fb.blocks[0];
+  if (first && (first.type === 'hang' || first.type === 'campus' || first.type === 'block')) {
+    fb.awaitingNext = false;
+    beginBlock();
+  }
   openFbOverlay();
 }
 
@@ -9531,13 +9712,13 @@ function advanceToNextStep() {
   return false;
 }
 
-/* Treibt #fb-ring-fg über eine ECHTE CSS-Animation an (statt den Offset
-   einmal pro Sekunde per JS zu setzen und drüber zu transitionieren) — der
-   Ring läuft dadurch exakt in Echtzeit mit (animation-delay ist die seit
+/* Treibt den Phasen-Balken (#fb-bar-fg, früher der Ring) über eine ECHTE
+   CSS-Animation an (statt einmal pro Sekunde per JS zu setzen) — er
+   läuft dadurch exakt in Echtzeit mit (animation-delay ist die seit
    Schrittbeginn verstrichene Zeit, negativ, damit die Animation an genau
    der richtigen Stelle "einsteigt"), unabhängig vom 1x/Sekunde-Tick-Timing
    und ohne dass am Phasenende manuell auf "geschlossen" gesprungen werden
-   müsste — die Animation erreicht stroke-dashoffset:0 von selbst exakt im
+   müsste — die Animation erreicht das Ende von selbst exakt im
    richtigen Moment. Bei "prefers-reduced-motion" (siehe auch styles.css)
    stattdessen wie bisher ein statischer, aus fb.secondsLeft berechneter
    Wert ohne Animation. Muss bei jedem echten Schrittwechsel neu aufgerufen
@@ -9546,22 +9727,32 @@ function advanceToNextStep() {
    laufenden Tick innerhalb derselben Phase, sonst würde die Animation
    ständig neu gestartet statt einfach weiterzulaufen. */
 function syncFbRingAnimation() {
-  const ring = document.getElementById('fb-ring-fg');
-  if (!ring) return;
+  const bar = document.getElementById('fb-bar-fg');
+  if (!bar) return;
+  // Vorbereitung: Balken läuft über die Countdown-Zeit
+  if (fb.preCount != null) {
+    bar.style.animation = 'none';
+    bar.getBoundingClientRect();
+    bar.style.animation = `fbBarFill ${FB_PRECOUNT_SECONDS}s linear forwards`;
+    bar.style.animationDelay = `-${FB_PRECOUNT_SECONDS - fb.preCount}s`;
+    bar.style.animationPlayState = fb.intervalId ? 'running' : 'paused';
+    return;
+  }
   const step = fb.sequence[fb.stepIndex];
-  const phaseTotal = step ? step.seconds : 1;
+  if (fb.awaitingNext || !step) { bar.style.animation = 'none'; bar.style.transform = 'scaleX(0)'; return; }
+  const phaseTotal = step.seconds;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reducedMotion || !phaseTotal) {
-    ring.style.animation = 'none';
-    ring.style.strokeDashoffset = (FB_RING_CIRCUMFERENCE * (phaseTotal ? fb.secondsLeft / phaseTotal : 0)).toFixed(1);
+    bar.style.animation = 'none';
+    bar.style.transform = `scaleX(${phaseTotal ? 1 - fb.secondsLeft / phaseTotal : 1})`;
     return;
   }
   const elapsedSec = Math.max(0, (Date.now() - fb.stepStartedAt) / 1000);
-  ring.style.animation = 'none';
-  ring.getBoundingClientRect(); // Reflow erzwingen, damit der Neustart unten wirklich greift
-  ring.style.animation = `fbRingFill ${phaseTotal}s linear forwards`;
-  ring.style.animationDelay = `-${elapsedSec}s`;
-  ring.style.animationPlayState = (fb.intervalId && !fbCheckinTyping) ? 'running' : 'paused';
+  bar.style.animation = 'none';
+  bar.getBoundingClientRect(); // Reflow erzwingen, damit der Neustart unten wirklich greift
+  bar.style.animation = `fbBarFill ${phaseTotal}s linear forwards`;
+  bar.style.animationDelay = `-${elapsedSec}s`;
+  bar.style.animationPlayState = (fb.intervalId && !fbCheckinTyping) ? 'running' : 'paused';
 }
 
 function tickBlock() {
@@ -9630,120 +9821,23 @@ function advanceBlock() {
 }
 
 function updateTimerUI() {
+  const root = document.querySelector('#fb-overlay .fbx');
+  if (!root) return;
+  const st = fbRunState();
+  // Neuer Schritt/neue Phase: ganz neu aufbauen (Figur, Titel, Knöpfe)
+  if (root.dataset.key !== fbStageKey(st)) { renderFbOverlay(); return; }
+  const restWarn = !st.working && fb.secondsLeft > 0 && fb.secondsLeft <= 5;
+  const restTense = !st.working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
+  const workTense = st.working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
   const big = document.getElementById('fb-big');
-  const phase = document.getElementById('fb-phase');
-  const ring = document.getElementById('fb-ring-fg');
-  const figureHolder = document.getElementById('fb-phase-figure');
-  const stageLabel = document.getElementById('fb-stage-label');
-  const block = fb.blocks[fb.blockIndex];
-  const step = fb.sequence[fb.stepIndex];
-  const working = isWorkPhase(step);
-  // Letzte 5 Sekunden einer Pause optisch hervorheben (Farbe + Pulsieren),
-  // damit man auch aus der Distanz merkt, dass es gleich weitergeht. Die
-  // letzten 3 Sekunden (synchron zu den beepTick()-Pieptönen, siehe
-  // tickBlock) bekommen zusätzlich einen deutlich kräftigeren Effekt statt
-  // nur des sanften Dauer-Pulsierens — inkl. spürbar grösserer Zahl.
-  const restWarn = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 5;
-  const restTense = !working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
-  const workTense = working && fb.secondsLeft > 0 && fb.secondsLeft <= 3;
-  // Während JEDER Pause (nicht nur der abschliessenden) ist die Kopfzeile
-  // (Griff/Übungsdetails) das Einzige, was noch verrät, was als Nächstes
-  // drankommt, war aber immer winzig — jetzt spürbar besser lesbar. Die
-  // abschliessende Pause zeigt dort nur den kurzen "NEXT: ..."-Titel und
-  // bekommt weiter die grosse Next-Schrift; Pausen MIT verbleibenden
-  // Wiederholungen zeigen den oft langen Griff-/Muster-Text (siehe
-  // headerText in renderFbOverlay) — dort nur moderat vergrössert, damit
-  // z. B. lange Campus-Muster nicht den Bildschirm sprengen.
-  if (stageLabel) {
-    const trailingNow = fbIsTrailingPause();
-    stageLabel.classList.toggle('fb-stage-label-next', !working && trailingNow);
-    stageLabel.classList.toggle('fb-stage-label-readable', !working && !trailingNow);
-  }
-
   if (big) {
-    // innerHTML statt textContent: sowohl für "LOS!" als auch für die
-    // rest-tense-Ziffern (jede ein eigenes <span>, siehe fbFlyDigitsHtml)
-    // nötig, damit die jeweilige Animation bei jedem Tick als frisches
-    // Element neu von vorne losläuft.
+    // innerHTML: "LOS!" und die einzeln rausfliegenden Ziffern (fbFlyDigitsHtml)
+    // sollen bei jedem Tick als frische Elemente neu animieren.
     big.innerHTML = fbBigContent(restTense);
-    big.className = 'big' + (working ? '' : ' rest') + (restWarn ? ' rest-warn' : '') + (restTense ? ' rest-tense' : '') + (workTense ? ' work-tense' : '') + (fb.showLos ? ' los-flash' : '');
+    big.className = 'fbx-num' + (restWarn ? ' rest-warn' : '') + (restTense ? ' rest-tense' : '') + (workTense ? ' work-tense' : '') + (fb.showLos ? ' los-flash' : '');
   }
-  // Während der abschliessenden Pause (isTrailingPause) zeigt das grosse
-  // Bild/der Titel schon den NÄCHSTEN Block (siehe renderFbOverlay) — das
-  // wird dort einmalig beim vollen Rendern gesetzt und bleibt für die
-  // Dauer dieser Pause gültig (blockIndex/stepIndex ändern sich erst beim
-  // nächsten Block), deshalb hier einfach griffbereit neu berechnet.
-  const isTrailingPauseNow = fbIsTrailingPause();
-  const displayBlockNow = isTrailingPauseNow ? (fb.blocks[fb.blockIndex + 1] || block) : block;
-  const displayIsHangNow = isHangLikeBlock(displayBlockNow);
-  if (phase) {
-    let phaseText;
-    if (isTrailingPauseNow) {
-      phaseText = 'Pause';
-    } else if (step && step.rep != null) {
-      const remaining = block.reps - step.rep - 1;
-      phaseText = working ? `${step.phase} · Satz ${step.rep + 1}/${block.reps}` : `Pause · noch ${remaining} ${remaining === 1 ? 'Satz' : 'Sätze'}`;
-    } else {
-      phaseText = step ? step.phase : '';
-    }
-    phase.textContent = phaseText;
-  }
-  if (ring) {
-    // Der Füllstand selbst läuft über die CSS-Animation aus
-    // syncFbRingAnimation() (echtzeit-synchron, hier nichts zu tun) — nur
-    // bei prefers-reduced-motion gibt's keine Animation, dort hier bei
-    // jedem Tick den statischen Wert nachziehen.
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      const phaseTotal = step ? step.seconds : 1;
-      ring.style.strokeDashoffset = (FB_RING_CIRCUMFERENCE * (phaseTotal ? fb.secondsLeft / phaseTotal : 0)).toFixed(1);
-    }
-    ring.classList.toggle('rest', !working);
-    ring.classList.toggle('rest-warn', restWarn);
-    ring.classList.toggle('rest-tense', restTense);
-    ring.classList.toggle('work-tense', workTense);
-  }
-  const hangVisual = document.querySelector('#fb-overlay .fb-hang-visual');
-  if (hangVisual) hangVisual.classList.toggle('rest-tense', restTense);
-  // Schlüssel enthält zusätzlich die aktuelle Wiederholung (rep) — beim
-  // Lifting Pin mit Hand-Wechsel pro Satz UND restSec=0 (keine Pause
-  // zwischen den Wiederholungen) bliebe "kind" sonst durchgehend "work",
-  // die Figur würde beim Handwechsel nie neu gezeichnet.
-  const activeRep = working && step ? step.rep : null;
-  const kind = (working ? 'work' : 'rest') + ':' + (activeRep != null ? activeRep : '') + (isTrailingPauseNow ? ':next' : '');
-  if (figureHolder && figureHolder.dataset.kind !== kind) {
-    if (working) {
-      figureHolder.innerHTML = isHangLikeBlock(block) ? holdBlockWorkFigure(block, activeRep) : block.type === 'campus' ? campusWorkFigureSvg(block, false) : exerciseFigureSvg(block.exerciseId);
-    } else if (displayIsHangNow) {
-      // Layout mit separatem Board-Thumb oben (schon beim vollen Rendern
-      // gesetzt, hier unberührt) — die kleine Figur bleibt die Ruhefigur.
-      figureHolder.innerHTML = FB_REST_FIGURE_SVG;
-    } else {
-      // Kombinierte Grossfigur (kein separater Board-Thumb): während der
-      // abschliessenden Pause die Vorschau des nächsten Blocks zeigen.
-      figureHolder.innerHTML = isTrailingPauseNow
-        ? (displayBlockNow.type === 'campus' ? campusWorkFigureSvg(displayBlockNow) : displayBlockNow.type === 'pause' ? FB_REST_FIGURE_SVG : exerciseFigureSvg(displayBlockNow.exerciseId))
-        : block.type === 'campus' ? campusWorkFigureSvg(block) : FB_REST_FIGURE_SVG;
-    }
-    figureHolder.dataset.kind = kind;
-    kickCampusAnims(figureHolder);
-  }
-  const repsDoneBtn = document.getElementById('fb-reps-done');
-  if (repsDoneBtn) repsDoneBtn.hidden = !working;
-  // Aktive Hand beim Lifting Pin ändert sich pro Wiederholung — das
-  // fb-stage-label selbst wird nur einmal pro Satz komplett aufgebaut
-  // (renderFbOverlay), deshalb hier gezielt nur die Hand-Anzeige darin
-  // nachziehen, statt das ganze Label (inkl. Titel/Griff) neu zu bauen.
-  // Nur während einer laufenden Arbeitsphase nötig (nur dort ändert sich
-  // pro Tick etwas) — während einer Pause stünde hier sonst fälschlich
-  // wieder das Muster des AKTUELLEN statt des in der Vorschau gezeigten
-  // nächsten Blocks.
-  const handNoteEl = document.getElementById('fb-hand-note');
-  if (handNoteEl && working && block && block.type === 'block') handNoteEl.textContent = blockArmNote(block, activeRep);
-  // Analog: die "Arme"-Regel-Kachel (siehe fbFactChipsHtml) zeigt beim
-  // Lifting Pin im Wechsel-Modus dieselbe pro-Wiederholung wechselnde Hand.
-  const factArmEl = document.getElementById('fb-fact-arm');
-  if (factArmEl && working && block && block.type === 'block') factArmEl.textContent = fbFactArmText(block, activeRep);
-  updateFbUpcomingUI();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) syncFbRingAnimation();
+  if (!st.trailing) updateFbUpcomingUI();
   updateFbProgressUI();
 }
 
