@@ -1,12 +1,30 @@
-# Faultier-Gliederpuppe (Prototyp, nicht in der App)
+# Faultier-Gliederpuppe
 
-Aus einer Einzelteil-Vorlage (Vorderansicht, Teile durch weisse Linien getrennt)
-ausgeschnitten und an Ellbogen, Hüfte und Knie drehbar zusammengesetzt.
+Die Figur in der App (`beta/sloth-rig.js`) wird aus Einzelteilen zusammengesetzt
+und per Winkel gestellt, statt für jede Übung ein eigenes Bild zu brauchen.
 
-- `seg.py` / `parts.py` — Vorlage in Teile zerlegen (Pfad zur Vorlage im Skript anpassen)
-- `*.png`, `bboxes.json` — die ausgeschnittenen Teile + Position im Original (1024 px)
-- `rig.html` — SVG-Puppe mit `setPose(name, t)`: `flex`, `wave`, `cheer`, `squat`
-- `render.mjs` — rendert Einzelbilder per Playwright (Pfade im Skript anpassen)
-- `poses.py` / `checker.py` — Freistellen der ganzen Posen (weisser bzw. eingemalter Karo-Hintergrund)
+## Teile erzeugen
 
-Offen: Seitenansicht-Vorlage, Oberarme als eigene Teile (Schultergelenk).
+```
+pip install pillow numpy scipy
+python3 tools/sloth-rig/build.py          # schreibt assets/sloth/rig/*.png + SLOTH_PARTS in beta/sloth-rig.js
+python3 tools/sloth-rig/build.py --list   # Teil-Nummern der Vorlagen anzeigen
+```
+
+- `sheets/front.jpg`: Vorderansicht (neutrales Gesicht)
+- `sheets/back.jpg`: Rückansicht mit Greifhänden und Ellbogen-Kugeln
+
+Die Vorlagen müssen weissen Hintergrund haben und die Teile durch weisse
+Lücken getrennt sein. Die Farben werden beim Erzeugen in Schwarzweiss
+umgerechnet (`CURVE` in `build.py`).
+
+## Posen
+
+In `beta/sloth-rig.js`: Gelenkpunkte (`SLOTH_JOINTS`, in Vorlagen-Pixeln),
+Posen (`SLOTH_POSES`, zwei Endstellungen als Weltwinkel) und `slothFigure(name)`,
+das ein fertiges SVG liefert. Die Bewegung läuft als CSS-Animation.
+
+## Ältere Dateien
+
+`seg.py`, `parts.py`, `rig.html`, `render.mjs`, `poses.py`, `checker.py` und
+die PNGs in diesem Ordner stammen vom ersten Prototyp (alte Vorlage).

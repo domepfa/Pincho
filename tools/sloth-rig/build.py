@@ -1,0 +1,75 @@
+"""Zerlegt die Faultier-Vorlagen (sheets/*.jpg) in Einzelteile für die Puppe.
+
+Jede Vorlage: Teile durch weisse Lücken getrennt, weisser Hintergrund.
+Ausgabe: assets/sloth/rig/<ansicht>_<teil>.png in Schwarzweiss (Graustufe +
+Transparenz) und die Teil-Rechtecke im Block PARTS in beta/sloth-rig.js.
+
+Aufruf aus dem Repo-Stamm:  python3 tools/sloth-rig/build.py
+Braucht: pip install pillow numpy scipy
+"""
+import json, os, re
+import numpy as np
+from PIL import Image, ImageFilter
+from scipy import ndimage as ndi
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(HERE))
+OUT = os.path.join(ROOT, 'assets', 'sloth', 'rig')
+RIG_JS = os.path.join(ROOT, 'beta', 'sloth-rig.js')
+
+# Teil-Nummern = Zusammenhangskomponenten der Vorlage (siehe --list)
+SHEETS = {
+    'front': ('front.jpg', {'head': [5], 'torso': [25], 'uarm_l': [27], 'uarm_r': [28], 'farm_l': [29], 'farm_r': [30],
+                            'thigh_l': [70], 'thigh_r': [71], 'tail': [72], 'calf_l': [87], 'calf_r': [88]}),
+    'back': ('back.jpg', {'head': [5], 'torso': [25], 'uarm_l': [27], 'uarm_r': [28], 'farm_l': [29], 'farm_r': [30],
+                          'elbow_l': [33], 'elbow_r': [31], 'grip_l': [97], 'grip_r': [100], 'thigh_l': [84], 'thigh_r': [83],
+                          'tail': [102], 'calf_l': [103], 'calf_r': [104]}),
+}
+
+# Schwarzweiss-Kurve: Helligkeit -> Grauwert (Stützpunkte bei 0, .25, .5, .75, 1)
+CURVE = [0.06, 0.30, 0.68, 0.96, 1.0]
+
+
+def label(path):
+    a = np.asarray(Image.open(path).convert('RGB')).astype(int)
+    white = (a.min(2) > 200) & (a.max(2) - a.min(2) < 30)
+    lab, _ = ndi.label(~white)
+    return a, lab
+
+
+def gray(rgb):
+    lum = (0.33 * rgb[..., 0] + 0.5 * rgb[..., 1] + 0.17 * rgb[..., 2]) / 255
+    return np.interp(lum, np.linspace(0, 1, len(CURVE)), CURVE) * 255
+
+
+def main():
+    os.makedirs(OUT, exist_ok=True)
+    parts = {}
+    for view, (fname, comps) in SHEETS.items():
+        rgb, lab = label(os.path.join(HERE, 'sheets', fname))
+        g = gray(rgb).astype(np.uint8)
+        for name, ids in comps.items():
+            m = ndi.binary_fill_holes(np.isin(lab, ids))
+            mask = Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.6))
+            box = mask.getbbox()
+            im = Image.merge('LA', (Image.fromarray(g), mask)).crop(box)
+            im.save(os.path.join(OUT, f'{view}_{name}.png'), optimize=True)
+            parts[f'{view}_{name}'] = list(box)
+    js = open(RIG_JS).read()
+    block = 'const SLOTH_PARTS = ' + json.dumps(parts, separators=(',', ':')) + ';'
+    js = re.sub(r'/\* PARTS:BEGIN \*/.*?/\* PARTS:END \*/', '/* PARTS:BEGIN */\n' + block + '\n/* PARTS:END */', js, flags=re.S)
+    open(RIG_JS, 'w').write(js)
+    print(f'{len(parts)} Teile -> {OUT}')
+
+
+if __name__ == '__main__':
+    import sys
+    if '--list' in sys.argv:
+        for view, (fname, _) in SHEETS.items():
+            _, lab = label(os.path.join(HERE, 'sheets', fname))
+            sizes = ndi.sum(lab > 0, lab, range(1, lab.max() + 1)); objs = ndi.find_objects(lab)
+            for i, s in enumerate(sizes):
+                if s > 1500:
+                    sl = objs[i]; print(view, i + 1, int(s), (sl[1].start, sl[0].start, sl[1].stop, sl[0].stop))
+    else:
+        main()

@@ -1859,7 +1859,7 @@ async function finishWallSession() {
   const el = ensureWallOverlay();
   el.innerHTML = `
     <div class="fb-overlay-inner fb-overlay-done">
-      <img class="fb-done-sloth" src="../assets/sloth/sloth-wave.png" alt="">
+      ${slothFigure('wave', 'fb-done-sloth')}
       <div class="fb-stage-title">Ausdauer geschafft!</div>
       <div class="fb-stage-sub mono">${elapsedMin} ${elapsedMin === 1 ? 'Minute' : 'Minuten'} Ausdauer</div>
       ${challengeDurationChipsHtml('wall-share', CHALLENGE_WINDOW_H)}
@@ -2372,7 +2372,7 @@ async function finishFlowSession(blocksOverride) {
   const el = ensureFlowOverlay();
   el.innerHTML = `
     <div class="fb-overlay-inner fb-overlay-done">
-      <img class="fb-done-sloth" src="../assets/sloth/sloth-wave.png" alt="">
+      ${slothFigure('wave', 'fb-done-sloth')}
       <div class="fb-stage-title">${isPartial ? 'Vorzeitig beendet & gespeichert' : 'Flow geschafft!'}</div>
       <div class="fb-stage-sub mono">${blocksDone.length} Posen · ${fmtMinSec(totalSec)}</div>
       <div class="fb-summary-list">${blocksDone.map((b) => `<div class="fb-summary-row"><span>${esc(poseName(b.poseId))}</span><span class="mono">${b.holdSec}s</span></div>`).join('')}</div>
@@ -7655,13 +7655,9 @@ const EXERCISE_FIGURES = {
    abstrakten Linienfiguren ist "vorne/hinten", "wie steht man zum Boden"
    und "geht's nach innen/aussen bzw. hoch/runter" per Bild allein nicht
    immer eindeutig, ein Satz Text macht es das aber zuverlässig. */
-/* Klimmzüge: zwei Faultier-Bilder (unten/oben) im Wechsel — die Stange
-   steht dabei still (beide Bilder an der Stangenhöhe ausgerichtet). */
+/* Klimmzüge: Faultier-Puppe von hinten (sloth-rig.js). */
 const SLOTH_PULL_IDS = ['pullup', 'pullup_weighted', 'pullup_close_grip'];
-const SLOTH_PULL_FIGURE = `<div class="ex-figure sloth-pull" role="img" aria-label="Klimmzug">
-  <img class="sloth-pull-bottom" src="../assets/sloth/sloth-pull-bottom.png" alt="">
-  <img class="sloth-pull-top" src="../assets/sloth/sloth-pull-top.png" alt="">
-</div>`;
+const SLOTH_PULL_FIGURE = slothFigure('pull', 'ex-figure sloth-img');
 function exerciseFigureSvg(exerciseId) {
   if (SLOTH_PULL_IDS.includes(exerciseId)) return SLOTH_PULL_FIGURE;
   const fig = EXERCISE_FIGURES[exerciseId];
@@ -8590,8 +8586,8 @@ const SLOTH_FACE = `
   <circle class="sloth-head" cx="100" cy="64" r="19"/>
   <path class="sloth-mask" d="M86 62 q6 -7 12 1 q-6 7 -12 -1z M114 62 q-6 -7 -12 1 q6 7 12 -1z"/>
   <path class="sloth-line" d="M97 71 h6 M94 76 q6 4 12 0"/>`;
-const FB_HANG_FIGURE_SVG = `<img class="ex-figure fb-hang-figure sloth-img" src="../assets/sloth/sloth-hang.png" alt="">`; // Muskelfaultier (assets/sloth)
-const FB_REST_FIGURE_SVG = `<img class="ex-figure sloth-img sloth-rest" src="../assets/sloth/sloth-rest.png" alt="">`;
+const FB_HANG_FIGURE_SVG = slothFigure('hang', 'ex-figure sloth-img'); // Faultier-Puppe (sloth-rig.js)
+const FB_REST_FIGURE_SVG = slothFigure('rest', 'ex-figure sloth-img');
 /* Lifting Pin ist kein Hängen (FB_HANG_FIGURE_SVG), sondern ein einarmiges
    Ziehen von unten (Pin auf Hüfthöhe) nach oben (Richtung Schulter) — eigene
    Animation dafür, stehende Fixfigur + EIN animierter Arm (Start/Ende
@@ -9790,7 +9786,7 @@ async function finishAblauf(blocksOverride, resultsOverride, isPartial) {
   const el = ensureFbOverlay();
   el.innerHTML = `
     <div class="fb-overlay-inner fb-overlay-done">
-      <img class="fb-done-sloth" src="../assets/sloth/sloth-wave.png" alt="">
+      ${slothFigure('wave', 'fb-done-sloth')}
       <div class="fb-stage-title">${isPartial ? 'Vorzeitig beendet & gespeichert' : 'Ablauf geschafft!'}</div>
       <div class="fb-stage-sub mono">${blocks.length} Sätze · ${fmtMinSec(estimateSeconds)} Trainingszeit</div>
       ${fbResultsSummaryHtml(blocks, results)}
@@ -10378,7 +10374,7 @@ function drawProgress() {
         <button type="button" class="chip ${progressSource === 'board' ? 'active' : ''}" data-pg-source="board">Board</button>
       </div>
       ${exIds.length ? `<p class="pg-ex-current">${esc(progressExerciseName(progressExerciseId))}</p>` : ''}
-      ${isNewPr ? `<div class="pg-pr-wrap"><img class="pg-pr-sloth" src="../assets/sloth/sloth-flex.png" alt=""><div class="pg-pr">Neuer Rekord: <b>${esc(pts[pts.length - 1].label)}</b></div></div>` : ''}
+      ${isNewPr ? `<div class="pg-pr-wrap">${slothFigure('flex', 'pg-pr-sloth')}<div class="pg-pr">Neuer Rekord: <b>${esc(pts[pts.length - 1].label)}</b></div></div>` : ''}
       ${headline}
       ${exIds.length ? progressLineChart('pg-ex', pts, 'Bester Satz je Training') : `<div class="list-empty">${progressSource === 'board' ? 'Noch keine Übungen im Board-Ablauf erfasst (Wdh./Gewicht im Check-in).' : 'Noch keine Gym-Sätze geloggt.'}</div>`}
       ${exIds.length && pts.length ? cycleLegendHtml() : ''}

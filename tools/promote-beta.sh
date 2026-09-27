@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Übernimmt den Stand aus beta/ in die Haupt-App (Repo-Wurzel).
-# Kopiert app.js, data.js, firebase.js, styles.css und index.html und
+# Kopiert app.js, sloth-rig.js, data.js, firebase.js, styles.css und index.html und
 # stellt dabei zurück, was nur für die Beta anders ist:
 #   - Pfade ../assets/  -> ./assets/
 #   - Speicher-Keys pinchobeta_ -> pincho_ (Offline-Kopie, Warteschlange,
@@ -11,7 +11,7 @@
 # damit die Handys die neue Version laden.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-for f in app.js data.js firebase.js styles.css index.html; do
+for f in app.js sloth-rig.js data.js firebase.js styles.css index.html; do
   sed -e 's#\.\./assets/#./assets/#g' \
       -e 's/pinchobeta_/pincho_/g' \
       "beta/$f" > "$f"
@@ -20,6 +20,8 @@ sed -i \
   -e 's#<title>Pincho Beta</title>#<title>Pincho – Krafttraining fürs Klettern</title>#' \
   -e 's#icon-beta-#icon-#g' \
   index.html
+# Neue Beta-Dateien auch in den Offline-Speicher der Haupt-App aufnehmen
+grep -q "sloth-rig.js" sw.js || sed -i "s#'./firebase.js', './app.js',#'./firebase.js', './sloth-rig.js', './app.js',#" sw.js
 v=$(grep -o "pincho-shell-v[0-9]*" sw.js | head -1 | grep -o "[0-9]*$")
 sed -i "s/pincho-shell-v$v/pincho-shell-v$((v + 1))/" sw.js
 echo "Beta übernommen, Cache pincho-shell-v$((v + 1))"
