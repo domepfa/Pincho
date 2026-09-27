@@ -395,7 +395,7 @@ function loadStoredProfile() {
 }
 const state = {
   member: loadStoredProfile(), // {id, name, uid} — eigenes Profil (members/{id})
-  route: (location.hash || '#fingerboard').replace('#', ''),
+  route: location.hash ? location.hash.replace('#', '') : null, // null: Start-Tab aus den Nav-Einstellungen (boot)
   members: {},        // {id: {name}} — alle Leute aus den eigenen Crews (für Namen)
   memberDoc: null,    // eigenes Profil aus Firebase (board, crews, …)
   crews: {},          // {crewId: {name, owner, members}}
@@ -407,6 +407,7 @@ const state = {
 
 /* ---------- Boot ---------- */
 async function boot() {
+  if (!state.route) state.route = defaultRoute();
   if (state.route === 'datenschutz') { renderPrivacy(); return; }
   // Einmal angemeldete Geräte starten sofort, auch ohne Netz (z. B. im
   // Gym) — das Token wird im Hintergrund erneuert, Daten kommen bis dahin
@@ -466,6 +467,7 @@ async function loadCrews() {
   const doc = await fbGet(`members/${state.member.id}`);
   if (doc === undefined) return;
   state.memberDoc = doc || {};
+  if (state.memberDoc.nav) { try { localStorage.setItem(NAV_PREF_KEY, JSON.stringify(state.memberDoc.nav)); } catch (e) { /* ignorieren */ } }
   const ids = Object.keys(state.memberDoc.crews || {});
   const crews = {};
   await Promise.all(ids.map(async (id) => {
@@ -884,6 +886,34 @@ const NAV_ITEMS = [
   { route: 'progress', label: 'Fortschritt', icon: 'M4 19h16 M5 15l4-5 4 3 6-8' },
   { route: 'challenges', label: 'Challenges', icon: 'M5 21V4 M5 4h11l-2 4 2 4H5' },
 ];
+/* Eigene Anordnung der unteren Navigation (Konto → Navigation): Reihenfolge
+   und ausgeblendete Tabs. Gespeichert im Profil (members/{id}/nav), dazu
+   lokal gespiegelt, damit der Start-Tab schon vor dem Laden stimmt. */
+const NAV_PREF_KEY = 'pinchobeta_nav';
+function navPrefs() {
+  const fromDoc = state.memberDoc && state.memberDoc.nav;
+  if (fromDoc) return fromDoc;
+  try { return JSON.parse(localStorage.getItem(NAV_PREF_KEY) || 'null') || {}; } catch (e) { return {}; }
+}
+/* Alle Tabs in gewählter Reihenfolge (neue Tabs, die es in der Liste noch nicht gibt, hinten dran) */
+function navOrdered() {
+  const order = Array.isArray(navPrefs().order) ? navPrefs().order : [];
+  const known = order.map((r) => NAV_ITEMS.find((n) => n.route === r)).filter(Boolean);
+  return known.concat(NAV_ITEMS.filter((n) => !order.includes(n.route)));
+}
+function navVisible() {
+  const hidden = Array.isArray(navPrefs().hidden) ? navPrefs().hidden : [];
+  const list = navOrdered().filter((n) => !hidden.includes(n.route));
+  return list.length ? list : NAV_ITEMS.slice(0, 1);
+}
+/* Start-Tab = erster sichtbarer Tab */
+function defaultRoute() { return navVisible()[0].route; }
+function saveNavPrefs(prefs) {
+  state.memberDoc = { ...(state.memberDoc || {}), nav: prefs };
+  try { localStorage.setItem(NAV_PREF_KEY, JSON.stringify(prefs)); } catch (e) { /* ignorieren */ }
+  fbPatch(`members/${state.member.id}`, { nav: prefs });
+}
+
 function navIconSvg(d) {
   return `<svg class="nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
 }
@@ -905,7 +935,7 @@ function renderShell(contentHtml) {
     </div>
     <div class="shell">${contentHtml}</div>
     <nav class="bottomnav">
-      ${NAV_ITEMS.map((n) => `<a href="#${n.route}" class="${state.route === n.route ? 'active' : ''}"><span class="nav-pill">${navIconSvg(n.icon)}</span><span class="nav-label">${n.label}</span>${n.route === 'challenges' ? `<span class="nav-dot" id="nav-challenge-dot" ${challengeUnseenCount ? '' : 'hidden'}></span>` : ''}</a>`).join('')}
+      ${navVisible().map((n) => `<a href="#${n.route}" class="${state.route === n.route ? 'active' : ''}"><span class="nav-pill">${navIconSvg(n.icon)}</span><span class="nav-label">${n.label}</span>${n.route === 'challenges' ? `<span class="nav-dot" id="nav-challenge-dot" ${challengeUnseenCount ? '' : 'hidden'}></span>` : ''}</a>`).join('')}
       <span class="nav-indicator" id="nav-indicator"></span>
     </nav>
   `;
@@ -11284,6 +11314,53 @@ function wishesCardHtml(list) {
     </div>`;
 }
 
+function renderKontoNav() {
+  const holder = document.getElementById('konto-nav');
+  if (!holder) return;
+  const list = navOrdered();
+  const hidden = Array.isArray(navPrefs().hidden) ? navPrefs().hidden : [];
+  const visibleCount = list.filter((n) => !hidden.includes(n.route)).length;
+  holder.innerHTML = `
+    <div class="card">
+      <p class="card-title">Navigation unten</p>
+      <p class="card-sub" style="margin-bottom:10px;">Reihenfolge ändern und Tabs ausblenden. Der oberste sichtbare Tab öffnet sich beim Start.</p>
+      <div class="nav-pref-list">
+        ${list.map((n, i) => {
+          const off = hidden.includes(n.route);
+          return `
+          <div class="nav-pref-row${off ? ' off' : ''}">
+            <span class="nav-pref-icon">${navIconSvg(n.icon)}</span>
+            <span class="nav-pref-label">${esc(n.label)}</span>
+            <button type="button" class="nav-pref-btn" data-nav-up="${i}" ${i === 0 ? 'disabled' : ''} aria-label="${esc(n.label)} nach oben">↑</button>
+            <button type="button" class="nav-pref-btn" data-nav-down="${i}" ${i === list.length - 1 ? 'disabled' : ''} aria-label="${esc(n.label)} nach unten">↓</button>
+            <button type="button" class="chip small ${off ? '' : 'active'}" data-nav-toggle="${n.route}" ${!off && visibleCount <= 1 ? 'disabled' : ''}>${off ? 'Aus' : 'An'}</button>
+          </div>`;
+        }).join('')}
+      </div>
+      ${navPrefs().order || navPrefs().hidden ? '<button type="button" class="btn ghost small" id="konto-nav-reset" style="margin-top:10px;">Standard wiederherstellen</button>' : ''}
+    </div>
+  `;
+  const apply = (order, hid) => { saveNavPrefs({ order, hidden: hid }); render(); };
+  const routes = list.map((n) => n.route);
+  holder.querySelectorAll('[data-nav-up]').forEach((b) => { b.onclick = () => {
+    const i = Number(b.dataset.navUp); [routes[i - 1], routes[i]] = [routes[i], routes[i - 1]]; apply(routes, hidden);
+  }; });
+  holder.querySelectorAll('[data-nav-down]').forEach((b) => { b.onclick = () => {
+    const i = Number(b.dataset.navDown); [routes[i + 1], routes[i]] = [routes[i], routes[i + 1]]; apply(routes, hidden);
+  }; });
+  holder.querySelectorAll('[data-nav-toggle]').forEach((b) => { b.onclick = () => {
+    const r = b.dataset.navToggle;
+    apply(routes, hidden.includes(r) ? hidden.filter((x) => x !== r) : hidden.concat(r));
+  }; });
+  const reset = document.getElementById('konto-nav-reset');
+  if (reset) reset.onclick = () => {
+    state.memberDoc = { ...(state.memberDoc || {}), nav: null };
+    try { localStorage.removeItem(NAV_PREF_KEY); } catch (e) { /* ignorieren */ }
+    fbPatch(`members/${state.member.id}`, { nav: null });
+    render();
+  };
+}
+
 async function renderKonto() {
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Konto</h2><div class="sec-rule"></div></div>
@@ -11303,12 +11380,14 @@ async function renderKonto() {
         <button class="btn small" id="konto-join">Beitreten</button>
       </div>
     </div>
+    <div id="konto-nav"></div>
     <div id="konto-create"></div>
     <div id="konto-wishes"></div>
     <div id="konto-cycle"></div>
     <div id="konto-data"></div>
   `);
   document.getElementById('konto-logout').onclick = () => logout();
+  renderKontoNav();
   document.getElementById('konto-join').onclick = () => joinCrewWithCode(normalizeInviteCode(document.getElementById('konto-join-code').value));
 
   await loadCrews(); // frisch: neue Mitglieder sollen ohne Neustart erscheinen
@@ -11501,7 +11580,7 @@ async function createCrew(name) {
 
 /* ---------- Start ---------- */
 window.addEventListener('hashchange', () => {
-  state.route = (location.hash || '#fingerboard').replace('#', '');
+  state.route = location.hash ? location.hash.replace('#', '') : defaultRoute();
   render();
 });
 boot();
