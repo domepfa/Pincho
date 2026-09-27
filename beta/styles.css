@@ -1548,7 +1548,7 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .fbx {
   --phase: var(--accent);
   position: absolute; inset: 0;
-  display: grid; grid-template-rows: 56px 60px minmax(0, 1fr) 124px 56px 104px;
+  display: grid; grid-template-rows: 56px 60px minmax(0, 1fr) 124px 66px 104px;
   max-width: 480px; margin: 0 auto;
   padding: var(--safe-top) 16px var(--safe-bottom);
 }
@@ -1592,7 +1592,7 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .fbx-paused-tag { font-size: 16px; letter-spacing: .08em; color: var(--ink-dim); margin-left: 10px; vertical-align: middle; }
 .fbx-rep {
   font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 19px; color: var(--ink-dim);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  white-space: nowrap; flex: none; /* Grösse passt fbFitOverlayText an, statt abzuschneiden */
 }
 
 .fbx-stage {
@@ -1648,8 +1648,11 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 @keyframes fbBarFill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 .fbx-info { text-align: center; align-self: center; min-width: 0; }
-.fbx-info b { display: block; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fbx-info > span { display: block; font-size: 15px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fbx-info b {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  font-size: 17px; font-weight: 600; line-height: 1.15; max-height: 2.3em;
+}
+.fbx-info > span { display: block; font-size: 15px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; }
 
 .fbx-controls { display: flex; align-items: center; justify-content: center; gap: 28px; }
 .fbx-ctl {
@@ -1679,7 +1682,7 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 
 /* Kleine Handys: Zahl und Titel etwas kleiner, Bühne behält den Rest */
 @media (max-height: 700px) {
-  .fbx { grid-template-rows: 52px 50px minmax(0, 1fr) 100px 52px 92px; }
+  .fbx { grid-template-rows: 52px 50px minmax(0, 1fr) 100px 62px 92px; }
   .fbx-phase { font-size: 32px; }
   .fbx-num { font-size: 84px; height: 78px; }
   .fbx-main { width: 72px; height: 72px; }

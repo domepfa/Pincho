@@ -8801,7 +8801,8 @@ function updateFbUpcomingUI() {
   if (!el) return;
   // In der abschliessenden Pause steht dort schon die Vorschau des nächsten Blocks (renderFbOverlay).
   if (fbIsTrailingPause()) return;
-  el.textContent = 'Danach: ' + fbUpcomingLabel();
+  const text = 'Danach: ' + fbUpcomingLabel();
+  if (el.textContent !== text) { el.textContent = text; fbFitLine(el); }
 }
 
 /* ---------- Transport-Leiste (Zurück / Play-Pause / Weiter) ----------
@@ -9006,8 +9007,7 @@ function fbRepText(st) {
   const n = fb.blocks.length;
   if (st.trailing) return n > 1 ? `Block ${fb.blockIndex + 2}/${n}` : '';
   const b = st.block;
-  // Im Start-Countdown steht links "Allez, …!" — dann nur der Satz, sonst wird's abgeschnitten
-  const blockPart = n > 1 && fb.preCount == null ? `Block ${fb.blockIndex + 1}/${n}` : '';
+  const blockPart = n > 1 ? `Block ${fb.blockIndex + 1}/${n}` : '';
   let repPart = '';
   if (st.step && st.step.rep != null) repPart = `Satz ${st.step.rep + 1}/${b.reps}`;
   else if (st.mode === 'ready' && (isHoldModeBlock(b) || b.type === 'campus')) repPart = `Satz 1/${b.reps}`;
@@ -9253,6 +9253,38 @@ function fbCloseQuit() {
   else renderFbOverlay();
 }
 
+/* Nichts abschneiden: Titel, Satz-Angabe und Info-Zeilen werden so weit
+   verkleinert, bis sie ganz hineinpassen (Info fett darf zweizeilig sein). */
+function fbFitOverlayText() {
+  const title = document.querySelector('#fb-overlay .fbx-title');
+  const phase = document.getElementById('fb-phase');
+  const repEl = document.getElementById('fb-rep');
+  if (title && phase && repEl) {
+    phase.style.fontSize = ''; repEl.style.fontSize = '';
+    const need = () => phase.scrollWidth + repEl.scrollWidth + 12;
+    let f = parseFloat(getComputedStyle(phase).fontSize);
+    while (need() > title.clientWidth && f > 24) { f -= 2; phase.style.fontSize = f + 'px'; }
+    let r = parseFloat(getComputedStyle(repEl).fontSize);
+    while (need() > title.clientWidth && r > 12) { r -= 1; repEl.style.fontSize = r + 'px'; }
+  }
+  const main = document.getElementById('fbx-info-main');
+  if (main) {
+    main.style.fontSize = '';
+    let m = parseFloat(getComputedStyle(main).fontSize);
+    while (main.scrollHeight > main.clientHeight + 1 && m > 12) { m -= 1; main.style.fontSize = m + 'px'; }
+  }
+  fbFitLine(document.getElementById('fb-upcoming'));
+}
+function fbFitLine(el) {
+  if (!el) return;
+  el.style.fontSize = '';
+  let f = parseFloat(getComputedStyle(el).fontSize);
+  while (el.scrollWidth > el.clientWidth + 1 && f > 11) { f -= 1; el.style.fontSize = f + 'px'; }
+}
+window.addEventListener('resize', () => { if (document.querySelector('#fb-overlay .fbx')) fbFitOverlayText(); });
+// Schrift (Barlow) kommt evtl. erst nach dem ersten Aufbau — danach nochmal einpassen
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (document.querySelector('#fb-overlay .fbx')) fbFitOverlayText(); });
+
 function renderFbOverlay() {
   const el = ensureFbOverlay();
   if (!fb.running && !fb.awaitingNext && fb.preCount == null) { closeFbOverlay(); return; }
@@ -9326,6 +9358,7 @@ function renderFbOverlay() {
   if (!st.trailing && !fb.awaitingNext && fb.preCount == null) updateFbUpcomingUI();
   updateFbProgressUI();
   syncFbRingAnimation();
+  fbFitOverlayText();
   fbLayoutBoardStage();
   // Board-Bild evtl. noch nicht geladen: nach dem Laden nochmal ausrichten
   const img = el.querySelector('.fbx-board-dim');
