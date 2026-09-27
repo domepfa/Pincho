@@ -75,6 +75,9 @@ const STAND_LEGS = { thigh_l: 100, calf_l: 91, thigh_r: 80, calf_r: 89 };
    Seite: 'wrist', 'ankle') · dur: Sekunden pro Durchgang · keys: Verlauf
    a(0) -> b(1) über die Zeit · bar: Stange an den Händen · floor: Boden-
    schatten (y relativ zum festen Punkt) · label: Bildbeschreibung.
+   Seite: pin auch 'grip', 'knee', 'elbow', 'shoulder', 'hip'; relArms: Arm-
+   winkel relativ zum Rumpf; lean: { pt, y, from, to } Rumpfwinkel so, dass
+   Punkt pt y über dem festen Punkt liegt; barEnd: Stange im Querschnitt.
    Seitenansicht: Winkel uarm/farm/hand/thigh/calf gelten für die vordere
    Seite, f… (fuarm, ffarm, …) für die hintere (sonst gleich wie vorne);
    grip: 'fist' (Faust) / 'flat' (flach am Boden) statt offener Hand;
@@ -90,6 +93,82 @@ const SLOTH_POSES = {
     view: 'side', pin: 'ankle', dur: 2.8, floor: 46, label: 'Kniebeuge',
     a: { torso: -100, uarm: 95, farm: 92, thigh: 80, calf: 92 },
     b: { torso: -60, uarm: -4, farm: -6, thigh: 10, calf: 110 },
+  },
+  plank: {
+    view: 'side', pin: 'wrist', dur: 3.6, floor: 30, solve: { toe: 34 }, grip: 'flat', label: 'Unterarmstütz',
+    a: { uarm: 90, farm: 0, hand: 0 },
+    b: { uarm: 92, farm: 0, hand: 0 },
+  },
+  mountain: {
+    view: 'side', pin: 'wrist', dur: 1.2, floor: 34, solve: { toe: 60 }, grip: 'flat', label: 'Mountain Climber',
+    a: { uarm: 92, farm: 90, hand: 0, kneeThigh: 0, kneeCalf: 0 },
+    b: { uarm: 92, farm: 90, hand: 0, kneeThigh: -115, kneeCalf: -20 },
+  },
+  bridge: {
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, lean: { pt: 'shoulder', y: 12, from: 150, to: 240 }, grip: 'flat', label: 'Glute Bridge',
+    a: { torso: 180, uarm: 8, farm: 4, hand: 0, thigh: -38, calf: 72 },
+    b: { torso: 180, uarm: 8, farm: 4, hand: 0, thigh: -8, calf: 88 },
+  },
+  situp: {
+    view: 'side', pin: 'hip', dur: 2.8, floor: 60, relArms: true, label: 'Sit-up',
+    keys: [[0, 0], [0.4, 1], [0.55, 1], [1, 0]],
+    a: { torso: 186, uarm: 145, farm: -15, thigh: -52, calf: 58 },
+    b: { torso: 292, uarm: 145, farm: -15, thigh: -52, calf: 58 },
+  },
+  crunch: {
+    view: 'side', pin: 'hip', dur: 2.2, floor: 60, relArms: true, label: 'Crunch',
+    a: { torso: 186, uarm: 145, farm: -15, thigh: -52, calf: 58 },
+    b: { torso: 214, uarm: 145, farm: -15, thigh: -52, calf: 58 },
+  },
+  superman: {
+    view: 'side', pin: 'hip', dur: 3, floor: 58, grip: 'flat', label: 'Superman',
+    a: { torso: -2, uarm: -4, farm: -4, hand: -4, thigh: 180, calf: 180, fthigh: 182, fcalf: 182 },
+    b: { torso: -14, uarm: -22, farm: -22, hand: -22, thigh: 192, calf: 194, fthigh: 194, fcalf: 196 },
+  },
+  hollow: {
+    view: 'side', pin: 'hip', dur: 3.2, floor: 60, label: 'Hollow Hold',
+    a: { torso: 196, uarm: 200, farm: 198, hand: 198, thigh: -16, calf: -14 },
+    b: { torso: 194, uarm: 198, farm: 196, hand: 196, thigh: -14, calf: -12 },
+  },
+  deadbug: {
+    view: 'side', pin: 'hip', dur: 3, floor: 60, label: 'Dead Bug',
+    a: { torso: 180, uarm: -90, farm: -90, fuarm: -90, ffarm: -90, thigh: -90, calf: 0, fthigh: -90, fcalf: 0 },
+    b: { torso: 180, uarm: 178, farm: 178, fuarm: -90, ffarm: -90, thigh: -90, calf: 0, fthigh: -8, fcalf: -6 },
+  },
+  birddog: {
+    view: 'side', pin: 'knee', dur: 3, floor: 34, grip: 'flat', label: 'Bird Dog',
+    a: { torso: -2, uarm: 90, farm: 90, hand: 0, fuarm: 90, ffarm: 90, fhand: 0, thigh: 90, calf: 178, fthigh: 90, fcalf: 178 },
+    b: { torso: -2, uarm: -6, farm: -6, hand: -6, fuarm: 90, ffarm: 90, fhand: 0, thigh: 90, calf: 178, fthigh: 182, fcalf: 182 },
+  },
+  squathold: {
+    view: 'side', pin: 'ankle', dur: 3.6, floor: 46, label: 'Tiefe Hocke',
+    a: { torso: -62, uarm: 20, farm: -30, thigh: 2, calf: 112 },
+    b: { torso: -64, uarm: 22, farm: -28, thigh: 2, calf: 112 },
+  },
+  splitsquat: {
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, label: 'Split Squat',
+    a: { torso: -96, uarm: 96, farm: 92, thigh: 72, calf: 100, fthigh: 112, fcalf: 140 },
+    b: { torso: -94, uarm: 96, farm: 92, thigh: 8, calf: 96, fthigh: 98, fcalf: 172 },
+  },
+  highknees: {
+    view: 'side', pin: 'hip', dur: 0.9, floor: 210, label: 'High Knees',
+    a: { torso: -96, uarm: 60, farm: -40, fuarm: 130, ffarm: 70, thigh: -8, calf: 88, fthigh: 90, fcalf: 94 },
+    b: { torso: -96, uarm: 130, farm: 70, fuarm: 60, ffarm: -40, thigh: 90, calf: 94, fthigh: -8, fcalf: 88 },
+  },
+  legraise: {
+    view: 'side', pin: 'grip', dur: 2.8, grip: 'fist', barEnd: true, label: 'Beinheben im Hang',
+    a: { torso: -94, uarm: -86, farm: -88, hand: -80, thigh: 94, calf: 92 },
+    b: { torso: -100, uarm: -86, farm: -88, hand: -80, thigh: -2, calf: -2 },
+  },
+  toestobar: {
+    view: 'side', pin: 'grip', dur: 2.8, grip: 'fist', barEnd: true, label: 'Toes to Bar',
+    a: { torso: -94, uarm: -86, farm: -88, hand: -80, thigh: 94, calf: 92 },
+    b: { torso: -130, uarm: -100, farm: -95, hand: -85, thigh: -62, calf: -70 },
+  },
+  dips: {
+    view: 'side', pin: 'grip', dur: 2.6, floor: 330, grip: 'fist', barEnd: true, label: 'Dips',
+    a: { torso: -92, uarm: 94, farm: 90, hand: 0, thigh: 96, calf: 150 },
+    b: { torso: -80, uarm: 150, farm: 64, hand: 0, thigh: 98, calf: 152 },
   },
   hang: {
     view: 'back', pin: 'hands', dur: 3.6, bar: true, label: 'Faultier hängt an der Stange',
@@ -139,7 +218,9 @@ function slothRigBuild(pose) {
     const t = q.torso = place('torso', [0, 0], s.torso);
     q.tail = place('tail', t.map(A.tail), s.torso + a0('tail') - a0('torso') + (s.tail || 0));
     for (const far of [false, true]) {
-      const x = far ? '_far' : '', v = (k) => (far ? s['f' + k] ?? s[k] : s[k]);
+      const x = far ? '_far' : '', raw = (k) => (far ? s['f' + k] ?? s[k] : s[k]);
+      // relArms: Armwinkel relativ zum Rumpf (Arme drehen beim Aufrichten mit)
+      const v = (k) => (pose.relArms && /arm|hand/.test(k) && raw(k) != null ? raw(k) + s.torso : raw(k));
       const sh = add(t.map(A.shoulder), far ? D : [0, 0]), hip = add(t.map(A.hip), far ? D : [0, 0]);
       q['uarm' + x] = place('uarm', sh, v('uarm'), 'side_uarm' + x);
       q['elbow' + x] = ball('side_elbow' + x, q['uarm' + x].end);
@@ -149,7 +230,8 @@ function slothRigBuild(pose) {
       q['knee' + x] = ball('side_knee' + x, q['thigh' + x].end);
       q['calf' + x] = place('calf', q['thigh' + x].end, v('calf'), 'side_calf' + x);
     }
-    return { q, pts: { wrist: q.farm.end, ankle: q.calf.end } };
+    return { q, pts: { wrist: q.farm.end, ankle: q.calf.end, grip: q.hand.end, knee: q.thigh.end, elbow: q.uarm.end,
+      shoulder: t.map(A.shoulder), hip: t.map(A.hip) } };
   }
 
   function frontBack(s) {
@@ -175,18 +257,32 @@ function slothRigBuild(pose) {
 
   const pose1 = view === 'side' ? side : frontBack;
   // Stütz: Rumpfwinkel suchen, bei dem die Zehen am Boden liegen
+  // Stütz: Rumpfwinkel so wählen, dass die Zehen (hinteres, gestrecktes Bein) am Boden liegen.
+  // Das vordere Bein kann per kneeThigh/kneeCalf (relativ zum gestreckten Bein) angezogen werden.
+  const legs = (s, a) => ({ ...s, torso: a, fthigh: a + 180 + (s.legBend || 0), fcalf: a + 180,
+    thigh: a + 180 + (s.legBend || 0) + (s.kneeThigh || 0), calf: a + 180 + (s.kneeCalf || 0) });
   const solve = (s) => {
-    let best = s.torso, bd = Infinity;
+    let best = 0, bd = Infinity;
     for (let a = -80; a <= 10; a += 0.25) {
-      const leg = a + 180, { pts } = pose1({ ...s, torso: a, thigh: leg + (s.legBend || 0), calf: leg });
-      const d = Math.abs(pts.ankle[1] + pose.solve.toe - pts.wrist[1]);
+      const { pts } = pose1(legs(s, a)), ankle = pose1({ ...legs(s, a), thigh: a + 180, calf: a + 180 }).pts.ankle;
+      const d = Math.abs(ankle[1] + pose.solve.toe - pts.wrist[1]);
       if (d < bd) { bd = d; best = a; }
     }
-    return { ...s, torso: best, thigh: best + 180 + (s.legBend || 0), calf: best + 180 };
+    return legs(s, best);
+  };
+  // Rumpfwinkel so wählen, dass ein Punkt (z. B. Schulter) auf gegebener Höhe über dem festen Punkt liegt
+  const lean = (s) => {
+    const { pt, y, from, to } = pose.lean;
+    let best = s.torso, bd = Infinity;
+    for (let a = from; a <= to; a += 0.25) {
+      const { pts } = pose1({ ...s, torso: a }), d = Math.abs(pts[pt][1] - pts[pose.pin][1] - y);
+      if (d < bd) { bd = d; best = a; }
+    }
+    return { ...s, torso: best };
   };
   // Liefert je Teil { img, P, r, p, k } (Welt = P + k·R(r)·(x - p)), relativ zum festen Punkt
   return (s) => {
-    const { q, pts } = pose1(pose.solve ? solve(s) : s);
+    const { q, pts } = pose1(pose.solve ? solve(s) : pose.lean ? lean(s) : s);
     const pin = pts[pose.pin];
     for (const k in q) q[k] = { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k };
     return q;
@@ -247,11 +343,16 @@ function slothRigPrepare(name) {
     return `<g class="sp-${key}" transform="${tfAttr(e)}"><image href="${SLOTH_RIG_BASE}${e.img}.png" x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}"/></g>`;
   }).join('');
   let extra = '';
+  if (pose.floor != null) extra += `<ellipse class="sloth-rig-shadow" cx="${n(box[0] + box[2] / 2)}" cy="${pose.floor}" rx="${n(box[2] * (pose.view === 'side' ? 0.46 : 0.34))}" ry="${n(Math.max(10, box[2] * 0.035))}"/>`;
   if (pose.bar) {
     const w = box[2] * 0.96;
-    extra = `<rect class="sloth-rig-bar" x="${(-w / 2).toFixed(0)}" y="14" width="${w.toFixed(0)}" height="26" rx="13"/>`;
+    extra += `<rect class="sloth-rig-bar" x="${(-w / 2).toFixed(0)}" y="14" width="${w.toFixed(0)}" height="26" rx="13"/>`;
   }
-  if (pose.floor != null) extra = `<ellipse class="sloth-rig-shadow" cx="${n(box[0] + box[2] / 2)}" cy="${pose.floor}" rx="${n(box[2] * (pose.view === 'side' ? 0.46 : 0.34))}" ry="${n(Math.max(10, box[2] * 0.035))}"/>`;
+  // Stange im Querschnitt (Seitenansicht) am festen Punkt, optional mit Pfosten bis zum Boden
+  if (pose.barEnd) {
+    if (pose.floor != null) extra += `<rect class="sloth-rig-bar" x="-9" y="0" width="18" height="${pose.floor}"/>`;
+    extra += `<circle class="sloth-rig-bar" r="22"/>`;
+  }
   slothRigCache[name] = { box, body: extra + parts };
   return slothRigCache[name];
 }

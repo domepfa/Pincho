@@ -7659,16 +7659,20 @@ const EXERCISE_FIGURES = {
    zeigen weiter die Strichfigur aus EXERCISE_FIGURES. */
 const SLOTH_EXERCISE_POSES = {
   pullup: 'pull', pullup_weighted: 'pull', pullup_close_grip: 'pull',
-  push_up: 'pushup', squat: 'squat',
+  push_up: 'pushup', squat: 'squat', plank: 'plank', mountain_climbers: 'mountain', glute_bridge: 'bridge',
+  sit_up: 'situp', crunches: 'crunch', superman: 'superman', hollow_hold: 'hollow', dead_bug: 'deadbug',
+  bird_dog: 'birddog', deep_squat_hold: 'squathold', split_squat: 'splitsquat', high_knees: 'highknees',
+  hanging_leg_raise: 'legraise', toes_to_bar: 'toestobar', dips: 'dips',
 };
+const SLOTH_VIEW_WORD = { side: 'Seitenansicht', back: 'Rückansicht', front: 'Vorderansicht' };
 function exerciseFigureSvg(exerciseId) {
   const fig = EXERCISE_FIGURES[exerciseId];
   const pose = SLOTH_EXERCISE_POSES[exerciseId];
   if (pose) {
     const svg = slothFigure(pose, 'ex-figure sloth-img');
     if (!fig || !fig.caption) return svg;
-    // Beschriftung stammt von der Strichfigur; die Puppe zeigt Klimmzüge von hinten
-    const caption = SLOTH_POSES[pose].view === 'back' ? fig.caption.replace(/^Vorderansicht/, 'Rückansicht') : fig.caption;
+    // Beschriftung stammt von der Strichfigur: Ansicht an die Puppe anpassen
+    const caption = fig.caption.replace(/^(Vorderansicht|Seitenansicht|Rückansicht)/, SLOTH_VIEW_WORD[SLOTH_POSES[pose].view]);
     return `${svg}<div class="ex-figure-caption">${esc(caption)}</div>`;
   }
   if (!fig) return `<div class="ex-figure-emoji">💪</div>`;
