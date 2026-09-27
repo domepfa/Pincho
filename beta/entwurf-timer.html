@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pincho – Entwurf Timer</title>
+<meta name="theme-color" content="#07090c">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<!--
+  Klickbarer Entwurf für den Ablauf-Bildschirm (Fingerboard-Timer), noch
+  nicht in der App verdrahtet. Ziele:
+  - Ein Bildschirm, feste Zeilen: nichts springt zwischen den Phasen, kein Scrollen.
+  - Faultier hängt am gewählten Griff (statt an einer Stange unter dem Board).
+  - Ein Zähler: Fortschritt als Segmente oben, Wiederholung im Phasen-Titel.
+  - Bereit-Phase ersetzt Vorschau + "LOS" + Countdown-Screen.
+  - Vibration + Ton beim Phasenwechsel, Bildschirm bleibt an (Wake Lock).
+-->
+<style>
+  :root {
+    --bg: #07090c; --surface: #10151b; --surface2: #161d25;
+    --line: #2f3a47; --line-soft: #1f2731;
+    --text: #f4f6f8; --muted: #b3bdc8; --quiet: #9aa6b4;
+    --blue: #4fc3ff; --on-blue: #04141f; --orange: #ff6b47;
+    --phase: var(--blue);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: Barlow, system-ui, sans-serif; }
+  body { overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  .cond { font-family: 'Barlow Condensed', Barlow, sans-serif; }
+
+  /* Feste Zeilen: Kopf · Titel · Bühne · Zahl · Info · Steuerung */
+  .screen {
+    height: 100dvh; max-width: 480px; margin: 0 auto;
+    display: grid; grid-template-rows: 56px 64px 1fr 128px 52px 104px;
+    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+  }
+  .screen.pause { --phase: var(--orange); }
+  .screen.ready, .screen.done { --phase: var(--text); }
+
+  /* Kopf: Schliessen · Fortschritt · Demo-Tempo */
+  .top { display: flex; align-items: center; gap: 12px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; flex: none; }
+  .icon-btn svg { width: 18px; height: 18px; }
+  .segs { flex: 1; display: flex; gap: 3px; height: 6px; }
+  .seg { flex: var(--w); background: var(--line-soft); border-radius: 3px; overflow: hidden; }
+  .seg i { display: block; height: 100%; width: 0; background: var(--muted); }
+  .seg.hang i { background: var(--blue); }
+  .seg.pause i { background: var(--orange); }
+  .speed { font-size: 13px; font-weight: 700; letter-spacing: .04em; padding: 0 10px; height: 28px; border-radius: 14px; border: 1px solid var(--line); color: var(--quiet); flex: none; }
+  .speed.on { color: var(--on-blue); background: var(--blue); border-color: var(--blue); }
+
+  /* Titel: Phase gross in Phasenfarbe, Wiederholung daneben */
+  .title { display: flex; align-items: baseline; justify-content: space-between; align-self: center; }
+  .phase { font-size: 40px; font-weight: 700; letter-spacing: .02em; color: var(--phase); text-transform: uppercase; line-height: 1; }
+  .rep { font-size: 20px; font-weight: 600; color: var(--muted); }
+
+  /* Bühne: Board + Faultier. Figur liegt über dem Board (Rückansicht = schaut aufs Board). */
+  .stage { position: relative; overflow: hidden; border-radius: 20px; background: radial-gradient(120% 80% at 50% 0%, #141b23 0%, var(--bg) 70%); }
+  .board { position: absolute; left: 4%; width: 92%; top: 14px; }
+  .board img { display: block; width: 100%; height: auto; }
+  .board img.dim { filter: brightness(.38) saturate(.6); }
+  .board img.lit { position: absolute; inset: 0; clip-path: url(#grip-clip); }
+  .measuring .sloth-rig g { animation: none !important; }
+  .board svg.mask { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .grip-ring { fill: none; stroke: var(--phase); stroke-width: .7; }
+  .screen.pause .grip-ring { stroke: var(--text); stroke-dasharray: 1.4 1; }
+  .grip-tag { position: absolute; transform: translate(-50%, -100%); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--bg); background: var(--text); padding: 2px 8px; border-radius: 10px; white-space: nowrap; margin-top: -6px; }
+  .fig { position: absolute; transition: opacity .25s; }
+  .fig svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .sloth-rig-bar { fill: #3b4048; }
+  .sloth-rig-cable { fill: #6b7079; }
+  .sloth-rig-shadow { fill: #000; opacity: .45; }
+  .paused .sloth-rig g, .paused .sloth-rig image { animation-play-state: paused; }
+
+  /* Zahl: gross, darunter Balken in Phasenfarbe */
+  .count { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+  .num { font-size: 112px; font-weight: 700; line-height: .9; font-variant-numeric: tabular-nums; color: var(--text); }
+  .screen.pause .num { color: var(--orange); }
+  .bar { width: 100%; height: 6px; border-radius: 3px; background: var(--line-soft); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--phase); width: 0; }
+
+  .info { text-align: center; align-self: center; }
+  .info b { display: block; font-size: 17px; font-weight: 600; }
+  .info span { font-size: 15px; color: var(--quiet); }
+
+  /* Steuerung: immer an derselben Stelle */
+  .controls { display: flex; align-items: center; justify-content: center; gap: 28px; }
+  .ctl { width: 60px; height: 60px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; }
+  .ctl svg { width: 22px; height: 22px; }
+  .ctl:disabled { visibility: hidden; }
+  .main { width: 84px; height: 84px; border-radius: 50%; background: var(--blue); color: var(--on-blue); display: grid; place-items: center; box-shadow: 0 6px 24px rgba(79,195,255,.28); }
+  .main svg { width: 32px; height: 32px; }
+  .main.wide { width: auto; padding: 0 36px; border-radius: 42px; font-size: 24px; font-weight: 700; letter-spacing: .04em; }
+
+  /* Rückfrage beim Schliessen */
+  .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: flex-end; justify-content: center; }
+  .sheet-bg.open { display: flex; }
+  .sheet { width: 100%; max-width: 480px; background: var(--surface); border-top: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 22px 16px calc(22px + env(safe-area-inset-bottom)); display: grid; gap: 10px; }
+  .sheet h2 { font-size: 26px; }
+  .sheet p { color: var(--muted); margin-bottom: 6px; }
+  .btn { height: 52px; border-radius: 14px; font-size: 18px; font-weight: 700; border: 1px solid var(--line); background: var(--surface2); }
+  .btn.primary { background: var(--blue); color: var(--on-blue); border: 0; }
+  .btn.danger { color: var(--orange); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sloth-rig g, .sloth-rig image { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<main class="screen ready" id="screen">
+  <div class="top">
+    <button class="icon-btn" id="close" aria-label="Schliessen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div class="segs" id="segs"></div>
+    <button class="speed cond" id="speed" aria-pressed="false" title="Entwurf: Zeit fünfmal schneller">DEMO ×5</button>
+  </div>
+  <div class="title">
+    <div class="phase cond" id="phase">Bereit</div>
+    <div class="rep cond" id="rep"></div>
+  </div>
+  <div class="stage" id="stage">
+    <div class="board" id="board">
+      <img id="board-img" class="dim" src="../assets/board-bm2000.png" alt="Beastmaker 2000">
+      <img class="lit" src="../assets/board-bm2000.png" alt="" aria-hidden="true">
+      <svg class="mask" id="mask" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+      <svg width="0" height="0" style="position:absolute"><clipPath id="grip-clip" clipPathUnits="objectBoundingBox"></clipPath></svg>
+    </div>
+    <div class="fig" id="fig-hang"></div>
+    <div class="fig" id="fig-stand"></div>
+  </div>
+  <div class="count">
+    <div class="num cond" id="num">10</div>
+    <div class="bar"><i id="bar"></i></div>
+  </div>
+  <div class="info">
+    <b id="info-main"></b>
+    <span id="info-next"></span>
+  </div>
+  <div class="controls">
+    <button class="ctl" id="prev" aria-label="Zurück"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2.4v14H6zM20 5v14L9.5 12z"/></svg></button>
+    <button class="main" id="main" aria-label="Start"></button>
+    <button class="ctl" id="next" aria-label="Weiter"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 5H18v14h-2.4zM4 5l10.5 7L4 19z"/></svg></button>
+  </div>
+</main>
+
+<div class="sheet-bg" id="sheet">
+  <div class="sheet">
+    <h2 class="cond">Training beenden?</h2>
+    <p>Bisher geschaffte Sätze werden gespeichert.</p>
+    <button class="btn primary cond" id="sheet-stay">Weitermachen</button>
+    <button class="btn danger cond" id="sheet-quit">Beenden</button>
+  </div>
+</div>
+
+<script src="./sloth-rig.js"></script>
+<script>
+/* Griffe (Prozent vom Board-Bild, aus BOARDS.bm2000.hotspots in data.js) */
+const GRIPS = {
+  edge_small: { label: 'Kleine Kante', note: '20 mm · beidarmig', spots: [[51.17, 66.57, 14.88, 8.72]] },
+  pocket2: { label: '2-Finger-Tasche', note: '30 mm · beidarmig', spots: [[39.1, 49.42, 7.18, 8.14], [63.25, 49.42, 6.92, 8.14]] },
+};
+/* Beispiel-Ablauf: zwei Hang-Blöcke */
+const BLOCKS = [
+  { grip: 'edge_small', reps: 3, hang: 7, rest: 30, after: 90 },
+  { grip: 'pocket2', reps: 3, hang: 10, rest: 30, after: 0 },
+];
+
+/* Phasenliste: bereit → hang/pause … → fertig */
+const phases = [{ kind: 'ready', dur: 10, block: 0 }];
+BLOCKS.forEach((b, bi) => {
+  for (let r = 0; r < b.reps; r++) {
+    phases.push({ kind: 'hang', dur: b.hang, block: bi, rep: r });
+    const last = r === b.reps - 1;
+    const rest = last ? b.after : b.rest;
+    if (rest) phases.push({ kind: 'pause', dur: rest, block: bi, rep: r, long: last });
+  }
+});
+phases.push({ kind: 'done', dur: 0, block: BLOCKS.length - 1 });
+
+const $ = (id) => document.getElementById(id);
+const screen = $('screen');
+let idx = 0, left = phases[0].dur, running = false, speed = 1, lastTick = 0;
+
+/* Faultier: Hang-Pose ohne Stange (Hände am Board), Stand-Pose für Pausen */
+/* Armspreizung f: 0 = Hände fast zusammen, 1 = wie die Stangen-Pose. Für jeden
+   Griff wird f so gesucht, dass die Hände genau auf dem Griff (bzw. den zwei
+   Griffen) liegen. */
+const HANG = SLOTH_POSES.hang;
+const NARROW = { uarm_l: -97, farm_l: -93, grip_l: -91, uarm_r: -83, farm_r: -87, grip_r: -89 };
+function hangPose(f) {
+  const name = 'boardhang' + Math.round(f * 1000);
+  if (!SLOTH_POSES[name]) {
+    const a = { ...HANG.a }, b = { ...HANG.b };
+    for (const k of Object.keys(NARROW)) {
+      a[k] = NARROW[k] + f * (HANG.a[k] - NARROW[k]);
+      b[k] = a[k] + (HANG.b[k] - HANG.a[k]);
+    }
+    SLOTH_POSES[name] = { ...HANG, bar: false, a, b };
+  }
+  return name;
+}
+const spreadCache = {};
+$('fig-stand').innerHTML = slothFigure('rest');
+
+/* Fortschritt oben: ein Segment je Hang/Pause, Breite nach Dauer */
+const workPhases = phases.filter((p) => p.kind === 'hang' || p.kind === 'pause');
+$('segs').innerHTML = workPhases.map((p) => `<div class="seg ${p.kind}" style="--w:${p.dur}"><i></i></div>`).join('');
+
+function curBlockForBoard() {
+  const p = phases[idx];
+  // In der Pause nach dem letzten Satz eines Blocks: schon den nächsten Griff zeigen
+  if (p.kind === 'pause' && p.long && BLOCKS[p.block + 1]) return p.block + 1;
+  return p.block;
+}
+
+function layout() {
+  const stage = $('stage').getBoundingClientRect();
+  const board = $('board').getBoundingClientRect();
+  const g = GRIPS[BLOCKS[curBlockForBoard()].grip];
+  const bx = board.left - stage.left, by = board.top - stage.top;
+  // Griffmitte (bei zwei Griffen: Mitte dazwischen), Oberkante des Griffs
+  const cx = g.spots.reduce((s, sp) => s + sp[0], 0) / g.spots.length;
+  const cy = g.spots[0][1];
+  const gx = bx + board.width * cx / 100;
+  const gy = by + board.height * cy / 100;
+
+  // Hang-Figur: Hände (Nullpunkt der Pose) auf die Griffmitte, Grösse passt in die Bühne
+  const place = (f) => {
+    $('fig-hang').innerHTML = slothFigure(hangPose(f));
+    const hs = $('fig-hang').querySelector('svg');
+    const [vx, vy, vw, vh] = hs.getAttribute('viewBox').split(' ').map(Number);
+    const s = (stage.height - gy - 6) / (vh + vy);
+    Object.assign($('fig-hang').style, { width: vw * s + 'px', height: vh * s + 'px', left: (gx + vx * s) + 'px', top: (gy + vy * s) + 'px' });
+  };
+  // Zielabstand der Hände: zwei Griffe = Abstand der Griffe, ein Griff = Hände nebeneinander darauf
+  const target = g.spots.length > 1
+    ? board.width * Math.abs(g.spots[1][0] - g.spots[0][0]) / 100
+    : board.width * g.spots[0][2] / 100 * 0.55;
+  const key = BLOCKS[curBlockForBoard()].grip + '@' + Math.round(board.width) + 'x' + Math.round(stage.height);
+  if (spreadCache[key] == null) {
+    screen.classList.add('measuring');
+    let lo = -1, hi = 1.6;
+    for (let i = 0; i < 9; i++) {
+      const mid = (lo + hi) / 2;
+      place(mid);
+      const l = $('fig-hang').querySelector('.sp-grip_l image').getBoundingClientRect();
+      const r = $('fig-hang').querySelector('.sp-grip_r image').getBoundingClientRect();
+      const span = (r.left + r.width / 2) - (l.left + l.width / 2);
+      if (span < target) lo = mid; else hi = mid;
+    }
+    spreadCache[key] = (lo + hi) / 2;
+    screen.classList.remove('measuring');
+  }
+  place(spreadCache[key]);
+
+  // Stand-Figur: Füsse auf den Bühnenboden, unter dem Board
+  const ss = $('fig-stand').querySelector('svg');
+  const [sx, sy, sw, sh] = ss.getAttribute('viewBox').split(' ').map(Number);
+  const room = stage.height - (by + board.height) - 10;
+  const k = room / sh;
+  Object.assign($('fig-stand').style, { width: sw * k + 'px', height: sh * k + 'px', left: (stage.width / 2 + sx * k) + 'px', top: (stage.height - 8 - sh * k) + 'px' });
+}
+
+function drawBoard() {
+  const p = phases[idx];
+  const bi = curBlockForBoard();
+  const g = GRIPS[BLOCKS[bi].grip];
+  // Board abdunkeln, Griff(e) ausgespart
+  const rings = g.spots.map(([x, y, w, h]) => `<rect class="grip-ring" x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="2.5" vector-effect="non-scaling-stroke" style="stroke-width:2.5px"/>`).join('');
+  $('mask').innerHTML = rings;
+  document.getElementById('grip-clip').innerHTML = g.spots.map(([x, y, w, h]) => `<rect x="${(x - w / 2) / 100}" y="${(y - h / 2) / 100}" width="${w / 100}" height="${h / 100}" rx=".02"/>`).join('');
+  // Hinweis "Als Nächstes" nur in der Pause
+  const old = $('board').querySelector('.grip-tag'); if (old) old.remove();
+  if (p.kind === 'pause' || p.kind === 'ready') {
+    const cx = g.spots.reduce((s, sp) => s + sp[0], 0) / g.spots.length;
+    const top = Math.min(...g.spots.map((sp) => sp[1] - sp[3] / 2));
+    $('board').insertAdjacentHTML('beforeend', `<div class="grip-tag cond" style="left:${cx}%;top:${top}%">${p.kind === 'ready' ? 'Hier hängen' : 'Als Nächstes'}</div>`);
+  }
+}
+
+const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15L19.5 12z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/></svg>';
+
+function render() {
+  const p = phases[idx];
+  const b = BLOCKS[p.block];
+  const g = GRIPS[b.grip];
+  screen.className = 'screen ' + p.kind + (running ? '' : ' paused');
+
+  const titles = { ready: 'Bereit', hang: 'Hang', pause: p.long ? 'Lange Pause' : 'Pause', done: 'Geschafft' };
+  $('phase').textContent = titles[p.kind];
+  $('rep').textContent = p.kind === 'done' ? '' : `Satz ${(p.rep ?? 0) + 1}/${b.reps}` + (BLOCKS.length > 1 ? ` · Block ${p.block + 1}/${BLOCKS.length}` : '');
+
+  const showHang = p.kind === 'hang';
+  $('fig-hang').style.opacity = showHang ? 1 : 0;
+  $('fig-stand').style.opacity = showHang ? 0 : 1;
+  if (p.kind === 'done' && !$('fig-stand').querySelector('.sr-wave')) { $('fig-stand').innerHTML = slothFigure('wave'); layout(); }
+
+  // Info: was jetzt, was danach
+  const next = phases[idx + 1];
+  const nb = BLOCKS[curBlockForBoard()], ng = GRIPS[nb.grip];
+  if (p.kind === 'done') {
+    $('info-main').textContent = `${BLOCKS.reduce((s, x) => s + x.reps, 0)} Hangs · ${fmt(totalWork())} am Board`;
+    $('info-next').textContent = 'Wird gespeichert';
+  } else if (p.kind === 'pause') {
+    $('info-main').textContent = `${ng.label} · ${ng.note}`;
+    $('info-next').textContent = `Danach: Hang ${nb.hang} s`;
+  } else {
+    $('info-main').textContent = `${g.label} · ${g.note}`;
+    $('info-next').textContent = next && next.kind === 'pause' ? `Danach: Pause ${next.dur} s` : next && next.kind === 'hang' ? `Danach: Hang ${next.dur} s` : 'Danach: fertig';
+  }
+
+  drawBoard();
+  renderClock();
+
+  $('prev').disabled = idx === 0 || p.kind === 'done';
+  $('next').disabled = p.kind === 'done';
+  const main = $('main');
+  main.classList.toggle('wide', p.kind === 'ready' || p.kind === 'done');
+  if (p.kind === 'ready') { main.innerHTML = 'START'; main.setAttribute('aria-label', 'Start'); }
+  else if (p.kind === 'done') { main.innerHTML = 'FERTIG'; main.setAttribute('aria-label', 'Fertig'); }
+  else { main.innerHTML = running ? ICON_PAUSE : ICON_PLAY; main.setAttribute('aria-label', running ? 'Pausieren' : 'Weiter'); }
+}
+
+function renderClock() {
+  const p = phases[idx];
+  const shown = p.kind === 'done' ? '✓' : Math.ceil(left - 1e-6);
+  $('num').textContent = p.kind === 'done' ? 'TOP' : (p.dur >= 60 && shown >= 60 ? fmt(shown) : String(shown).padStart(2, '0'));
+  $('bar').style.width = p.dur ? (100 * (1 - left / p.dur)) + '%' : '100%';
+  // Segmente oben
+  const segs = $('segs').children;
+  let wi = 0;
+  phases.forEach((q, i) => {
+    if (q.kind !== 'hang' && q.kind !== 'pause') return;
+    const fill = i < idx ? 1 : i > idx ? 0 : 1 - left / q.dur;
+    segs[wi++].firstChild.style.width = (fill * 100) + '%';
+  });
+}
+
+function fmt(sec) { sec = Math.round(sec); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; }
+function totalWork() { return BLOCKS.reduce((s, b) => s + b.reps * b.hang, 0); }
+
+/* Ton + Vibration beim Phasenwechsel, Piepser in den letzten 3 Sekunden */
+let audio;
+function beep(freq = 880, ms = 120) {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = freq; g.gain.value = .12;
+    o.connect(g).connect(audio.destination);
+    o.start(); o.stop(audio.currentTime + ms / 1000);
+  } catch (e) { /* ignorieren */ }
+}
+function buzz(pattern) { try { navigator.vibrate && navigator.vibrate(pattern); } catch (e) { /* ignorieren */ } }
+
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && !wakeLock && navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen');
+    if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch (e) { /* ignorieren */ }
+}
+
+function go(to) {
+  idx = Math.max(0, Math.min(phases.length - 1, to));
+  left = phases[idx].dur;
+  const k = phases[idx].kind;
+  if (k === 'hang') { beep(1175, 220); buzz([60, 40, 60]); }
+  else if (k === 'pause') { beep(660, 260); buzz(200); }
+  else if (k === 'done') { beep(988, 400); buzz([80, 60, 80, 60, 200]); running = false; keepAwake(false); }
+  layout();
+  render();
+}
+
+function tick(now) {
+  if (running) {
+    const dt = (now - lastTick) / 1000 * speed;
+    const before = Math.ceil(left);
+    left -= dt;
+    const after = Math.ceil(left);
+    if (after !== before && after <= 3 && after > 0) beep(740, 80);
+    if (left <= 0) go(idx + 1); else renderClock();
+  }
+  lastTick = now;
+  requestAnimationFrame(tick);
+}
+
+$('main').onclick = () => {
+  const p = phases[idx];
+  if (p.kind === 'done') { location.reload(); return; }
+  if (p.kind === 'ready') { running = true; keepAwake(true); go(1); return; }
+  running = !running;
+  keepAwake(running);
+  render();
+};
+$('prev').onclick = () => go(idx - 1);
+$('next').onclick = () => go(idx + 1);
+$('speed').onclick = () => {
+  speed = speed === 1 ? 5 : 1;
+  $('speed').classList.toggle('on', speed !== 1);
+  $('speed').setAttribute('aria-pressed', speed !== 1);
+};
+$('close').onclick = () => { $('sheet').classList.add('open'); };
+$('sheet-stay').onclick = () => { $('sheet').classList.remove('open'); };
+$('sheet-quit').onclick = () => { $('sheet').classList.remove('open'); running = false; keepAwake(false); go(phases.length - 1); };
+
+/* Bereit-Phase zählt schon von selbst herunter */
+running = true;
+window.addEventListener('resize', () => { layout(); render(); });
+$('board-img').decode ? $('board-img').decode().then(() => { layout(); render(); }).catch(() => { layout(); render(); }) : null;
+window.addEventListener('load', () => { layout(); render(); });
+layout(); render();
+requestAnimationFrame((t) => { lastTick = t; tick(t); });
+</script>
+</body>
+</html>
