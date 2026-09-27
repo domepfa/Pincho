@@ -7663,6 +7663,14 @@ const SLOTH_EXERCISE_POSES = {
   sit_up: 'situp', crunches: 'crunch', superman: 'superman', hollow_hold: 'hollow', dead_bug: 'deadbug',
   bird_dog: 'birddog', deep_squat_hold: 'squathold', split_squat: 'splitsquat', high_knees: 'highknees',
   hanging_leg_raise: 'legraise', toes_to_bar: 'toestobar', dips: 'dips',
+  scapula_pull: 'scapula', swimmer: 'swimmer', y_t_w: 'ytw', side_plank: 'sideplank', front_lever_prog: 'frontlever',
+  calf_raise: 'calfraise', wall_sit: 'wallsit', cat_cow: 'catcow', worlds_greatest_stretch: 'wgs',
+  spiderman_lunge_rotation: 'wgs', thoracic_rotation: 'thoracic', leg_swings: 'legswing', ankle_rocks: 'anklerock',
+  neck_mobility: 'neck', jefferson_curl: 'jefferson', standwaage: 'standwaage', lateral_shuffle: 'shuffle',
+  quick_feet: 'quickfeet', single_leg_hops: 'hops', lateral_bounds: 'bounds', shuttle_sprint: 'sprint',
+  couch_stretch: 'couch', figure_four_stretch: 'figurefour', standing_hip_circles: 'hipcircle',
+  lateral_lunge_mobility: 'lateralLunge', standing_quad_stretch: 'quadstretch', calf_stretch_wall: 'calfstretch',
+  adductor_rock: 'adductor', nordic_hamstring_curl: 'nordic', heel_touches: 'heeltouch',
 };
 const SLOTH_VIEW_WORD = { side: 'Seitenansicht', back: 'Rückansicht', front: 'Vorderansicht' };
 function exerciseFigureSvg(exerciseId) {
