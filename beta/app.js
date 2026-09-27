@@ -7655,12 +7655,26 @@ const EXERCISE_FIGURES = {
    abstrakten Linienfiguren ist "vorne/hinten", "wie steht man zum Boden"
    und "geht's nach innen/aussen bzw. hoch/runter" per Bild allein nicht
    immer eindeutig, ein Satz Text macht es das aber zuverlässig. */
-/* Klimmzüge: Faultier-Puppe von hinten (sloth-rig.js). */
-const SLOTH_PULL_IDS = ['pullup', 'pullup_weighted', 'pullup_close_grip'];
-const SLOTH_PULL_FIGURE = slothFigure('pull', 'ex-figure sloth-img');
+/* Übungen mit Faultier-Puppe (sloth-rig.js): Übung -> Pose. Die übrigen
+   zeigen weiter die Strichfigur aus EXERCISE_FIGURES. */
+const SLOTH_EXERCISE_POSES = {
+  pullup: 'pull', pullup_weighted: 'pull', pullup_close_grip: 'pull',
+  push_up: 'pushup', squat: 'squat', plank: 'plank', mountain_climbers: 'mountain', glute_bridge: 'bridge',
+  sit_up: 'situp', crunches: 'crunch', superman: 'superman', hollow_hold: 'hollow', dead_bug: 'deadbug',
+  bird_dog: 'birddog', deep_squat_hold: 'squathold', split_squat: 'splitsquat', high_knees: 'highknees',
+  hanging_leg_raise: 'legraise', toes_to_bar: 'toestobar', dips: 'dips',
+};
+const SLOTH_VIEW_WORD = { side: 'Seitenansicht', back: 'Rückansicht', front: 'Vorderansicht' };
 function exerciseFigureSvg(exerciseId) {
-  if (SLOTH_PULL_IDS.includes(exerciseId)) return SLOTH_PULL_FIGURE;
   const fig = EXERCISE_FIGURES[exerciseId];
+  const pose = SLOTH_EXERCISE_POSES[exerciseId];
+  if (pose) {
+    const svg = slothFigure(pose, 'ex-figure sloth-img');
+    if (!fig || !fig.caption) return svg;
+    // Beschriftung stammt von der Strichfigur: Ansicht an die Puppe anpassen
+    const caption = fig.caption.replace(/^(Vorderansicht|Seitenansicht|Rückansicht)/, SLOTH_VIEW_WORD[SLOTH_POSES[pose].view]);
+    return `${svg}<div class="ex-figure-caption">${esc(caption)}</div>`;
+  }
   if (!fig) return `<div class="ex-figure-emoji">💪</div>`;
   const svg = `<svg viewBox="0 0 200 200" class="ex-figure ${fig.kind === 'static' ? 'fig-static' : ''}">${fig.svg}</svg>`;
   return fig.caption ? `${svg}<div class="ex-figure-caption">${esc(fig.caption)}</div>` : svg;
