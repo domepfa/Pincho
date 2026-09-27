@@ -377,6 +377,11 @@ function toast(message, kind) {
 function fmtDate(d) {
   return d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
+/* Gespeichertes Datum (JJJJ-MM-TT) für die Anzeige: 22.09.2026 */
+function fmtDayKey(key) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key || '');
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : (key || '');
+}
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -390,7 +395,7 @@ function loadStoredProfile() {
 }
 const state = {
   member: loadStoredProfile(), // {id, name, uid} — eigenes Profil (members/{id})
-  route: (location.hash || '#fingerboard').replace('#', ''),
+  route: location.hash ? location.hash.replace('#', '') : null, // null: Start-Tab aus den Nav-Einstellungen (boot)
   members: {},        // {id: {name}} — alle Leute aus den eigenen Crews (für Namen)
   memberDoc: null,    // eigenes Profil aus Firebase (board, crews, …)
   crews: {},          // {crewId: {name, owner, members}}
@@ -402,6 +407,7 @@ const state = {
 
 /* ---------- Boot ---------- */
 async function boot() {
+  if (!state.route) state.route = defaultRoute();
   if (state.route === 'datenschutz') { renderPrivacy(); return; }
   // Einmal angemeldete Geräte starten sofort, auch ohne Netz (z. B. im
   // Gym) — das Token wird im Hintergrund erneuert, Daten kommen bis dahin
@@ -461,6 +467,7 @@ async function loadCrews() {
   const doc = await fbGet(`members/${state.member.id}`);
   if (doc === undefined) return;
   state.memberDoc = doc || {};
+  if (state.memberDoc.nav) { try { localStorage.setItem(NAV_PREF_KEY, JSON.stringify(state.memberDoc.nav)); } catch (e) { /* ignorieren */ } }
   const ids = Object.keys(state.memberDoc.crews || {});
   const crews = {};
   await Promise.all(ids.map(async (id) => {
@@ -879,6 +886,34 @@ const NAV_ITEMS = [
   { route: 'progress', label: 'Fortschritt', icon: 'M4 19h16 M5 15l4-5 4 3 6-8' },
   { route: 'challenges', label: 'Challenges', icon: 'M5 21V4 M5 4h11l-2 4 2 4H5' },
 ];
+/* Eigene Anordnung der unteren Navigation (Konto → Navigation): Reihenfolge
+   und ausgeblendete Tabs. Gespeichert im Profil (members/{id}/nav), dazu
+   lokal gespiegelt, damit der Start-Tab schon vor dem Laden stimmt. */
+const NAV_PREF_KEY = 'pinchobeta_nav';
+function navPrefs() {
+  const fromDoc = state.memberDoc && state.memberDoc.nav;
+  if (fromDoc) return fromDoc;
+  try { return JSON.parse(localStorage.getItem(NAV_PREF_KEY) || 'null') || {}; } catch (e) { return {}; }
+}
+/* Alle Tabs in gewählter Reihenfolge (neue Tabs, die es in der Liste noch nicht gibt, hinten dran) */
+function navOrdered() {
+  const order = Array.isArray(navPrefs().order) ? navPrefs().order : [];
+  const known = order.map((r) => NAV_ITEMS.find((n) => n.route === r)).filter(Boolean);
+  return known.concat(NAV_ITEMS.filter((n) => !order.includes(n.route)));
+}
+function navVisible() {
+  const hidden = Array.isArray(navPrefs().hidden) ? navPrefs().hidden : [];
+  const list = navOrdered().filter((n) => !hidden.includes(n.route));
+  return list.length ? list : NAV_ITEMS.slice(0, 1);
+}
+/* Start-Tab = erster sichtbarer Tab */
+function defaultRoute() { return navVisible()[0].route; }
+function saveNavPrefs(prefs) {
+  state.memberDoc = { ...(state.memberDoc || {}), nav: prefs };
+  try { localStorage.setItem(NAV_PREF_KEY, JSON.stringify(prefs)); } catch (e) { /* ignorieren */ }
+  fbPatch(`members/${state.member.id}`, { nav: prefs });
+}
+
 function navIconSvg(d) {
   return `<svg class="nav-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
 }
@@ -900,7 +935,7 @@ function renderShell(contentHtml) {
     </div>
     <div class="shell">${contentHtml}</div>
     <nav class="bottomnav">
-      ${NAV_ITEMS.map((n) => `<a href="#${n.route}" class="${state.route === n.route ? 'active' : ''}"><span class="nav-pill">${navIconSvg(n.icon)}</span><span class="nav-label">${n.label}</span>${n.route === 'challenges' ? `<span class="nav-dot" id="nav-challenge-dot" ${challengeUnseenCount ? '' : 'hidden'}></span>` : ''}</a>`).join('')}
+      ${navVisible().map((n) => `<a href="#${n.route}" class="${state.route === n.route ? 'active' : ''}"><span class="nav-pill">${navIconSvg(n.icon)}</span><span class="nav-label">${n.label}</span>${n.route === 'challenges' ? `<span class="nav-dot" id="nav-challenge-dot" ${challengeUnseenCount ? '' : 'hidden'}></span>` : ''}</a>`).join('')}
       <span class="nav-indicator" id="nav-indicator"></span>
     </nav>
   `;
@@ -1429,7 +1464,7 @@ async function renderLogHistory() {
   };
   list.innerHTML = entries.length ? entries.map(([id, e], idx) => `
     <div class="log-item">
-      <div class="top"><span>${esc(e.date)}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
+      <div class="top"><span>${esc(fmtDayKey(e.date))}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
       ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>${sessionTypeIconLabel(e.type)}</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
       ${e.totalSessionSec ? `<div class="ex-log-list"><div class="ex-log-row"><span>⏱ Zeit</span><span class="mono">${fmtMinSec(e.totalSessionSec)} gesamt · ${fmtMinSec(e.totalWorkSec || 0)} Arbeit</span></div></div>` : ''}
       ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => {
@@ -1472,7 +1507,7 @@ async function renderLogHistory() {
           };
         });
       if (!exercises.length) { toast('Keine Übungen zum Speichern gefunden.', 'err'); return; }
-      const name = prompt('Name für diesen Plan:', entry.date);
+      const name = prompt('Name für diesen Plan:', fmtDayKey(entry.date));
       if (!name) return;
       const key = await fbPush(`sessionPlans/${state.member.id}`, { name, exercises, createdAt: Date.now() });
       if (!key) { toast('Speichern fehlgeschlagen.', 'err'); return; }
@@ -4651,7 +4686,7 @@ async function renderFbHistory() {
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
   list.innerHTML = entries.length ? entries.map(([id, s]) => `
     <div class="log-item">
-      <div class="top"><span>${esc(s.date)}</span><span class="type">${esc((BOARDS[s.board] && BOARDS[s.board].label) || s.board)}${s.partial ? ' · UNVOLLSTÄNDIG' : ''}</span></div>
+      <div class="top"><span>${esc(fmtDayKey(s.date))}</span><span class="type">${esc((BOARDS[s.board] && BOARDS[s.board].label) || s.board)}${s.partial ? ' · UNVOLLSTÄNDIG' : ''}</span></div>
       <div class="ex-log-list">${fbResultsSummaryHtml(s.blocks || [], s.results || [])}</div>
       ${challengeDurationChipsHtml(`fb-history-share-${id}`, CHALLENGE_WINDOW_H)}
       <div class="field-row" style="margin-top:6px;">
@@ -8796,7 +8831,8 @@ function updateFbUpcomingUI() {
   if (!el) return;
   // In der abschliessenden Pause steht dort schon die Vorschau des nächsten Blocks (renderFbOverlay).
   if (fbIsTrailingPause()) return;
-  el.textContent = 'Danach: ' + fbUpcomingLabel();
+  const text = 'Danach: ' + fbUpcomingLabel();
+  if (el.textContent !== text) { el.textContent = text; fbFitLine(el); }
 }
 
 /* ---------- Transport-Leiste (Zurück / Play-Pause / Weiter) ----------
@@ -8947,7 +8983,7 @@ function fbRunState() {
 /* Wechselt dieser Schlüssel, wird das Vollbild neu aufgebaut (Phasen-/
    Schrittwechsel), sonst werden nur Zahl und Balken nachgezogen. */
 function fbStageKey(st) {
-  return [st.mode, fb.blockIndex, fb.awaitingNext ? 'a' : '', fb.preCount != null ? 'p' : '', st.mode === 'ready' ? '' : fb.stepIndex, st.mode === 'rest' ? fbSoonLevel() : ''].join(':');
+  return [st.mode, fb.blockIndex, fb.awaitingNext ? 'a' : '', fb.preCount != null ? 'p' : '', st.mode === 'ready' ? '' : fb.stepIndex, st.mode !== 'work' ? fbSoonLevel() : ''].join(':');
 }
 
 /* ---- Ende der Pause ankündigen ----
@@ -8969,6 +9005,7 @@ function fbWorkWord(b) {
 }
 /* 0 = normale Pause, 1 = ≤10 s, 2 = ≤5 s (nur wenn danach gearbeitet wird) */
 function fbSoonLevel() {
+  if (fb.preCount != null) return fb.preCount <= 5 ? 2 : 0; // Start-Countdown: gleiche Steigerung
   if (!fbNextWorkBlock() || fb.secondsLeft <= 0) return 0;
   return fb.secondsLeft <= 5 ? 2 : fb.secondsLeft <= 10 ? 1 : 0;
 }
@@ -8979,7 +9016,11 @@ function fbWarnSoon() {
 }
 
 function fbPhaseWord(st) {
-  if (st.mode === 'ready') return 'Bereit';
+  if (st.mode === 'ready') {
+    // Start-Countdown: motivierend mit Vornamen (wie früher "ALLEZ, …!")
+    const first = state.member && state.member.name ? String(state.member.name).trim().split(/\s+/)[0].slice(0, 10) : '';
+    return fb.preCount != null ? esc(first ? `Allez, ${first}!` : 'Allez!') : 'Bereit';
+  }
   const b = st.block;
   if (st.mode === 'rest') {
     const next = fbNextWorkBlock();
@@ -9037,6 +9078,13 @@ function fbInfoMainHtml(b, activeRep) {
   return esc(exerciseName(b.exerciseId));
 }
 /* Kurzfassung eines Blocks für die Vorschau in der Pause davor. */
+/* Zeile unter der Info im Start-Countdown: was jetzt zu tun ist */
+function fbGetReadyText(b) {
+  if (b.type === 'hang') return 'Get ready — Hände ans Board!';
+  if (b.type === 'block') return 'Get ready — Pin greifen!';
+  if (b.type === 'campus') return 'Get ready — an die Startsprosse!';
+  return 'Get ready — Position einnehmen!';
+}
 function fbShortSub(b) {
   if (b.type === 'pause') return 'Pause';
   if (isHoldModeBlock(b)) return `${b.reps}× ${b.hangSec} s ${b.type === 'block' ? 'Halten' : 'Hang'}${b.reps > 1 && b.restSec > 0 ? ` · ${b.restSec} s Pause` : ''}`;
@@ -9160,8 +9208,9 @@ function fbLayoutBoardStage() {
   const key = `${b.board}:${spots.map((p) => p.x.toFixed(1)).join('/')}@${Math.round(board.width)}x${Math.round(stage.height)}`;
   if (fbHangSpreadCache[key] == null) {
     figEl.classList.add('fbx-measuring');
-    let lo = -1, hi = 1.6;
-    for (let i = 0; i < 9; i++) {
+    // hi gross genug, dass die Hände auch die äussersten Griffe erreichen
+    let lo = -1, hi = 5;
+    for (let i = 0; i < 12; i++) {
       const mid = (lo + hi) / 2;
       place(mid);
       const l = figEl.querySelector('.sp-grip_l image');
@@ -9183,7 +9232,7 @@ function fbStageInnerHtml(st) {
   const d = st.displayBlock;
   const onBoard = d.type === 'hang' && BOARDS[d.board];
   const tag = st.mode === 'ready' ? (onBoard ? 'Hier hängen' : '') : st.trailing ? 'Als Nächstes' : '';
-  if (onBoard) return fbBoardStageHtml(d, st.mode === 'work', tag, st.mode === 'rest' && fbSoonLevel() === 2);
+  if (onBoard) return fbBoardStageHtml(d, st.mode === 'work', tag, st.mode !== 'work' && fbSoonLevel() === 2);
   let fig;
   if (st.mode === 'work') {
     const b = st.block;
@@ -9234,6 +9283,38 @@ function fbCloseQuit() {
   else renderFbOverlay();
 }
 
+/* Nichts abschneiden: Titel, Satz-Angabe und Info-Zeilen werden so weit
+   verkleinert, bis sie ganz hineinpassen (Info fett darf zweizeilig sein). */
+function fbFitOverlayText() {
+  const title = document.querySelector('#fb-overlay .fbx-title');
+  const phase = document.getElementById('fb-phase');
+  const repEl = document.getElementById('fb-rep');
+  if (title && phase && repEl) {
+    phase.style.fontSize = ''; repEl.style.fontSize = '';
+    const need = () => phase.scrollWidth + repEl.scrollWidth + 12;
+    let f = parseFloat(getComputedStyle(phase).fontSize);
+    while (need() > title.clientWidth && f > 24) { f -= 2; phase.style.fontSize = f + 'px'; }
+    let r = parseFloat(getComputedStyle(repEl).fontSize);
+    while (need() > title.clientWidth && r > 12) { r -= 1; repEl.style.fontSize = r + 'px'; }
+  }
+  const main = document.getElementById('fbx-info-main');
+  if (main) {
+    main.style.fontSize = '';
+    let m = parseFloat(getComputedStyle(main).fontSize);
+    while (main.scrollHeight > main.clientHeight + 1 && m > 12) { m -= 1; main.style.fontSize = m + 'px'; }
+  }
+  fbFitLine(document.getElementById('fb-upcoming'));
+}
+function fbFitLine(el) {
+  if (!el) return;
+  el.style.fontSize = '';
+  let f = parseFloat(getComputedStyle(el).fontSize);
+  while (el.scrollWidth > el.clientWidth + 1 && f > 11) { f -= 1; el.style.fontSize = f + 'px'; }
+}
+window.addEventListener('resize', () => { if (document.querySelector('#fb-overlay .fbx')) fbFitOverlayText(); });
+// Schrift (Barlow) kommt evtl. erst nach dem ersten Aufbau — danach nochmal einpassen
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (document.querySelector('#fb-overlay .fbx')) fbFitOverlayText(); });
+
 function renderFbOverlay() {
   const el = ensureFbOverlay();
   if (!fb.running && !fb.awaitingNext && fb.preCount == null) { closeFbOverlay(); return; }
@@ -9244,16 +9325,16 @@ function renderFbOverlay() {
   const muscles = (st.mode === 'work' && st.block.type === 'exercise') ? exerciseMuscles(st.block.exerciseId)
     : (st.trailing && st.displayBlock.type === 'exercise') ? exerciseMuscles(st.displayBlock.exerciseId) : null;
   const showMuscles = muscles && muscleLabelsText(muscles.primary, muscles.secondary);
-  const upcoming = st.trailing ? fbShortSub(st.displayBlock) : fb.preCount != null ? 'Hände ans Board — gleich geht\'s los' : fb.awaitingNext ? fbShortSub(st.block) : '';
+  const upcoming = st.trailing ? fbShortSub(st.displayBlock) : fb.preCount != null ? fbGetReadyText(st.block) : fb.awaitingNext ? fbShortSub(st.block) : '';
   const bigNum = fb.preCount != null
-    ? `<div class="fbx-num${fb.preCount <= 3 ? ' fb-precount-tense' : ''}" id="fb-precount">${fb.preCount}</div>`
+    ? `<div class="fbx-num" id="fb-precount">${fb.preCount}</div>`
     : fb.awaitingNext
       ? `<div class="fbx-num" id="fb-big">${pad2(buildBlockSequence(st.block)[0].seconds)}</div>`
       : `<div class="fbx-num" id="fb-big">${fbBigContent(false)}</div>`;
   const canBack = !(fb.blockIndex === 0 && fb.stepIndex === 0) && !fb.awaitingNext && fb.preCount == null;
 
   el.innerHTML = `
-    <div class="fbx fbx-${st.mode}${isPaused ? ' paused' : ''}${st.mode === 'rest' && fbSoonLevel() === 2 ? ' fbx-soon' : ''}" data-key="${fbStageKey(st)}">
+    <div class="fbx fbx-${st.mode}${isPaused ? ' paused' : ''}${st.mode !== 'work' && fbSoonLevel() === 2 ? ' fbx-soon' : ''}" data-key="${fbStageKey(st)}">
       <div class="fbx-top">
         <button type="button" class="fbx-icon" id="fb-overlay-close" aria-label="Beenden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         <div class="fbx-segs" id="fbx-segs">${segs}</div>
@@ -9307,6 +9388,7 @@ function renderFbOverlay() {
   if (!st.trailing && !fb.awaitingNext && fb.preCount == null) updateFbUpcomingUI();
   updateFbProgressUI();
   syncFbRingAnimation();
+  fbFitOverlayText();
   fbLayoutBoardStage();
   // Board-Bild evtl. noch nicht geladen: nach dem Laden nochmal ausrichten
   const img = el.querySelector('.fbx-board-dim');
@@ -9674,14 +9756,21 @@ function tickPreCountdown() {
   audioKeepWarm();
   fb.preCount--;
   if (fb.preCount <= 0) { finishPreCountdown(); return; }
-  if (fb.preCount <= 3) beepTick();
+  if (fb.preCount <= 3) { beepTick(); fbBuzz(80); }
   // Nur die Zahl aktualisieren statt alles neu zu zeichnen — sonst startet
   // die Campus-Routen-Animation jede Sekunde von vorne und läuft nie durch.
+  // Ausnahme: bei 5 s einmal neu aufbauen (Farbe → Blau, Faultier streckt sich).
   setTimeout(() => {
+    const root = document.querySelector('#fb-overlay .fbx');
+    if (root && root.dataset.key !== fbStageKey(fbRunState())) { renderFbOverlay(); return; }
     const num = document.getElementById('fb-precount');
     if (!num || fb.preCount == null) { renderFbOverlay(); return; }
     num.textContent = fb.preCount;
-    num.classList.toggle('fb-precount-tense', fb.preCount <= 3);
+    if (fb.preCount <= 3) {
+      num.classList.remove('fbx-pop'); void num.offsetWidth; num.classList.add('fbx-pop');
+      const stageEl = document.getElementById('fbx-stage');
+      if (stageEl && fb.preCount === 3) stageEl.classList.add('fbx-flash');
+    }
   }, FB_AUDIO_LEAD_MS); // siehe FB_AUDIO_LEAD_MS — Ton vor Bild
 }
 
@@ -11225,6 +11314,53 @@ function wishesCardHtml(list) {
     </div>`;
 }
 
+function renderKontoNav() {
+  const holder = document.getElementById('konto-nav');
+  if (!holder) return;
+  const list = navOrdered();
+  const hidden = Array.isArray(navPrefs().hidden) ? navPrefs().hidden : [];
+  const visibleCount = list.filter((n) => !hidden.includes(n.route)).length;
+  holder.innerHTML = `
+    <div class="card">
+      <p class="card-title">Navigation unten</p>
+      <p class="card-sub" style="margin-bottom:10px;">Reihenfolge ändern und Tabs ausblenden. Der oberste sichtbare Tab öffnet sich beim Start.</p>
+      <div class="nav-pref-list">
+        ${list.map((n, i) => {
+          const off = hidden.includes(n.route);
+          return `
+          <div class="nav-pref-row${off ? ' off' : ''}">
+            <span class="nav-pref-icon">${navIconSvg(n.icon)}</span>
+            <span class="nav-pref-label">${esc(n.label)}</span>
+            <button type="button" class="nav-pref-btn" data-nav-up="${i}" ${i === 0 ? 'disabled' : ''} aria-label="${esc(n.label)} nach oben">↑</button>
+            <button type="button" class="nav-pref-btn" data-nav-down="${i}" ${i === list.length - 1 ? 'disabled' : ''} aria-label="${esc(n.label)} nach unten">↓</button>
+            <button type="button" class="chip small ${off ? '' : 'active'}" data-nav-toggle="${n.route}" ${!off && visibleCount <= 1 ? 'disabled' : ''}>${off ? 'Aus' : 'An'}</button>
+          </div>`;
+        }).join('')}
+      </div>
+      ${navPrefs().order || navPrefs().hidden ? '<button type="button" class="btn ghost small" id="konto-nav-reset" style="margin-top:10px;">Standard wiederherstellen</button>' : ''}
+    </div>
+  `;
+  const apply = (order, hid) => { saveNavPrefs({ order, hidden: hid }); render(); };
+  const routes = list.map((n) => n.route);
+  holder.querySelectorAll('[data-nav-up]').forEach((b) => { b.onclick = () => {
+    const i = Number(b.dataset.navUp); [routes[i - 1], routes[i]] = [routes[i], routes[i - 1]]; apply(routes, hidden);
+  }; });
+  holder.querySelectorAll('[data-nav-down]').forEach((b) => { b.onclick = () => {
+    const i = Number(b.dataset.navDown); [routes[i + 1], routes[i]] = [routes[i], routes[i + 1]]; apply(routes, hidden);
+  }; });
+  holder.querySelectorAll('[data-nav-toggle]').forEach((b) => { b.onclick = () => {
+    const r = b.dataset.navToggle;
+    apply(routes, hidden.includes(r) ? hidden.filter((x) => x !== r) : hidden.concat(r));
+  }; });
+  const reset = document.getElementById('konto-nav-reset');
+  if (reset) reset.onclick = () => {
+    state.memberDoc = { ...(state.memberDoc || {}), nav: null };
+    try { localStorage.removeItem(NAV_PREF_KEY); } catch (e) { /* ignorieren */ }
+    fbPatch(`members/${state.member.id}`, { nav: null });
+    render();
+  };
+}
+
 async function renderKonto() {
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Konto</h2><div class="sec-rule"></div></div>
@@ -11244,12 +11380,14 @@ async function renderKonto() {
         <button class="btn small" id="konto-join">Beitreten</button>
       </div>
     </div>
+    <div id="konto-nav"></div>
     <div id="konto-create"></div>
     <div id="konto-wishes"></div>
     <div id="konto-cycle"></div>
     <div id="konto-data"></div>
   `);
   document.getElementById('konto-logout').onclick = () => logout();
+  renderKontoNav();
   document.getElementById('konto-join').onclick = () => joinCrewWithCode(normalizeInviteCode(document.getElementById('konto-join-code').value));
 
   await loadCrews(); // frisch: neue Mitglieder sollen ohne Neustart erscheinen
@@ -11442,7 +11580,7 @@ async function createCrew(name) {
 
 /* ---------- Start ---------- */
 window.addEventListener('hashchange', () => {
-  state.route = (location.hash || '#fingerboard').replace('#', '');
+  state.route = location.hash ? location.hash.replace('#', '') : defaultRoute();
   render();
 });
 boot();
