@@ -15,7 +15,7 @@ python3 tools/sloth-rig/build.py --list   # Teil-Nummern der Vorlagen anzeigen
 - `sheets/back.jpg`: Rückansicht mit Greifhänden und Ellbogen-Kugeln
 - `sheets/side.jpg` + `sheets/side_extra.jpg`: Seitenansicht (Blick nach rechts),
   Fäuste und Füsse im Zusatzblatt. Hintere Arme/Beine = abgedunkelte Kopie (`*_far.png`)
-- `sheets/arms_extra.jpg`: hängende Arme (vorne) und flache Hand (Seite)
+- `sheets/arms_extra.jpg`: flache Hand (Seite); die hängenden Arme darin werden nicht verwendet
 - `sheets/equipment/`: Geräte, Maschinen, Kleinteile (für Etappe 2, noch nicht zerlegt)
 
 Die Vorlagen müssen weissen Hintergrund haben und die Teile durch weisse
