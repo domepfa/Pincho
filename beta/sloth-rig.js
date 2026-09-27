@@ -9,7 +9,7 @@
 const SLOTH_RIG_BASE = '../assets/sloth/rig/';
 
 /* PARTS:BEGIN */
-const SLOTH_PARTS = {"front_head":[510,53,696,293],"front_torso":[456,248,745,582],"front_uarm_l":[296,251,478,388],"front_uarm_r":[723,251,904,388],"front_farm_l":[51,288,294,400],"front_farm_r":[907,288,1150,400],"front_thigh_l":[439,516,582,697],"front_thigh_r":[629,516,773,697],"front_tail":[566,584,643,725],"front_calf_l":[444,678,569,866],"front_calf_r":[643,679,768,866],"back_head":[510,53,696,293],"back_torso":[455,247,745,622],"back_uarm_l":[300,251,478,388],"back_uarm_r":[723,251,900,388],"back_farm_l":[163,288,294,396],"back_farm_r":[906,288,1039,396],"back_elbow_l":[267,315,319,367],"back_elbow_r":[881,314,934,367],"back_grip_l":[195,606,314,813],"back_grip_r":[899,606,1018,813],"back_thigh_l":[439,567,571,697],"back_thigh_r":[641,562,773,697],"back_tail":[566,619,643,741],"back_calf_l":[444,678,569,866],"back_calf_r":[643,678,768,866],"side_torso":[458,53,699,568],"side_tail":[372,453,473,535],"side_uarm":[791,80,910,268],"side_uarm_far":[791,80,910,268],"side_elbow":[811,261,857,307],"side_elbow_far":[811,261,857,307],"side_farm":[770,320,959,400],"side_farm_far":[770,320,959,400],"side_hand":[990,449,1166,539],"side_hand_far":[990,449,1166,539],"side_thigh":[629,516,773,687],"side_thigh_far":[629,516,773,687],"side_knee":[721,652,768,700],"side_knee_far":[721,652,768,700],"side_calf":[1020,689,1180,854],"side_calf_far":[1020,689,1180,854],"side_fist":[59,109,404,284],"side_fist_far":[59,109,404,284],"side_flat":[624,706,893,825],"side_flat_far":[624,706,893,825]};
+const SLOTH_PARTS = {"front_head":[510,53,696,293],"front_torso":[456,248,745,582],"front_uarm_l":[296,251,478,388],"front_uarm_r":[723,251,904,388],"front_farm_l":[51,288,294,400],"front_farm_r":[907,288,1150,400],"front_thigh_l":[439,516,582,697],"front_thigh_r":[629,516,773,697],"front_tail":[566,584,643,725],"front_calf_l":[444,678,569,866],"front_calf_r":[643,679,768,866],"back_head":[510,53,696,293],"back_torso":[455,247,745,622],"back_uarm_l":[300,251,478,388],"back_uarm_r":[723,251,900,388],"back_farm_l":[163,288,294,396],"back_farm_r":[906,288,1039,396],"back_elbow_l":[267,315,319,367],"back_elbow_r":[881,314,934,367],"back_grip_l":[195,606,314,813],"back_grip_r":[899,606,1018,813],"back_thigh_l":[439,567,571,697],"back_thigh_r":[641,562,773,697],"back_tail":[566,619,643,741],"back_calf_l":[444,678,569,866],"back_calf_r":[643,678,768,866],"eq_plate":[570,40,688,159],"eq_kettlebell":[870,40,962,159],"eq_dumbbell":[184,51,365,151],"eq_dhandle":[178,193,273,328],"eq_rope":[515,183,622,331],"eq_ring":[866,182,955,336],"eq_barend":[66,379,285,434],"eq_bench":[326,418,558,499],"eq_incline":[604,353,821,499],"eq_decline":[887,404,1118,499],"eq_cable":[92,506,252,840],"eq_dipstation":[436,631,630,840],"eq_rack":[890,553,1108,840],"eq_latpull":[68,33,237,248],"eq_legpress":[312,68,575,239],"eq_legext":[657,67,851,241],"eq_legcurl":[917,67,1143,241],"eq_butterfly":[69,324,232,543],"eq_abduction":[362,329,510,543],"eq_calfseated":[657,417,844,543],"eq_calfstanding":[931,326,1134,541],"eq_hyperext":[71,688,280,839],"eq_pullover":[465,604,649,840],"eq_tbar":[877,653,1112,840],"eq_abwheel":[181,58,443,250],"eq_jumprope":[776,42,989,261],"eq_ladder":[93,361,534,514],"eq_stepbox":[748,354,1035,538],"eq_band":[93,682,531,759],"eq_mat":[627,666,1152,759],"side_torso":[458,53,699,568],"side_tail":[372,453,473,535],"side_uarm":[791,80,910,268],"side_uarm_far":[791,80,910,268],"side_elbow":[811,261,857,307],"side_elbow_far":[811,261,857,307],"side_farm":[770,320,959,400],"side_farm_far":[770,320,959,400],"side_hand":[990,449,1166,539],"side_hand_far":[990,449,1166,539],"side_thigh":[629,516,773,687],"side_thigh_far":[629,516,773,687],"side_knee":[721,652,768,700],"side_knee_far":[721,652,768,700],"side_calf":[1020,689,1180,854],"side_calf_far":[1020,689,1180,854],"side_fist":[59,109,404,284],"side_fist_far":[59,109,404,284],"side_flat":[624,706,893,825],"side_flat_far":[624,706,893,825]};
 /* PARTS:END */
 
 // Gelenkpunkte in Vorlagen-Koordinaten (1200 x 896): [nah, fern]
@@ -82,6 +82,9 @@ const STAND_LEGS = { thigh_l: 100, calf_l: 91, thigh_r: 80, calf_r: 89 };
    gerade Verlängerung; vorne: Winkel wie im Stand, drehen mit dem Rumpf);
    dx/dy in der Stellung verschieben die ganze Figur.
    Vorne: pin auch 'hand_l', 'hand_r', 'foot_l', 'foot_r'.
+   props: Geräte [{ img, at: Punkt ('grip', 'fgrip', 'hand_l', …) oder [x, y]
+   fest, k: Massstab, r: Drehung, a: Ankerpunkt im Blatt, turn: dreht mit
+   dem Rumpf, layer: 'back' | 'mid' | 'front' }].
    Seitenansicht: Winkel uarm/farm/hand/thigh/calf gelten für die vordere
    Seite, f… (fuarm, ffarm, …) für die hintere (sonst gleich wie vorne);
    grip: 'fist' (Faust) / 'flat' (flach am Boden) statt offener Hand;
@@ -323,6 +326,136 @@ const SLOTH_POSES = {
     a: { torso: 204, uarm: 8, farm: 8, fuarm: 20, ffarm: 20, thigh: -52, calf: 58 },
     b: { torso: 204, uarm: 20, farm: 20, fuarm: 8, ffarm: 8, thigh: -52, calf: 58 },
   },
+  // ---- Freihanteln und Bank ----
+  benchpress: {
+    view: 'side', pin: 'hip', dur: 2.6, floor: 286, grip: 'fist', label: 'Bankdrücken', props: [{ img: 'bench', at: [-150, 108], a: [442, 422], k: 2.2, layer: 'back' }, { img: 'plate', at: 'grip', k: 1.3 }],
+    a: { torso: 180, uarm: -90, farm: -90, hand: -90, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+    b: { torso: 180, uarm: 104, farm: -84, hand: -90, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+  },
+  dbbench: {
+    view: 'side', pin: 'hip', dur: 2.6, floor: 286, grip: 'fist', label: 'Kurzhantel-Bankdrücken', props: [{ img: 'bench', at: [-150, 108], a: [442, 422], k: 2.2, layer: 'back' }, { img: 'plate', at: 'fgrip', k: 0.72, layer: 'mid' }, { img: 'plate', at: 'grip', k: 0.72 }],
+    a: { torso: 180, uarm: -90, farm: -90, hand: -90, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+    b: { torso: 180, uarm: 104, farm: -84, hand: -90, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+  },
+  inclinebench: {
+    view: 'side', pin: 'hip', dur: 2.6, floor: 250, grip: 'fist', label: 'Schrägbankdrücken',
+    props: [{ img: 'incline', at: [-40, 40], a: [712, 470], k: 2.1, layer: 'back' }, { img: 'plate', at: 'grip', k: 1.3 }],
+    a: { torso: -142, uarm: -120, farm: -120, hand: -120, thigh: 10, calf: 96, fthigh: 6, fcalf: 94 },
+    b: { torso: -142, uarm: 100, farm: -110, hand: -120, thigh: 10, calf: 96, fthigh: 6, fcalf: 94 },
+  },
+  declinebench: {
+    view: 'side', pin: 'hip', dur: 2.6, floor: 260, grip: 'fist', label: 'Negativ-Bankdrücken',
+    props: [{ img: 'decline', at: [-120, 96], a: [1000, 432], k: 2.1, layer: 'back' }, { img: 'plate', at: 'grip', k: 1.3 }],
+    a: { torso: 166, uarm: -80, farm: -80, hand: -80, thigh: -20, calf: 80, fthigh: -24, fcalf: 78 },
+    b: { torso: 166, uarm: 110, farm: -76, hand: -80, thigh: -20, calf: 80, fthigh: -24, fcalf: 78 },
+  },
+  skullcrusher: {
+    view: 'side', pin: 'hip', dur: 2.6, floor: 286, grip: 'fist', label: 'Skull Crusher', props: [{ img: 'bench', at: [-150, 108], a: [442, 422], k: 2.2, layer: 'back' }, { img: 'plate', at: 'grip', k: 1.3 }],
+    a: { torso: 180, uarm: -104, farm: -100, hand: -100, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+    b: { torso: 180, uarm: -110, farm: 176, hand: 176, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+  },
+  dbpullover: {
+    view: 'side', pin: 'hip', dur: 3, floor: 286, grip: 'fist', label: 'Überzüge mit Kurzhantel', props: [{ img: 'bench', at: [-150, 108], a: [442, 422], k: 2.2, layer: 'back' }, { img: 'plate', at: 'grip', k: 0.72 }],
+    a: { torso: 180, uarm: -90, farm: -92, hand: -92, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+    b: { torso: 180, uarm: 196, farm: 190, hand: 190, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+  },
+  deadlift: {
+    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Kreuzheben', props: [{ img: 'plate', at: 'grip', k: 1.05 }],
+    a: { torso: -34, uarm: 114, farm: 62, hand: 90, thigh: 56, calf: 104 },
+    b: { torso: -96, uarm: 100, farm: 80, hand: 90, thigh: 86, calf: 92 },
+  },
+
+  rdl: {
+    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Rumänisches Kreuzheben', props: [{ img: 'plate', at: 'grip', k: 1.05 }],
+    a: { torso: -96, uarm: 100, farm: 80, hand: 90, thigh: 86, calf: 92 },
+    b: { torso: -32, uarm: 114, farm: 62, hand: 90, thigh: 94, calf: 96 },
+  },
+
+  barbellrow: {
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Langhantel-Rudern', props: [{ img: 'plate', at: 'grip', k: 1.05 }],
+    a: { torso: -40, uarm: 112, farm: 64, hand: 90, thigh: 70, calf: 102 },
+    b: { torso: -40, uarm: 170, farm: 70, hand: 90, thigh: 70, calf: 102 },
+  },
+
+  dbrow: {
+    view: 'side', pin: 'fknee', dur: 2.4, floor: 250, grip: 'fist', label: 'Einarmiges Kurzhantel-Rudern',
+    props: [{ img: 'bench', at: [70, 26], a: [442, 422], k: 2, layer: 'back' }, { img: 'plate', at: 'grip', k: 0.72 }],
+    a: { torso: -6, uarm: 92, farm: 92, hand: 92, fuarm: 92, ffarm: 90, thigh: 92, calf: 96, fthigh: 90, fcalf: 180 },
+    b: { torso: -6, uarm: 164, farm: 78, hand: 90, fuarm: 92, ffarm: 90, thigh: 92, calf: 96, fthigh: 90, fcalf: 180 },
+  },
+  goblet: {
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'Goblet Squat', props: [{ img: 'kettlebell', at: 'grip', a: [916, 64], k: 1.3 }],
+    a: { torso: -98, uarm: 104, farm: -58, hand: -40, thigh: 80, calf: 92 },
+    b: { torso: -66, uarm: 70, farm: -80, hand: -60, thigh: 8, calf: 110 },
+  },
+  sumosquat: {
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'Sumo Squat', props: [{ img: 'plate', at: 'grip', k: 0.72 }],
+    a: { torso: -98, uarm: 92, farm: 90, hand: 90, thigh: 80, calf: 92 },
+    b: { torso: -82, uarm: 92, farm: 90, hand: 90, thigh: 12, calf: 100 },
+  },
+  lunge: {
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'Ausfallschritt mit Kurzhanteln', props: [{ img: 'plate', at: 'fgrip', k: 0.72, layer: 'mid' }, { img: 'plate', at: 'grip', k: 0.72 }],
+    a: { torso: -96, uarm: 94, farm: 92, hand: 92, thigh: 72, calf: 100, fthigh: 112, fcalf: 140 },
+    b: { torso: -94, uarm: 94, farm: 92, hand: 92, thigh: 8, calf: 96, fthigh: 98, fcalf: 172 },
+  },
+  stepup: {
+    view: 'side', pin: 'fankle', dur: 2.8, floor: 46, grip: 'fist', label: 'Step-up',
+    props: [{ img: 'stepbox', at: [150, -60], a: [891, 446], k: 1.1, layer: 'back' }],
+    a: { torso: -94, uarm: 94, farm: 92, thigh: 8, calf: 96, fthigh: 92, fcalf: 94, dy: 0 },
+    b: { torso: -96, uarm: 94, farm: 92, thigh: 82, calf: 94, fthigh: 60, fcalf: 140, dy: -150 },
+  },
+  hipthrust: {
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'Hip Thrust',
+    lean: { pt: 'shoulder', y: -140, from: 150, to: 240 },
+    props: [{ img: 'bench', at: [-330, -150], a: [442, 422], k: 1.6, layer: 'back' }, { img: 'plate', at: 'hip', k: 1.5 }],
+    a: { torso: 180, uarm: 0, farm: 20, hand: 20, thigh: -30, calf: 84 },
+    b: { torso: 180, uarm: -14, farm: 20, hand: 20, thigh: -4, calf: 92 },
+  },
+  ohp: {
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'Schulterdrücken', props: [{ img: 'plate', at: 'grip', k: 1.3 }],
+    a: { torso: -96, uarm: 64, farm: -86, hand: -90, thigh: 86, calf: 92 },
+    b: { torso: -96, uarm: -92, farm: -92, hand: -92, thigh: 86, calf: 92 },
+  },
+  curl: {
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Bizepscurl', props: [{ img: 'plate', at: 'fgrip', k: 0.72, layer: 'mid' }, { img: 'plate', at: 'grip', k: 0.72 }],
+    a: { torso: -96, uarm: 94, farm: 92, hand: 92, thigh: 86, calf: 92 },
+    b: { torso: -96, uarm: 98, farm: -52, hand: -60, thigh: 86, calf: 92 },
+  },
+  bbcurl: {
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Langhantel-Curl', props: [{ img: 'plate', at: 'grip', k: 1.3 }],
+    a: { torso: -96, uarm: 94, farm: 92, hand: 92, thigh: 86, calf: 92 },
+    b: { torso: -96, uarm: 98, farm: -52, hand: -60, thigh: 86, calf: 92 },
+  },
+  tricepsext: {
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Trizepsdrücken am Kabel',
+    props: [{ img: 'cable', at: [360, 46], a: [171, 838], k: 2.7, layer: 'back' }, { img: 'rope', at: 'grip', a: [568, 196], k: 1.2 }],
+    a: { torso: -92, uarm: 100, farm: -30, hand: -30, thigh: 84, calf: 92 },
+    b: { torso: -92, uarm: 100, farm: 84, hand: 84, thigh: 84, calf: 92 },
+  },
+  dbflyes: {
+    view: 'side', pin: 'hip', dur: 3, floor: 286, grip: 'fist', label: 'Kurzhantel-Fliegende',
+    props: [{ img: 'bench', at: [-150, 108], a: [442, 422], k: 2.2, layer: 'back' }, { img: 'plate', at: 'fgrip', k: 0.72, layer: 'mid' }, { img: 'plate', at: 'grip', k: 0.72 }],
+    a: { torso: 180, uarm: -90, farm: -96, hand: -96, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+    b: { torso: 180, uarm: 98, farm: 12, hand: 12, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+  },
+
+  frontraise: {
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Frontheben', props: [{ img: 'plate', at: 'grip', k: 0.72 }],
+    a: { torso: -96, uarm: 88, farm: 86, hand: 86, thigh: 86, calf: 92 },
+    b: { torso: -96, uarm: -4, farm: -6, hand: -6, thigh: 86, calf: 92 },
+  },
+  lateralraise: {
+    view: 'front', pin: 'feet', dur: 2.4, floor: 26, armLift: 45, label: 'Seitheben',
+    props: [{ img: 'plate', at: 'hand_l', k: 0.72 }, { img: 'plate', at: 'hand_r', k: 0.72 }],
+    a: { torso: -90, head: -90, uarm_l: 104, farm_l: 96, uarm_r: 76, farm_r: 84, ...STAND_LEGS, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: 184, farm_l: 180, uarm_r: -4, farm_r: 0, ...STAND_LEGS, tail: 0 },
+  },
+  sidebend: {
+    view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, relArms: true, label: 'Seitbeuge mit Kurzhantel',
+    props: [{ img: 'plate', at: 'hand_l', k: 0.72 }],
+    a: { torso: -80, head: -80, uarm_l: 100, farm_l: 94, uarm_r: 60, farm_r: 150, ...STAND_LEGS, tail: 0 },
+    b: { torso: -100, head: -100, uarm_l: 100, farm_l: 94, uarm_r: 60, farm_r: 150, ...STAND_LEGS, tail: 0 },
+  },
   hang: {
     view: 'back', pin: 'hands', dur: 3.6, bar: true, label: 'Faultier hängt an der Stange',
     a: { torso: -90, head: -90, ...HANG_ARMS, thigh_l: 97, calf_l: 92, thigh_r: 83, calf_r: 88, tail: 0 },
@@ -384,7 +517,8 @@ function slothRigBuild(pose) {
       q['calf' + x] = place('calf', q['thigh' + x].end, v('calf'), 'side_calf' + x);
     }
     return { q, pts: { wrist: q.farm.end, ankle: q.calf.end, grip: q.hand.end, knee: q.thigh.end, elbow: q.uarm.end,
-      fwrist: q.farm_far.end, fankle: q.calf_far.end, fknee: q.thigh_far.end, shoulder: t.map(A.shoulder), hip: t.map(A.hip) } };
+      fwrist: q.farm_far.end, fankle: q.calf_far.end, fknee: q.thigh_far.end, fgrip: q.hand_far.end,
+      shoulder: t.map(A.shoulder), hip: t.map(A.hip) } };
   }
 
   function frontBack(s) {
@@ -441,6 +575,12 @@ function slothRigBuild(pose) {
     // dx/dy: ganze Figur verschieben (Hüpfen, Fersen heben)
     const pin = sub(pts[pose.pin], [s.dx || 0, s.dy || 0]);
     for (const k in q) q[k] = { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k };
+    // Requisiten: an einem Punkt der Figur (z. B. 'grip') oder fest im Bild ([x, y] relativ zum festen Punkt)
+    (pose.props || []).forEach((pr, i) => {
+      const b = SLOTH_PARTS['eq_' + pr.img], p = pr.a || [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
+      const P = Array.isArray(pr.at) ? pr.at : sub(pts[pr.at], pin);
+      q['prop' + i] = { img: 'eq_' + pr.img, P, r: (pr.r || 0) + (pr.turn ? s.torso : 0), p, k: pr.k || 1 };
+    });
     return q;
   };
 }
@@ -467,7 +607,11 @@ function slothRigPrepare(name) {
     for (const k in pose.a) s[k] = pose.a[k] + ((pose.b[k] ?? pose.a[k]) - pose.a[k]) * m;
     frames.push(build(s));
   }
-  const order = SLOTH_ORDER[pose.view];
+  // Requisiten einsortieren: 'back' hinter allem, 'mid' zwischen hinterer und vorderer Seite, sonst vorne
+  const base = SLOTH_ORDER[pose.view], props = (pose.props || []).map((pr, i) => [pr.layer || 'front', 'prop' + i]);
+  const mid = base.indexOf(pose.view === 'side' ? 'tail' : 'torso');
+  const order = [...props.filter((x) => x[0] === 'back').map((x) => x[1]), ...base.slice(0, mid),
+    ...props.filter((x) => x[0] === 'mid').map((x) => x[1]), ...base.slice(mid), ...props.filter((x) => x[0] === 'front').map((x) => x[1])];
   // Umriss über alle Stellungen -> viewBox
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const f of frames) for (const key of order) {

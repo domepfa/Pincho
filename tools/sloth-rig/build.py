@@ -38,6 +38,18 @@ FAR_DARK = 0.5
 # Weisse Ringe der Gelenk-Pfannen am Rumpf dunkel füllen: (Mitte, Radius)
 SIDE_SOCKETS = [((544, 295), 40), ((586, 513), 40)]
 
+# Geräte (Requisiten), Teil-Nummern je Blatt in sheets/equipment/
+EQUIP = {
+    'geraete.jpg': {'plate': [1], 'kettlebell': [2], 'dumbbell': [3], 'dhandle': [54], 'rope': [53], 'ring': [52],
+                    'barend': [96], 'bench': [98], 'incline': [95], 'decline': [97], 'cable': [114], 'dipstation': [168], 'rack': [167]},
+    'maschinen.jpg': {'latpull': [1], 'legpress': [2], 'legext': [3], 'legcurl': [4], 'butterfly': [71], 'abduction': [73],
+                      'calfseated': [74], 'calfstanding': [72], 'hyperext': [166], 'pullover': [164], 'tbar': [165]},
+    'kleinteile.jpg': {'abwheel': [2], 'jumprope': [1], 'ladder': [29], 'stepbox': [28], 'band': [63], 'mat': [62]},
+}
+
+# Geräte etwas dunkler, damit sie neben dem Faultier zurücktreten
+EQUIP_DARK = 0.62
+
 # Schwarzweiss-Kurve: Helligkeit -> Grauwert (Stützpunkte bei 0, .25, .5, .75, 1)
 CURVE = [0.06, 0.30, 0.68, 0.96, 1.0]
 
@@ -82,6 +94,11 @@ def main():
         g = gray(rgb)
         for name, ids in comps.items():
             parts[f'{view}_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'{view}_{name}.png'))
+    for fname, comps in EQUIP.items():
+        rgb, lab = label(os.path.join(HERE, 'sheets', 'equipment', fname))
+        g = gray(rgb)
+        for name, ids in comps.items():
+            parts[f'eq_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'eq_{name}.png'), dark=EQUIP_DARK)
     for fname, comps in SIDE:
         rgb, lab = label(os.path.join(HERE, 'sheets', fname))
         g = gray(rgb)

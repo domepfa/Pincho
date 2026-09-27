@@ -7671,6 +7671,13 @@ const SLOTH_EXERCISE_POSES = {
   couch_stretch: 'couch', figure_four_stretch: 'figurefour', standing_hip_circles: 'hipcircle',
   lateral_lunge_mobility: 'lateralLunge', standing_quad_stretch: 'quadstretch', calf_stretch_wall: 'calfstretch',
   adductor_rock: 'adductor', nordic_hamstring_curl: 'nordic', heel_touches: 'heeltouch',
+  bench_press: 'benchpress', close_grip_bench_press: 'benchpress', dumbbell_bench_press: 'dbbench',
+  incline_bench_press: 'inclinebench', decline_bench_press: 'declinebench', skull_crusher: 'skullcrusher',
+  dumbbell_pullover: 'dbpullover', dumbbell_flyes: 'dbflyes', deadlift: 'deadlift', deadlift_sumo: 'deadlift', rdl: 'rdl',
+  row_barbell: 'barbellrow', one_arm_row_dumbbell: 'dbrow', goblet_squat: 'goblet', sumo_squat: 'sumosquat',
+  lunge_dumbbell: 'lunge', step_up: 'stepup', box_step_stepper: 'stepup', hip_thrust: 'hipthrust', ohp: 'ohp',
+  bicep_curl_dumbbell: 'curl', hammer_curl: 'curl', bicep_curl_barbell: 'bbcurl', triceps_extension: 'tricepsext',
+  front_raise: 'frontraise', lateral_raise: 'lateralraise', side_bend_dumbbell: 'sidebend',
 };
 const SLOTH_VIEW_WORD = { side: 'Seitenansicht', back: 'Rückansicht', front: 'Vorderansicht' };
 function exerciseFigureSvg(exerciseId) {
