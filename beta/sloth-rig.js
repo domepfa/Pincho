@@ -84,7 +84,8 @@ const STAND_LEGS = { thigh_l: 100, calf_l: 91, thigh_r: 80, calf_r: 89 };
    Vorne: pin auch 'hand_l', 'hand_r', 'foot_l', 'foot_r'.
    props: Geräte [{ img, at: Punkt ('grip', 'fgrip', 'hand_l', …) oder [x, y]
    fest, k: Massstab, r: Drehung, a: Ankerpunkt im Blatt, turn: dreht mit
-   dem Rumpf, layer: 'back' | 'mid' | 'front' }].
+   dem Rumpf, flip: gespiegelt, layer: 'back' | 'mid' | 'front' } oder
+   { line: [x, y], to: Punkt } für ein Seil vom festen Punkt zur Hand].
    Seitenansicht: Winkel uarm/farm/hand/thigh/calf gelten für die vordere
    Seite, f… (fuarm, ffarm, …) für die hintere (sonst gleich wie vorne);
    grip: 'fist' (Faust) / 'flat' (flach am Boden) statt offener Hand;
@@ -428,10 +429,12 @@ const SLOTH_POSES = {
   },
   tricepsext: {
     view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Trizepsdrücken am Kabel',
-    props: [{ img: 'cable', at: [360, 46], a: [171, 838], k: 2.7, layer: 'back' }, { img: 'rope', at: 'grip', a: [568, 196], k: 1.2 }],
+    props: [{ img: 'cable', at: [400, 46], a: [171, 838], k: 2.7, flip: true, layer: 'back' },
+      { line: [287, -764], to: 'grip' }, { img: 'rope', at: 'grip', a: [568, 196], k: 1.2 }],
     a: { torso: -92, uarm: 100, farm: -30, hand: -30, thigh: 84, calf: 92 },
     b: { torso: -92, uarm: 100, farm: 84, hand: 84, thigh: 84, calf: 92 },
   },
+
   dbflyes: {
     view: 'side', pin: 'hip', dur: 3, floor: 286, grip: 'fist', label: 'Kurzhantel-Fliegende',
     props: [{ img: 'bench', at: [-150, 108], a: [442, 422], k: 2.2, layer: 'back' }, { img: 'plate', at: 'fgrip', k: 0.72, layer: 'mid' }, { img: 'plate', at: 'grip', k: 0.72 }],
@@ -577,9 +580,14 @@ function slothRigBuild(pose) {
     for (const k in q) q[k] = { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k };
     // Requisiten: an einem Punkt der Figur (z. B. 'grip') oder fest im Bild ([x, y] relativ zum festen Punkt)
     (pose.props || []).forEach((pr, i) => {
-      const b = SLOTH_PARTS['eq_' + pr.img], p = pr.a || [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
-      const P = Array.isArray(pr.at) ? pr.at : sub(pts[pr.at], pin);
-      q['prop' + i] = { img: 'eq_' + pr.img, P, r: (pr.r || 0) + (pr.turn ? s.torso : 0), p, k: pr.k || 1 };
+      const pt = (at) => (Array.isArray(at) ? at : sub(pts[at], pin));
+      if (pr.line) { // Seil vom festen Punkt line zum Punkt to (Rechteck, in der Länge gestreckt)
+        const A0 = pr.line, B = pt(pr.to), d = sub(B, A0);
+        q['prop' + i] = { line: true, P: A0, r: Math.atan2(d[1], d[0]) * 180 / Math.PI, p: [0, 0], k: [Math.hypot(d[0], d[1]), 1] };
+        return;
+      }
+      const b = SLOTH_PARTS['eq_' + pr.img], p = pr.a || [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k = pr.k || 1;
+      q['prop' + i] = { img: 'eq_' + pr.img, P: pt(pr.at), r: (pr.r || 0) + (pr.turn ? s.torso : 0), p, k: pr.flip ? [-k, k] : k };
     });
     return q;
   };
@@ -615,10 +623,11 @@ function slothRigPrepare(name) {
   // Umriss über alle Stellungen -> viewBox
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const f of frames) for (const key of order) {
-    const { img, P, r, p, k } = f[key], b = SLOTH_PARTS[img];
-    const c = Math.cos(r * Math.PI / 180) * k, s = Math.sin(r * Math.PI / 180) * k;
+    if (f[key].line) continue;
+    const { img, P, r, p, k } = f[key], b = SLOTH_PARTS[img], [kx, ky] = Array.isArray(k) ? k : [k, k];
+    const c = Math.cos(r * Math.PI / 180), s = Math.sin(r * Math.PI / 180);
     for (const [x, y] of [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]]) {
-      const dx = x - p[0], dy = y - p[1], wx = P[0] + dx * c - dy * s, wy = P[1] + dx * s + dy * c;
+      const dx = (x - p[0]) * kx, dy = (y - p[1]) * ky, wx = P[0] + dx * c - dy * s, wy = P[1] + dx * s + dy * c;
       x0 = Math.min(x0, wx); x1 = Math.max(x1, wx); y0 = Math.min(y0, wy); y1 = Math.max(y1, wy);
     }
   }
@@ -627,7 +636,7 @@ function slothRigPrepare(name) {
   const padX = (x1 - x0) * 0.02, padY = (y1 - y0) * 0.02;
   const box = [x0 - padX, y0 - padY, x1 - x0 + 2 * padX, y1 - y0 + 2 * padY].map((v) => Math.round(v));
   const n = (v) => +v.toFixed(1);
-  const sc = (e) => (e.k !== 1 ? ` scale(${e.k})` : '');
+  const sc = (e) => (Array.isArray(e.k) ? ` scale(${n(e.k[0])}, ${n(e.k[1])})` : e.k !== 1 ? ` scale(${e.k})` : '');
   // SVG-Attribut (Startstellung) und CSS-Transform (Keyframes) derselben Stellung
   const tfAttr = (e) => `translate(${n(e.P[0])} ${n(e.P[1])}) rotate(${+e.r.toFixed(2)})${sc(e)} translate(${n(-e.p[0])} ${n(-e.p[1])})`;
   const tfCss = (e) => `translate(${n(e.P[0])}px,${n(e.P[1])}px) rotate(${+e.r.toFixed(2)}deg)${sc(e)} translate(${n(-e.p[0])}px,${n(-e.p[1])}px)`;
@@ -640,7 +649,9 @@ function slothRigPrepare(name) {
   style.textContent = css.join('\n');
   document.head.appendChild(style);
   const parts = order.map((key) => {
-    const e = frames[0][key], b = SLOTH_PARTS[e.img];
+    const e = frames[0][key];
+    if (e.line) return `<g class="sp-${key}" transform="${tfAttr(e)}"><rect class="sloth-rig-cable" x="0" y="-3" width="1" height="6"/></g>`;
+    const b = SLOTH_PARTS[e.img];
     return `<g class="sp-${key}" transform="${tfAttr(e)}"><image href="${SLOTH_RIG_BASE}${e.img}.png" x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}"/></g>`;
   }).join('');
   let extra = '';

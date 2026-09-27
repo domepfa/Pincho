@@ -47,6 +47,9 @@ EQUIP = {
     'kleinteile.jpg': {'abwheel': [2], 'jumprope': [1], 'ladder': [29], 'stepbox': [28], 'band': [63], 'mat': [62]},
 }
 
+# Bereiche, die aus einem Gerät entfernt werden (x0, y0, x1, y1 im Blatt): Griff am Kabelturm
+EQUIP_ERASE = {'cable': [(214, 652, 256, 714)]}
+
 # Geräte etwas dunkler, damit sie neben dem Faultier zurücktreten
 EQUIP_DARK = 0.62
 
@@ -66,8 +69,10 @@ def gray(rgb):
     return np.interp(lum, np.linspace(0, 1, len(CURVE)), CURVE) * 255
 
 
-def cut(rgb, lab, ids, g, out, fix=None, dark=1.0):
+def cut(rgb, lab, ids, g, out, fix=None, dark=1.0, erase=()):
     m = ndi.binary_fill_holes(np.isin(lab, ids))
+    for x0, y0, x1, y1 in erase:
+        m[y0:y1, x0:x1] = False
     g = g.astype(float)
     if fix:
         # Gelenk-Pfannen mit dem umgebenden Fell zumalen (normierte Unschärfe von aussen nach innen)
@@ -98,7 +103,7 @@ def main():
         rgb, lab = label(os.path.join(HERE, 'sheets', 'equipment', fname))
         g = gray(rgb)
         for name, ids in comps.items():
-            parts[f'eq_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'eq_{name}.png'), dark=EQUIP_DARK)
+            parts[f'eq_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'eq_{name}.png'), dark=EQUIP_DARK, erase=EQUIP_ERASE.get(name, ()))
     for fname, comps in SIDE:
         rgb, lab = label(os.path.join(HERE, 'sheets', fname))
         g = gray(rgb)
