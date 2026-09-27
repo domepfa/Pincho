@@ -377,6 +377,11 @@ function toast(message, kind) {
 function fmtDate(d) {
   return d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
+/* Gespeichertes Datum (JJJJ-MM-TT) für die Anzeige: 22.09.2026 */
+function fmtDayKey(key) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key || '');
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : (key || '');
+}
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -1429,7 +1434,7 @@ async function renderLogHistory() {
   };
   list.innerHTML = entries.length ? entries.map(([id, e], idx) => `
     <div class="log-item">
-      <div class="top"><span>${esc(e.date)}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
+      <div class="top"><span>${esc(fmtDayKey(e.date))}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
       ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>${sessionTypeIconLabel(e.type)}</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
       ${e.totalSessionSec ? `<div class="ex-log-list"><div class="ex-log-row"><span>⏱ Zeit</span><span class="mono">${fmtMinSec(e.totalSessionSec)} gesamt · ${fmtMinSec(e.totalWorkSec || 0)} Arbeit</span></div></div>` : ''}
       ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => {
@@ -1472,7 +1477,7 @@ async function renderLogHistory() {
           };
         });
       if (!exercises.length) { toast('Keine Übungen zum Speichern gefunden.', 'err'); return; }
-      const name = prompt('Name für diesen Plan:', entry.date);
+      const name = prompt('Name für diesen Plan:', fmtDayKey(entry.date));
       if (!name) return;
       const key = await fbPush(`sessionPlans/${state.member.id}`, { name, exercises, createdAt: Date.now() });
       if (!key) { toast('Speichern fehlgeschlagen.', 'err'); return; }
@@ -4651,7 +4656,7 @@ async function renderFbHistory() {
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
   list.innerHTML = entries.length ? entries.map(([id, s]) => `
     <div class="log-item">
-      <div class="top"><span>${esc(s.date)}</span><span class="type">${esc((BOARDS[s.board] && BOARDS[s.board].label) || s.board)}${s.partial ? ' · UNVOLLSTÄNDIG' : ''}</span></div>
+      <div class="top"><span>${esc(fmtDayKey(s.date))}</span><span class="type">${esc((BOARDS[s.board] && BOARDS[s.board].label) || s.board)}${s.partial ? ' · UNVOLLSTÄNDIG' : ''}</span></div>
       <div class="ex-log-list">${fbResultsSummaryHtml(s.blocks || [], s.results || [])}</div>
       ${challengeDurationChipsHtml(`fb-history-share-${id}`, CHALLENGE_WINDOW_H)}
       <div class="field-row" style="margin-top:6px;">
@@ -9160,8 +9165,9 @@ function fbLayoutBoardStage() {
   const key = `${b.board}:${spots.map((p) => p.x.toFixed(1)).join('/')}@${Math.round(board.width)}x${Math.round(stage.height)}`;
   if (fbHangSpreadCache[key] == null) {
     figEl.classList.add('fbx-measuring');
-    let lo = -1, hi = 1.6;
-    for (let i = 0; i < 9; i++) {
+    // hi gross genug, dass die Hände auch die äussersten Griffe erreichen
+    let lo = -1, hi = 5;
+    for (let i = 0; i < 12; i++) {
       const mid = (lo + hi) / 2;
       place(mid);
       const l = figEl.querySelector('.sp-grip_l image');
