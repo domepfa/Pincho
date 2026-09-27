@@ -26,6 +26,17 @@ SHEETS = {
                           'tail': [102], 'calf_l': [103], 'calf_r': [104]}),
 }
 
+# Seitenansicht: aus zwei Blättern, hintere Gliedmassen = abgedunkelte Kopie (_far)
+SIDE = [
+    ('side.jpg', {'torso': [35], 'tail': [85], 'uarm': [36], 'elbow': [39], 'farm': [55], 'hand': [84],
+                  'thigh': [89], 'knee': [132], 'calf': [172]}),
+    ('side_extra.jpg', {'fist': [32]}),
+]
+SIDE_FAR = ['uarm', 'elbow', 'farm', 'hand', 'fist', 'thigh', 'knee', 'calf']
+FAR_DARK = 0.5
+# Weisse Ringe der Gelenk-Pfannen am Rumpf dunkel füllen: (Mitte, Radius)
+SIDE_SOCKETS = [((544, 295), 36), ((586, 513), 36)]
+
 # Schwarzweiss-Kurve: Helligkeit -> Grauwert (Stützpunkte bei 0, .25, .5, .75, 1)
 CURVE = [0.06, 0.30, 0.68, 0.96, 1.0]
 
@@ -42,19 +53,37 @@ def gray(rgb):
     return np.interp(lum, np.linspace(0, 1, len(CURVE)), CURVE) * 255
 
 
+def cut(rgb, lab, ids, g, out, fix=None, dark=1.0):
+    m = ndi.binary_fill_holes(np.isin(lab, ids))
+    g = g.astype(float)
+    if fix:
+        yy, xx = np.mgrid[0:g.shape[0], 0:g.shape[1]]
+        for (cx, cy), r in fix:
+            ring = (np.hypot(xx - cx, yy - cy) < r) & (rgb.min(2) > 150)
+            g[ring] = 20
+    g = np.clip(g * dark, 0, 255).astype(np.uint8)
+    mask = Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.6))
+    box = mask.getbbox()
+    Image.merge('LA', (Image.fromarray(g), mask)).crop(box).save(out, optimize=True)
+    return list(box)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     parts = {}
     for view, (fname, comps) in SHEETS.items():
         rgb, lab = label(os.path.join(HERE, 'sheets', fname))
-        g = gray(rgb).astype(np.uint8)
+        g = gray(rgb)
         for name, ids in comps.items():
-            m = ndi.binary_fill_holes(np.isin(lab, ids))
-            mask = Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.6))
-            box = mask.getbbox()
-            im = Image.merge('LA', (Image.fromarray(g), mask)).crop(box)
-            im.save(os.path.join(OUT, f'{view}_{name}.png'), optimize=True)
-            parts[f'{view}_{name}'] = list(box)
+            parts[f'{view}_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'{view}_{name}.png'))
+    for fname, comps in SIDE:
+        rgb, lab = label(os.path.join(HERE, 'sheets', fname))
+        g = gray(rgb)
+        for name, ids in comps.items():
+            fix = SIDE_SOCKETS if name == 'torso' else None
+            parts[f'side_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}.png'), fix)
+            if name in SIDE_FAR:
+                parts[f'side_{name}_far'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}_far.png'), dark=FAR_DARK)
     js = open(RIG_JS).read()
     block = 'const SLOTH_PARTS = ' + json.dumps(parts, separators=(',', ':')) + ';'
     js = re.sub(r'/\* PARTS:BEGIN \*/.*?/\* PARTS:END \*/', '/* PARTS:BEGIN */\n' + block + '\n/* PARTS:END */', js, flags=re.S)

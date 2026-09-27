@@ -9,7 +9,7 @@
 const SLOTH_RIG_BASE = '../assets/sloth/rig/';
 
 /* PARTS:BEGIN */
-const SLOTH_PARTS = {"front_head":[510,53,696,293],"front_torso":[456,248,745,582],"front_uarm_l":[296,251,478,388],"front_uarm_r":[723,251,904,388],"front_farm_l":[51,288,294,400],"front_farm_r":[907,288,1150,400],"front_thigh_l":[439,516,582,697],"front_thigh_r":[629,516,773,697],"front_tail":[566,584,643,725],"front_calf_l":[444,678,569,866],"front_calf_r":[643,679,768,866],"back_head":[510,53,696,293],"back_torso":[455,247,745,622],"back_uarm_l":[300,251,478,388],"back_uarm_r":[723,251,900,388],"back_farm_l":[163,288,294,396],"back_farm_r":[906,288,1039,396],"back_elbow_l":[267,315,319,367],"back_elbow_r":[881,314,934,367],"back_grip_l":[195,606,314,813],"back_grip_r":[899,606,1018,813],"back_thigh_l":[439,567,571,697],"back_thigh_r":[641,562,773,697],"back_tail":[566,619,643,741],"back_calf_l":[444,678,569,866],"back_calf_r":[643,678,768,866]};
+const SLOTH_PARTS = {"front_head":[510,53,696,293],"front_torso":[456,248,745,582],"front_uarm_l":[296,251,478,388],"front_uarm_r":[723,251,904,388],"front_farm_l":[51,288,294,400],"front_farm_r":[907,288,1150,400],"front_thigh_l":[439,516,582,697],"front_thigh_r":[629,516,773,697],"front_tail":[566,584,643,725],"front_calf_l":[444,678,569,866],"front_calf_r":[643,679,768,866],"back_head":[510,53,696,293],"back_torso":[455,247,745,622],"back_uarm_l":[300,251,478,388],"back_uarm_r":[723,251,900,388],"back_farm_l":[163,288,294,396],"back_farm_r":[906,288,1039,396],"back_elbow_l":[267,315,319,367],"back_elbow_r":[881,314,934,367],"back_grip_l":[195,606,314,813],"back_grip_r":[899,606,1018,813],"back_thigh_l":[439,567,571,697],"back_thigh_r":[641,562,773,697],"back_tail":[566,619,643,741],"back_calf_l":[444,678,569,866],"back_calf_r":[643,678,768,866],"side_torso":[458,53,699,568],"side_tail":[372,453,473,535],"side_uarm":[791,80,910,268],"side_uarm_far":[791,80,910,268],"side_elbow":[811,261,857,307],"side_elbow_far":[811,261,857,307],"side_farm":[770,320,959,400],"side_farm_far":[770,320,959,400],"side_hand":[990,449,1166,539],"side_hand_far":[990,449,1166,539],"side_thigh":[629,516,773,687],"side_thigh_far":[629,516,773,687],"side_knee":[721,652,768,700],"side_knee_far":[721,652,768,700],"side_calf":[1020,689,1180,854],"side_calf_far":[1020,689,1180,854],"side_fist":[59,109,404,284],"side_fist_far":[59,109,404,284]};
 /* PARTS:END */
 
 // Gelenkpunkte in Vorlagen-Koordinaten (1200 x 896): [nah, fern]
@@ -42,25 +42,53 @@ const SLOTH_JOINTS = {
     calf_l: [[507, 692], [508, 835]],
     calf_r: [[693, 692], [692, 835]],
   },
+  // Seitenansicht (Blick nach rechts); dritter Wert = Massstab des Teils
+  side: {
+    torso: [[586, 513], [544, 295]],
+    tail: [[462, 500], [385, 468]],
+    uarm: [[850, 128], [834, 284]],
+    farm: [[806, 360], [948, 360]],
+    hand: [[1000, 492], [1160, 494]],
+    fist: [[100, 205], [313, 195], 0.5],
+    thigh: [[668, 548], [745, 676]],
+    calf: [[1068, 702], [1064, 812]],
+  },
 };
 // Anschlusspunkte am Rumpf
 const SLOTH_ANCHORS = {
   front: { neck: [600, 282], sh_l: [470, 318], sh_r: [730, 318], hip_l: [532, 545], hip_r: [668, 545], tail: [602, 585] },
   back: { neck: [603, 282], sh_l: [470, 318], sh_r: [732, 318], hip_l: [520, 584], hip_r: [686, 584], tail: [604, 616] },
+  side: { shoulder: [544, 295], hip: [586, 513], tail: [505, 505] },
 };
 // Zeichenreihenfolge (hinten -> vorne)
 const SLOTH_ORDER = {
   front: ['tail', 'calf_l', 'calf_r', 'thigh_l', 'thigh_r', 'farm_l', 'farm_r', 'uarm_l', 'uarm_r', 'torso', 'head'],
   back: ['calf_l', 'calf_r', 'thigh_l', 'thigh_r', 'farm_l', 'farm_r', 'uarm_l', 'uarm_r', 'elbow_l', 'elbow_r', 'torso', 'tail', 'head', 'grip_l', 'grip_r'],
+  side: ['farm_far', 'hand_far', 'uarm_far', 'elbow_far', 'calf_far', 'thigh_far', 'knee_far', 'tail', 'torso', 'calf', 'thigh', 'knee', 'farm', 'hand', 'uarm', 'elbow'],
 };
 
 const HANG_ARMS = { uarm_l: -110, farm_l: -98, grip_l: -94, uarm_r: -70, farm_r: -82, grip_r: -86 };
 const STAND_LEGS = { thigh_l: 100, calf_l: 91, thigh_r: 80, calf_r: 89 };
 
-/* view: Vorlage · pin: fester Punkt ('hands' = Mitte der Hände, 'feet') ·
-   dur: Sekunden pro Durchgang · keys: Verlauf a(0) -> b(1) über die Zeit ·
-   bar: Stange an den Händen · label: Bildbeschreibung */
+/* view: Vorlage · pin: fester Punkt ('hands' = Mitte der Hände, 'feet';
+   Seite: 'wrist', 'ankle') · dur: Sekunden pro Durchgang · keys: Verlauf
+   a(0) -> b(1) über die Zeit · bar: Stange an den Händen · floor: Boden-
+   linie (y relativ zum festen Punkt) · label: Bildbeschreibung.
+   Seitenansicht: Winkel uarm/farm/hand/thigh/calf gelten für die vordere
+   Seite, f… (fuarm, ffarm, …) für die hintere (sonst gleich wie vorne);
+   grip: 'fist' statt offener Hand; solve: Rumpfwinkel so wählen, dass die
+   Zehen auf Handhöhe liegen (Stütz), mit toe = Abstand Knöchel–Boden. */
 const SLOTH_POSES = {
+  pushup: {
+    view: 'side', pin: 'wrist', dur: 2.4, floor: 36, solve: { toe: 60 }, label: 'Liegestütz',
+    a: { uarm: 92, farm: 90, hand: 0 },
+    b: { uarm: 150, farm: 48, hand: 0 },
+  },
+  squat: {
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, label: 'Kniebeuge',
+    a: { torso: -100, uarm: 95, farm: 92, thigh: 80, calf: 92 },
+    b: { torso: -60, uarm: -4, farm: -6, thigh: 10, calf: 110 },
+  },
   hang: {
     view: 'back', pin: 'hands', dur: 3.6, bar: true, label: 'Faultier hängt an der Stange',
     a: { torso: -90, head: -90, ...HANG_ARMS, thigh_l: 97, calf_l: 92, thigh_r: 83, calf_r: 88, tail: 0 },
@@ -90,38 +118,74 @@ const SLOTH_POSES = {
 };
 
 function slothRigBuild(pose) {
-  const J = SLOTH_JOINTS[pose.view], A = SLOTH_ANCHORS[pose.view];
+  const view = pose.view, J = SLOTH_JOINTS[view], A = SLOTH_ANCHORS[view];
   const rad = (d) => d * Math.PI / 180;
   const rot = (v, d) => { const c = Math.cos(rad(d)), s = Math.sin(rad(d)); return [v[0] * c - v[1] * s, v[0] * s + v[1] * c]; };
   const add = (a, b) => [a[0] + b[0], a[1] + b[1]];
   const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
-  const place = (name, P, deg) => {
-    const [p, d] = J[name];
-    const r = deg - Math.atan2(d[1] - p[1], d[0] - p[0]) * 180 / Math.PI;
-    return { P, r, p, map: (q) => add(P, rot(sub(q, p), r)), end: add(P, rot(sub(d, p), r)) };
+  const mul = (v, k) => [v[0] * k, v[1] * k];
+  const a0 = (name) => { const [p, d] = J[name]; return Math.atan2(d[1] - p[1], d[0] - p[0]) * 180 / Math.PI; };
+  // Teil so stellen, dass sein Nah-Gelenk auf P liegt und der Knochen in Weltrichtung deg zeigt
+  const place = (name, P, deg, img) => {
+    const [p, d, k = 1] = J[name], r = deg - a0(name);
+    return { img: img || view + '_' + name, P, r, p, k, map: (q) => add(P, mul(rot(sub(q, p), r), k)), end: add(P, mul(rot(sub(d, p), r), k)) };
   };
-  // Liefert je Teil { P, r, p } (Welt = P + R(r)·(x - p)) für eine Stellung s
-  return (s) => {
-    const t = place('torso', [0, 0], s.torso);
-    const q = { torso: t };
+  const ball = (img, P) => { const b = SLOTH_PARTS[img]; return { img, P, r: 0, p: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k: 1 }; };
+
+  function side(s) {
+    const q = {}, hk = pose.grip === 'fist' ? 'fist' : 'hand', D = pose.depth || [-14, -8];
+    const t = q.torso = place('torso', [0, 0], s.torso);
+    q.tail = place('tail', t.map(A.tail), s.torso + a0('tail') - a0('torso') + (s.tail || 0));
+    for (const far of [false, true]) {
+      const x = far ? '_far' : '', v = (k) => (far ? s['f' + k] ?? s[k] : s[k]);
+      const sh = add(t.map(A.shoulder), far ? D : [0, 0]), hip = add(t.map(A.hip), far ? D : [0, 0]);
+      q['uarm' + x] = place('uarm', sh, v('uarm'), 'side_uarm' + x);
+      q['elbow' + x] = ball('side_elbow' + x, q['uarm' + x].end);
+      q['farm' + x] = place('farm', q['uarm' + x].end, v('farm'), 'side_farm' + x);
+      q['hand' + x] = place(hk, q['farm' + x].end, v('hand') ?? v('farm'), 'side_' + hk + x);
+      q['thigh' + x] = place('thigh', hip, v('thigh'), 'side_thigh' + x);
+      q['knee' + x] = ball('side_knee' + x, q['thigh' + x].end);
+      q['calf' + x] = place('calf', q['thigh' + x].end, v('calf'), 'side_calf' + x);
+    }
+    return { q, pts: { wrist: q.farm.end, ankle: q.calf.end } };
+  }
+
+  function frontBack(s) {
+    const q = {};
+    const t = q.torso = place('torso', [0, 0], s.torso);
     q.head = place('head', t.map(A.neck), s.head);
     q.tail = place('tail', t.map(A.tail), s.torso + 180 + (s.tail || 0));
-    for (const side of ['l', 'r']) {
-      q['uarm_' + side] = place('uarm_' + side, t.map(A['sh_' + side]), s['uarm_' + side]);
-      q['farm_' + side] = place('farm_' + side, q['uarm_' + side].end, s['farm_' + side]);
-      if (J['grip_' + side]) q['grip_' + side] = place('grip_' + side, q['farm_' + side].end, s['grip_' + side]);
-      q['thigh_' + side] = place('thigh_' + side, t.map(A['hip_' + side]), s['thigh_' + side]);
-      q['calf_' + side] = place('calf_' + side, q['thigh_' + side].end, s['calf_' + side]);
-      if (pose.view === 'back') {
-        const b = SLOTH_PARTS['back_elbow_' + side], c = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
-        q['elbow_' + side] = { P: q['uarm_' + side].end, r: 0, p: c };
-      }
+    for (const x of ['l', 'r']) {
+      q['uarm_' + x] = place('uarm_' + x, t.map(A['sh_' + x]), s['uarm_' + x]);
+      q['farm_' + x] = place('farm_' + x, q['uarm_' + x].end, s['farm_' + x]);
+      if (J['grip_' + x]) q['grip_' + x] = place('grip_' + x, q['farm_' + x].end, s['grip_' + x]);
+      q['thigh_' + x] = place('thigh_' + x, t.map(A['hip_' + x]), s['thigh_' + x]);
+      q['calf_' + x] = place('calf_' + x, q['thigh_' + x].end, s['calf_' + x]);
+      if (view === 'back') q['elbow_' + x] = ball('back_elbow_' + x, q['uarm_' + x].end);
     }
-    const hand = (k) => (q['grip_' + k] || q['farm_' + k]).end;
-    const pin = pose.pin === 'hands'
-      ? [(hand('l')[0] + hand('r')[0]) / 2, Math.min(hand('l')[1], hand('r')[1])]
-      : [(q.calf_l.end[0] + q.calf_r.end[0]) / 2, Math.max(q.calf_l.end[1], q.calf_r.end[1])];
-    for (const k in q) q[k] = { P: sub(q[k].P, pin), r: q[k].r, p: q[k].p };
+    const hand = (x) => (q['grip_' + x] || q['farm_' + x]).end;
+    return { q, pts: {
+      hands: [(hand('l')[0] + hand('r')[0]) / 2, Math.min(hand('l')[1], hand('r')[1])],
+      feet: [(q.calf_l.end[0] + q.calf_r.end[0]) / 2, Math.max(q.calf_l.end[1], q.calf_r.end[1])],
+    } };
+  }
+
+  const pose1 = view === 'side' ? side : frontBack;
+  // Stütz: Rumpfwinkel suchen, bei dem die Zehen am Boden liegen
+  const solve = (s) => {
+    let best = s.torso, bd = Infinity;
+    for (let a = -80; a <= 10; a += 0.25) {
+      const leg = a + 180, { pts } = pose1({ ...s, torso: a, thigh: leg + (s.legBend || 0), calf: leg });
+      const d = Math.abs(pts.ankle[1] + pose.solve.toe - pts.wrist[1]);
+      if (d < bd) { bd = d; best = a; }
+    }
+    return { ...s, torso: best, thigh: best + 180 + (s.legBend || 0), calf: best + 180 };
+  };
+  // Liefert je Teil { img, P, r, p, k } (Welt = P + k·R(r)·(x - p)), relativ zum festen Punkt
+  return (s) => {
+    const { q, pts } = pose1(pose.solve ? solve(s) : s);
+    const pin = pts[pose.pin];
+    for (const k in q) q[k] = { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k };
     return q;
   };
 }
@@ -148,41 +212,44 @@ function slothRigPrepare(name) {
     for (const k in pose.a) s[k] = pose.a[k] + ((pose.b[k] ?? pose.a[k]) - pose.a[k]) * m;
     frames.push(build(s));
   }
+  const order = SLOTH_ORDER[pose.view];
   // Umriss über alle Stellungen -> viewBox
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const f of frames) for (const k in f) {
-    const b = SLOTH_PARTS[pose.view + '_' + k], { P, r, p } = f[k];
-    const c = Math.cos(r * Math.PI / 180), s = Math.sin(r * Math.PI / 180);
+  for (const f of frames) for (const key of order) {
+    const { img, P, r, p, k } = f[key], b = SLOTH_PARTS[img];
+    const c = Math.cos(r * Math.PI / 180) * k, s = Math.sin(r * Math.PI / 180) * k;
     for (const [x, y] of [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]]) {
       const dx = x - p[0], dy = y - p[1], wx = P[0] + dx * c - dy * s, wy = P[1] + dx * s + dy * c;
       x0 = Math.min(x0, wx); x1 = Math.max(x1, wx); y0 = Math.min(y0, wy); y1 = Math.max(y1, wy);
     }
   }
-  // Teil-Rechtecke sind grösser als die Figur: etwas enger schneiden
+  if (pose.floor != null) y1 = Math.max(y1, pose.floor + 6);
   const padX = (x1 - x0) * 0.02, padY = (y1 - y0) * 0.02;
   const box = [x0 - padX, y0 - padY, x1 - x0 + 2 * padX, y1 - y0 + 2 * padY].map((v) => Math.round(v));
   const n = (v) => +v.toFixed(1);
+  const sc = (e) => (e.k !== 1 ? ` scale(${e.k})` : '');
   // SVG-Attribut (Startstellung) und CSS-Transform (Keyframes) derselben Stellung
-  const tfAttr = (e) => `translate(${n(e.P[0])} ${n(e.P[1])}) rotate(${+e.r.toFixed(2)}) translate(${n(-e.p[0])} ${n(-e.p[1])})`;
-  const tfCss = (e) => `translate(${n(e.P[0])}px,${n(e.P[1])}px) rotate(${+e.r.toFixed(2)}deg) translate(${n(-e.p[0])}px,${n(-e.p[1])}px)`;
+  const tfAttr = (e) => `translate(${n(e.P[0])} ${n(e.P[1])}) rotate(${+e.r.toFixed(2)})${sc(e)} translate(${n(-e.p[0])} ${n(-e.p[1])})`;
+  const tfCss = (e) => `translate(${n(e.P[0])}px,${n(e.P[1])}px) rotate(${+e.r.toFixed(2)}deg)${sc(e)} translate(${n(-e.p[0])}px,${n(-e.p[1])}px)`;
   const css = [];
-  for (const k of SLOTH_ORDER[pose.view]) {
-    const steps = frames.map((f, i) => `${+(i * 100 / N).toFixed(2)}%{transform:${tfCss(f[k])}}`).join('');
-    css.push(`@keyframes srk-${name}-${k}{${steps}}.sr-${name} .sp-${k}{animation:srk-${name}-${k} ${pose.dur}s linear infinite}`);
+  for (const key of order) {
+    const steps = frames.map((f, i) => `${+(i * 100 / N).toFixed(2)}%{transform:${tfCss(f[key])}}`).join('');
+    css.push(`@keyframes srk-${name}-${key}{${steps}}.sr-${name} .sp-${key}{animation:srk-${name}-${key} ${pose.dur}s linear infinite}`);
   }
   const style = document.createElement('style');
   style.textContent = css.join('\n');
   document.head.appendChild(style);
-  const parts = SLOTH_ORDER[pose.view].map((k) => {
-    const b = SLOTH_PARTS[pose.view + '_' + k];
-    return `<g class="sp-${k}" transform="${tfAttr(frames[0][k])}"><image href="${SLOTH_RIG_BASE}${pose.view}_${k}.png" x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}"/></g>`;
+  const parts = order.map((key) => {
+    const e = frames[0][key], b = SLOTH_PARTS[e.img];
+    return `<g class="sp-${key}" transform="${tfAttr(e)}"><image href="${SLOTH_RIG_BASE}${e.img}.png" x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}"/></g>`;
   }).join('');
-  let bar = '';
+  let extra = '';
   if (pose.bar) {
     const w = box[2] * 0.96;
-    bar = `<rect class="sloth-rig-bar" x="${(-w / 2).toFixed(0)}" y="14" width="${w.toFixed(0)}" height="26" rx="13"/>`;
+    extra = `<rect class="sloth-rig-bar" x="${(-w / 2).toFixed(0)}" y="14" width="${w.toFixed(0)}" height="26" rx="13"/>`;
   }
-  slothRigCache[name] = { box, body: bar + parts };
+  if (pose.floor != null) extra = `<line class="sloth-rig-floor" x1="${box[0]}" x2="${box[0] + box[2]}" y1="${pose.floor}" y2="${pose.floor}"/>`;
+  slothRigCache[name] = { box, body: extra + parts };
   return slothRigCache[name];
 }
 

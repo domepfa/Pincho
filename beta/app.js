@@ -7655,12 +7655,22 @@ const EXERCISE_FIGURES = {
    abstrakten Linienfiguren ist "vorne/hinten", "wie steht man zum Boden"
    und "geht's nach innen/aussen bzw. hoch/runter" per Bild allein nicht
    immer eindeutig, ein Satz Text macht es das aber zuverlässig. */
-/* Klimmzüge: Faultier-Puppe von hinten (sloth-rig.js). */
-const SLOTH_PULL_IDS = ['pullup', 'pullup_weighted', 'pullup_close_grip'];
-const SLOTH_PULL_FIGURE = slothFigure('pull', 'ex-figure sloth-img');
+/* Übungen mit Faultier-Puppe (sloth-rig.js): Übung -> Pose. Die übrigen
+   zeigen weiter die Strichfigur aus EXERCISE_FIGURES. */
+const SLOTH_EXERCISE_POSES = {
+  pullup: 'pull', pullup_weighted: 'pull', pullup_close_grip: 'pull',
+  push_up: 'pushup', squat: 'squat',
+};
 function exerciseFigureSvg(exerciseId) {
-  if (SLOTH_PULL_IDS.includes(exerciseId)) return SLOTH_PULL_FIGURE;
   const fig = EXERCISE_FIGURES[exerciseId];
+  const pose = SLOTH_EXERCISE_POSES[exerciseId];
+  if (pose) {
+    const svg = slothFigure(pose, 'ex-figure sloth-img');
+    if (!fig || !fig.caption) return svg;
+    // Beschriftung stammt von der Strichfigur; die Puppe zeigt Klimmzüge von hinten
+    const caption = SLOTH_POSES[pose].view === 'back' ? fig.caption.replace(/^Vorderansicht/, 'Rückansicht') : fig.caption;
+    return `${svg}<div class="ex-figure-caption">${esc(caption)}</div>`;
+  }
   if (!fig) return `<div class="ex-figure-emoji">💪</div>`;
   const svg = `<svg viewBox="0 0 200 200" class="ex-figure ${fig.kind === 'static' ? 'fig-static' : ''}">${fig.svg}</svg>`;
   return fig.caption ? `${svg}<div class="ex-figure-caption">${esc(fig.caption)}</div>` : svg;
