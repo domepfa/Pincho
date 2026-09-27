@@ -8947,13 +8947,45 @@ function fbRunState() {
 /* Wechselt dieser Schlüssel, wird das Vollbild neu aufgebaut (Phasen-/
    Schrittwechsel), sonst werden nur Zahl und Balken nachgezogen. */
 function fbStageKey(st) {
-  return [st.mode, fb.blockIndex, fb.awaitingNext ? 'a' : '', fb.preCount != null ? 'p' : '', st.mode === 'ready' ? '' : fb.stepIndex].join(':');
+  return [st.mode, fb.blockIndex, fb.awaitingNext ? 'a' : '', fb.preCount != null ? 'p' : '', st.mode === 'ready' ? '' : fb.stepIndex, st.mode === 'rest' ? fbSoonLevel() : ''].join(':');
+}
+
+/* ---- Ende der Pause ankündigen ----
+   Stufe 1 (10 s vorher): Doppelton + Vibration, Titel "Gleich Hang".
+   Stufe 2 (5 s): Phasenfarbe läuft von Orange zu Blau, Faultier streckt
+   die Arme Richtung Griff. Stufe 3 (3 s): Piep + Vibration pro Sekunde,
+   Zahl springt, Bühne blitzt einmal blau. */
+function fbNextWorkBlock() {
+  const step = fb.sequence[fb.stepIndex];
+  if (fb.awaitingNext || fb.preCount != null || !step || isWorkPhase(step)) return null;
+  const next = fbIsTrailingPause() ? fb.blocks[fb.blockIndex + 1] : fb.blocks[fb.blockIndex];
+  return next && next.type !== 'pause' ? next : null;
+}
+function fbWorkWord(b) {
+  if (b.type === 'hang') return 'Hang';
+  if (b.type === 'block') return b.mode === 'reps' ? 'Ziehen' : 'Halten';
+  if (b.type === 'campus') return 'Campus';
+  return 'Übung';
+}
+/* 0 = normale Pause, 1 = ≤10 s, 2 = ≤5 s (nur wenn danach gearbeitet wird) */
+function fbSoonLevel() {
+  if (!fbNextWorkBlock() || fb.secondsLeft <= 0) return 0;
+  return fb.secondsLeft <= 5 ? 2 : fb.secondsLeft <= 10 ? 1 : 0;
+}
+function fbWarnSoon() {
+  fbBuzz([80, 60, 80]);
+  beep(1175, 90);
+  setTimeout(() => beep(1175, 90), 140);
 }
 
 function fbPhaseWord(st) {
   if (st.mode === 'ready') return 'Bereit';
   const b = st.block;
-  if (st.mode === 'rest') return st.step && st.step.phase === 'Zeit zum Loggen' ? 'Loggen' : 'Pause';
+  if (st.mode === 'rest') {
+    const next = fbNextWorkBlock();
+    if (next && fbSoonLevel() > 0) return `Gleich ${fbWorkWord(next)}`;
+    return st.step && st.step.phase === 'Zeit zum Loggen' ? 'Loggen' : 'Pause';
+  }
   if (b.type === 'pause') return 'Pause';
   if (b.type === 'hang') return 'Hang';
   if (b.type === 'block') return b.mode === 'reps' ? 'Ziehen' : 'Halten';
@@ -9026,7 +9058,7 @@ function fbHangSpots(b) {
   }
   return board.hotspots.filter((h) => h.grip === b.grip).map((h) => box(h, ''));
 }
-function fbBoardStageHtml(b, hanging, tag) {
+function fbBoardStageHtml(b, hanging, tag, reach) {
   const board = BOARDS[b.board];
   const spots = fbHangSpots(b);
   const rings = spots.map((s) => `<rect class="fbx-ring${s.hand ? ' fbx-ring-' + s.hand : ''}" x="${s.x - s.w / 2}" y="${s.y - s.h / 2}" width="${s.w}" height="${s.h}" rx="2.5" vector-effect="non-scaling-stroke"/>`).join('');
@@ -9041,7 +9073,7 @@ function fbBoardStageHtml(b, hanging, tag) {
       <svg width="0" height="0" class="fbx-clipdef" aria-hidden="true"><clipPath id="fbx-grip-clip" clipPathUnits="objectBoundingBox">${clip}</clipPath></svg>
       ${tag ? `<div class="fbx-tag" style="left:${cx}%;top:${top}%">${esc(tag)}</div>` : ''}
     </div>
-    <div class="fbx-fig" id="fbx-fig" data-fit="${hanging ? 'hang' : 'stand'}">${hanging ? '' : FB_REST_FIGURE_SVG}</div>
+    <div class="fbx-fig" id="fbx-fig" data-fit="${hanging ? 'hang' : 'stand'}">${hanging ? '' : reach ? slothFigure('reach', 'sloth-img') : FB_REST_FIGURE_SVG}</div>
   `;
 }
 
@@ -9151,7 +9183,7 @@ function fbStageInnerHtml(st) {
   const d = st.displayBlock;
   const onBoard = d.type === 'hang' && BOARDS[d.board];
   const tag = st.mode === 'ready' ? (onBoard ? 'Hier hängen' : '') : st.trailing ? 'Als Nächstes' : '';
-  if (onBoard) return fbBoardStageHtml(d, st.mode === 'work', tag);
+  if (onBoard) return fbBoardStageHtml(d, st.mode === 'work', tag, st.mode === 'rest' && fbSoonLevel() === 2);
   let fig;
   if (st.mode === 'work') {
     const b = st.block;
@@ -9221,7 +9253,7 @@ function renderFbOverlay() {
   const canBack = !(fb.blockIndex === 0 && fb.stepIndex === 0) && !fb.awaitingNext && fb.preCount == null;
 
   el.innerHTML = `
-    <div class="fbx fbx-${st.mode}${isPaused ? ' paused' : ''}" data-key="${fbStageKey(st)}">
+    <div class="fbx fbx-${st.mode}${isPaused ? ' paused' : ''}${st.mode === 'rest' && fbSoonLevel() === 2 ? ' fbx-soon' : ''}" data-key="${fbStageKey(st)}">
       <div class="fbx-top">
         <button type="button" class="fbx-icon" id="fb-overlay-close" aria-label="Beenden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         <div class="fbx-segs" id="fbx-segs">${segs}</div>
@@ -9783,6 +9815,9 @@ function tickBlock() {
     // Letzte 3 Sekunden einer Pause: kurzer Tick pro Sekunde als
     // akustische Vorwarnung, dass der nächste Satz gleich losgeht.
     beepTick();
+    if (fbNextWorkBlock()) fbBuzz(80);
+  } else if (step && !isWorkPhase(step) && fb.secondsLeft === 10 && fbNextWorkBlock()) {
+    fbWarnSoon(); // Stufe 1: 10 s vor Ende der Pause
   }
   setTimeout(updateTimerUI, FB_AUDIO_LEAD_MS);
 }
@@ -9833,9 +9868,13 @@ function updateTimerUI() {
   if (big) {
     // innerHTML: "LOS!" und die einzeln rausfliegenden Ziffern (fbFlyDigitsHtml)
     // sollen bei jedem Tick als frische Elemente neu animieren.
-    big.innerHTML = fbBigContent(restTense);
-    big.className = 'fbx-num' + (restWarn ? ' rest-warn' : '') + (restTense ? ' rest-tense' : '') + (workTense ? ' work-tense' : '') + (fb.showLos ? ' los-flash' : '');
+    big.innerHTML = fbBigContent(false);
+    big.className = 'fbx-num' + (restWarn ? ' rest-warn' : '') + (workTense ? ' work-tense' : '') + (fb.showLos ? ' los-flash' : '');
+    // Letzte 3 s der Pause: Zahl springt bei jedem Tick (Klasse neu setzen, damit die Animation neu startet)
+    if (restTense && fbNextWorkBlock()) { void big.offsetWidth; big.classList.add('fbx-pop'); }
   }
+  const stageEl = document.getElementById('fbx-stage');
+  if (stageEl && !st.working && fb.secondsLeft === 3 && fbNextWorkBlock() && !stageEl.classList.contains('fbx-flash')) stageEl.classList.add('fbx-flash');
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) syncFbRingAnimation();
   if (!st.trailing) updateFbUpcomingUI();
   updateFbProgressUI();

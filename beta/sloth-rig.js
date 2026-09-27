@@ -691,6 +691,12 @@ const SLOTH_POSES = {
     a: { torso: -90, head: -90, uarm_l: 108, farm_l: 96, uarm_r: 72, farm_r: 84, ...STAND_LEGS, tail: 0 },
     b: { torso: -90, head: -93, uarm_l: 104, farm_l: 94, uarm_r: 76, farm_r: 86, ...STAND_LEGS, tail: 0 },
   },
+  // Ende der Pause: streckt die Arme Richtung Griff, macht sich bereit
+  reach: {
+    view: 'front', pin: 'feet', dur: 1.6, floor: 26, label: 'Faultier macht sich bereit',
+    a: { torso: -90, head: -92, uarm_l: -110, farm_l: -96, uarm_r: -70, farm_r: -84, ...STAND_LEGS, tail: 0 },
+    b: { torso: -90, head: -94, uarm_l: -114, farm_l: -98, uarm_r: -66, farm_r: -82, ...STAND_LEGS, tail: 0 },
+  },
   wave: {
     view: 'front', pin: 'feet', dur: 1.4, mirror: ['farm_r'], label: 'Faultier winkt',
     a: { torso: -90, head: -92, uarm_l: 106, farm_l: 95, uarm_r: -30, farm_r: -70, ...STAND_LEGS, tail: 0 },
