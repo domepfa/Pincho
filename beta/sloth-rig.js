@@ -91,7 +91,7 @@ const STAND_LEGS = { thigh_l: 100, calf_l: 91, thigh_r: 80, calf_r: 89 };
    Vorne: len_<teil> verkürzt ein Glied (zeigt zum Betrachter), armsFront Arme vor dem Rumpf;
    pin auch 'hand_l', 'hand_r', 'foot_l', 'foot_r'.
    props: Geräte [{ img, at: Punkt ('grip', 'fgrip', 'hand_l', …) oder [x, y]
-   fest, k: Massstab, r: Drehung, a: Ankerpunkt im Blatt, turn: dreht mit
+   fest (dx/dy: Versatz davon), k: Massstab, r: Drehung, a: Ankerpunkt im Blatt, turn: dreht mit
    dem Rumpf, flip: gespiegelt, layer: 'back' | 'mid' | 'front' } oder
    { line: [x, y], to: Punkt } für ein Seil vom festen Punkt zur Hand].
    Seitenansicht: Winkel uarm/farm/hand/thigh/calf gelten für die vordere
@@ -666,6 +666,25 @@ const SLOTH_POSES = {
     a: { torso: -90, head: -90, ...HANG_ARMS, thigh_l: 100, calf_l: 96, thigh_r: 80, calf_r: 84, tail: 0 },
     b: { torso: -90, head: -86, uarm_l: -198, farm_l: -100, grip_l: -95, uarm_r: 18, farm_r: -80, grip_r: -85, thigh_l: 108, calf_l: 100, thigh_r: 72, calf_r: 80, tail: -6 },
   },
+  // Einarmig hängen (Einarm-Griffe am Board): Griffhand fest, die andere hängt locker
+  hang1l: {
+    view: 'back', pin: 'hand_l', dur: 3.6, label: 'Faultier hängt einarmig (links)',
+    a: { torso: -94, head: -96, uarm_l: -100, farm_l: -94, grip_l: -92, uarm_r: 84, farm_r: 88, grip_r: 90, thigh_l: 98, calf_l: 92, thigh_r: 84, calf_r: 88, tail: 4 },
+    b: { torso: -95, head: -97, uarm_l: -101, farm_l: -95, grip_l: -93, uarm_r: 81, farm_r: 86, grip_r: 88, thigh_l: 101, calf_l: 96, thigh_r: 82, calf_r: 85, tail: 9 },
+  },
+  hang1r: {
+    view: 'back', pin: 'hand_r', dur: 3.6, label: 'Faultier hängt einarmig (rechts)',
+    a: { torso: -86, head: -84, uarm_r: -80, farm_r: -86, grip_r: -88, uarm_l: 96, farm_l: 92, grip_l: 90, thigh_l: 96, calf_l: 92, thigh_r: 82, calf_r: 88, tail: -4 },
+    b: { torso: -85, head: -83, uarm_r: -79, farm_r: -85, grip_r: -87, uarm_l: 99, farm_l: 94, grip_l: 92, thigh_l: 98, calf_l: 95, thigh_r: 79, calf_r: 84, tail: -9 },
+  },
+  // Lifting Pin: steht seitlich, Arm gestreckt, hält den Griffblock mit den
+  // Fingern, darunter der Pin mit Scheibe. Statisch bis auf leichtes Atmen.
+  pinlift: {
+    view: 'side', pin: 'ankle', dur: 4, floor: 46, grip: 'fist', label: 'Lifting Pin',
+    props: [{ img: 'plate', at: 'grip', dy: 100, k: 1.05 }, { line: { prop: 0, pt: [629, 99] }, to: 'grip' }, { img: 'plate', at: 'grip', dy: 100, dx: 12, k: 1.05, layer: 'back' }],
+    a: { torso: -99, uarm: 66, farm: 74, thigh: 86, calf: 92 },
+    b: { torso: -100, uarm: 66, farm: 74, thigh: 86, calf: 92 },
+  },
   rest: {
     view: 'front', pin: 'feet', dur: 4.2, floor: 26, armLift: 45, label: 'Faultier steht und atmet durch',
     a: { torso: -90, head: -90, uarm_l: 108, farm_l: 96, uarm_r: 72, farm_r: 84, ...STAND_LEGS, tail: 0 },
@@ -802,7 +821,7 @@ function slothRigBuild(pose) {
         return;
       }
       const b = SLOTH_PARTS['eq_' + pr.img], p = pr.a || [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k = pr.k || 1;
-      q['prop' + i] = { img: 'eq_' + pr.img, P: pt(pr.at), r: (pr.r || 0) + (pr.turn ? s.torso : 0), p, k: pr.flip ? [-k, k] : k };
+      q['prop' + i] = { img: 'eq_' + pr.img, P: add(pt(pr.at), [pr.dx || 0, pr.dy || 0]), r: (pr.r || 0) + (pr.turn ? s.torso : 0), p, k: pr.flip ? [-k, k] : k };
     });
     return q;
   };

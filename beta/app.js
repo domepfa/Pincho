@@ -7924,7 +7924,7 @@ function blockArmNote(b, activeRep) {
    Hänge-Figur reicht als Vorschau-"Thumb" (klein genug, dass die
    abweichende Bewegung dort nicht ins Gewicht fällt). */
 function blockThumb() {
-  return `<div class="timeline-thumb fb-block-thumb">${FB_HANG_FIGURE_SVG}</div>`;
+  return `<div class="timeline-thumb fb-block-thumb">${blockPinFigureSvg('left')}</div>`;
 }
 /* Dispatcher: an den meisten Stellen sind Hang- und Griffblock-Sätze
    austauschbar (gleicher Timer/gleiche Vorlaufzeit) — nur Titel/Figur
@@ -8631,42 +8631,20 @@ const SLOTH_FACE = `
   <path class="sloth-line" d="M97 71 h6 M94 76 q6 4 12 0"/>`;
 const FB_HANG_FIGURE_SVG = slothFigure('hang', 'ex-figure sloth-img'); // Faultier-Puppe (sloth-rig.js)
 const FB_REST_FIGURE_SVG = slothFigure('rest', 'ex-figure sloth-img');
-/* Lifting Pin ist kein Hängen (FB_HANG_FIGURE_SVG), sondern ein einarmiges
-   Ziehen von unten (Pin auf Hüfthöhe) nach oben (Richtung Schulter) — eigene
-   Animation dafür, stehende Fixfigur + EIN animierter Arm (Start/Ende
-   überblenden wie bei den dynamischen Übungs-Strichmännchen), der andere
-   Arm hängt ruhig/gedämpft daneben. Standardzeichnung ist die rechte Hand;
-   für "links" wird die ganze Figur per CSS horizontal gespiegelt. */
-function blockPullFigureSvg(hand) {
-  const flip = hand === 'left' ? ' style="transform:scaleX(-1);"' : '';
-  return `
-  <svg viewBox="0 0 200 200" class="ex-figure fb-block-pull-figure"${flip}>
-    <path class="fig-motion" d="M138,148 L138,76"/>
-    <polygon class="fig-arrow" points="138,76 130,90 146,90"/>
-    <g class="fig-pose fig-fixed">
-      <circle cx="100" cy="42" r="14"/>
-      <line x1="100" y1="56" x2="100" y2="128"/>
-      <line x1="100" y1="128" x2="86" y2="190"/>
-      <line x1="100" y1="128" x2="114" y2="190"/>
-      <line x1="100" y1="60" x2="76" y2="108"/>
-    </g>
-    <g class="fig-pose fig-a" style="animation-duration:1.6s;">
-      <line x1="100" y1="60" x2="138" y2="148"/>
-      <circle class="fig-joint fig-hi" cx="138" cy="148" r="6"/>
-    </g>
-    <g class="fig-pose fig-b" style="animation-duration:1.6s;">
-      <line x1="100" y1="60" x2="130" y2="76"/>
-      <circle class="fig-joint fig-hi" cx="130" cy="76" r="6"/>
-    </g>
-  </svg>
-  `;
+/* Lifting Pin: Faultier steht seitlich und hält den Griffblock mit dem Pin
+   und der Scheibe darunter (statisch, siehe Pose 'pinlift' in sloth-rig.js).
+   Die Figur schaut nach rechts, man sieht also ihre linke Seite — für die
+   rechte Hand wird sie gespiegelt. */
+function blockPinFigureSvg(hand) {
+  const svg = slothFigure('pinlift', 'ex-figure sloth-img');
+  return hand === 'right' ? svg.replace('<svg ', '<svg style="transform:scaleX(-1)" ') : svg;
 }
 /* Dispatcher fürs "Work"-Strichmännchen während des laufenden Timers:
    Hang bleibt die Hänge-Figur, Griffblock/Lifting Pin zeigt stattdessen
    das Zieh-Strichmännchen mit der gerade aktiven Hand (activeRep kommt
    aus dem rep-Feld des laufenden Sequenz-Schritts, siehe buildBlockSequence). */
 function holdBlockWorkFigure(b, activeRep) {
-  return b.type === 'block' ? blockPullFigureSvg(blockHandForRep(b, activeRep || 0)) : FB_HANG_FIGURE_SVG;
+  return b.type === 'block' ? blockPinFigureSvg(blockHandForRep(b, activeRep || 0)) : FB_HANG_FIGURE_SVG;
 }
 
 function ensureFbOverlay() {
@@ -8967,7 +8945,9 @@ function fbInfoMainHtml(b, activeRep) {
     if (hangIsAsymmetric(b)) {
       return `<span class="hand-l">L: ${esc(gripLabel(b.board, b.gripLeft))}</span> · <span class="hand-r">R: ${esc(gripLabel(b.board, b.gripRight))}</span>`;
     }
-    const parts = [gripLabel(b.board, b.grip), fbGripNote(b.board, b.grip), hangArmNote(b)].filter(Boolean);
+    const arm = hangArmNote(b);
+    const armText = arm === 'einarmig' && activeRep != null ? `einarmig ${handLabel(activeRep % 2 ? 'right' : 'left').toLowerCase()}` : arm;
+    const parts = [gripLabel(b.board, b.grip), fbGripNote(b.board, b.grip), armText].filter(Boolean);
     return esc(parts.join(' · '));
   }
   if (b.type === 'block') {
@@ -9042,6 +9022,14 @@ function fbHangPose(f) {
   return name;
 }
 const fbHangSpreadCache = {};
+/* Griff nur einarmig nutzbar (z. B. BM2000 Grosse Kante, siehe GRIP_ARM_OVERRIDE). */
+function fbHangOneArm(b) {
+  return b.type === 'hang' && !hangIsAsymmetric(b) && hangArmNote(b) === 'einarmig';
+}
+/* Einarmig: Satz 1 links, Satz 2 rechts, … */
+function fbOneArmHand(st) {
+  return (st.activeRep || 0) % 2 ? 'right' : 'left';
+}
 function fbLayoutBoardStage() {
   const stageEl = document.getElementById('fbx-stage');
   const boardEl = document.getElementById('fbx-board');
@@ -9060,9 +9048,21 @@ function fbLayoutBoardStage() {
     Object.assign(figEl.style, { width: sw * k + 'px', height: sh * k + 'px', left: (stage.width / 2 + sx * k) + 'px', top: (stage.height - 8 - sh * k) + 'px' });
     return;
   }
-  const b = fbRunState().displayBlock;
+  const st = fbRunState();
+  const b = st.displayBlock;
   const spots = fbHangSpots(b);
   if (!spots.length) return;
+  // Einarm-Griff: Faultier hängt an einer Hand (abwechselnd je Satz), die andere hängt locker
+  if (fbHangOneArm(b)) {
+    const sp = spots[0];
+    const gx1 = bx + board.width * sp.x / 100;
+    const gy1 = by + board.height * sp.y / 100;
+    figEl.innerHTML = slothFigure(fbOneArmHand(st) === 'right' ? 'hang1r' : 'hang1l', 'sloth-img');
+    const [vx, vy, vw, vh] = figEl.querySelector('svg').getAttribute('viewBox').split(' ').map(Number);
+    const s1 = (stage.height - gy1 - 6) / (vh + vy);
+    Object.assign(figEl.style, { width: vw * s1 + 'px', height: vh * s1 + 'px', left: (gx1 + vx * s1) + 'px', top: (gy1 + vy * s1) + 'px' });
+    return;
+  }
   const cx = spots.reduce((s, p) => s + p.x, 0) / spots.length;
   const cy = spots.reduce((s, p) => s + p.y, 0) / spots.length;
   const gx = bx + board.width * cx / 100;
