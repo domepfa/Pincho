@@ -8952,7 +8952,7 @@ function fbRunState() {
 /* Wechselt dieser Schlüssel, wird das Vollbild neu aufgebaut (Phasen-/
    Schrittwechsel), sonst werden nur Zahl und Balken nachgezogen. */
 function fbStageKey(st) {
-  return [st.mode, fb.blockIndex, fb.awaitingNext ? 'a' : '', fb.preCount != null ? 'p' : '', st.mode === 'ready' ? '' : fb.stepIndex, st.mode === 'rest' ? fbSoonLevel() : ''].join(':');
+  return [st.mode, fb.blockIndex, fb.awaitingNext ? 'a' : '', fb.preCount != null ? 'p' : '', st.mode === 'ready' ? '' : fb.stepIndex, st.mode !== 'work' ? fbSoonLevel() : ''].join(':');
 }
 
 /* ---- Ende der Pause ankündigen ----
@@ -8974,6 +8974,7 @@ function fbWorkWord(b) {
 }
 /* 0 = normale Pause, 1 = ≤10 s, 2 = ≤5 s (nur wenn danach gearbeitet wird) */
 function fbSoonLevel() {
+  if (fb.preCount != null) return fb.preCount <= 5 ? 2 : 0; // Start-Countdown: gleiche Steigerung
   if (!fbNextWorkBlock() || fb.secondsLeft <= 0) return 0;
   return fb.secondsLeft <= 5 ? 2 : fb.secondsLeft <= 10 ? 1 : 0;
 }
@@ -8984,7 +8985,11 @@ function fbWarnSoon() {
 }
 
 function fbPhaseWord(st) {
-  if (st.mode === 'ready') return 'Bereit';
+  if (st.mode === 'ready') {
+    // Start-Countdown: motivierend mit Vornamen (wie früher "ALLEZ, …!")
+    const first = state.member && state.member.name ? String(state.member.name).trim().split(/\s+/)[0].slice(0, 10) : '';
+    return fb.preCount != null ? esc(first ? `Allez, ${first}!` : 'Allez!') : 'Bereit';
+  }
   const b = st.block;
   if (st.mode === 'rest') {
     const next = fbNextWorkBlock();
@@ -9001,7 +9006,8 @@ function fbRepText(st) {
   const n = fb.blocks.length;
   if (st.trailing) return n > 1 ? `Block ${fb.blockIndex + 2}/${n}` : '';
   const b = st.block;
-  const blockPart = n > 1 ? `Block ${fb.blockIndex + 1}/${n}` : '';
+  // Im Start-Countdown steht links "Allez, …!" — dann nur der Satz, sonst wird's abgeschnitten
+  const blockPart = n > 1 && fb.preCount == null ? `Block ${fb.blockIndex + 1}/${n}` : '';
   let repPart = '';
   if (st.step && st.step.rep != null) repPart = `Satz ${st.step.rep + 1}/${b.reps}`;
   else if (st.mode === 'ready' && (isHoldModeBlock(b) || b.type === 'campus')) repPart = `Satz 1/${b.reps}`;
@@ -9042,6 +9048,13 @@ function fbInfoMainHtml(b, activeRep) {
   return esc(exerciseName(b.exerciseId));
 }
 /* Kurzfassung eines Blocks für die Vorschau in der Pause davor. */
+/* Zeile unter der Info im Start-Countdown: was jetzt zu tun ist */
+function fbGetReadyText(b) {
+  if (b.type === 'hang') return 'Get ready — Hände ans Board!';
+  if (b.type === 'block') return 'Get ready — Pin greifen!';
+  if (b.type === 'campus') return 'Get ready — an die Startsprosse!';
+  return 'Get ready — Position einnehmen!';
+}
 function fbShortSub(b) {
   if (b.type === 'pause') return 'Pause';
   if (isHoldModeBlock(b)) return `${b.reps}× ${b.hangSec} s ${b.type === 'block' ? 'Halten' : 'Hang'}${b.reps > 1 && b.restSec > 0 ? ` · ${b.restSec} s Pause` : ''}`;
@@ -9189,7 +9202,7 @@ function fbStageInnerHtml(st) {
   const d = st.displayBlock;
   const onBoard = d.type === 'hang' && BOARDS[d.board];
   const tag = st.mode === 'ready' ? (onBoard ? 'Hier hängen' : '') : st.trailing ? 'Als Nächstes' : '';
-  if (onBoard) return fbBoardStageHtml(d, st.mode === 'work', tag, st.mode === 'rest' && fbSoonLevel() === 2);
+  if (onBoard) return fbBoardStageHtml(d, st.mode === 'work', tag, st.mode !== 'work' && fbSoonLevel() === 2);
   let fig;
   if (st.mode === 'work') {
     const b = st.block;
@@ -9250,16 +9263,16 @@ function renderFbOverlay() {
   const muscles = (st.mode === 'work' && st.block.type === 'exercise') ? exerciseMuscles(st.block.exerciseId)
     : (st.trailing && st.displayBlock.type === 'exercise') ? exerciseMuscles(st.displayBlock.exerciseId) : null;
   const showMuscles = muscles && muscleLabelsText(muscles.primary, muscles.secondary);
-  const upcoming = st.trailing ? fbShortSub(st.displayBlock) : fb.preCount != null ? 'Hände ans Board — gleich geht\'s los' : fb.awaitingNext ? fbShortSub(st.block) : '';
+  const upcoming = st.trailing ? fbShortSub(st.displayBlock) : fb.preCount != null ? fbGetReadyText(st.block) : fb.awaitingNext ? fbShortSub(st.block) : '';
   const bigNum = fb.preCount != null
-    ? `<div class="fbx-num${fb.preCount <= 3 ? ' fb-precount-tense' : ''}" id="fb-precount">${fb.preCount}</div>`
+    ? `<div class="fbx-num" id="fb-precount">${fb.preCount}</div>`
     : fb.awaitingNext
       ? `<div class="fbx-num" id="fb-big">${pad2(buildBlockSequence(st.block)[0].seconds)}</div>`
       : `<div class="fbx-num" id="fb-big">${fbBigContent(false)}</div>`;
   const canBack = !(fb.blockIndex === 0 && fb.stepIndex === 0) && !fb.awaitingNext && fb.preCount == null;
 
   el.innerHTML = `
-    <div class="fbx fbx-${st.mode}${isPaused ? ' paused' : ''}${st.mode === 'rest' && fbSoonLevel() === 2 ? ' fbx-soon' : ''}" data-key="${fbStageKey(st)}">
+    <div class="fbx fbx-${st.mode}${isPaused ? ' paused' : ''}${st.mode !== 'work' && fbSoonLevel() === 2 ? ' fbx-soon' : ''}" data-key="${fbStageKey(st)}">
       <div class="fbx-top">
         <button type="button" class="fbx-icon" id="fb-overlay-close" aria-label="Beenden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         <div class="fbx-segs" id="fbx-segs">${segs}</div>
@@ -9680,14 +9693,21 @@ function tickPreCountdown() {
   audioKeepWarm();
   fb.preCount--;
   if (fb.preCount <= 0) { finishPreCountdown(); return; }
-  if (fb.preCount <= 3) beepTick();
+  if (fb.preCount <= 3) { beepTick(); fbBuzz(80); }
   // Nur die Zahl aktualisieren statt alles neu zu zeichnen — sonst startet
   // die Campus-Routen-Animation jede Sekunde von vorne und läuft nie durch.
+  // Ausnahme: bei 5 s einmal neu aufbauen (Farbe → Blau, Faultier streckt sich).
   setTimeout(() => {
+    const root = document.querySelector('#fb-overlay .fbx');
+    if (root && root.dataset.key !== fbStageKey(fbRunState())) { renderFbOverlay(); return; }
     const num = document.getElementById('fb-precount');
     if (!num || fb.preCount == null) { renderFbOverlay(); return; }
     num.textContent = fb.preCount;
-    num.classList.toggle('fb-precount-tense', fb.preCount <= 3);
+    if (fb.preCount <= 3) {
+      num.classList.remove('fbx-pop'); void num.offsetWidth; num.classList.add('fbx-pop');
+      const stageEl = document.getElementById('fbx-stage');
+      if (stageEl && fb.preCount === 3) stageEl.classList.add('fbx-flash');
+    }
   }, FB_AUDIO_LEAD_MS); // siehe FB_AUDIO_LEAD_MS — Ton vor Bild
 }
 

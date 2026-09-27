@@ -1559,6 +1559,9 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 @property --phase { syntax: '<color>'; inherits: true; initial-value: #4fc3ff; }
 .fbx-soon { animation: fbxToWork 1.5s ease-out forwards; }
 @keyframes fbxToWork { from { --phase: var(--accent2); } to { --phase: var(--accent); } }
+.fbx-ready.fbx-soon { animation-name: fbxReadyToWork; }
+@keyframes fbxReadyToWork { from { --phase: var(--ink); } to { --phase: var(--accent); } }
+.fbx-ready .fbx-num { color: var(--phase); }
 .fbx-num.fbx-pop { animation: fbxPop .45s cubic-bezier(.25, 1.5, .4, 1); }
 @keyframes fbxPop { 0% { transform: scale(1.28); } 100% { transform: scale(1); } }
 .fbx-stage.fbx-flash::after {
