@@ -31,11 +31,14 @@ SIDE = [
     ('side.jpg', {'torso': [35], 'tail': [85], 'uarm': [36], 'elbow': [39], 'farm': [55], 'hand': [84],
                   'thigh': [89], 'knee': [132], 'calf': [172]}),
     ('side_extra.jpg', {'fist': [32]}),
+    ('arms_extra.jpg', {'flat': [104]}),
 ]
-SIDE_FAR = ['uarm', 'elbow', 'farm', 'hand', 'fist', 'thigh', 'knee', 'calf']
+# Vorderansicht mit hängenden Armen (Zusatzblatt)
+FRONT_EXTRA = ('arms_extra.jpg', {'uarm2_l': [74], 'uarm2_r': [75], 'farm2_l': [76], 'farm2_r': [77]})
+SIDE_FAR = ['uarm', 'elbow', 'farm', 'hand', 'fist', 'flat', 'thigh', 'knee', 'calf']
 FAR_DARK = 0.5
 # Weisse Ringe der Gelenk-Pfannen am Rumpf dunkel füllen: (Mitte, Radius)
-SIDE_SOCKETS = [((544, 295), 36), ((586, 513), 36)]
+SIDE_SOCKETS = [((544, 295), 40), ((586, 513), 40)]
 
 # Schwarzweiss-Kurve: Helligkeit -> Grauwert (Stützpunkte bei 0, .25, .5, .75, 1)
 CURVE = [0.06, 0.30, 0.68, 0.96, 1.0]
@@ -57,10 +60,15 @@ def cut(rgb, lab, ids, g, out, fix=None, dark=1.0):
     m = ndi.binary_fill_holes(np.isin(lab, ids))
     g = g.astype(float)
     if fix:
+        # Gelenk-Pfannen mit dem umgebenden Fell zumalen (normierte Unschärfe von aussen nach innen)
         yy, xx = np.mgrid[0:g.shape[0], 0:g.shape[1]]
+        hole = np.zeros(g.shape, bool)
         for (cx, cy), r in fix:
-            ring = (np.hypot(xx - cx, yy - cy) < r) & (rgb.min(2) > 150)
-            g[ring] = 20
+            hole |= np.hypot(xx - cx, yy - cy) < r
+        known = (~hole & m).astype(float)
+        num = ndi.gaussian_filter(g * known, 14); den = ndi.gaussian_filter(known, 14)
+        fill = num / np.maximum(den, 1e-3)
+        g[hole & m] = fill[hole & m]
     g = np.clip(g * dark, 0, 255).astype(np.uint8)
     mask = Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.6))
     box = mask.getbbox()
@@ -76,6 +84,10 @@ def main():
         g = gray(rgb)
         for name, ids in comps.items():
             parts[f'{view}_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'{view}_{name}.png'))
+    rgb, lab = label(os.path.join(HERE, 'sheets', FRONT_EXTRA[0]))
+    g = gray(rgb)
+    for name, ids in FRONT_EXTRA[1].items():
+        parts[f'front_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'front_{name}.png'))
     for fname, comps in SIDE:
         rgb, lab = label(os.path.join(HERE, 'sheets', fname))
         g = gray(rgb)
