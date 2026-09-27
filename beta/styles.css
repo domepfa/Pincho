@@ -1513,7 +1513,8 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .sloth-rig-bar { fill: #3b4048; stroke: #0a0a0a; stroke-width: 5; }
 .sloth-rig-cable { fill: #6b7079; }
 .sloth-rig-shadow { fill: #000; opacity: .45; }
-.fb-stage-figure .sloth-img, .fb-phase-figure .sloth-img { max-height: 24vh; width: auto; }
+/* 18vh statt 24vh: mit Geräten (Kabelturm) war die Figur so hoch, dass die Knöpfe unten aus dem Bild rutschten */
+.fb-stage-figure .sloth-img, .fb-phase-figure .sloth-img { max-height: 18vh; width: auto; }
 .timeline-thumb .sloth-img { width: 100%; height: 100%; }
 .fb-phase-figure .sloth-img { width: 100%; height: auto; max-height: none; }
 .fb-phase-figure:has(.sloth-img) { width: clamp(110px, 20vh, 170px); }

@@ -7680,7 +7680,7 @@ const SLOTH_EXERCISE_POSES = {
   front_raise: 'frontraise', lateral_raise: 'lateralraise', side_bend_dumbbell: 'sidebend',
   face_pull: 'facepull', row_cable: 'cablerow', straight_arm_pulldown: 'straightarm', cable_curl: 'cablecurl',
   cable_curl_low_pulley: 'cablecurl', cable_crunch: 'cablecrunch', cable_woodchop: 'woodchop', pallof: 'pallof',
-  cable_glute_kickback: 'kickback', cable_crossover: 'crossover', lateral_raise_cable: 'lateralraise',
+  cable_glute_kickback: 'kickback', cable_crossover: 'crossover', lateral_raise_cable: 'lateralcable',
   side_bend_cable: 'sidebend', band_pull_apart: 'bandpull', shoulder_circles_band: 'bandcircle',
   glute_bridge_side_step: 'bridge', lat_pulldown: 'latpull', lat_pulldown_wide: 'latpull', lat_pulldown_single: 'latpull',
   leg_press: 'legpress', leg_extension: 'legext', leg_curl_lying: 'legcurl', butterfly: 'pecdeck',
