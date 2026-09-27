@@ -88,7 +88,8 @@ const STAND_LEGS = { thigh_l: 100, calf_l: 91, thigh_r: 80, calf_r: 89 };
    wall: { x } Wand; relLegs: Beinwinkel relativ zum Rumpf (Seite: 180 =
    gerade Verlängerung; vorne: Winkel wie im Stand, drehen mit dem Rumpf);
    dx/dy in der Stellung verschieben die ganze Figur.
-   Vorne: pin auch 'hand_l', 'hand_r', 'foot_l', 'foot_r'.
+   Vorne: len_<teil> verkürzt ein Glied (zeigt zum Betrachter), armsFront Arme vor dem Rumpf;
+   pin auch 'hand_l', 'hand_r', 'foot_l', 'foot_r'.
    props: Geräte [{ img, at: Punkt ('grip', 'fgrip', 'hand_l', …) oder [x, y]
    fest, k: Massstab, r: Drehung, a: Ankerpunkt im Blatt, turn: dreht mit
    dem Rumpf, flip: gespiegelt, layer: 'back' | 'mid' | 'front' } oder
@@ -149,7 +150,7 @@ const SLOTH_POSES = {
   deadbug: {
     view: 'side', pin: 'hip', dur: 3, floor: 60, label: 'Dead Bug',
     a: { torso: 180, uarm: -90, farm: -90, fuarm: -90, ffarm: -90, thigh: -90, calf: 0, fthigh: -90, fcalf: 0 },
-    b: { torso: 180, uarm: 178, farm: 178, fuarm: -90, ffarm: -90, thigh: -90, calf: 0, fthigh: -8, fcalf: -6 },
+    b: { torso: 180, uarm: -182, farm: -182, fuarm: -90, ffarm: -90, thigh: -90, calf: 0, fthigh: -8, fcalf: -6 },
   },
   birddog: {
     view: 'side', pin: 'knee', dur: 3, floor: 34, grip: 'flat', label: 'Bird Dog',
@@ -361,12 +362,12 @@ const SLOTH_POSES = {
   skullcrusher: {
     view: 'side', pin: 'hip', dur: 2.6, floor: 286, grip: 'fist', label: 'Skull Crusher', props: [{ img: 'bench', at: [-150, 108], a: [442, 422], k: 2.2, layer: 'back' }, { img: 'plate', at: 'grip', k: 1.3 }],
     a: { torso: 180, uarm: -104, farm: -100, hand: -100, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
-    b: { torso: 180, uarm: -110, farm: 176, hand: 176, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+    b: { torso: 180, uarm: -116, farm: -215, hand: -215, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
   },
   dbpullover: {
     view: 'side', pin: 'hip', dur: 3, floor: 286, grip: 'fist', label: 'Überzüge mit Kurzhantel', props: [{ img: 'bench', at: [-150, 108], a: [442, 422], k: 2.2, layer: 'back' }, { img: 'plate', at: 'grip', k: 0.72 }],
     a: { torso: 180, uarm: -90, farm: -92, hand: -92, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
-    b: { torso: 180, uarm: 196, farm: 190, hand: 190, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+    b: { torso: 180, uarm: -164, farm: -170, hand: -170, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
   },
   deadlift: {
     view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Kreuzheben', props: [{ img: 'plate', at: 'grip', k: 1.3 }],
@@ -447,11 +448,12 @@ const SLOTH_POSES = {
 
 
   dbflyes: {
-    view: 'side', pin: 'hip', dur: 3, floor: 286, grip: 'fist', label: 'Kurzhantel-Fliegende',
-    props: [{ img: 'bench', at: [-150, 108], a: [442, 422], k: 2.2, layer: 'back' }, { img: 'plate', at: 'fgrip', k: 0.72, layer: 'mid' }, { img: 'plate', at: 'grip', k: 0.72 }],
-    a: { torso: 180, uarm: -90, farm: -96, hand: -96, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
-    b: { torso: 180, uarm: 98, farm: 12, hand: 12, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
+    view: 'front', pin: 'foot_l', dur: 3, armLift: 45, armsFront: true, relArms: true, relLegs: true, label: 'Kurzhantel-Fliegende (von oben)',
+    props: [{ img: 'plate', at: 'hand_l', k: 0.72 }, { img: 'plate', at: 'hand_r', k: 0.72 }],
+    a: { torso: 180, head: 180, uarm_l: 184, farm_l: 196, uarm_r: -4, farm_r: -16, ...STAND_LEGS, tail: 0 },
+    b: { torso: 180, head: 180, uarm_l: 184, farm_l: 190, uarm_r: -4, farm_r: -10, len_uarm_l: 0.3, len_farm_l: -0.55, len_uarm_r: 0.3, len_farm_r: -0.55, ...STAND_LEGS, tail: 0 },
   },
+
 
   frontraise: {
     view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Frontheben', props: [{ img: 'plate', at: 'grip', k: 0.72 }],
@@ -463,6 +465,13 @@ const SLOTH_POSES = {
     props: [{ img: 'plate', at: 'hand_l', k: 0.72 }, { img: 'plate', at: 'hand_r', k: 0.72 }],
     a: { torso: -90, head: -90, uarm_l: 104, farm_l: 96, uarm_r: 76, farm_r: 84, ...STAND_LEGS, tail: 0 },
     b: { torso: -90, head: -90, uarm_l: 184, farm_l: 180, uarm_r: -4, farm_r: 0, ...STAND_LEGS, tail: 0 },
+  },
+  lateralcable: {
+    view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, label: 'Seitheben am Kabel',
+    props: [{ img: 'cable', at: [-420, 26], a: [171, 838], k: 2.7, layer: 'back' }, cableLine('low', 'hand_r'),
+      { img: 'dhandle', at: 'hand_r', a: [226, 205], k: 1.1 }],
+    a: { torso: -90, head: -90, uarm_l: 108, farm_l: 96, uarm_r: 80, farm_r: 96, ...STAND_LEGS, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: 108, farm_l: 96, uarm_r: -2, farm_r: 6, ...STAND_LEGS, tail: 0 },
   },
   sidebend: {
     view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, relArms: true, label: 'Seitbeuge mit Kurzhantel',
@@ -523,7 +532,7 @@ const SLOTH_POSES = {
     view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, label: 'Kabel-Crossover',
     props: [{ line: [-560, -900], to: 'hand_l' }, { line: [560, -900], to: 'hand_r' }],
     a: { torso: -90, head: -90, uarm_l: -160, farm_l: -150, uarm_r: -20, farm_r: -30, ...STAND_LEGS, tail: 0 },
-    b: { torso: -90, head: -90, uarm_l: 120, farm_l: 40, uarm_r: 60, farm_r: 140, ...STAND_LEGS, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: -240, farm_l: -320, uarm_r: 60, farm_r: 140, ...STAND_LEGS, tail: 0 },
   },
   bandpull: {
     view: 'front', pin: 'feet', dur: 2.4, floor: 26, armLift: 45, label: 'Band auseinanderziehen',
@@ -535,7 +544,7 @@ const SLOTH_POSES = {
     view: 'front', pin: 'feet', dur: 3, floor: 26, armLift: 45, label: 'Schulterkreisen mit Band',
     props: [{ line: 'hand_l', to: 'hand_r' }],
     a: { torso: -90, head: -90, uarm_l: 130, farm_l: 120, uarm_r: 50, farm_r: 60, ...STAND_LEGS, tail: 0 },
-    b: { torso: -90, head: -90, uarm_l: -120, farm_l: -110, uarm_r: -60, farm_r: -70, ...STAND_LEGS, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: 240, farm_l: 250, uarm_r: -60, farm_r: -70, ...STAND_LEGS, tail: 0 },
   },
   // ---- Maschinen ----
   latpull: {
@@ -564,11 +573,12 @@ const SLOTH_POSES = {
     b: { torso: -4, uarm: 70, farm: 0, thigh: 184, calf: 284 }, // über 270° (nach oben) zum Gesäss, nicht durch den Boden
   },
   pecdeck: {
-    view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, label: 'Butterfly',
+    view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, armsFront: true, label: 'Butterfly',
     props: [{ img: 'butterfly', at: [0, 26], a: [125, 555], k: 3.6, layer: 'back' }],
-    a: { torso: -90, head: -90, uarm_l: 182, farm_l: -90, uarm_r: -2, farm_r: -90, ...STAND_LEGS, tail: 0 },
-    b: { torso: -90, head: -90, uarm_l: 140, farm_l: -40, uarm_r: 40, farm_r: -140, ...STAND_LEGS, tail: 0 },
+    a: { torso: -90, head: -90, uarm_l: 184, farm_l: 196, uarm_r: -4, farm_r: -16, ...STAND_LEGS, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: 184, farm_l: 190, uarm_r: -4, farm_r: -10, len_uarm_l: 0.3, len_farm_l: -0.55, len_uarm_r: 0.3, len_farm_r: -0.55, ...STAND_LEGS, tail: 0 },
   },
+
   reversefly: {
     view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, label: 'Reverse Butterfly',
     props: [{ img: 'butterfly', at: [0, 26], a: [125, 555], k: 3.6, layer: 'back' }],
@@ -727,10 +737,13 @@ function slothRigBuild(pose) {
     q.head = place('head', t.map(A.neck), s.head);
     q.tail = place('tail', t.map(A.tail), s.torso + 180 + (s.tail || 0));
     const arm = (k) => s[k] + (pose.relArms ? s.torso + 90 : 0), leg = (k) => s[k] + (pose.relLegs ? s.torso + 90 : 0);
+    // len_<teil>: Glied verkürzt (zeigt zum Betrachter, z. B. Arme kommen beim Butterfly nach vorne)
+    const shorten = (e, key) => { const L = s['len_' + key]; if (L == null || L === 1) return e;
+      const d = sub(e.end, e.P); return { ...e, k: [e.k * L, e.k], end: add(e.P, mul(d, L)) }; };
     for (const x of ['l', 'r']) {
       const sh = A['sh_' + x];
-      q['uarm_' + x] = place('uarm_' + x, t.map([sh[0], sh[1] - (pose.armLift || 0)]), arm('uarm_' + x));
-      q['farm_' + x] = place('farm_' + x, q['uarm_' + x].end, arm('farm_' + x));
+      q['uarm_' + x] = shorten(place('uarm_' + x, t.map([sh[0], sh[1] - (pose.armLift || 0)]), arm('uarm_' + x)), 'uarm_' + x);
+      q['farm_' + x] = shorten(place('farm_' + x, q['uarm_' + x].end, arm('farm_' + x)), 'farm_' + x);
       if (J['grip_' + x]) q['grip_' + x] = place('grip_' + x, q['farm_' + x].end, arm('grip_' + x));
       q['thigh_' + x] = place('thigh_' + x, t.map(A['hip_' + x]), leg('thigh_' + x));
       q['calf_' + x] = place('calf_' + x, q['thigh_' + x].end, leg('calf_' + x));
@@ -814,11 +827,17 @@ function slothRigPrepare(name) {
   const N = 16, frames = [];
   for (let i = 0; i <= N; i++) {
     const m = amount(i / N), s = {};
-    for (const k in pose.a) s[k] = pose.a[k] + ((pose.b[k] ?? pose.a[k]) - pose.a[k]) * m;
+    for (const k of new Set([...Object.keys(pose.a), ...Object.keys(pose.b)])) {
+      const a = pose.a[k] ?? (k.startsWith('len_') ? 1 : pose.b[k]); // fehlt in a: Länge 1, sonst wie b
+      s[k] = a + ((pose.b[k] ?? a) - a) * m;
+    }
     frames.push(build(s));
   }
   // Requisiten einsortieren: 'back' hinter allem, 'mid' zwischen hinterer und vorderer Seite, sonst vorne
-  const base = SLOTH_ORDER[pose.view], props = (pose.props || []).map((pr, i) => [pr.layer || 'front', 'prop' + i]);
+  // armsFront: Arme vor dem Rumpf zeichnen (Vorderansicht, Arme kreuzen die Brust)
+  let base = SLOTH_ORDER[pose.view];
+  if (pose.armsFront) { const arms = base.filter((k) => /arm/.test(k)); base = base.filter((k) => !/arm/.test(k)); base.splice(base.indexOf('torso') + 1, 0, ...arms); }
+  const props = (pose.props || []).map((pr, i) => [pr.layer || 'front', 'prop' + i]);
   const mid = base.indexOf(pose.view === 'side' ? 'tail' : 'torso');
   const order = [...props.filter((x) => x[0] === 'back').map((x) => x[1]), ...base.slice(0, mid),
     ...props.filter((x) => x[0] === 'mid').map((x) => x[1]), ...base.slice(mid), ...props.filter((x) => x[0] === 'front').map((x) => x[1])];
