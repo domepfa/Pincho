@@ -49,7 +49,7 @@ const SLOTH_JOINTS = {
     uarm: [[850, 128], [834, 284]],
     farm: [[806, 360], [948, 360]],
     hand: [[1000, 492], [1160, 494]],
-    fist: [[100, 205], [313, 195], 0.5],
+    fist: [[100, 205], [313, 195], 0.72], // Unterarm + Faust in einem Teil
     flat: [[655, 766], [880, 792], 0.62],
     thigh: [[668, 548], [745, 676]],
     calf: [[1068, 702], [1064, 812]],
@@ -361,22 +361,25 @@ const SLOTH_POSES = {
     b: { torso: 180, uarm: 196, farm: 190, hand: 190, thigh: 62, calf: 96, fthigh: 58, fcalf: 94 },
   },
   deadlift: {
-    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Kreuzheben', props: [{ img: 'plate', at: 'grip', k: 1.05 }],
-    a: { torso: -34, uarm: 114, farm: 62, hand: 90, thigh: 56, calf: 104 },
-    b: { torso: -96, uarm: 100, farm: 80, hand: 90, thigh: 86, calf: 92 },
+    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Kreuzheben', props: [{ img: 'plate', at: 'grip', k: 1.3 }],
+    a: { torso: -34, uarm: 94, farm: 92, thigh: 50, calf: 108 },
+    b: { torso: -96, uarm: 94, farm: 92, thigh: 86, calf: 92 },
   },
+
 
   rdl: {
-    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Rumänisches Kreuzheben', props: [{ img: 'plate', at: 'grip', k: 1.05 }],
-    a: { torso: -96, uarm: 100, farm: 80, hand: 90, thigh: 86, calf: 92 },
-    b: { torso: -32, uarm: 114, farm: 62, hand: 90, thigh: 94, calf: 96 },
+    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Rumänisches Kreuzheben', props: [{ img: 'plate', at: 'grip', k: 1.3 }],
+    a: { torso: -96, uarm: 94, farm: 92, thigh: 86, calf: 92 },
+    b: { torso: -26, uarm: 92, farm: 90, thigh: 96, calf: 96 },
   },
 
+
   barbellrow: {
-    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Langhantel-Rudern', props: [{ img: 'plate', at: 'grip', k: 1.05 }],
-    a: { torso: -40, uarm: 112, farm: 64, hand: 90, thigh: 70, calf: 102 },
-    b: { torso: -40, uarm: 170, farm: 70, hand: 90, thigh: 70, calf: 102 },
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Langhantel-Rudern', props: [{ img: 'plate', at: 'grip', k: 1.3 }],
+    a: { torso: -36, uarm: 92, farm: 90, thigh: 70, calf: 102 },
+    b: { torso: -36, uarm: 170, farm: 70, thigh: 70, calf: 102 },
   },
+
 
   dbrow: {
     view: 'side', pin: 'fknee', dur: 2.4, floor: 250, grip: 'fist', label: 'Einarmiges Kurzhantel-Rudern',
@@ -513,8 +516,13 @@ function slothRigBuild(pose) {
       const sh = add(t.map(A.shoulder), far ? D : [0, 0]), hip = add(t.map(A.hip), far ? D : [0, 0]);
       q['uarm' + x] = place('uarm', sh, v('uarm'), 'side_uarm' + x);
       q['elbow' + x] = ball('side_elbow' + x, q['uarm' + x].end);
-      q['farm' + x] = place('farm', q['uarm' + x].end, v('farm'), 'side_farm' + x);
-      q['hand' + x] = place(hk, q['farm' + x].end, v('hand') ?? v('farm'), 'side_' + hk + x);
+      if (hk === 'fist') { // Faust-Teil enthält den Unterarm: sitzt direkt am Ellbogen, kein eigener Unterarm
+        q['farm' + x] = place('fist', q['uarm' + x].end, v('farm'), 'side_fist' + x);
+        q['hand' + x] = { skip: true, end: q['farm' + x].end };
+      } else {
+        q['farm' + x] = place('farm', q['uarm' + x].end, v('farm'), 'side_farm' + x);
+        q['hand' + x] = place(hk, q['farm' + x].end, v('hand') ?? v('farm'), 'side_' + hk + x);
+      }
       q['thigh' + x] = place('thigh', hip, v('thigh'), 'side_thigh' + x);
       q['knee' + x] = ball('side_knee' + x, q['thigh' + x].end);
       q['calf' + x] = place('calf', q['thigh' + x].end, v('calf'), 'side_calf' + x);
@@ -577,7 +585,7 @@ function slothRigBuild(pose) {
     const { q, pts } = pose1(pose.solve ? solve(s) : pose.lean ? lean(s) : s);
     // dx/dy: ganze Figur verschieben (Hüpfen, Fersen heben)
     const pin = sub(pts[pose.pin], [s.dx || 0, s.dy || 0]);
-    for (const k in q) q[k] = { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k };
+    for (const k in q) q[k] = q[k].skip ? { skip: true } : { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k };
     // Requisiten: an einem Punkt der Figur (z. B. 'grip') oder fest im Bild ([x, y] relativ zum festen Punkt)
     (pose.props || []).forEach((pr, i) => {
       const pt = (at) => (Array.isArray(at) ? at : sub(pts[at], pin));
@@ -623,7 +631,7 @@ function slothRigPrepare(name) {
   // Umriss über alle Stellungen -> viewBox
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const f of frames) for (const key of order) {
-    if (f[key].line) continue;
+    if (f[key].line || f[key].skip) continue;
     const { img, P, r, p, k } = f[key], b = SLOTH_PARTS[img], [kx, ky] = Array.isArray(k) ? k : [k, k];
     const c = Math.cos(r * Math.PI / 180), s = Math.sin(r * Math.PI / 180);
     for (const [x, y] of [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]]) {
@@ -642,6 +650,7 @@ function slothRigPrepare(name) {
   const tfCss = (e) => `translate(${n(e.P[0])}px,${n(e.P[1])}px) rotate(${+e.r.toFixed(2)}deg)${sc(e)} translate(${n(-e.p[0])}px,${n(-e.p[1])}px)`;
   const css = [];
   for (const key of order) {
+    if (frames[0][key].skip) continue;
     const steps = frames.map((f, i) => `${+(i * 100 / N).toFixed(2)}%{transform:${tfCss(f[key])}}`).join('');
     css.push(`@keyframes srk-${name}-${key}{${steps}}.sr-${name} .sp-${key}{animation:srk-${name}-${key} ${pose.dur}s linear infinite}`);
   }
@@ -650,6 +659,7 @@ function slothRigPrepare(name) {
   document.head.appendChild(style);
   const parts = order.map((key) => {
     const e = frames[0][key];
+    if (e.skip) return '';
     if (e.line) return `<g class="sp-${key}" transform="${tfAttr(e)}"><rect class="sloth-rig-cable" x="0" y="-3" width="1" height="6"/></g>`;
     const b = SLOTH_PARTS[e.img];
     return `<g class="sp-${key}" transform="${tfAttr(e)}"><image href="${SLOTH_RIG_BASE}${e.img}.png" x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}"/></g>`;

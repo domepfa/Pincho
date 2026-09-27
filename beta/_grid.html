@@ -1,0 +1,10 @@
+<body style="margin:0;background:#07090c;display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:6px;color:#ccc;font:11px sans-serif">
+<style>svg{height:150px;width:100%;background:#161d25;display:block}.sloth-rig-bar{fill:#3b4048;stroke:#0a0a0a;stroke-width:5}.sloth-rig-cable{fill:#6b7079}.sloth-rig-shadow{fill:#000;opacity:.45}.sloth-rig g{animation-play-state:paused!important}</style>
+<script src="./sloth-rig.js"></script>
+<script>
+const names = (new URLSearchParams(location.search).get('p')).split(',');
+for (const n of names) for (const half of [0, 1]) {
+  const d = document.createElement('div'); d.innerHTML = slothFigure(n) + n + (half ? ' b' : ' a'); document.body.appendChild(d);
+  if (half) d.querySelectorAll('g').forEach((g) => g.style.animationDelay = (-SLOTH_POSES[n].dur * (SLOTH_POSES[n].keys ? SLOTH_POSES[n].keys.find(k => k[1] === 1)[0] : 0.5)) + 's');
+}
+</script></body>
