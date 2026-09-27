@@ -30,13 +30,34 @@ SHEETS = {
 SIDE = [
     ('side.jpg', {'torso': [35], 'tail': [85], 'uarm': [36], 'elbow': [39], 'farm': [55], 'hand': [84],
                   'thigh': [89], 'knee': [132], 'calf': [172]}),
-    ('side_extra.jpg', {'fist': [32]}),
+    ('side_extra.jpg', {'fist': [32], 'foot': [38]}),
     ('arms_extra.jpg', {'flat': [104]}),
 ]
-SIDE_FAR = ['uarm', 'elbow', 'farm', 'hand', 'fist', 'flat', 'thigh', 'knee', 'calf']
+SIDE_FAR = ['uarm', 'elbow', 'farm', 'hand', 'fist', 'flat', 'thigh', 'knee', 'calf', 'shin', 'foot']
 FAR_DARK = 0.5
+# Unterschenkel ohne Fuss: alles unterhalb des Knöchels wegschneiden
+SIDE_SHIN_CUT = [(1000, 792, 1200, 900)]
 # Weisse Ringe der Gelenk-Pfannen am Rumpf dunkel füllen: (Mitte, Radius)
 SIDE_SOCKETS = [((544, 295), 40), ((586, 513), 40)]
+
+# Ganze Posen (Überblendung zwischen zwei Bildern) für Übungen, die die Puppe nicht zeigen kann
+POSES = ('poses_extra.jpg', {'russian_a': [2], 'russian_b': [1], 'ninety': [5], 'frog_a': [8], 'frog_b': [9],
+                             'extrot_a': [15], 'extrot_b': [14]})
+
+# Geräte (Requisiten), Teil-Nummern je Blatt in sheets/equipment/
+EQUIP = {
+    'geraete.jpg': {'plate': [1], 'kettlebell': [2], 'dumbbell': [3], 'dhandle': [54], 'rope': [53], 'ring': [52],
+                    'barend': [96], 'bench': [98], 'incline': [95], 'decline': [97], 'cable': [114], 'dipstation': [168], 'rack': [167]},
+    'maschinen.jpg': {'latpull': [1], 'legpress': [2], 'legext': [3], 'legcurl': [4], 'butterfly': [71], 'abduction': [73],
+                      'calfseated': [74], 'calfstanding': [72], 'hyperext': [166], 'pullover': [164], 'tbar': [165]},
+    'kleinteile.jpg': {'abwheel': [2], 'jumprope': [1], 'ladder': [29], 'stepbox': [28], 'band': [63], 'mat': [62]},
+}
+
+# Bereiche, die aus einem Gerät entfernt werden (x0, y0, x1, y1 im Blatt): Griff am Kabelturm, Stange am Latzug
+EQUIP_ERASE = {'cable': [(214, 652, 256, 714)], 'latpull': [(115, 52, 242, 90)]}
+
+# Geräte etwas dunkler, damit sie neben dem Faultier zurücktreten
+EQUIP_DARK = 0.62
 
 # Schwarzweiss-Kurve: Helligkeit -> Grauwert (Stützpunkte bei 0, .25, .5, .75, 1)
 CURVE = [0.06, 0.30, 0.68, 0.96, 1.0]
@@ -54,8 +75,13 @@ def gray(rgb):
     return np.interp(lum, np.linspace(0, 1, len(CURVE)), CURVE) * 255
 
 
-def cut(rgb, lab, ids, g, out, fix=None, dark=1.0):
-    m = ndi.binary_fill_holes(np.isin(lab, ids))
+def cut(rgb, lab, ids, g, out, fix=None, dark=1.0, erase=(), holes=True):
+    # holes: eingeschlossene weisse Flächen mitnehmen (Augen, Zähne); bei Geräten nicht (Lücken im Rahmen)
+    m = np.isin(lab, ids)
+    if holes:
+        m = ndi.binary_fill_holes(m)
+    for x0, y0, x1, y1 in erase:
+        m[y0:y1, x0:x1] = False
     g = g.astype(float)
     if fix:
         # Gelenk-Pfannen mit dem umgebenden Fell zumalen (normierte Unschärfe von aussen nach innen)
@@ -82,14 +108,26 @@ def main():
         g = gray(rgb)
         for name, ids in comps.items():
             parts[f'{view}_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'{view}_{name}.png'))
+    rgb, lab = label(os.path.join(HERE, 'sheets', POSES[0]))
+    g = gray(rgb)
+    for name, ids in POSES[1].items():
+        parts[f'pose_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'pose_{name}.png'))
+    for fname, comps in EQUIP.items():
+        rgb, lab = label(os.path.join(HERE, 'sheets', 'equipment', fname))
+        g = gray(rgb)
+        for name, ids in comps.items():
+            parts[f'eq_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'eq_{name}.png'), dark=EQUIP_DARK, erase=EQUIP_ERASE.get(name, ()), holes=False)
     for fname, comps in SIDE:
         rgb, lab = label(os.path.join(HERE, 'sheets', fname))
         g = gray(rgb)
+        if fname == 'side.jpg':  # Unterschenkel ohne Fuss (für ein bewegliches Fussgelenk)
+            comps = {**comps, 'shin': comps['calf']}
         for name, ids in comps.items():
             fix = SIDE_SOCKETS if name == 'torso' else None
-            parts[f'side_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}.png'), fix)
+            er = SIDE_SHIN_CUT if name == 'shin' else ()
+            parts[f'side_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}.png'), fix, erase=er)
             if name in SIDE_FAR:
-                parts[f'side_{name}_far'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}_far.png'), dark=FAR_DARK)
+                parts[f'side_{name}_far'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}_far.png'), dark=FAR_DARK, erase=er)
     js = open(RIG_JS).read()
     block = 'const SLOTH_PARTS = ' + json.dumps(parts, separators=(',', ':')) + ';'
     js = re.sub(r'/\* PARTS:BEGIN \*/.*?/\* PARTS:END \*/', '/* PARTS:BEGIN */\n' + block + '\n/* PARTS:END */', js, flags=re.S)

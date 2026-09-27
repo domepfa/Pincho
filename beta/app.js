@@ -7663,6 +7663,34 @@ const SLOTH_EXERCISE_POSES = {
   sit_up: 'situp', crunches: 'crunch', superman: 'superman', hollow_hold: 'hollow', dead_bug: 'deadbug',
   bird_dog: 'birddog', deep_squat_hold: 'squathold', split_squat: 'splitsquat', high_knees: 'highknees',
   hanging_leg_raise: 'legraise', toes_to_bar: 'toestobar', dips: 'dips',
+  scapula_pull: 'scapula', swimmer: 'swimmer', y_t_w: 'ytw', side_plank: 'sideplank', front_lever_prog: 'frontlever',
+  calf_raise: 'calfraise', wall_sit: 'wallsit', cat_cow: 'catcow', worlds_greatest_stretch: 'wgs',
+  spiderman_lunge_rotation: 'wgs', thoracic_rotation: 'thoracic', leg_swings: 'legswing', ankle_rocks: 'anklerock',
+  neck_mobility: 'neck', jefferson_curl: 'jefferson', standwaage: 'standwaage', lateral_shuffle: 'shuffle',
+  quick_feet: 'quickfeet', single_leg_hops: 'hops', lateral_bounds: 'bounds', shuttle_sprint: 'sprint',
+  couch_stretch: 'couch', figure_four_stretch: 'figurefour', standing_hip_circles: 'hipcircle',
+  lateral_lunge_mobility: 'lateralLunge', standing_quad_stretch: 'quadstretch', calf_stretch_wall: 'calfstretch',
+  adductor_rock: 'adductor', nordic_hamstring_curl: 'nordic', heel_touches: 'heeltouch',
+  bench_press: 'benchpress', close_grip_bench_press: 'benchpress', dumbbell_bench_press: 'dbbench',
+  incline_bench_press: 'inclinebench', decline_bench_press: 'declinebench', skull_crusher: 'skullcrusher',
+  dumbbell_pullover: 'dbpullover', dumbbell_flyes: 'dbflyes', deadlift: 'deadlift', deadlift_sumo: 'deadlift', rdl: 'rdl',
+  row_barbell: 'barbellrow', one_arm_row_dumbbell: 'dbrow', goblet_squat: 'goblet', sumo_squat: 'sumosquat',
+  lunge_dumbbell: 'lunge', step_up: 'stepup', box_step_stepper: 'stepup', hip_thrust: 'hipthrust', ohp: 'ohp',
+  bicep_curl_dumbbell: 'curl', hammer_curl: 'curl', bicep_curl_barbell: 'bbcurl', triceps_extension: 'tricepsext',
+  front_raise: 'frontraise', lateral_raise: 'lateralraise', side_bend_dumbbell: 'sidebend',
+  face_pull: 'facepull', row_cable: 'cablerow', straight_arm_pulldown: 'straightarm', cable_curl: 'cablecurl',
+  cable_curl_low_pulley: 'cablecurl', cable_crunch: 'cablecrunch', cable_woodchop: 'woodchop', pallof: 'pallof',
+  cable_glute_kickback: 'kickback', cable_crossover: 'crossover', lateral_raise_cable: 'lateralraise',
+  side_bend_cable: 'sidebend', band_pull_apart: 'bandpull', shoulder_circles_band: 'bandcircle',
+  glute_bridge_side_step: 'bridge', lat_pulldown: 'latpull', lat_pulldown_wide: 'latpull', lat_pulldown_single: 'latpull',
+  leg_press: 'legpress', leg_extension: 'legext', leg_curl_lying: 'legcurl', butterfly: 'pecdeck',
+  reverse_butterfly: 'reversefly', hip_abduction_machine: 'abduction', hip_adduction_machine: 'abduction',
+  hip_abduction_cable: 'abduction', calf_raise_seated: 'calfseated', calf_raise_machine: 'calfmachine',
+  back_extension: 'backext', pullover_machine: 'pullovermachine', t_bar_row: 'barbellrow', ab_wheel_rollout: 'abwheel',
+  jump_rope: 'jumprope', agility_ladder_run: 'ladder', zercher_squat_rotation: 'goblet', carioca: 'shuffle',
+  russian_twist: 'russian', hip_9090: 'ninety', frog_stretch: 'frog', ext_rotation: 'extrot',
+  tibialis_raise: 'tibialis', wrist_curl: 'wristcurl', wrist_ext: 'wristcurl', wrist_mobility: 'wristmob',
+  doorway_pec_stretch: 'doorway',
 };
 const SLOTH_VIEW_WORD = { side: 'Seitenansicht', back: 'Rückansicht', front: 'Vorderansicht' };
 function exerciseFigureSvg(exerciseId) {
@@ -7672,7 +7700,8 @@ function exerciseFigureSvg(exerciseId) {
     const svg = slothFigure(pose, 'ex-figure sloth-img');
     if (!fig || !fig.caption) return svg;
     // Beschriftung stammt von der Strichfigur: Ansicht an die Puppe anpassen
-    const caption = fig.caption.replace(/^(Vorderansicht|Seitenansicht|Rückansicht)/, SLOTH_VIEW_WORD[SLOTH_POSES[pose].view]);
+    const view = SLOTH_POSES[pose] ? SLOTH_POSES[pose].view : 'front';
+    const caption = fig.caption.replace(/^(Vorderansicht|Seitenansicht|Rückansicht)/, SLOTH_VIEW_WORD[view]);
     return `${svg}<div class="ex-figure-caption">${esc(caption)}</div>`;
   }
   if (!fig) return `<div class="ex-figure-emoji">💪</div>`;

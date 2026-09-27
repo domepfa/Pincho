@@ -16,7 +16,8 @@ python3 tools/sloth-rig/build.py --list   # Teil-Nummern der Vorlagen anzeigen
 - `sheets/side.jpg` + `sheets/side_extra.jpg`: Seitenansicht (Blick nach rechts),
   Fäuste und Füsse im Zusatzblatt. Hintere Arme/Beine = abgedunkelte Kopie (`*_far.png`)
 - `sheets/arms_extra.jpg`: flache Hand (Seite); die hängenden Arme darin werden nicht verwendet
-- `sheets/equipment/`: Geräte, Maschinen, Kleinteile (für Etappe 2, noch nicht zerlegt)
+- `sheets/poses_extra.jpg`: ganze Posen (Russian Twist, 90/90, Frog Stretch, Aussenrotation) -> `pose_*.png`, per Überblendung (`SLOTH_SWAPS`)
+- `sheets/equipment/`: Geräte, Maschinen, Kleinteile -> `eq_*.png` (Requisiten, per `props` in einer Pose)
 
 Die Vorlagen müssen weissen Hintergrund haben und die Teile durch weisse
 Lücken getrennt sein. Die Farben werden beim Erzeugen in Schwarzweiss
