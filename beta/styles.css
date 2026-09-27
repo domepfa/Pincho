@@ -1553,6 +1553,20 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
   padding: var(--safe-top) 16px var(--safe-bottom);
 }
 .fbx-rest { --phase: var(--accent2); }
+/* Ende der Pause (siehe fbSoonLevel): Phasenfarbe läuft in den letzten 5 s
+   von Orange zu Blau — Titel, Zahl, Balken und Griff-Rahmen gleichzeitig.
+   @property, damit die Farbe animierbar ist. */
+@property --phase { syntax: '<color>'; inherits: true; initial-value: #4fc3ff; }
+.fbx-soon { animation: fbxToWork 1.5s ease-out forwards; }
+@keyframes fbxToWork { from { --phase: var(--accent2); } to { --phase: var(--accent); } }
+.fbx-num.fbx-pop { animation: fbxPop .45s cubic-bezier(.25, 1.5, .4, 1); }
+@keyframes fbxPop { 0% { transform: scale(1.28); } 100% { transform: scale(1); } }
+.fbx-stage.fbx-flash::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 0 0 3px var(--accent), inset 0 0 60px rgba(var(--accent-rgb), .45);
+  animation: fbxFlash .9s ease-out forwards;
+}
+@keyframes fbxFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
 .fbx-ready { --phase: var(--ink); }
 
 .fbx-top { display: flex; align-items: center; gap: 12px; }
@@ -1623,7 +1637,7 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
   font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 108px; line-height: .9;
   font-variant-numeric: tabular-nums; color: var(--ink); height: 98px; display: flex; align-items: center;
 }
-.fbx-rest .fbx-num { color: var(--accent2); }
+.fbx-rest .fbx-num { color: var(--phase); }
 .fbx-num.work-tense { animation: blinkTense .5s steps(1) infinite; }
 .fbx-num.los-flash { color: var(--accent); }
 .fbx-bar { width: 100%; height: 6px; border-radius: 3px; background: var(--line-soft); overflow: hidden; }
@@ -1669,5 +1683,6 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
   .fbx-ctl { width: 52px; height: 52px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .fbx-num.work-tense { animation: none; }
+  .fbx-num.work-tense, .fbx-num.fbx-pop, .fbx-stage.fbx-flash::after { animation: none; }
+  .fbx-soon { animation: none; --phase: var(--accent); }
 }
