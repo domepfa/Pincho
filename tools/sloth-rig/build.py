@@ -35,6 +35,8 @@ SIDE = [
 ]
 # Vorderansicht mit hängenden Armen (Zusatzblatt)
 FRONT_EXTRA = ('arms_extra.jpg', {'uarm2_l': [74], 'uarm2_r': [75], 'farm2_l': [76], 'farm2_r': [77]})
+# Die Oberarm-Teile haben unten ein zweites Segment: nur bis zur Einkerbung verwenden
+FRONT_EXTRA_YMAX = {'uarm2_l': 336, 'uarm2_r': 336}
 SIDE_FAR = ['uarm', 'elbow', 'farm', 'hand', 'fist', 'flat', 'thigh', 'knee', 'calf']
 FAR_DARK = 0.5
 # Weisse Ringe der Gelenk-Pfannen am Rumpf dunkel füllen: (Mitte, Radius)
@@ -56,8 +58,10 @@ def gray(rgb):
     return np.interp(lum, np.linspace(0, 1, len(CURVE)), CURVE) * 255
 
 
-def cut(rgb, lab, ids, g, out, fix=None, dark=1.0):
+def cut(rgb, lab, ids, g, out, fix=None, dark=1.0, ymax=None):
     m = ndi.binary_fill_holes(np.isin(lab, ids))
+    if ymax:
+        m[ymax:] = False
     g = g.astype(float)
     if fix:
         # Gelenk-Pfannen mit dem umgebenden Fell zumalen (normierte Unschärfe von aussen nach innen)
@@ -87,7 +91,7 @@ def main():
     rgb, lab = label(os.path.join(HERE, 'sheets', FRONT_EXTRA[0]))
     g = gray(rgb)
     for name, ids in FRONT_EXTRA[1].items():
-        parts[f'front_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'front_{name}.png'))
+        parts[f'front_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'front_{name}.png'), ymax=FRONT_EXTRA_YMAX.get(name))
     for fname, comps in SIDE:
         rgb, lab = label(os.path.join(HERE, 'sheets', fname))
         g = gray(rgb)

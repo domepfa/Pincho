@@ -9,7 +9,7 @@
 const SLOTH_RIG_BASE = '../assets/sloth/rig/';
 
 /* PARTS:BEGIN */
-const SLOTH_PARTS = {"front_head":[510,53,696,293],"front_torso":[456,248,745,582],"front_uarm_l":[296,251,478,388],"front_uarm_r":[723,251,904,388],"front_farm_l":[51,288,294,400],"front_farm_r":[907,288,1150,400],"front_thigh_l":[439,516,582,697],"front_thigh_r":[629,516,773,697],"front_tail":[566,584,643,725],"front_calf_l":[444,678,569,866],"front_calf_r":[643,679,768,866],"back_head":[510,53,696,293],"back_torso":[455,247,745,622],"back_uarm_l":[300,251,478,388],"back_uarm_r":[723,251,900,388],"back_farm_l":[163,288,294,396],"back_farm_r":[906,288,1039,396],"back_elbow_l":[267,315,319,367],"back_elbow_r":[881,314,934,367],"back_grip_l":[195,606,314,813],"back_grip_r":[899,606,1018,813],"back_thigh_l":[439,567,571,697],"back_thigh_r":[641,562,773,697],"back_tail":[566,619,643,741],"back_calf_l":[444,678,569,866],"back_calf_r":[643,678,768,866],"front_uarm2_l":[79,99,258,555],"front_uarm2_r":[377,99,531,555],"front_farm2_l":[681,101,861,612],"front_farm2_r":[951,101,1131,612],"side_torso":[458,53,699,568],"side_tail":[372,453,473,535],"side_uarm":[791,80,910,268],"side_uarm_far":[791,80,910,268],"side_elbow":[811,261,857,307],"side_elbow_far":[811,261,857,307],"side_farm":[770,320,959,400],"side_farm_far":[770,320,959,400],"side_hand":[990,449,1166,539],"side_hand_far":[990,449,1166,539],"side_thigh":[629,516,773,687],"side_thigh_far":[629,516,773,687],"side_knee":[721,652,768,700],"side_knee_far":[721,652,768,700],"side_calf":[1020,689,1180,854],"side_calf_far":[1020,689,1180,854],"side_fist":[59,109,404,284],"side_fist_far":[59,109,404,284],"side_flat":[624,706,893,825],"side_flat_far":[624,706,893,825]};
+const SLOTH_PARTS = {"front_head":[510,53,696,293],"front_torso":[456,248,745,582],"front_uarm_l":[296,251,478,388],"front_uarm_r":[723,251,904,388],"front_farm_l":[51,288,294,400],"front_farm_r":[907,288,1150,400],"front_thigh_l":[439,516,582,697],"front_thigh_r":[629,516,773,697],"front_tail":[566,584,643,725],"front_calf_l":[444,678,569,866],"front_calf_r":[643,679,768,866],"back_head":[510,53,696,293],"back_torso":[455,247,745,622],"back_uarm_l":[300,251,478,388],"back_uarm_r":[723,251,900,388],"back_farm_l":[163,288,294,396],"back_farm_r":[906,288,1039,396],"back_elbow_l":[267,315,319,367],"back_elbow_r":[881,314,934,367],"back_grip_l":[195,606,314,813],"back_grip_r":[899,606,1018,813],"back_thigh_l":[439,567,571,697],"back_thigh_r":[641,562,773,697],"back_tail":[566,619,643,741],"back_calf_l":[444,678,569,866],"back_calf_r":[643,678,768,866],"front_uarm2_l":[79,99,232,337],"front_uarm2_r":[377,99,531,337],"front_farm2_l":[681,101,861,612],"front_farm2_r":[951,101,1131,612],"side_torso":[458,53,699,568],"side_tail":[372,453,473,535],"side_uarm":[791,80,910,268],"side_uarm_far":[791,80,910,268],"side_elbow":[811,261,857,307],"side_elbow_far":[811,261,857,307],"side_farm":[770,320,959,400],"side_farm_far":[770,320,959,400],"side_hand":[990,449,1166,539],"side_hand_far":[990,449,1166,539],"side_thigh":[629,516,773,687],"side_thigh_far":[629,516,773,687],"side_knee":[721,652,768,700],"side_knee_far":[721,652,768,700],"side_calf":[1020,689,1180,854],"side_calf_far":[1020,689,1180,854],"side_fist":[59,109,404,284],"side_fist_far":[59,109,404,284],"side_flat":[624,706,893,825],"side_flat_far":[624,706,893,825]};
 /* PARTS:END */
 
 // Gelenkpunkte in Vorlagen-Koordinaten (1200 x 896): [nah, fern]
@@ -27,10 +27,10 @@ const SLOTH_JOINTS = {
     calf_r: [[692, 700], [692, 835]],
     tail: [[604, 592], [600, 715]],
     // hängende Arme (Zusatzblatt, grösser gezeichnet)
-    uarm2_l: [[160, 168], [212, 500], 0.62],
-    farm2_l: [[760, 160], [770, 585], 0.56],
-    uarm2_r: [[450, 168], [470, 500], 0.62],
-    farm2_r: [[1045, 160], [1035, 585], 0.56],
+    uarm2_l: [[160, 168], [166, 322], 0.62],
+    farm2_l: [[757, 185], [770, 585], 0.58],
+    uarm2_r: [[450, 168], [456, 322], 0.62],
+    farm2_r: [[1043, 185], [1035, 585], 0.58],
   },
   back: {
     torso: [[606, 560], [606, 282]],
@@ -70,7 +70,8 @@ const SLOTH_ANCHORS = {
 const SLOTH_ORDER = {
   front: ['tail', 'calf_l', 'calf_r', 'thigh_l', 'thigh_r', 'farm_l', 'farm_r', 'uarm_l', 'uarm_r', 'torso', 'head'],
   back: ['calf_l', 'calf_r', 'thigh_l', 'thigh_r', 'farm_l', 'farm_r', 'uarm_l', 'uarm_r', 'elbow_l', 'elbow_r', 'torso', 'tail', 'head', 'grip_l', 'grip_r'],
-  frontDown: ['tail', 'calf_l', 'calf_r', 'thigh_l', 'thigh_r', 'torso', 'farm_l', 'farm_r', 'uarm_l', 'uarm_r', 'head'],
+  // hängende Arme: Unterarm-Kappe liegt über der Schnittkante des Oberarms
+  frontDown: ['tail', 'calf_l', 'calf_r', 'thigh_l', 'thigh_r', 'torso', 'uarm_l', 'uarm_r', 'farm_l', 'farm_r', 'head'],
   side: ['farm_far', 'hand_far', 'uarm_far', 'elbow_far', 'calf_far', 'thigh_far', 'knee_far', 'tail', 'torso', 'calf', 'thigh', 'knee', 'farm', 'hand', 'uarm', 'elbow'],
 };
 
