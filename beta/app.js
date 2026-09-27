@@ -3315,7 +3315,8 @@ const fb = {
   selectedGripLeft: null,
   selectedGripRight: null,
   addType: 'hang',       // 'hang' | 'block' | 'exercise' | 'campus' | 'pause' — welches Add-Panel gerade offen ist
-  newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
+  newHang: { reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60 },
+  newHangHand: { handMode: 'alternate', startHand: 'left' }, // nur bei Einarm-Griffen (siehe fbHangHandHtml)      // Werte fürs nächste Hinzufügen, direkt im Add-Panel editierbar
   newBlock: { gripType: 'leiste', leisteWidth: 15, fingers: 4, weight: 0, mode: 'hold', reps: 3, hangSec: 7, restSec: 30, blockRestSec: 60, workSec: 40, handMode: 'fixed', startHand: 'left' },
   newExercise: { exerciseId: ACCESSORY_EXERCISES[0].id, reps: 15, workSec: 40, restSec: 30 },
   newCampus: {
@@ -3452,6 +3453,8 @@ function selectFbGrip(gripId, side) {
   }
   const hint = document.getElementById('fb-selected-hint');
   if (hint) hint.innerHTML = fbSelectedGripHint();
+  const handHolder = document.getElementById('fb-hang-hand');
+  if (handHolder) { handHolder.innerHTML = fbHangHandHtml(); wireFbHangHand(); }
   document.querySelectorAll('#fb-board-visual .board-hotspot').forEach((el) => {
     if (fb.gripMode === 'different') {
       const h = { grip: el.dataset.grip, hx: Number(el.dataset.hx) };
@@ -3703,6 +3706,39 @@ function renderFbBlockGripEditorSheet() {
    darunter, dann Sätze/Zeiten, dann der Hinzufügen-Button. Nach dem
    Hinzufügen bleibt man auf derselben Stelle stehen (kein Re-Render der
    ganzen Seite) und kann direkt den nächsten Satz konfigurieren. */
+/* Handwahl für Hang-Sätze an Einarm-Griffen (z. B. BM2000 Grosse Kante):
+   gleiche Muster wie beim Lifting Pin — fix, abwechselnd oder erst alle
+   Sätze mit der einen, dann mit der anderen Hand. */
+function fbHangHandHtml() {
+  if (fb.gripMode !== 'same' || !fb.selectedGrip || gripArmNote(fb.board, fb.selectedGrip) !== 'einarmig') return '';
+  const h = fb.newHangHand;
+  const first = h.handMode === 'fixed' ? '' : ' zuerst';
+  return `
+    <div class="field">
+      <label>Hand (Griff ist einarmig)</label>
+      <div class="chip-row" id="fb-hang-handmode-row">
+        <button type="button" class="chip ${h.handMode === 'fixed' ? 'active' : ''}" data-hand-mode="fixed">Immer gleiche</button>
+        <button type="button" class="chip ${h.handMode === 'alternate' ? 'active' : ''}" data-hand-mode="alternate">Abwechselnd</button>
+        <button type="button" class="chip ${h.handMode === 'block' ? 'active' : ''}" data-hand-mode="block">Erst eine, dann andere</button>
+      </div>
+    </div>
+    <div class="chip-row" id="fb-hang-starthand-row">
+      <button type="button" class="chip ${h.startHand === 'left' ? 'active' : ''}" data-start-hand="left" data-hand-color="l">Links${first}</button>
+      <button type="button" class="chip ${h.startHand === 'right' ? 'active' : ''}" data-start-hand="right" data-hand-color="r">Rechts${first}</button>
+    </div>
+  `;
+}
+function wireFbHangHand() {
+  const holder = document.getElementById('fb-hang-hand');
+  if (!holder) return;
+  holder.querySelectorAll('[data-hand-mode]').forEach((btn) => {
+    btn.onclick = () => { fb.newHangHand.handMode = btn.dataset.handMode; holder.innerHTML = fbHangHandHtml(); wireFbHangHand(); };
+  });
+  holder.querySelectorAll('[data-start-hand]').forEach((btn) => {
+    btn.onclick = () => { fb.newHangHand.startHand = btn.dataset.startHand; holder.innerHTML = fbHangHandHtml(); wireFbHangHand(); };
+  });
+}
+
 function renderFbAddPanel() {
   const holder = document.getElementById('fb-add-panel');
   if (!holder) return;
@@ -3741,8 +3777,10 @@ function renderFbAddPanel() {
         <div class="field"><label>Pause zw. Sätzen (s)</label><input type="number" id="fb-new-restsec" value="${fb.newHang.restSec}" min="0"></div>
         <div class="field"><label>Pause danach (s)</label><input type="number" id="fb-new-blockrestsec" value="${fb.newHang.blockRestSec}" min="0"></div>
       </div>
+      <div id="fb-hang-hand">${fbHangHandHtml()}</div>
       <button type="button" class="btn" id="fb-add-hang" style="width:100%;">+ Hang-Satz hinzufügen</button>
     `;
+    wireFbHangHand();
     wireCalibration();
     document.getElementById('fb-board-toggle').querySelectorAll('.chip').forEach((btn) => {
       btn.onclick = () => {
@@ -3790,7 +3828,8 @@ function renderFbAddPanel() {
         fb.blocks.push({ type: 'hang', board: fb.board, gripLeft: fb.selectedGripLeft, gripRight: fb.selectedGripRight, ...fb.newHang });
       } else {
         if (!fb.selectedGrip) { toast('Zuerst einen Griff wählen.', 'err'); return; }
-        fb.blocks.push({ type: 'hang', board: fb.board, grip: fb.selectedGrip, ...fb.newHang });
+        const oneArm = gripArmNote(fb.board, fb.selectedGrip) === 'einarmig';
+        fb.blocks.push({ type: 'hang', board: fb.board, grip: fb.selectedGrip, ...fb.newHang, ...(oneArm ? fb.newHangHand : {}) });
       }
       renderFbBlocksList();
     };
@@ -8329,7 +8368,7 @@ function fbBlockSub(b) {
   if (isHoldModeBlock(b)) {
     const blockRestSec = b.blockRestSec != null ? b.blockRestSec : b.restSec;
     const prefix = b.type === 'block' ? 'Halten' : 'Hang';
-    const handSuffix = b.type === 'block' ? ' · ' + blockHandPatternText(b) : '';
+    const handSuffix = (b.type === 'block' || b.handMode) ? ' · ' + blockHandPatternText(b) : '';
     return `${b.hangSec}s ${prefix} · ${b.restSec}s zw. Sätzen · ${blockRestSec}s danach · ×${b.reps}${handSuffix}`;
   }
   if (b.type === 'campus') {
@@ -8946,7 +8985,9 @@ function fbInfoMainHtml(b, activeRep) {
       return `<span class="hand-l">L: ${esc(gripLabel(b.board, b.gripLeft))}</span> · <span class="hand-r">R: ${esc(gripLabel(b.board, b.gripRight))}</span>`;
     }
     const arm = hangArmNote(b);
-    const armText = arm === 'einarmig' && activeRep != null ? `einarmig ${handLabel(activeRep % 2 ? 'right' : 'left').toLowerCase()}` : arm;
+    const armText = arm !== 'einarmig' ? arm
+      : activeRep != null ? `einarmig ${handLabel(fbHangHandForRep(b, activeRep)).toLowerCase()}`
+      : b.handMode ? `einarmig, ${blockHandPatternText(b)}` : arm;
     const parts = [gripLabel(b.board, b.grip), fbGripNote(b.board, b.grip), armText].filter(Boolean);
     return esc(parts.join(' · '));
   }
@@ -9012,7 +9053,8 @@ function fbHangPose(f) {
   const name = 'boardhang' + Math.round(f * 1000);
   if (!SLOTH_POSES[name]) {
     const base = SLOTH_POSES.hang;
-    const a = { ...base.a }, b = { ...base.b };
+    // len_farm ~0: Greifhand bringt schon Unterarm mit (sonst ein Glied zu viel)
+    const a = { ...base.a, len_farm_l: 0.001, len_farm_r: 0.001 }, b = { ...base.b, len_farm_l: 0.001, len_farm_r: 0.001 };
     for (const k of Object.keys(FB_HANG_NARROW)) {
       a[k] = FB_HANG_NARROW[k] + f * (base.a[k] - FB_HANG_NARROW[k]);
       b[k] = a[k] + (base.b[k] - base.a[k]);
@@ -9026,9 +9068,14 @@ const fbHangSpreadCache = {};
 function fbHangOneArm(b) {
   return b.type === 'hang' && !hangIsAsymmetric(b) && hangArmNote(b) === 'einarmig';
 }
-/* Einarmig: Satz 1 links, Satz 2 rechts, … */
+/* Welche Hand bei einem Einarm-Hang dran ist: gewählt beim Hinzufügen
+   (handMode/startHand wie beim Lifting Pin); ältere Sätze ohne Wahl
+   wechseln einfach ab, links zuerst. */
+function fbHangHandForRep(b, rep) {
+  return b.handMode ? blockHandForRep(b, rep) : (rep % 2 ? 'right' : 'left');
+}
 function fbOneArmHand(st) {
-  return (st.activeRep || 0) % 2 ? 'right' : 'left';
+  return fbHangHandForRep(st.displayBlock, st.activeRep || 0);
 }
 function fbLayoutBoardStage() {
   const stageEl = document.getElementById('fbx-stage');

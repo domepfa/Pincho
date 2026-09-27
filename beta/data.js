@@ -181,11 +181,14 @@ function gripInfo(boardId, gripId) {
    darum wird bei einem Loch bewusst NICHTS behauptet, statt zu raten —
    ausser für die wenigen unten explizit bestätigten Ausnahmen. */
 const GRIP_ARM_OVERRIDE = {
-  // Beim Beastmaker 2000 ist "Grosse Kante" (anders als beim 1000er) real
+  // Beim Beastmaker 2000 ist "Grosse Kante" real
   // zu schmal für zwei Hände nebeneinander — laut Nutzer-Rückmeldung am
   // echten Brett nur einarmig nutzbar, keine gewöhnliche beidhändige
   // Aufwärm-Kante wie sonst bei einem einzelnen Kalibrierpunkt vermutet.
-  bm2000: { edge_large: 'einarmig' },
+  // Die kleine Kante direkt darunter ebenso (Nutzer-Rückmeldung).
+  bm2000: { edge_large: 'einarmig', edge_small: 'einarmig' },
+  // Grosse Kante in der Mitte des 1000ers: ebenfalls nur für eine Hand.
+  bm1000: { edge_large: 'einarmig' },
 };
 function gripArmNote(boardId, gripId) {
   const override = GRIP_ARM_OVERRIDE[boardId] && GRIP_ARM_OVERRIDE[boardId][gripId];

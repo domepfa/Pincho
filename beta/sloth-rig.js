@@ -669,18 +669,19 @@ const SLOTH_POSES = {
   // Einarmig hängen (Einarm-Griffe am Board): Griffhand fest, die andere hängt locker
   hang1l: {
     view: 'back', pin: 'hand_l', dur: 3.6, label: 'Faultier hängt einarmig (links)',
-    a: { torso: -94, head: -96, uarm_l: -100, farm_l: -94, grip_l: -92, uarm_r: 84, farm_r: 88, grip_r: 90, thigh_l: 98, calf_l: 92, thigh_r: 84, calf_r: 88, tail: 4 },
-    b: { torso: -95, head: -97, uarm_l: -101, farm_l: -95, grip_l: -93, uarm_r: 81, farm_r: 86, grip_r: 88, thigh_l: 101, calf_l: 96, thigh_r: 82, calf_r: 85, tail: 9 },
+    // len_farm ~0: der Greifhand-Teil bringt schon ein Stück Unterarm mit, sonst wirkt der Arm ein Glied zu lang
+    a: { torso: -94, head: -96, uarm_l: -100, farm_l: -94, grip_l: -92, len_farm_l: 0.001, uarm_r: 76, farm_r: 88, grip_r: 96, len_farm_r: 0.001, thigh_l: 98, calf_l: 92, thigh_r: 84, calf_r: 88, tail: 4 },
+    b: { torso: -95, head: -97, uarm_l: -101, farm_l: -95, grip_l: -93, len_farm_l: 0.001, uarm_r: 74, farm_r: 86, grip_r: 94, len_farm_r: 0.001, thigh_l: 101, calf_l: 96, thigh_r: 82, calf_r: 85, tail: 9 },
   },
   hang1r: {
     view: 'back', pin: 'hand_r', dur: 3.6, label: 'Faultier hängt einarmig (rechts)',
-    a: { torso: -86, head: -84, uarm_r: -80, farm_r: -86, grip_r: -88, uarm_l: 96, farm_l: 92, grip_l: 90, thigh_l: 96, calf_l: 92, thigh_r: 82, calf_r: 88, tail: -4 },
-    b: { torso: -85, head: -83, uarm_r: -79, farm_r: -85, grip_r: -87, uarm_l: 99, farm_l: 94, grip_l: 92, thigh_l: 98, calf_l: 95, thigh_r: 79, calf_r: 84, tail: -9 },
+    a: { torso: -86, head: -84, uarm_r: -80, farm_r: -86, grip_r: -88, len_farm_r: 0.001, uarm_l: 104, farm_l: 92, grip_l: 84, len_farm_l: 0.001, thigh_l: 96, calf_l: 92, thigh_r: 82, calf_r: 88, tail: -4 },
+    b: { torso: -85, head: -83, uarm_r: -79, farm_r: -85, grip_r: -87, len_farm_r: 0.001, uarm_l: 106, farm_l: 94, grip_l: 86, len_farm_l: 0.001, thigh_l: 98, calf_l: 95, thigh_r: 79, calf_r: 84, tail: -9 },
   },
   // Lifting Pin: steht seitlich, Arm gestreckt, hält den Griffblock mit den
   // Fingern, darunter der Pin mit Scheibe. Statisch bis auf leichtes Atmen.
   pinlift: {
-    view: 'side', pin: 'ankle', dur: 4, floor: 46, grip: 'fist', label: 'Lifting Pin',
+    view: 'side', pin: 'ankle', dur: 4, floor: 46, grip: 'fist', mirror: ['farm'], label: 'Lifting Pin', // mirror: Faust zum Körper statt nach aussen
     props: [{ img: 'plate', at: 'grip', dy: 100, k: 1.05 }, { line: { prop: 0, pt: [629, 99] }, to: 'grip' }, { img: 'plate', at: 'grip', dy: 100, dx: 12, k: 1.05, layer: 'back' }],
     a: { torso: -99, uarm: 66, farm: 74, thigh: 86, calf: 92 },
     b: { torso: -100, uarm: 66, farm: 74, thigh: 86, calf: 92 },
@@ -745,6 +746,7 @@ function slothRigBuild(pose) {
         q['foot' + x] = { skip: true, end: q['calf' + x].end };
       }
     }
+    for (const k of pose.mirror || []) q[k].k = [q[k].k, -q[k].k]; // Teil an der Knochenachse spiegeln
     return { q, pts: { wrist: q.farm.end, ankle: q.calf.end, grip: q.hand.end, knee: q.thigh.end, elbow: q.uarm.end,
       fwrist: q.farm_far.end, fankle: q.calf_far.end, fknee: q.thigh_far.end, fgrip: q.hand_far.end,
       shoulder: t.map(A.shoulder), hip: t.map(A.hip) } };
