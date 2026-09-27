@@ -865,7 +865,7 @@ function slothRigPrepare(name) {
   for (const key of order) {
     if (frames[0][key].skip) continue;
     const steps = frames.map((f, i) => `${+(i * 100 / N).toFixed(2)}%{transform:${tfCss(f[key])}}`).join('');
-    css.push(`@keyframes srk-${name}-${key}{${steps}}.sr-${name} .sp-${key}{animation:srk-${name}-${key} ${pose.dur}s linear infinite}`);
+    css.push(`@keyframes srk-${name}-${key}{${steps}}.sr-${name} .sp-${key}{animation:srk-${name}-${key} ${pose.dur}s linear infinite;animation-delay:var(--srd,0s)}`);
   }
   const style = document.createElement('style');
   style.textContent = css.join('\n');
@@ -914,20 +914,40 @@ function slothSwapFigure(name, cls) {
   if (!slothRigCache['swap:' + name]) {
     const st = document.createElement('style');
     st.textContent = sw.imgs.length > 1
-      ? `@keyframes srs-${name}{0%,38%{opacity:1}50%,88%{opacity:0}100%{opacity:1}}.sr-${name} .sw-0{animation:srs-${name} ${sw.dur}s ease-in-out infinite}`
-        + `@keyframes srs-${name}-b{0%,38%{opacity:0}50%,88%{opacity:1}100%{opacity:0}}.sr-${name} .sw-1{animation:srs-${name}-b ${sw.dur}s ease-in-out infinite}`
-      : `@keyframes srs-${name}{0%,100%{transform:scale(1)}50%{transform:scale(1.015,1.03)}}.sr-${name} .sw-0{transform-box:fill-box;transform-origin:50% 100%;animation:srs-${name} ${sw.dur}s ease-in-out infinite}`;
+      ? `@keyframes srs-${name}{0%,38%{opacity:1}50%,88%{opacity:0}100%{opacity:1}}.sr-${name} .sw-0{animation:srs-${name} ${sw.dur}s ease-in-out infinite;animation-delay:var(--srd,0s)}`
+        + `@keyframes srs-${name}-b{0%,38%{opacity:0}50%,88%{opacity:1}100%{opacity:0}}.sr-${name} .sw-1{animation:srs-${name}-b ${sw.dur}s ease-in-out infinite;animation-delay:var(--srd,0s)}`
+      : `@keyframes srs-${name}{0%,100%{transform:scale(1)}50%{transform:scale(1.015,1.03)}}.sr-${name} .sw-0{transform-box:fill-box;transform-origin:50% 100%;animation:srs-${name} ${sw.dur}s ease-in-out infinite;animation-delay:var(--srd,0s)}`;
     document.head.appendChild(st);
     slothRigCache['swap:' + name] = true;
   }
   const pad = 20, w = x1 - x0 + 2 * pad, h = y1 - y0 + 2 * pad;
   const shadow = `<ellipse class="sloth-rig-shadow" cx="0" cy="-4" rx="${Math.round((x1 - x0) * 0.4)}" ry="10"/>`;
-  return `<svg class="sloth-rig sr-${name} ${cls}" viewBox="${x0 - pad} ${y0 - pad} ${w} ${h}" width="${Math.round(w / 1.5)}" height="${Math.round(h / 1.5)}" role="img" aria-label="${sw.label}">${shadow}${imgs.join('')}</svg>`;
+  return `<svg class="sloth-rig sr-${name} ${cls}" data-dur="${sw.dur}" viewBox="${x0 - pad} ${y0 - pad} ${w} ${h}" width="${Math.round(w / 1.5)}" height="${Math.round(h / 1.5)}" role="img" aria-label="${sw.label}">${shadow}${imgs.join('')}</svg>`;
 }
 
 // SVG-Markup einer Pose, z. B. slothFigure('hang', 'ex-figure sloth-img')
 function slothFigure(name, cls = '') {
   if (SLOTH_SWAPS[name]) return slothSwapFigure(name, cls);
   const r = slothRigPrepare(name), [x, y, w, h] = r.box;
-  return `<svg class="sloth-rig sr-${name} ${cls}" viewBox="${x} ${y} ${w} ${h}" width="${Math.round(w / 3)}" height="${Math.round(h / 3)}" role="img" aria-label="${SLOTH_POSES[name].label}">${r.body}</svg>`;
+  return `<svg class="sloth-rig sr-${name} ${cls}" data-dur="${SLOTH_POSES[name].dur}" viewBox="${x} ${y} ${w} ${h}" width="${Math.round(w / 3)}" height="${Math.round(h / 3)}" role="img" aria-label="${SLOTH_POSES[name].label}">${r.body}</svg>`;
+}
+
+/* Die App baut den Ablauf-Bildschirm immer wieder neu auf (innerHTML); jede neu
+   eingesetzte Figur würde ihre Animation von vorne beginnen und springen. Darum
+   läuft die Animation nach der Uhr: beim Einsetzen bekommt die Figur eine negative
+   Verzögerung (--srd) passend zur aktuellen Zeit und macht nahtlos weiter. */
+function slothRigSync(root) {
+  const list = root.matches && root.matches('.sloth-rig[data-dur]') ? [root] : root.querySelectorAll ? root.querySelectorAll('.sloth-rig[data-dur]') : [];
+  for (const svg of list) {
+    const dur = +svg.dataset.dur;
+    svg.style.setProperty('--srd', `${-((Date.now() / 1000) % dur).toFixed(3)}s`);
+  }
+}
+if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+  const start = () => {
+    slothRigSync(document.body);
+    new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) slothRigSync(n); })
+      .observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
 }
