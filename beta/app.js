@@ -2078,7 +2078,7 @@ function renderFlowBuilderPanel(holder) {
     ${sharedFlows.map((t) => `<option value="shared:${t.id}">${esc(t.name)} (${esc(t.createdByName)})</option>`).join('')}
   </optgroup>` : '';
   holder.innerHTML = `
-    <button type="button" class="btn" id="flow-new" style="width:100%;margin-bottom:12px;">＋ Neue Session</button>
+    <button type="button" class="btn" id="flow-new" style="width:100%;margin-bottom:12px;">＋ Neuer Flow</button>
     <div class="field">
       <label>Vorlage laden</label>
       <div class="field-row">
@@ -4637,7 +4637,7 @@ async function renderFingerboard() {
 
     <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Eigenen Ablauf bauen</h2><div class="sec-rule"></div></div>
 
-    <button type="button" class="btn" id="fb-new-ablauf" style="width:100%;margin-bottom:12px;">＋ Neue Session</button>
+    <button type="button" class="btn" id="fb-new-ablauf" style="width:100%;margin-bottom:12px;">＋ Neuer Ablauf</button>
 
     <div class="chip-row fb-addtype-row">
       <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Board</button>
@@ -4769,8 +4769,11 @@ async function renderFingerboard() {
    im Gym-Log) keine sichtbare Liste, fertig gemachte Abläufe landeten
    "unsichtbar" nur in Firebase (fingerboardSessions). Gleiches Muster wie
    renderLogHistory(): neueste zuerst, pro Eintrag teilen/löschen. */
+let fbSessionsCache = []; // neueste zuerst, für Steigerungsvorschlag und Max-Hang-Test
 async function renderFbHistory() {
   const raw = await fbGet(`fingerboardSessions/${state.member.id}`);
+  fbSessionsCache = Object.values(raw || {}).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  fbRefreshStartCard();
   const entries = Object.entries(raw || {}).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
   const list = document.getElementById('fb-history-list');
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
@@ -4834,6 +4837,7 @@ function fbStartCardHtml() {
         <span class="fb-start-eyebrow">${last ? 'Weiter mit' : 'Vorschlag'}</span>
         <b>${esc(t.name)}</b>
         <span class="fb-start-meta">${when} · ${t.blocks.length} Sätze · ~${fmtMinSec(totalSec)}</span>
+        ${(() => { const sug = fbWeightSuggestion(t.id); return sug ? `<span class="fb-start-sug">${esc(sug.why)}</span>` : ''; })()}
       </div>
       <button type="button" class="btn qs-start fb-start-go" data-tpl="${t.id}" aria-label="${esc(t.name)} starten"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 001.5.9l10.2-6.5a1 1 0 000-1.8L9.5 4.6A1 1 0 008 5.5z"/></svg></button>
     </div>`;
@@ -4842,6 +4846,56 @@ function fmtDateShort(d) {
   const days = Math.floor((Date.now() - d.getTime()) / 86400000);
   return days <= 0 ? 'heute' : days === 1 ? 'gestern' : days < 7 ? `vor ${days} Tagen` : `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
 }
+/* Anteil geschaffter Hänger einer Session (0..1), null ohne Hang-Sätze */
+function fbHangSuccess(sn) {
+  let done = 0, total = 0;
+  (sn.blocks || []).forEach((b, i) => {
+    if (b.type !== 'hang') return;
+    const r = (sn.results || [])[i];
+    const reps = r && r.doneReps ? r.doneReps : new Array(b.reps).fill(false);
+    total += reps.length; done += reps.filter(Boolean).length;
+  });
+  return total ? done / total : null;
+}
+/* Bester Max-Hang-Test: höchstes Zusatzgewicht, bei dem mindestens ein Test-Hänger (10 s) geschafft wurde */
+function fbMaxHangBest() {
+  let best = null;
+  fbSessionsCache.filter((sn) => sn.templateId === 'pp_maxtest').forEach((sn) => {
+    const ok = (sn.blocks || []).some((b, i) => b.type === 'hang' && b.reps === 1 && b.hangSec >= 10 && ((sn.results || [])[i]?.doneReps || [])[0]);
+    const w = Number(sn.weight) || 0;
+    if (ok && (best == null || w > best.weight)) best = { weight: w, date: sn.date };
+  });
+  return best;
+}
+/* Zusatzgewicht-Vorschlag für eine Vorlage:
+   Max Hangs aus dem Test (85 %), sonst Steigerung gegenüber dem letzten Mal mit derselben Vorlage */
+function fbWeightSuggestion(id) {
+  if (id === 'pp_maxhang') {
+    const best = fbMaxHangBest();
+    if (best) {
+      // 85 % der Gesamtlast wäre ohne Körpergewicht nicht rechenbar; Faustregel: ~4 kg unter dem Testgewicht
+      const w = Math.round((best.weight - 4) * 2) / 2;
+      return { weight: w, why: `Max-Hang-Test ${fmtKg(best.weight)} → heute ${fmtKg(w)}` };
+    }
+  }
+  const last = fbSessionsCache.find((sn) => sn.templateId === id && !sn.partial);
+  if (!last || id === 'pp_maxtest' || id === 'pp_warmup') return null;
+  const ok = fbHangSuccess(last);
+  if (ok == null) return null;
+  const w = Number(last.weight) || 0;
+  if (ok >= 1) return { weight: w + 2, why: `Letztes Mal ${fmtKg(w)} alles geschafft → heute ${fmtKg(w + 2)}` };
+  if (ok < 0.75) return { weight: w - 2, why: `Letztes Mal ${fmtKg(w)} nur ${Math.round(ok * 100)} % geschafft → heute ${fmtKg(w - 2)}` };
+  return { weight: w, why: `Letztes Mal ${fmtKg(w)}, fast alles geschafft → gleich bleiben` };
+}
+function fmtKg(w) { return `${w > 0 ? '+' : ''}${String(w).replace('.', ',')} kg`; }
+function fbRefreshStartCard() {
+  const holder = document.getElementById('fb-start-card-holder');
+  if (!holder) return;
+  holder.innerHTML = fbStartCardHtml();
+  const go = holder.querySelector('.fb-start-go');
+  if (go) go.onclick = () => fbStartTemplate(go.dataset.tpl);
+}
+
 /* Ein Schnelltraining (Vorlage/Programm) laden und sofort starten */
 function fbStartTemplate(id) {
   const t = findFbTemplateById(id);
@@ -4849,6 +4903,14 @@ function fbStartTemplate(id) {
   if (fb.blocks.length && !confirm('Aktuellen Ablauf durch "' + t.name + '" ersetzen und sofort starten?')) return;
   fb.blocks = fbBlocksWithCurrentBoard(t.blocks);
   fbRememberTemplate(id);
+  fb.pendingTemplateId = id;
+  const sug = fbWeightSuggestion(id);
+  if (sug) {
+    fb.weight = sug.weight;
+    const field = document.getElementById('fb-weight');
+    if (field) field.value = sug.weight;
+    toast(`Zusatzgewicht: ${sug.why}. Anpassbar unter „Zusatzgewicht“.`);
+  }
   renderFbBlocksList();
   startAblauf(); // öffnet direkt das Ablauf-Vollbild
 }
@@ -9710,6 +9772,8 @@ function fbWarmupReminder() {
 
 function startAblauf() {
   fbWarmupReminder();
+  fb.templateId = fb.pendingTemplateId || null;
+  fb.pendingTemplateId = null;
   fb.blockIndex = 0;
   fb.running = false;
   fb.awaitingNext = true;
@@ -10210,6 +10274,7 @@ async function finishAblauf(blocksOverride, resultsOverride, isPartial) {
     date: todayKey(),
     board,
     weight: fb.weight || 0,
+    ...(fb.templateId ? { templateId: fb.templateId } : {}),
     blocks,
     results,
     createdAt: Date.now(),
@@ -10402,18 +10467,29 @@ const RECOVERY_AREAS = [
   { id: 'beine', label: 'Beine', readyH: 48, muscles: ['quads', 'hamstrings', 'glutes', 'calves', 'shins'] },
   { id: 'rumpf', label: 'Rumpf', readyH: 36, muscles: ['abs', 'obliques', 'lower_back'] },
 ];
+/* Erholungszeit hängt an der Anstrengung: RPE im Log (locker 60 %, mittel 85 %, hart 100–115 %),
+   beim Board am Programm (Aufwärmen/Einsteiger kürzer) */
+function recoveryFactorForRpe(rpe) {
+  const r = Number(rpe);
+  if (!r) return 1;
+  return r <= 5 ? 0.6 : r <= 7 ? 0.85 : r >= 10 ? 1.15 : 1;
+}
+const RECOVERY_FB_FACTOR = { pp_warmup: 0.4, pp_beginner: 0.8 };
 function progressRecoveryHtml() {
-  const lastT = {};
-  const touch = (id, t) => { if (!lastT[id] || t > lastT[id]) lastT[id] = t; };
-  progressFbSessions.forEach((sn) => touch('finger', entryTime(sn)));
+  const lastT = {}, factor = {};
+  // die jüngste Belastung zählt, mit ihrem eigenen Faktor
+  const touch = (id, t, f = 1) => { if (!lastT[id] || t > lastT[id]) { lastT[id] = t; factor[id] = f; } };
+  progressFbSessions.forEach((sn) => touch('finger', entryTime(sn), sn.partial ? 0.7 : RECOVERY_FB_FACTOR[sn.templateId] || 1));
   state.logs.forEach((e) => {
-    if (e.type === 'klettern') touch('finger', entryTime(e));
+    const f = recoveryFactorForRpe(e.rpe);
+    if (e.type === 'klettern') touch('finger', entryTime(e), f);
     (e.exercises || []).forEach((ex) => {
       const m = exerciseMuscles(ex.exerciseId);
-      RECOVERY_AREAS.forEach((a) => { if (a.muscles && m.primary.some((x) => a.muscles.includes(x))) touch(a.id, entryTime(e)); });
+      RECOVERY_AREAS.forEach((a) => { if (a.muscles && m.primary.some((x) => a.muscles.includes(x))) touch(a.id, entryTime(e), f); });
     });
   });
-  return RECOVERY_AREAS.map((a) => {
+  return RECOVERY_AREAS.map((a0) => {
+    const a = { ...a0, readyH: Math.round(a0.readyH * (factor[a0.id] || 1)) };
     const t = lastT[a.id];
     const h = t ? (Date.now() - t) / 3600000 : null;
     const ratio = h == null ? 1 : Math.min(1, h / a.readyH);
@@ -10738,6 +10814,7 @@ async function renderProgress() {
   cycleData = rawCycle && rawCycle.consentAt ? rawCycle : null;
   state.logs = Object.values(rawLogs || {}).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   progressFbSessions = Object.values(rawFb || {}).sort((a, b) => entryTime(a) - entryTime(b));
+  fbSessionsCache = progressFbSessions.slice().reverse();
   drawProgress();
 }
 
@@ -10800,6 +10877,16 @@ function drawProgress() {
       ${exIds.length ? progressOverviewHtml(exIds, days) : ''}
     </div>
 
+    ${(() => {
+      const best = fbMaxHangBest();
+      return `<div class="pg-card pg-maxhang">
+        <div class="pg-card-head"><h3>Max Hang</h3><span class="pg-muted">10 s · mittlere Kante</span></div>
+        ${best ? `<div class="pg-hero"><span class="pg-hero-num up">${fmtKg(best.weight)}</span><span class="pg-hero-sub">bester Test · ${esc(fmtDayKey(best.date))}</span></div>
+          <p class="pg-muted" style="margin:6px 0 0;">Neuer Test alle 4–6 Wochen. Max Hangs schlägt danach das passende Gewicht vor.</p>`
+        : '<p class="pg-muted" style="margin:0;">Noch kein Test. Mach den „Max-Hang-Test“ unter Board → Programme: danach schlägt die App dein Trainingsgewicht vor.</p>'}
+      </div>`;
+    })()}
+
     <div class="pg-card">
       <div class="pg-card-head"><h3>Board · Hängezeit je Einheit</h3></div>
       ${progressLineChart('pg-fb', fbPts, 'Hängezeit je Einheit')}
@@ -10816,7 +10903,7 @@ function drawProgress() {
     <div class="pg-card">
       <div class="pg-card-head"><h3>Erholung</h3><span class="pg-muted">seit letzter Belastung</span></div>
       ${progressRecoveryHtml()}
-      <p class="pg-muted" style="margin:8px 0 0;">Grobe Richtwerte (Finger 72 h, Rumpf 36 h, sonst 48 h), kein medizinischer Rat.</p>
+      <p class="pg-muted" style="margin:8px 0 0;">Grobe Richtwerte (Finger 72 h, Rumpf 36 h, sonst 48 h), nach lockeren Einheiten (RPE bis 5) kürzer, nach sehr harten länger. Kein medizinischer Rat.</p>
     </div>
   `;
   root.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => { progressRange = b.dataset.range; drawProgress(); }; });
