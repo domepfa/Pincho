@@ -451,10 +451,10 @@ const SLOTH_POSES = {
 
 
   dbflyes: {
-    view: 'front', pin: 'foot_l', dur: 3, armLift: 45, armsFront: true, relArms: true, relLegs: true, label: 'Kurzhantel-Fliegende (von oben)',
+    view: 'front', pin: 'foot_l', dur: 3, armLift: -20, armsFront: true, relArms: true, relLegs: true, label: 'Kurzhantel-Fliegende (von oben)',
     props: [{ img: 'plate', at: 'hand_l', k: 0.72 }, { img: 'plate', at: 'hand_r', k: 0.72 }],
-    a: { torso: 180, head: 180, uarm_l: 184, farm_l: 196, uarm_r: -4, farm_r: -16, ...STAND_LEGS, tail: 0 },
-    b: { torso: 180, head: 180, uarm_l: 184, farm_l: 190, uarm_r: -4, farm_r: -10, len_uarm_l: 0.3, len_farm_l: -0.55, len_uarm_r: 0.3, len_farm_r: -0.55, ...STAND_LEGS, tail: 0 },
+    a: { torso: 180, head: 180, uarm_l: 176, farm_l: 176, uarm_r: 4, farm_r: 4, ...STAND_LEGS, tail: 0 },
+    b: { torso: 180, head: 180, uarm_l: 176, farm_l: 176, uarm_r: 4, farm_r: 4, len_uarm_l: 0.4, len_farm_l: -0.85, len_uarm_r: 0.4, len_farm_r: -0.85, ...STAND_LEGS, tail: 0 },
   },
 
 
