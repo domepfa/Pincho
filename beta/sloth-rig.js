@@ -68,10 +68,20 @@ const SLOTH_ANCHORS = {
   side: { shoulder: [544, 295], hip: [586, 513], tail: [505, 505], face: [685, 190] },
 };
 // Zeichenreihenfolge (hinten -> vorne)
+// Gelenkkugeln liegen UNTER den Gliedern: sie füllen nur die Lücke im gebeugten Gelenk, statt als Kugel aufzusitzen
 const SLOTH_ORDER = {
   front: ['tail', 'calf_l', 'calf_r', 'thigh_l', 'thigh_r', 'farm_l', 'farm_r', 'uarm_l', 'uarm_r', 'torso', 'head'],
-  back: ['calf_l', 'calf_r', 'thigh_l', 'thigh_r', 'farm_l', 'farm_r', 'uarm_l', 'uarm_r', 'elbow_l', 'elbow_r', 'torso', 'tail', 'head', 'grip_l', 'grip_r'],
-  side: ['farm_far', 'hand_far', 'uarm_far', 'elbow_far', 'foot_far', 'calf_far', 'thigh_far', 'knee_far', 'tail', 'torso', 'head', 'foot', 'calf', 'thigh', 'knee', 'farm', 'hand', 'uarm', 'elbow'],
+  back: ['calf_l', 'calf_r', 'thigh_l', 'thigh_r', 'elbow_l', 'elbow_r', 'farm_l', 'farm_r', 'uarm_l', 'uarm_r', 'torso', 'tail', 'head', 'grip_l', 'grip_r'],
+  // Seite: vorderer Oberschenkel hinter dem Rumpf, damit die Hüfte rund bleibt (keine Schnittkante am Gesäss)
+  side: ['elbow_far', 'farm_far', 'hand_far', 'uarm_far', 'knee_far', 'foot_far', 'calf_far', 'thigh_far', 'tail', 'knee', 'foot', 'calf', 'thigh', 'torso', 'head', 'elbow', 'farm', 'hand', 'uarm'],
+};
+/* Grundproportionen: Die Vorlage hat einen sehr grossen Rumpf und kurze Beine (Bein ~2/3 von Rumpf+Kopf).
+   Beine länger, Rumpf und Kopf etwas kleiner, damit die Figur wie ein Athlet und nicht gebastelt wirkt. */
+const SLOTH_SCALE = {
+  side: { torso: 0.9, face: 0.9, tail: 0.9, uarm: 0.92, thigh: 1.16, calf: 1.16, shin: 1.16, foot: 1.1, ball: 1.7 },
+  front: { torso: 0.92, face: 0.92, tail: 0.92, uarm_l: 0.95, uarm_r: 0.95, farm_l: 0.97, farm_r: 0.97, thigh_l: 1.14, thigh_r: 1.14, calf_l: 1.12, calf_r: 1.12 },
+  back: { torso: 0.92, head: 0.92, tail: 0.92, uarm_l: 0.95, uarm_r: 0.95, farm_l: 0.97, farm_r: 0.97, grip_l: 0.97, grip_r: 0.97,
+    thigh_l: 1.14, thigh_r: 1.14, calf_l: 1.12, calf_r: 1.12, ball: 0.95 },
 };
 
 // Kabelturm vor dem Faultier (gespiegelt, Rollen zeigen nach links) und Seil von einer Rolle zur Hand
@@ -751,6 +761,24 @@ const SLOTH_POSES = {
   },
 };
 
+// Hanteln räumlich: hinter jeder Scheibe in der Hand eine zweite, versetzte Scheibe mit Stange dazwischen,
+// so liest man Kurz- und Langhantel statt einer einzelnen Scheibe (Seitenansicht zeigt die Stange von der Stirnseite)
+for (const pose of Object.values(SLOTH_POSES)) {
+  if (pose.view !== 'side') continue;
+  const props = pose.props || [];
+  props.slice().forEach((pr) => {
+    if (pr.img !== 'plate' || typeof pr.at !== 'string' || pr.depth === false) return;
+    const big = pr.k >= 1; // Langhantel: andere Scheibe auf der anderen Körperseite (hinter allem), Kurzhantel: dicht dahinter
+    const d = big ? [26, -16] : [34, -20];
+    // hinten anhängen: vorhandene Teil-Nummern (z. B. Seil an einem Gerät) bleiben gültig
+    // Kurzhantel in der vorderen Hand: hinteres Ende liegt vor dem Rumpf, aber unter der Faust ('hand');
+    // Kurzhantel in der hinteren Hand (layer mid) und Langhantel: hinter dem Körper
+    const layer = big || pr.layer === 'mid' ? 'back' : 'hand';
+    props.push({ bar: true, at: pr.at, dx: pr.dx || 0, dy: pr.dy || 0, d, w: big ? 16 : 12, layer },
+      { ...pr, dx: (pr.dx || 0) + d[0], dy: (pr.dy || 0) + d[1], layer, far: true });
+  });
+}
+
 // Kabeltürme bekommen einen eigenen Gewichtsstapel, der sich hebt, wenn das Seil länger wird
 // (Stapel sitzt über den oberen Scheiben des Turmbilds; Masse in Turm-Blattkoordinaten)
 for (const pose of Object.values(SLOTH_POSES)) {
@@ -764,6 +792,16 @@ for (const pose of Object.values(SLOTH_POSES)) {
   });
 }
 
+/* Bewegungsbahn: welcher Punkt eine gestrichelte Hilfslinie bekommt (Hand am Gerät/Gewicht) */
+function slothPathPoint(pose) {
+  if (pose.path !== undefined) return pose.path;
+  const ats = (pose.props || []).map((p) => p.at || p.to).filter((a) => typeof a === 'string');
+  if (pose.view === 'side') return ats.includes('grip') ? 'grip' : ats.includes('fgrip') ? 'fgrip' : null;
+  return ats.includes('hand_r') ? 'hand_r' : ats.includes('hand_l') ? 'hand_l' : null;
+}
+// Einheitliche Kamera: Bildausschnitt mindestens so hoch, damit liegende und stehende Figuren gleich gross wirken
+const SLOTH_MIN_H = 780;
+
 function slothRigBuild(pose) {
   const view = pose.view, J = SLOTH_JOINTS[view], A = SLOTH_ANCHORS[view];
   const rad = (d) => d * Math.PI / 180;
@@ -774,10 +812,10 @@ function slothRigBuild(pose) {
   const a0 = (name) => { const [p, d] = J[name]; return Math.atan2(d[1] - p[1], d[0] - p[0]) * 180 / Math.PI; };
   // Teil so stellen, dass sein Nah-Gelenk auf P liegt und der Knochen in Weltrichtung deg zeigt
   const place = (name, P, deg, img, km = 1) => {
-    const [p, d, k0 = 1] = J[name], r = deg - a0(name), k = k0 * km;
+    const [p, d, k0 = 1] = J[name], r = deg - a0(name), k = k0 * km * (SLOTH_SCALE[view][name] ?? 1);
     return { img: img || view + '_' + name, P, r, p, k, map: (q) => add(P, mul(rot(sub(q, p), r), k)), end: add(P, mul(rot(sub(d, p), r), k)) };
   };
-  const ball = (img, P) => { const b = SLOTH_PARTS[img]; return { img, P, r: 0, p: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k: 1 }; };
+  const ball = (img, P) => { const b = SLOTH_PARTS[img]; return { img, P, r: 0, p: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k: SLOTH_SCALE[view].ball ?? 1 }; };
 
   function side(s) {
     const q = {}, hk = pose.grip || 'hand', D = pose.depth || [-14, -8];
@@ -901,9 +939,16 @@ function slothRigBuild(pose) {
     // dx/dy: ganze Figur verschieben (Hüpfen, Fersen heben)
     const pin = sub(pts[pose.pin], [s.dx || 0, s.dy || 0]);
     for (const k in q) q[k] = q[k].skip ? { skip: true } : { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k };
+    const pathPt = slothPathPoint(pose);
+    if (pathPt && pts[pathPt]) Object.defineProperty(q, 'path', { value: sub(pts[pathPt], pin), enumerable: false });
     // Requisiten: an einem Punkt der Figur (z. B. 'grip') oder fest im Bild ([x, y] relativ zum festen Punkt)
     (pose.props || []).forEach((pr, i) => {
       const pt = (at) => (Array.isArray(at) ? at : sub(pts[at], pin));
+      if (pr.bar) { // Hantelstange von der Scheibe in der Hand schräg nach hinten zur zweiten Scheibe
+        const A0 = add(pt(pr.at), [pr.dx, pr.dy]);
+        q['prop' + i] = { line: true, bar: true, P: A0, r: Math.atan2(pr.d[1], pr.d[0]) * 180 / Math.PI, p: [0, 0], k: [Math.hypot(pr.d[0], pr.d[1]), pr.w / 6] };
+        return;
+      }
       if (pr.line) { // Seil von line zum Punkt to (Rechteck, in der Länge gestreckt)
         // line: [x, y] fest, Punktname der Figur, oder { prop: i, pt: [x, y] } = Punkt auf einem Gerät (Blatt-Koordinaten)
         const onProp = (o) => { const e = q['prop' + o.prop], [kx, ky] = Array.isArray(e.k) ? e.k : [e.k, e.k];
@@ -913,7 +958,7 @@ function slothRigBuild(pose) {
         return;
       }
       const b = SLOTH_PARTS['eq_' + pr.img], p = pr.a || [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k = pr.k || 1;
-      q['prop' + i] = { img: 'eq_' + pr.img, P: add(pt(pr.at), [pr.dx || 0, pr.dy || 0]), r: (pr.r || 0) + (pr.turn ? s.torso : 0), p, k: pr.flip ? [-k, k] : k };
+      q['prop' + i] = { img: 'eq_' + pr.img, P: add(pt(pr.at), [pr.dx || 0, pr.dy || 0]), r: (pr.r || 0) + (pr.turn ? s.torso : 0), p, k: pr.flip ? [-k, k] : k, far: pr.far };
     });
     return q;
   };
@@ -982,6 +1027,9 @@ function slothRigPrepare(name) {
   const mid = base.indexOf(pose.view === 'side' ? 'tail' : 'torso');
   const order = [...props.filter((x) => x[0] === 'back').map((x) => x[1]), ...base.slice(0, mid),
     ...props.filter((x) => x[0] === 'mid').map((x) => x[1]), ...base.slice(mid), ...props.filter((x) => x[0] === 'front').map((x) => x[1])];
+  // 'hand': direkt unter dem vorderen Unterarm/Faust (Seitenansicht), z. B. hinteres Ende einer Kurzhantel
+  const handProps = props.filter((x) => x[0] === 'hand').map((x) => x[1]);
+  if (handProps.length) order.splice(order.indexOf(pose.view === 'side' ? 'farm' : 'torso') + (pose.view === 'side' ? 0 : 1), 0, ...handProps);
   // Umriss über alle Stellungen -> viewBox
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const f of frames) for (const key of order) {
@@ -995,6 +1043,7 @@ function slothRigPrepare(name) {
   }
   if (pose.floor != null) y1 = Math.max(y1, pose.floor + 6);
   if (pose.wall) { x0 = Math.min(x0, pose.wall.x - 4); x1 = Math.max(x1, pose.wall.x + 30); }
+  if (y1 - y0 < SLOTH_MIN_H) y0 = y1 - SLOTH_MIN_H; // nach oben auffüllen, Boden bleibt unten
   const padX = (x1 - x0) * 0.02, padY = (y1 - y0) * 0.02;
   const box = [x0 - padX, y0 - padY, x1 - x0 + 2 * padX, y1 - y0 + 2 * padY].map((v) => Math.round(v));
   const n = (v) => +v.toFixed(1);
@@ -1031,12 +1080,17 @@ function slothRigPrepare(name) {
   const parts = order.map((key) => {
     const e = frames[0][key];
     if (e.skip) return '';
-    if (e.line) return `<g class="sp-${key}" transform="${tfAttr(e)}"><rect class="sloth-rig-cable" x="0" y="-3" width="1" height="6"/></g>`;
+    if (e.line) return `<g class="sp-${key}" transform="${tfAttr(e)}"><rect class="${e.bar ? 'sloth-rig-handle' : 'sloth-rig-cable'}" x="0" y="-3" width="1" height="6"/></g>`;
     const img = (im, cls = '') => { const b = SLOTH_PARTS[im]; return `<image${cls ? ` class="${cls}"` : ''} href="${SLOTH_RIG_BASE}${im}.png" x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}"/>`; };
     const extra = key === 'head' && /_face_neutral$/.test(e.img) ? faceLayers(e.img).map(([l, im]) => img(im, 'sf-' + l)).join('') : '';
-    return `<g class="sp-${key}" transform="${tfAttr(e)}">${img(e.img)}${extra}</g>`;
+    return `<g class="sp-${key}${e.far ? ' sp-far' : ''}" transform="${tfAttr(e)}">${img(e.img)}${extra}</g>`;
   }).join('');
   let extra = '';
+  // Bahn der Hand über einen Durchgang, nur wenn sie sich merklich bewegt
+  const path = frames.map((f) => f.path).filter(Boolean);
+  if (path.length && Math.hypot(...[0, 1].map((a) => Math.max(...path.map((p) => p[a])) - Math.min(...path.map((p) => p[a])))) > 60) {
+    extra += `<polyline class="sloth-rig-path" points="${path.map((p) => `${n(p[0])},${n(p[1])}`).join(' ')}"/>`;
+  }
   if (pose.floor != null) extra += `<ellipse class="sloth-rig-shadow" cx="${n(box[0] + box[2] / 2)}" cy="${pose.floor}" rx="${n(box[2] * (pose.view === 'side' ? 0.46 : 0.34))}" ry="${n(Math.max(10, box[2] * 0.035))}"/>`;
   if (pose.bar) {
     const w = box[2] * 0.96;
@@ -1098,6 +1152,9 @@ function slothFigure(name, cls = '') {
 function slothRigSync(root) {
   const list = root.matches && root.matches('.sloth-rig[data-dur]') ? [root] : root.querySelectorAll ? root.querySelectorAll('.sloth-rig[data-dur]') : [];
   for (const svg of list) {
+    // anderer Übungswechsel im selben Behälter: kurz einblenden statt hart umschalten
+    const box = svg.parentElement, pose = [...svg.classList].find((c) => c.startsWith('sr-'));
+    if (box) { if (box.__srPose && box.__srPose !== pose) svg.classList.add('sr-enter'); box.__srPose = pose; }
     const dur = +svg.dataset.dur;
     svg.style.setProperty('--srd', `${-((Date.now() / 1000) % dur).toFixed(3)}s`);
   }
