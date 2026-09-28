@@ -292,8 +292,9 @@ const SLOTH_POSES = {
   },
   bounds: {
     view: 'front', pin: 'feet', dur: 1.4, floor: 26, armLift: 45, relLegs: true, label: 'Seitsprünge',
-    a: { torso: -80, head: -84, uarm_l: 140, farm_l: 110, uarm_r: 30, farm_r: 20, thigh_l: 104, calf_l: 94, thigh_r: 120, calf_r: 150, tail: 0 },
-    b: { torso: -100, head: -96, uarm_l: 150, farm_l: 160, uarm_r: 40, farm_r: 70, thigh_l: 60, calf_l: 30, thigh_r: 76, calf_r: 86, tail: 0 },
+    // Arme mit gebeugten Ellbogen: gestreckt würden sie durch die Waagrechte schwingen und die Figur sehr breit machen
+    a: { torso: -80, head: -84, uarm_l: 125, farm_l: 60, uarm_r: 55, farm_r: 120, thigh_l: 104, calf_l: 94, thigh_r: 120, calf_r: 150, tail: 0 },
+    b: { torso: -100, head: -96, uarm_l: 165, farm_l: 250, uarm_r: 15, farm_r: -70, thigh_l: 60, calf_l: 30, thigh_r: 76, calf_r: 86, tail: 0 },
   },
   sprint: {
     view: 'side', pin: 'hip', dur: 0.6, floor: 205, label: 'Sprint',
@@ -926,12 +927,22 @@ const SLOTH_CALM = new Set(['plank', 'hollow', 'squathold', 'wallsit', 'catcow',
   'birddog', 'deadbug', 'swimmer', 'ytw', 'heeltouch', 'pinlift', 'rest', 'reach', 'wave', 'scapula']);
 const SLOTH_EFFORT_THRESHOLD = 0.8;
 
+/* Tempo wie im Training statt Gleichtakt: kraftvoll hin (konzentrisch), kurz halten, langsam zurück.
+   SLOTH_ECC_AB: Übungen, bei denen a -> b das Absenken ist (dort a -> b langsam, b -> a zügig). */
+const SLOTH_ECC_AB = new Set(['pushup', 'squat', 'splitsquat', 'lunge', 'goblet', 'sumosquat', 'benchpress', 'dbbench', 'inclinebench',
+  'declinebench', 'skullcrusher', 'dbpullover', 'dips', 'rdl', 'abwheel']);
+const SLOTH_NO_TEMPO = new Set(['hang', 'hang1l', 'hang1r', 'flex', 'wave', 'pinlift', 'sideplank', 'frontlever']);
+const SLOTH_KEYS_CON = [[0, 0], [0.3, 1], [0.42, 1], [0.92, 0], [1, 0]];
+const SLOTH_KEYS_ECC = [[0, 0], [0.5, 1], [0.58, 1], [0.9, 0], [1, 0]];
+const slothKeys = (name, pose) => pose.keys || (SLOTH_CALM.has(name) || SLOTH_NO_TEMPO.has(name) || pose.view === 'back' ? [[0, 0], [0.5, 1], [1, 0]]
+  : SLOTH_ECC_AB.has(name) ? SLOTH_KEYS_ECC : SLOTH_KEYS_CON);
+
 const slothRigCache = {};
 function slothRigPrepare(name) {
   if (slothRigCache[name]) return slothRigCache[name];
   const pose = SLOTH_POSES[name];
   const build = slothRigBuild(pose);
-  const keys = pose.keys || [[0, 0], [0.5, 1], [1, 0]];
+  const keys = slothKeys(name, pose);
   const amount = (t) => {
     for (let i = 1; i < keys.length; i++) {
       if (t <= keys[i][0]) {
@@ -942,13 +953,15 @@ function slothRigPrepare(name) {
     }
     return keys[keys.length - 1][1];
   };
-  const N = 16, frames = [];
+  const N = 24, frames = [];
   for (let i = 0; i <= N; i++) {
     const m = amount(i / N), s = {};
     for (const k of new Set([...Object.keys(pose.a), ...Object.keys(pose.b)])) {
       const a = pose.a[k] ?? (k.startsWith('len_') ? 1 : pose.b[k]); // fehlt in a: Länge 1, sonst wie b
       s[k] = a + ((pose.b[k] ?? a) - a) * m;
     }
+    // Nachschwingen: der Schwanz pendelt der Bewegung etwas hinterher
+    s.tail = (s.tail || 0) + 7 * Math.sin(2 * Math.PI * i / N - 1.2);
     frames.push(build(s));
   }
   // Gewichtsstapel heben: halbe Seilverlängerung gegenüber der kürzesten Stellung
