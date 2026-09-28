@@ -3288,7 +3288,7 @@ let fbQuickstartOpen = false; // Schnelltraining-Karten sind standardmässig ein
 /* Schnelltraining: 'own' = eigene Vorlagen, 'crew' = von anderen geteilte.
    Tab-Wahl pro Gerät gemerkt; Ersteller-Filter/"Ausgeblendete zeigen" nur
    für die aktuelle Ansicht. */
-let fbQsTab = (() => { try { return localStorage.getItem('pinchobeta_fb_qs_tab') || 'own'; } catch (e) { return 'own'; } })();
+let fbQsTab = (() => { try { return localStorage.getItem('pinchobeta_fb_qs_tab') || 'pincho'; } catch (e) { return 'pincho'; } })();
 let fbQsCreator = 'all';
 let fbQsShowHidden = false;
 /* Pro Mitglied ausgeblendete Crew-Vorlagen ({sharedTemplateId: true}) —
@@ -4627,6 +4627,7 @@ async function renderFingerboard() {
 
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Fingerboard</h2><div class="sec-rule"></div></div>
+    <div id="fb-start-card-holder">${fbStartCardHtml()}</div>
 
     <div class="sec-head" id="fb-quickstart-toggle" style="cursor:pointer;">
       <h2 class="sec-title" style="font-size:18px;">Schnelltraining</h2><div class="sec-rule"></div>
@@ -4692,6 +4693,8 @@ async function renderFingerboard() {
   renderFbQuickstart();
   renderFbHistory();
 
+  const startGo = document.querySelector('#fb-start-card-holder .fb-start-go');
+  if (startGo) startGo.onclick = () => fbStartTemplate(startGo.dataset.tpl);
   document.getElementById('fb-quickstart-toggle').onclick = () => {
     fbQuickstartOpen = !fbQuickstartOpen;
     document.getElementById('fb-quickstart').hidden = !fbQuickstartOpen;
@@ -4808,7 +4811,46 @@ async function renderFbHistory() {
    antippen". Zeigt eigene (fb.templates) bzw. von der Crew geteilte
    Abläufe als Karten, getrennt über die Tabs Eigene/Crew. */
 function findFbTemplateById(id) {
-  return fb.templates.find((r) => r.id === id) || sharedTemplatesOfKind('fingerboard').find((r) => r.id === id);
+  return fb.templates.find((r) => r.id === id) || sharedTemplatesOfKind('fingerboard').find((r) => r.id === id)
+    || PINCHO_PROGRAMS.find((r) => r.id === id);
+}
+/* Zuletzt per Schnelltraining gestartete Vorlage bzw. Programm (für die Startkarte oben) */
+function fbLastTemplate() {
+  try { const v = JSON.parse(localStorage.getItem('pinchobeta_fb_last_tpl') || 'null'); return v && findFbTemplateById(v.id) ? v : null; } catch (e) { return null; }
+}
+function fbRememberTemplate(id) {
+  try { localStorage.setItem('pinchobeta_fb_last_tpl', JSON.stringify({ id, at: Date.now() })); } catch (e) { /* ignorieren */ }
+}
+/* Startkarte: grosser "Weiter mit"-Knopf ganz oben; neue Nutzer bekommen das Einsteiger-Programm vorgeschlagen */
+function fbStartCardHtml() {
+  const last = fbLastTemplate();
+  const t = last ? findFbTemplateById(last.id) : PINCHO_PROGRAMS.find((p) => p.id === 'pp_beginner');
+  if (!t) return '';
+  const totalSec = t.blocks.reduce((sum, b) => sum + fbBlockSeconds(b), 0);
+  const when = last ? `zuletzt ${fmtDateShort(new Date(last.at))}` : 'Dein erstes Training';
+  return `
+    <div class="fb-start-card">
+      <div class="fb-start-text">
+        <span class="fb-start-eyebrow">${last ? 'Weiter mit' : 'Vorschlag'}</span>
+        <b>${esc(t.name)}</b>
+        <span class="fb-start-meta">${when} · ${t.blocks.length} Sätze · ~${fmtMinSec(totalSec)}</span>
+      </div>
+      <button type="button" class="btn qs-start fb-start-go" data-tpl="${t.id}" aria-label="${esc(t.name)} starten"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 001.5.9l10.2-6.5a1 1 0 000-1.8L9.5 4.6A1 1 0 008 5.5z"/></svg></button>
+    </div>`;
+}
+function fmtDateShort(d) {
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  return days <= 0 ? 'heute' : days === 1 ? 'gestern' : days < 7 ? `vor ${days} Tagen` : `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
+}
+/* Ein Schnelltraining (Vorlage/Programm) laden und sofort starten */
+function fbStartTemplate(id) {
+  const t = findFbTemplateById(id);
+  if (!t) return;
+  if (fb.blocks.length && !confirm('Aktuellen Ablauf durch "' + t.name + '" ersetzen und sofort starten?')) return;
+  fb.blocks = fbBlocksWithCurrentBoard(t.blocks);
+  fbRememberTemplate(id);
+  renderFbBlocksList();
+  startAblauf(); // öffnet direkt das Ablauf-Vollbild
 }
 
 /* Beim Teilen entsteht eine KOPIE in sharedTemplates — die eigene Vorlage
@@ -4877,18 +4919,21 @@ function renderFbQuickstart() {
   const holder = document.getElementById('fb-quickstart');
   if (!holder) return;
   const isCrew = fbQsTab === 'crew';
+  const isPincho = fbQsTab === 'pincho';
   const crewAll = crewFbTemplates();
   const creators = [...new Map(crewAll.map((t) => [t.createdBy, t.createdByName])).entries()];
   if (fbQsCreator !== 'all' && !creators.some(([id]) => id === fbQsCreator)) fbQsCreator = 'all';
   const crewFiltered = crewAll.filter((t) => fbQsCreator === 'all' || t.createdBy === fbQsCreator);
-  const hiddenCount = crewFiltered.filter((t) => hiddenTemplates[t.id]).length;
-  const list = isCrew
-    ? crewFiltered.filter((t) => fbQsShowHidden || !hiddenTemplates[t.id])
+  const hideable = isCrew ? crewFiltered : isPincho ? PINCHO_PROGRAMS : [];
+  const hiddenCount = hideable.filter((t) => hiddenTemplates[t.id]).length;
+  const list = isCrew || isPincho
+    ? hideable.filter((t) => fbQsShowHidden || !hiddenTemplates[t.id])
     : ownFbEntries();
 
   const tabs = `
     <div class="chip-row" style="margin-bottom:8px;">
-      <button type="button" class="chip ${!isCrew ? 'active' : ''}" data-qs-tab="own">Eigene</button>
+      <button type="button" class="chip ${isPincho ? 'active' : ''}" data-qs-tab="pincho">Programme</button>
+      <button type="button" class="chip ${!isCrew && !isPincho ? 'active' : ''}" data-qs-tab="own">Eigene</button>
       <button type="button" class="chip ${isCrew ? 'active' : ''}" data-qs-tab="crew">Crew${crewAll.length ? ` (${crewAll.length})` : ''}</button>
     </div>`;
   const creatorFilter = isCrew && creators.length > 1 ? `
@@ -4896,21 +4941,21 @@ function renderFbQuickstart() {
       <button type="button" class="chip small ${fbQsCreator === 'all' ? 'active' : ''}" data-qs-creator="all">Alle</button>
       ${creators.map(([id, name]) => `<button type="button" class="chip small ${fbQsCreator === id ? 'active' : ''}" data-qs-creator="${esc(id)}">${esc(name)}</button>`).join('')}
     </div>` : '';
-  const hiddenToggle = isCrew && (hiddenCount || fbQsShowHidden) ? `
+  const hiddenToggle = (isCrew || isPincho) && (hiddenCount || fbQsShowHidden) ? `
     <button type="button" class="btn ghost small" id="qs-toggle-hidden" style="width:100%;margin-bottom:10px;">
       ${fbQsShowHidden ? 'Ausgeblendete verbergen' : `Ausgeblendete anzeigen (${hiddenCount})`}
     </button>` : '';
-  const empty = isCrew
+  const empty = isPincho ? 'Alle Programme ausgeblendet.' : isCrew
     ? (crewAll.length ? 'Alles ausgeblendet.' : 'Noch hat niemand aus der Crew eine Vorlage geteilt.')
     : 'Noch keine eigenen Vorlagen — unten einen Ablauf bauen und "Als Vorlage speichern".';
 
   holder.innerHTML = tabs + creatorFilter + hiddenToggle + (list.length ? list.map((t, i) => {
     const totalSec = t.blocks.reduce((total, b) => total + fbBlockSeconds(b), 0);
-    const isHidden = isCrew && !!hiddenTemplates[t.id];
-    const badge = isCrew
+    const isHidden = (isCrew || isPincho) && !!hiddenTemplates[t.id];
+    const badge = isPincho ? '' : isCrew
       ? `<span class="qs-badge">von ${esc(t.createdByName)}</span>`
       : (t.sharedCopy || t.sharedOnly) ? '<span class="qs-badge">geteilt</span>' : '';
-    const actionBtn = isCrew
+    const actionBtn = isCrew || isPincho
       ? `<button type="button" class="ex-pick-info" data-qs-hide="${t.id}" title="${isHidden ? 'Wieder einblenden' : 'Für mich ausblenden'}">${isHidden ? '👁' : '🙈'}</button>`
       : `<button type="button" class="ex-pick-info" data-qs-delete="${t.id}" title="Vorlage löschen">🗑</button>`;
     return `
@@ -4967,14 +5012,7 @@ function renderFbQuickstart() {
     };
   });
   holder.querySelectorAll('.qs-start').forEach((btn) => {
-    btn.onclick = () => {
-      const t = findFbTemplateById(btn.dataset.tpl);
-      if (!t) return;
-      if (fb.blocks.length && !confirm('Aktuellen Ablauf durch "' + t.name + '" ersetzen und sofort starten?')) return;
-      fb.blocks = fbBlocksWithCurrentBoard(t.blocks);
-      renderFbBlocksList();
-      startAblauf(); // öffnet direkt das Ablauf-Vollbild
-    };
+    btn.onclick = () => fbStartTemplate(btn.dataset.tpl);
   });
   holder.querySelectorAll('[data-tpl-info]').forEach((btn) => {
     btn.onclick = () => showFbTemplateInfoSheet(btn.dataset.tplInfo);
@@ -9659,7 +9697,19 @@ document.addEventListener('visibilitychange', () => {
   if (sessionActive) requestWakeLock();
 });
 
+/* Beginnt ein Ablauf direkt mit kleinen Griffen, einmal am Tag ans Aufwärmen erinnern
+   (häufigste Ursache für Ringband-Verletzungen: kalt an kleine Leisten) */
+function fbWarmupReminder() {
+  const first = fb.blocks.find((b) => b.type !== 'pause');
+  const warm = !first || first.type !== 'hang' || ['jug', 'edge_large', 'sloper_easy', 'sloper_medium'].includes(first.grip || first.gripLeft);
+  if (warm) return;
+  const today = todayKey();
+  try { if (localStorage.getItem('pinchobeta_warmup_hint') === today) return; localStorage.setItem('pinchobeta_warmup_hint', today); } catch (e) { return; }
+  toast('Aufgewärmt? Nie kalt an kleine Griffe: Programm „Aufwärmen“ unter Schnelltraining dauert 5 Minuten.');
+}
+
 function startAblauf() {
+  fbWarmupReminder();
   fb.blockIndex = 0;
   fb.running = false;
   fb.awaitingNext = true;
