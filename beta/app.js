@@ -5929,7 +5929,7 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="120" cy="98" r="4.5"/>
     </g>
   ` },
-  jefferson_curl: { kind: 'dynamic', caption: 'Seitenansicht, stehend, leichtes Gewicht in den Händen · Wirbelsäule rollt Wirbel für Wirbel Richtung Boden ein und wieder auf', svg: `
+  jefferson_curl: { kind: 'dynamic', caption: 'Seitenansicht, auf einer Box stehend, leichtes Gewicht in den Händen · Wirbelsäule rollt Wirbel für Wirbel nach unten ein und wieder auf', svg: `
     <line class="fig-rig" x1="10" y1="196" x2="190" y2="196"/>
     <g class="fig-pose fig-fixed">
       <line x1="99" y1="138" x2="86" y2="196"/>
