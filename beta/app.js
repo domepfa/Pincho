@@ -206,15 +206,26 @@ function exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents,
   `;
 }
 
+/* Körperkarte einklappbar: wer schon Übungen geloggt hat, sieht zuerst "Zuletzt gemacht" und die Suche,
+   die Karte bleibt einen Tipp entfernt. Die Wahl merkt sich das Gerät. */
+let exBodyMapOpen = (() => { try { const v = localStorage.getItem('pinchobeta_bodymap'); return v == null ? null : v === '1'; } catch (e) { return null; } })();
+function exBodyMapIsOpen(useRecents) {
+  return exBodyMapOpen ?? !(useRecents && recentExerciseIds(1).length);
+}
 function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll) {
   list = list.filter((e) => !e.hidden);
   const muscleLabel = muscle ? (MUSCLE_ZONE_LABEL[muscle] || muscle) : '';
+  const mapOpen = exBodyMapIsOpen(useRecents) || !!muscle;
   return `
     <label class="ex-search">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input type="search" class="ex-search-input" placeholder="Übung suchen …" aria-label="Übung suchen" value="${esc(query || '')}">
     </label>
-    ${clickableBodyMapSvg(sg, muscle)}
+    <button type="button" class="ex-body-toggle" id="ex-body-toggle" aria-expanded="${mapOpen}">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 10l4 2 4-2M10 21l2-6 2 6"/></svg>
+      ${mapOpen ? 'Körperkarte ausblenden' : 'Nach Muskel wählen'}
+    </button>
+    ${mapOpen ? clickableBodyMapSvg(sg, muscle) : ''}
     ${muscle ? `<div class="ex-muscle-row"><span class="ex-muscle-pill">${esc(muscleLabel)}</span><button type="button" class="ex-muscle-clear" id="ex-muscle-clear">ganzer Bereich</button></div>` : ''}
     <div class="chip-row ex-supergroup-row">
       ${Object.entries(EX_SUPERGROUP_LABEL).filter(([key]) => list.some((e) => exerciseSupergroup(e) === key)).map(([key, label]) => `
@@ -386,6 +397,13 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
     holder.querySelectorAll('[data-supergroup-btn]').forEach((el) => {
       el.onclick = () => { sg = el.dataset.supergroupBtn; muscle = ''; query = ''; showAll = false; render(); };
     });
+    const mapToggle = holder.querySelector('#ex-body-toggle');
+    if (mapToggle) mapToggle.onclick = () => {
+      exBodyMapOpen = !exBodyMapIsOpen(useRecents);
+      if (!exBodyMapOpen) muscle = '';
+      try { localStorage.setItem('pinchobeta_bodymap', exBodyMapOpen ? '1' : '0'); } catch (e) { /* ignorieren */ }
+      render();
+    };
     const clearBtn = holder.querySelector('#ex-muscle-clear');
     if (clearBtn) clearBtn.onclick = () => { muscle = ''; showAll = false; render(); };
     const search = holder.querySelector('.ex-search-input');
@@ -1125,18 +1143,22 @@ async function renderPlan() {
 
   const list = document.getElementById('plan-list');
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
+  // Tage mit passendem Tab bekommen einen Start-Knopf (Gym -> Gym-Tab, Finger -> Fingerboard)
+  const PLAN_ROUTE = { gym: 'log', finger: 'fingerboard' };
+  const startBtn = (d, i) => (PLAN_ROUTE[d.tag]
+    ? `<button type="button" class="day-go" data-go="${PLAN_ROUTE[d.tag]}" aria-label="${esc(d.title || TAG_LABEL[d.tag])} starten"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg></button>`
+    : '<span class="day-go-gap"></span>');
   list.innerHTML = plan.map((d, i) => `
     <div class="day-row ${i === todayIdx ? 'today' : ''}">
-      <span class="d mono">${d.day}</span>
-      <div class="fields">
-        <input type="text" value="${esc(d.title)}" data-idx="${i}" data-field="title" placeholder="Titel">
-        <select data-idx="${i}" data-field="tag">
-          ${Object.keys(TAG_LABEL).map((t) => `<option value="${t}" ${d.tag === t ? 'selected' : ''}>${TAG_LABEL[t]}</option>`).join('')}
-        </select>
-      </div>
-      ${i === todayIdx ? '<span class="tag-pill">HEUTE</span>' : ''}
+      <span class="d">${d.day}${i === todayIdx ? '<span class="tag-pill">HEUTE</span>' : ''}</span>
+      <input type="text" value="${esc(d.title)}" data-idx="${i}" data-field="title" placeholder="Titel">
+      <select data-idx="${i}" data-field="tag">
+        ${Object.keys(TAG_LABEL).map((t) => `<option value="${t}" ${d.tag === t ? 'selected' : ''}>${TAG_LABEL[t]}</option>`).join('')}
+      </select>
+      ${startBtn(d, i)}
     </div>
   `).join('');
+  list.querySelectorAll('[data-go]').forEach((b) => { b.onclick = () => { location.hash = '#' + b.dataset.go; }; });
 
   list.querySelectorAll('input, select').forEach((el) => {
     el.addEventListener('change', async () => {
@@ -1144,6 +1166,7 @@ async function renderPlan() {
       state.weekPlan[idx][el.dataset.field] = el.value;
       await fbPut(`plans/${state.member.id}`, state.weekPlan);
       toast('Gespeichert.', 'ok');
+      if (el.dataset.field === 'tag') renderPlan(); // Start-Knopf passt zum neuen Typ
     });
   });
 }
@@ -10686,6 +10709,23 @@ function drawProgress() {
   const fbRecent = progressFbSessions.filter((sn) => entryTime(sn) > Date.now() - days * 86400000);
   const fbPts = fbRecent.map((sn) => { const v = fbSessionHangSeconds(sn); return { t: entryTime(sn), date: sn.date, value: v, label: `${v} s Hängezeit` }; }).filter((p) => p.value > 0);
 
+  // Noch gar nichts trainiert: Einladung statt Nullen, leerem Raster und fünf vollen Erholungsbalken
+  if (!state.logs.length && !progressFbSessions.length) {
+    root.innerHTML = `
+      <div class="pg-card empty-invite">
+        ${slothFigure('wave', 'empty-invite-sloth')}
+        <h3>Hier wächst dein Fortschritt</h3>
+        <p class="pg-muted">Nach dem ersten Training siehst du hier Rekorde, deine Wochen und wie gut Finger, Zug, Druck, Beine und Rumpf erholt sind.</p>
+        <div class="empty-invite-actions">
+          <a class="btn" href="#fingerboard">Board-Training</a>
+          <a class="btn ghost" href="#log">Gym-Training</a>
+        </div>
+      </div>
+      ${cycleCardHtml()}`;
+    wireCycleCard();
+    return;
+  }
+
   root.innerHTML = `
     <div class="pg-tiles">
       <div class="pg-tile"><b>${stats.last30}</b><span>Einheiten in 30 Tagen</span></div>
@@ -10847,12 +10887,17 @@ async function renderChallenges() {
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Challenges</h2><div class="sec-rule"></div></div>
     ${crewSwitchHtml()}
-    <p class="login-hint" style="margin:0 0 16px;text-align:left;">Ein Training fertig gemacht? Im Fingerboard (nach "Ablauf geschafft") oder im Log-Verlauf kannst du es ${crew ? `<b>${esc(crew.name)}</b>` : 'der Crew'} als Challenge vorschlagen — Zeitfenster beim Teilen wählbar (24h bis 1 Woche).</p>
+    ${crew ? `<p class="login-hint" style="margin:0 0 16px;text-align:left;">Ein Training fertig gemacht? Im Fingerboard (nach "Ablauf geschafft") oder im Log-Verlauf kannst du es <b>${esc(crew.name)}</b> als Challenge vorschlagen — Zeitfenster beim Teilen wählbar (24h bis 1 Woche).</p>` : ''}
     <div class="list" id="challenge-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
   `);
   wireCrewSwitch(() => { loadSharedTemplates(); renderChallenges(); });
   if (!crew) {
-    document.getElementById('challenge-list').innerHTML = '<div class="list-empty">Du bist noch in keiner Crew — unter <a href="#konto">KONTO</a> mit einem Einladungscode beitreten.</div>';
+    document.getElementById('challenge-list').innerHTML = `<div class="pg-card empty-invite">
+      ${slothFigure('flex', 'empty-invite-sloth')}
+      <h3>Trainiert zusammen</h3>
+      <p class="pg-muted">Challenges laufen in einer Crew. Mit einem Einladungscode trittst du bei und siehst, was die anderen vorlegen.</p>
+      <div class="empty-invite-actions"><a class="btn" href="#konto">Crew beitreten</a></div>
+    </div>`;
     return;
   }
   const base = `crewData/${state.crewId}/challenges`;
