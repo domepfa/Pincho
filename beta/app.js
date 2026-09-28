@@ -228,9 +228,63 @@ function ensureExerciseInfoSheet() {
     el.id = 'exercise-info-sheet';
     el.className = 'info-sheet-backdrop hidden';
     document.body.appendChild(el);
-    el.onclick = (e) => { if (e.target === el) el.classList.add('hidden'); };
+    el.onclick = (e) => { if (e.target === el) closeExerciseInfoSheet(); };
+    wireSheetSwipeDown(el, closeExerciseInfoSheet);
   }
   return el;
+}
+/* Das Sheet legt beim Öffnen einen eigenen History-Eintrag an, damit die
+   Zurück-Taste/-Geste des Handys es schliesst statt die App zu verlassen.
+   Schliessen per ✕/Hintergrund/Wischen räumt diesen Eintrag wieder ab. */
+function openExerciseInfoSheet(el) {
+  el.classList.remove('hidden');
+  const card = el.querySelector('.info-sheet-card');
+  if (card) { card.style.transform = ''; card.style.transition = ''; }
+  if (!(history.state && history.state.infoSheet)) history.pushState({ infoSheet: true }, '');
+}
+function closeExerciseInfoSheet() {
+  const el = document.getElementById('exercise-info-sheet');
+  if (el) el.classList.add('hidden');
+  if (history.state && history.state.infoSheet) history.back();
+}
+window.addEventListener('popstate', () => {
+  const el = document.getElementById('exercise-info-sheet');
+  if (el && !el.classList.contains('hidden')) el.classList.add('hidden');
+});
+/* Runterwischen schliesst das Sheet — nur wenn die Karte ganz oben steht,
+   sonst gehört die Geste dem Scrollen im Inhalt. */
+function wireSheetSwipeDown(backdrop, onClose) {
+  let startY = null;
+  let dy = 0;
+  let card = null;
+  backdrop.addEventListener('touchstart', (e) => {
+    card = backdrop.querySelector('.info-sheet-card');
+    if (!card || card.scrollTop > 0 || e.touches.length !== 1) { startY = null; return; }
+    startY = e.touches[0].clientY;
+    dy = 0;
+  }, { passive: true });
+  backdrop.addEventListener('touchmove', (e) => {
+    if (startY === null || !card) return;
+    dy = e.touches[0].clientY - startY;
+    if (dy > 0) {
+      // Die Einblend-Animation (riseIn, fill both) würde sonst das inline
+      // transform überschreiben.
+      card.style.animation = 'none';
+      card.style.transition = 'none';
+      card.style.transform = `translateY(${dy}px)`;
+    }
+  }, { passive: true });
+  backdrop.addEventListener('touchend', () => {
+    if (startY === null || !card) return;
+    startY = null;
+    card.style.transition = 'transform .18s ease';
+    if (dy > 90) {
+      card.style.transform = 'translateY(100%)';
+      setTimeout(() => { card.style.transition = ''; onClose(); }, 160);
+    } else {
+      card.style.transform = '';
+    }
+  });
 }
 
 function showExerciseInfoSheet(exerciseId, onChange) {
@@ -256,10 +310,10 @@ function showExerciseInfoSheet(exerciseId, onChange) {
       ${customExercises[exerciseId] ? '<button type="button" class="btn ghost small" id="info-sheet-hide" style="margin-top:10px;">Aus der Auswahl entfernen</button>' : ''}
     </div>
   `;
-  el.classList.remove('hidden');
+  openExerciseInfoSheet(el);
   const hideBtn = document.getElementById('info-sheet-hide');
-  if (hideBtn) hideBtn.onclick = async () => { if (await hideCustomExercise(exerciseId)) { el.classList.add('hidden'); if (onChange) onChange(); } };
-  document.getElementById('info-sheet-close').onclick = () => el.classList.add('hidden');
+  if (hideBtn) hideBtn.onclick = async () => { if (await hideCustomExercise(exerciseId)) { closeExerciseInfoSheet(); if (onChange) onChange(); } };
+  document.getElementById('info-sheet-close').onclick = () => closeExerciseInfoSheet();
   document.getElementById('info-sheet-fav').onclick = () => {
     toggleExerciseFavorite(exerciseId);
     showExerciseInfoSheet(exerciseId, onChange);
@@ -1960,8 +2014,8 @@ function showPoseInfoSheet(poseId) {
       <div class="ex-howto">${esc(poseHowTo(poseId))}</div>
     </div>
   `;
-  el.classList.remove('hidden');
-  document.getElementById('info-sheet-close').onclick = () => el.classList.add('hidden');
+  openExerciseInfoSheet(el);
+  document.getElementById('info-sheet-close').onclick = () => closeExerciseInfoSheet();
 }
 
 function renderFlowPoseGrid() {
@@ -1994,7 +2048,7 @@ function renderFlowBuilderPanel(holder) {
     ${sharedFlows.map((t) => `<option value="shared:${t.id}">${esc(t.name)} (${esc(t.createdByName)})</option>`).join('')}
   </optgroup>` : '';
   holder.innerHTML = `
-    <button type="button" class="btn ghost small" id="flow-new" style="width:100%;margin-bottom:12px;">Neue Session</button>
+    <button type="button" class="btn" id="flow-new" style="width:100%;margin-bottom:12px;">＋ Neue Session</button>
     <div class="field">
       <label>Vorlage laden</label>
       <div class="field-row">
@@ -4552,7 +4606,7 @@ async function renderFingerboard() {
 
     <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Eigenen Ablauf bauen</h2><div class="sec-rule"></div></div>
 
-    <button type="button" class="btn ghost small" id="fb-new-ablauf" style="width:100%;margin-bottom:12px;">Neue Session</button>
+    <button type="button" class="btn" id="fb-new-ablauf" style="width:100%;margin-bottom:12px;">＋ Neue Session</button>
 
     <div class="chip-row fb-addtype-row">
       <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Board</button>
@@ -4563,7 +4617,7 @@ async function renderFingerboard() {
     </div>
     <div id="fb-add-panel" style="margin:12px 0 16px;"></div>
 
-    <div class="field"><label>Zusatzgewicht für diese Session (negativ = Assistenz)</label><div class="kg-field"><input type="number" inputmode="decimal" id="fb-weight" value="${fb.weight}" step="0.5"><span class="mono">kg</span></div></div>
+    <div class="field" id="fb-weight-field" ${fb.addType === 'block' ? 'hidden' : ''}><label>Zusatzgewicht für diese Session (negativ = Assistenz)</label><div class="kg-field"><input type="number" inputmode="decimal" id="fb-weight" value="${fb.weight}" step="0.5"><span class="mono">kg</span></div></div>
 
     <div class="sec-head"><h2 class="sec-title">Ablauf</h2><div class="sec-rule"></div></div>
 
@@ -4618,6 +4672,9 @@ async function renderFingerboard() {
     btn.onclick = () => {
       fb.addType = btn.dataset.addType;
       document.querySelectorAll('[data-add-type]').forEach((b) => b.classList.toggle('active', b.dataset.addType === fb.addType));
+      // Beim Lifting Pin hängt das Gewicht direkt am Pin — ein Zusatzgewicht
+      // am Körper gibt es dort nicht.
+      document.getElementById('fb-weight-field').hidden = fb.addType === 'block';
       renderFbAddPanel();
     };
   });
@@ -7755,11 +7812,11 @@ const SLOTH_EXERCISE_POSES = {
   face_pull: 'facepull', row_cable: 'cablerow', straight_arm_pulldown: 'straightarm', cable_curl: 'cablecurl',
   cable_curl_low_pulley: 'cablecurl', cable_crunch: 'cablecrunch', cable_woodchop: 'woodchop', pallof: 'pallof',
   cable_glute_kickback: 'kickback', cable_crossover: 'crossover', lateral_raise_cable: 'lateralcable',
-  side_bend_cable: 'sidebend', band_pull_apart: 'bandpull', shoulder_circles_band: 'bandcircle',
+  side_bend_cable: 'sidebendcable', band_pull_apart: 'bandpull', shoulder_circles_band: 'bandcircle',
   glute_bridge_side_step: 'bridge', lat_pulldown: 'latpull', lat_pulldown_wide: 'latpull', lat_pulldown_single: 'latpull',
   leg_press: 'legpress', leg_extension: 'legext', leg_curl_lying: 'legcurl', butterfly: 'pecdeck',
   reverse_butterfly: 'reversefly', hip_abduction_machine: 'abduction', hip_adduction_machine: 'abduction',
-  hip_abduction_cable: 'abduction', calf_raise_seated: 'calfseated', calf_raise_machine: 'calfmachine',
+  hip_abduction_cable: 'abductioncable', calf_raise_seated: 'calfseated', calf_raise_machine: 'calfmachine',
   back_extension: 'backext', pullover_machine: 'pullovermachine', t_bar_row: 'barbellrow', ab_wheel_rollout: 'abwheel',
   jump_rope: 'jumprope', agility_ladder_run: 'ladder', zercher_squat_rotation: 'goblet', carioca: 'shuffle',
   russian_twist: 'russian', hip_9090: 'ninety', frog_stretch: 'frog', ext_rotation: 'extrot',
@@ -11245,8 +11302,8 @@ function showCustomExerciseSheet(mode, onDone) {
       ${isWish ? '' : `<label class="cx-check"><input type="checkbox" id="cx-wish"> Auch als Wunsch an ${esc(PRIVACY_OPERATOR)} schicken</label>`}
       <button class="btn" id="cx-save" style="width:100%;">${isWish ? 'Wunsch senden' : 'Übung anlegen'}</button>
     </div>`;
-  el.classList.remove('hidden');
-  document.getElementById('info-sheet-close').onclick = () => el.classList.add('hidden');
+  openExerciseInfoSheet(el);
+  document.getElementById('info-sheet-close').onclick = () => closeExerciseInfoSheet();
   const pick = (holderId, attr, set) => {
     const h = document.getElementById(holderId);
     if (!h) return;
@@ -11276,7 +11333,7 @@ function showCustomExerciseSheet(mode, onDone) {
       else if (isWish) toast(`Danke! Wunsch an ${PRIVACY_OPERATOR} gesendet.`, 'ok');
     }
     if (!isWish) toast(`"${name}" angelegt${sendWish ? ' und gewünscht' : ''}.`, 'ok');
-    el.classList.add('hidden');
+    closeExerciseInfoSheet();
     if (onDone) onDone(newId);
   };
 }

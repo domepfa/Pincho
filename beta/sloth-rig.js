@@ -162,10 +162,12 @@ const SLOTH_POSES = {
     a: { torso: -62, uarm: 20, farm: -30, thigh: 2, calf: 112 },
     b: { torso: -64, uarm: 22, farm: -28, thigh: 2, calf: 112 },
   },
+  // Bulgarian: hinterer Fuss liegt fest auf der Bank (farFoot), nur das vordere Bein beugt
   splitsquat: {
-    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, label: 'Split Squat',
-    a: { torso: -96, uarm: 96, farm: 92, thigh: 72, calf: 100, fthigh: 112, fcalf: 140 },
-    b: { torso: -94, uarm: 96, farm: 92, thigh: 8, calf: 96, fthigh: 98, fcalf: 172 },
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, farFoot: [-235, -85], label: 'Bulgarian Split Squat',
+    props: [{ img: 'bench', at: [-300, 46], a: [442, 499], k: 1.3, layer: 'back' }],
+    a: { torso: -94, uarm: 96, farm: 92, thigh: 70, calf: 104 },
+    b: { torso: -80, uarm: 100, farm: 94, thigh: 12, calf: 100 },
   },
   highknees: {
     view: 'side', pin: 'hip', dur: 0.9, floor: 210, label: 'High Knees',
@@ -316,9 +318,10 @@ const SLOTH_POSES = {
     b: { torso: -94, uarm: 150, farm: 118, fuarm: 94, ffarm: 90, thigh: 104, calf: -100, fthigh: 88, fcalf: 92 },
   },
   calfstretch: {
-    view: 'side', pin: 'fankle', dur: 3.6, floor: 46, wall: { x: 420 }, label: 'Waden-Dehnung an der Wand',
-    a: { torso: -54, uarm: -12, farm: -12, thigh: 44, calf: 96, fthigh: 128, fcalf: 128 },
-    b: { torso: -50, uarm: -8, farm: -8, thigh: 40, calf: 92, fthigh: 130, fcalf: 130 },
+    // Hände flach an der Wand (Finger nach oben)
+    view: 'side', pin: 'fankle', dur: 3.6, floor: 46, wall: { x: 596 }, label: 'Waden-Dehnung an der Wand',
+    a: { torso: -54, uarm: -12, farm: -12, hand: -84, thigh: 44, calf: 96, fthigh: 128, fcalf: 128 },
+    b: { torso: -50, uarm: -10, farm: -6, hand: -84, thigh: 40, calf: 92, fthigh: 130, fcalf: 130 },
   },
   adductor: {
     view: 'side', pin: 'knee', dur: 3, floor: 34, grip: 'flat', label: 'Adduktoren-Wippen',
@@ -480,6 +483,29 @@ const SLOTH_POSES = {
     b: { torso: -100, head: -100, uarm_l: 100, farm_l: 94, uarm_r: 60, farm_r: 150, ...STAND_LEGS, tail: 0 },
   },
   // ---- Kabelzug ----
+  // Seitlich zum Kabelturm (links), Fussschlaufe am rechten Bein, Kabel läuft vor dem Standbein durch
+  abductioncable: {
+    view: 'front', pin: 'foot_l', dur: 2.6, floor: 26, armLift: 45, label: 'Abduktion am Kabel',
+    props: [{ img: 'cable', at: [-490, 26], a: [171, 838], k: 2.7, layer: 'back' }, cableLine('low', 'foot_r')],
+    a: { torso: -90, head: -90, uarm_l: 160, farm_l: 150, uarm_r: 72, farm_r: 84, thigh_l: 94, calf_l: 91, thigh_r: 90, calf_r: 92, tail: 0 },
+    b: { torso: -94, head: -92, uarm_l: 160, farm_l: 150, uarm_r: 72, farm_r: 84, thigh_l: 94, calf_l: 91, thigh_r: 48, calf_r: 50, tail: 0 },
+  },
+  // Vorderansicht: Kabel oben rechts, beide Hände am Griff ziehen diagonal vor dem Körper nach unten links
+  woodchop: {
+    view: 'front', pin: 'feet', dur: 2.4, floor: 26, armLift: 45, armsFront: true, join: { arm: 'l', to: 'hand_r', bend: 1 }, label: 'Holzhacker am Kabel',
+    props: [{ img: 'cable', at: [620, 26], a: [171, 838], k: 2.7, flip: true, layer: 'back' }, cableLine('top', 'hand_r'),
+      { img: 'dhandle', at: 'hand_r', a: [226, 205], k: 1.1 }],
+    a: { torso: -80, head: -84, uarm_l: -23.6, farm_l: -23.6, uarm_r: 45, farm_r: 268, ...STAND_LEGS, tail: 0 },
+    b: { torso: -100, head: -96, uarm_l: 142.9, farm_l: 45.9, uarm_r: 127.5, farm_r: 127.5, ...STAND_LEGS, tail: 0 },
+  },
+  // Kabelturm links, Griff in der linken Hand; neigt sich gegen den Zug vom Turm weg
+  sidebendcable: {
+    view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, relArms: true, label: 'Seitbeuge am Kabel',
+    props: [{ img: 'cable', at: [-460, 26], a: [171, 838], k: 2.7, layer: 'back' }, cableLine('low', 'hand_l'),
+      { img: 'dhandle', at: 'hand_l', a: [226, 205], k: 1.1 }],
+    a: { torso: -100, head: -98, uarm_l: 100, farm_l: 94, uarm_r: 60, farm_r: 150, ...STAND_LEGS, tail: 0 },
+    b: { torso: -76, head: -80, uarm_l: 100, farm_l: 94, uarm_r: 60, farm_r: 150, ...STAND_LEGS, tail: 0 },
+  },
   facepull: {
     view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Face Pull',
     props: [cableTower(420), cableLine('top'), { img: 'rope', at: 'grip', a: [568, 196], k: 1.2 }],
@@ -510,12 +536,6 @@ const SLOTH_POSES = {
     a: { torso: -86, uarm: 170, farm: -10, thigh: 90, calf: 180, fthigh: 90, fcalf: 180 },
     b: { torso: -10, uarm: 170, farm: -10, thigh: 110, calf: 180, fthigh: 110, fcalf: 180 },
   },
-  woodchop: {
-    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Holzhacker am Kabel',
-    props: [cableTower(460), cableLine('top'), { img: 'dhandle', at: 'grip', a: [226, 205], k: 1.1 }],
-    a: { torso: -96, uarm: -36, farm: -30, thigh: 84, calf: 92 },
-    b: { torso: -80, uarm: 80, farm: 70, thigh: 70, calf: 100 },
-  },
   pallof: {
     view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Pallof Press',
     props: [cableTower(470), cableLine('mid'), { img: 'dhandle', at: 'grip', a: [226, 205], k: 1.1 }],
@@ -523,10 +543,11 @@ const SLOTH_POSES = {
     b: { torso: -94, uarm: -4, farm: -4, thigh: 80, calf: 96 },
   },
   kickback: {
-    view: 'side', pin: 'fankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Kickback am Kabel',
+    // feet: eigener Fuss, damit er beim Zurückdrücken nicht mit dem Unterschenkel mitdreht (Zehen zeigen zum Boden)
+    view: 'side', pin: 'fankle', dur: 2.4, floor: 48, feet: true, grip: 'fist', label: 'Kickback am Kabel',
     props: [cableTower(330), cableLine('low', 'ankle')],
-    a: { torso: -70, uarm: -8, farm: -8, fuarm: -8, ffarm: -8, thigh: 96, calf: 96, fthigh: 88, fcalf: 94 },
-    b: { torso: -70, uarm: -8, farm: -8, fuarm: -8, ffarm: -8, thigh: 150, calf: 158, fthigh: 88, fcalf: 94 },
+    a: { torso: -70, uarm: -8, farm: -8, fuarm: -8, ffarm: -8, thigh: 96, calf: 98, foot: 16, fthigh: 88, fcalf: 94, ffoot: 16 },
+    b: { torso: -70, uarm: -8, farm: -8, fuarm: -8, ffarm: -8, thigh: 150, calf: 154, foot: 70, fthigh: 88, fcalf: 94, ffoot: 16 },
   },
   crossover: {
     view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, label: 'Kabel-Crossover',
@@ -573,10 +594,12 @@ const SLOTH_POSES = {
     b: { torso: -4, uarm: 70, farm: 0, thigh: 184, calf: 284 }, // über 270° (nach oben) zum Gesäss, nicht durch den Boden
   },
   pecdeck: {
+    // Arme kommen nach vorne: Oberarm zeigt zum Betrachter (kürzer), Unterarme
+    // klappen nach innen, bis sich die Hände vor der Brustmitte treffen
     view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, armsFront: true, label: 'Butterfly',
     props: [{ img: 'butterfly', at: [0, 26], a: [125, 555], k: 3.6, layer: 'back' }],
-    a: { torso: -90, head: -90, uarm_l: 184, farm_l: 196, uarm_r: -4, farm_r: -16, ...STAND_LEGS, tail: 0 },
-    b: { torso: -90, head: -90, uarm_l: 184, farm_l: 190, uarm_r: -4, farm_r: -10, len_uarm_l: 0.3, len_farm_l: -0.55, len_uarm_r: 0.3, len_farm_r: -0.55, ...STAND_LEGS, tail: 0 },
+    a: { torso: -90, head: -90, uarm_l: 184, farm_l: 184, uarm_r: -4, farm_r: -4, ...STAND_LEGS, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: 184, farm_l: 184, uarm_r: -4, farm_r: -4, len_uarm_l: 0.4, len_farm_l: -0.85, len_uarm_r: 0.4, len_farm_r: -0.85, ...STAND_LEGS, tail: 0 },
   },
 
   reversefly: {
@@ -598,10 +621,11 @@ const SLOTH_POSES = {
     b: { torso: -96, uarm: 70, farm: 10, thigh: -10, calf: 96 },
   },
   calfmachine: {
-    view: 'side', pin: 'ankle', dur: 2, floor: 46, label: 'Wadenheben an der Maschine',
-    props: [{ img: 'calfstanding', at: [40, 46], a: [1000, 553], k: 3.9, layer: 'back' }],
-    a: { torso: -96, uarm: 70, farm: -84, thigh: 84, calf: 92, dy: 0 },
-    b: { torso: -96, uarm: 70, farm: -84, thigh: 84, calf: 92, dy: -26 },
+    view: 'side', pin: 'ankle', dur: 2, floor: 118, label: 'Wadenheben an der Maschine',
+    // a = Knöchel über der Trittkante (Vorfuss auf der Kante), Polster liegt dann auf den Schultern
+    props: [{ img: 'calfstanding', at: [0, 42], a: [1030, 518], k: 3.3, layer: 'back' }],
+    a: { torso: -92, uarm: 76, farm: -84, thigh: 84, calf: 92, dy: 0 },
+    b: { torso: -92, uarm: 76, farm: -84, thigh: 84, calf: 92, dy: -26 },
   },
   backext: {
     view: 'side', pin: 'hip', dur: 2.8, floor: 332, relArms: true, label: 'Rückenstrecker',
@@ -718,8 +742,8 @@ function slothRigBuild(pose) {
   const mul = (v, k) => [v[0] * k, v[1] * k];
   const a0 = (name) => { const [p, d] = J[name]; return Math.atan2(d[1] - p[1], d[0] - p[0]) * 180 / Math.PI; };
   // Teil so stellen, dass sein Nah-Gelenk auf P liegt und der Knochen in Weltrichtung deg zeigt
-  const place = (name, P, deg, img) => {
-    const [p, d, k = 1] = J[name], r = deg - a0(name);
+  const place = (name, P, deg, img, km = 1) => {
+    const [p, d, k0 = 1] = J[name], r = deg - a0(name), k = k0 * km;
     return { img: img || view + '_' + name, P, r, p, k, map: (q) => add(P, mul(rot(sub(q, p), r), k)), end: add(P, mul(rot(sub(d, p), r), k)) };
   };
   const ball = (img, P) => { const b = SLOTH_PARTS[img]; return { img, P, r: 0, p: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k: 1 }; };
@@ -739,8 +763,11 @@ function slothRigBuild(pose) {
         q['farm' + x] = place('fist', q['uarm' + x].end, v('farm'), 'side_fist' + x);
         q['hand' + x] = { skip: true, end: q['farm' + x].end };
       } else {
-        q['farm' + x] = place('farm', q['uarm' + x].end, v('farm'), 'side_farm' + x);
-        q['hand' + x] = place(hk, q['farm' + x].end, v('hand') ?? v('farm'), 'side_' + hk + x);
+        // Offene Hand: Unterarm und Krallenhand aus der Vorlage sind zusammen gut
+        // doppelt so lang wie der Oberarm; auf menschliche Proportionen kürzen.
+        const open = hk === 'hand';
+        q['farm' + x] = place('farm', q['uarm' + x].end, v('farm'), 'side_farm' + x, open ? 0.82 : 1);
+        q['hand' + x] = place(hk, q['farm' + x].end, v('hand') ?? v('farm'), 'side_' + hk + x, open ? 0.66 : 1);
       }
       q['thigh' + x] = place('thigh', hip, v('thigh'), 'side_thigh' + x);
       q['knee' + x] = ball('side_knee' + x, q['thigh' + x].end);
@@ -750,6 +777,19 @@ function slothRigBuild(pose) {
       } else {
         q['calf' + x] = place('calf', q['thigh' + x].end, v('calf'), 'side_calf' + x);
         q['foot' + x] = { skip: true, end: q['calf' + x].end };
+      }
+      // farFoot: [dx, dy] hinterer Knöchel bleibt fest relativ zum vorderen (z. B. auf der Bank),
+      // Oberschenkel/Unterschenkel per Zweigelenk-IK, Knie zeigt nach unten
+      if (far && pose.farFoot) {
+        const T = add(q.calf.end, pose.farFoot), len = (e) => Math.hypot(e.end[0] - e.P[0], e.end[1] - e.P[1]);
+        const L1 = len(q.thigh_far), L2 = len(q.calf_far), dv = sub(T, hip);
+        const d = Math.min(Math.max(Math.hypot(dv[0], dv[1]), Math.abs(L1 - L2) + 1), L1 + L2 - 0.01);
+        const base = Math.atan2(dv[1], dv[0]) * 180 / Math.PI, al = Math.acos((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d)) * 180 / Math.PI;
+        const th = [base + al, base - al].map((deg) => place('thigh', hip, deg, 'side_thigh_far')).sort((m, n) => n.end[1] - m.end[1])[0];
+        const cv = sub(T, th.end);
+        q.thigh_far = th;
+        q.knee_far = ball('side_knee_far', th.end);
+        q.calf_far = place('calf', th.end, Math.atan2(cv[1], cv[0]) * 180 / Math.PI + (pose.farFoot[2] || 0), 'side_calf_far');
       }
     }
     for (const k of pose.mirror || []) q[k].k = [q[k].k, -q[k].k]; // Teil an der Knochenachse spiegeln
@@ -775,6 +815,18 @@ function slothRigBuild(pose) {
       q['thigh_' + x] = place('thigh_' + x, t.map(A['hip_' + x]), leg('thigh_' + x));
       q['calf_' + x] = place('calf_' + x, q['thigh_' + x].end, leg('calf_' + x));
       if (view === 'back') q['elbow_' + x] = ball('back_elbow_' + x, q['uarm_' + x].end);
+    }
+    // join: { arm, to, bend } — dieser Arm greift per Zweigelenk-IK an einen Punkt des anderen Arms
+    // (beide Hände am selben Griff); bend ±1 wählt, auf welcher Seite der Ellbogen liegt
+    if (pose.join) {
+      const { arm: x, to, bend = 1 } = pose.join, u = q['uarm_' + x], f = q['farm_' + x];
+      const T = q[to.replace('hand', 'farm')].end, S = u.P, len = (e) => Math.hypot(e.end[0] - e.P[0], e.end[1] - e.P[1]);
+      const L1 = len(u), L2 = len(f), dv = sub(T, S);
+      const d = Math.min(Math.max(Math.hypot(dv[0], dv[1]), Math.abs(L1 - L2) + 1), L1 + L2 - 0.01);
+      const al = Math.acos((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d)) * 180 / Math.PI;
+      q['uarm_' + x] = place('uarm_' + x, S, Math.atan2(dv[1], dv[0]) * 180 / Math.PI + bend * al);
+      const E = q['uarm_' + x].end, fv = sub(T, E);
+      q['farm_' + x] = place('farm_' + x, E, Math.atan2(fv[1], fv[0]) * 180 / Math.PI);
     }
     // mirror: Teile an ihrer Knochenachse spiegeln (z. B. Hand beim Winken mit Krallen nach innen)
     for (const k of pose.mirror || []) q[k].k = [1, -1];
