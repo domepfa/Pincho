@@ -1760,3 +1760,9 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .fb-start-meta { font-size: 13px; color: var(--ink-dim); }
 .fb-start-card .fb-start-go { width: 60px; height: 60px; border-radius: 50%; flex: none; display: grid; place-items: center; padding: 0; }
 .fb-start-sug { font-size: 13px; color: var(--accent); font-weight: 600; }
+
+/* Übung antippen -> Hinzufügen-Knopf erscheint direkt in der Karte */
+.ex-card { flex-wrap: wrap; }
+.ex-quick-add { flex: 0 0 calc(100% - 16px); margin: 0 8px 8px; min-height: 44px; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
+  font: 700 16px 'Barlow', system-ui, sans-serif; cursor: pointer; animation: riseIn .18s ease both; }
+.ex-quick-add.done { background: var(--surface-2); color: var(--success); }

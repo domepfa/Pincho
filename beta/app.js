@@ -367,8 +367,24 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
         listHolder.querySelectorAll('.ex-card').forEach((c) => c.classList.toggle('active', c.contains(btn)));
         listHolder.querySelectorAll('.ex-pick-btn').forEach((b) => b.classList.toggle('active', b === btn));
         onSelect(selectedId);
+        // Hinzufügen direkt an der angetippten Übung statt zum Knopf unten zu springen und wieder hochzuscrollen
         if (scrollTargetId) {
-          document.getElementById(scrollTargetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          listHolder.querySelectorAll('.ex-quick-add').forEach((b) => b.remove());
+          const card = btn.closest('.ex-card');
+          const add = document.createElement('button');
+          add.type = 'button';
+          add.className = 'ex-quick-add';
+          add.textContent = '＋ Hinzufügen';
+          add.onclick = () => {
+            const target = document.getElementById(scrollTargetId);
+            if (!target) return;
+            target.click();
+            add.textContent = '✓ Hinzugefügt';
+            add.classList.add('done');
+            toast(`${exerciseName(selectedId)} hinzugefügt`, 'ok');
+            setTimeout(() => add.remove(), 1400);
+          };
+          card.appendChild(add);
         }
       };
     });
@@ -2693,10 +2709,6 @@ function renderLogBuilderPanel() {
     document.getElementById('log-exercise-add').onclick = () => {
       logBuilder.exercises.push({ exerciseId: logPickerExerciseId, sets: 3, reps: '', weight: '' });
       renderLogExerciseRows();
-      // Direkt zur neu hinzugefügten Zeile scrollen, damit man das Gewicht/
-      // die Wiederholungen sofort eintragen kann, ohne zurückscrollen zu
-      // müssen — die Zeile landet sonst ausserhalb des sichtbaren Bereichs.
-      document.getElementById(`log-exercise-row-${logBuilder.exercises.length - 1}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       const startBtn = document.getElementById('plan-start');
       if (startBtn) startBtn.disabled = !logBuilder.exercises.length;
       showFabStart('▶ STARTEN', 'plan-start');

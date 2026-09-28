@@ -64,7 +64,8 @@ const SLOTH_JOINTS = {
 // Anschlusspunkte am Rumpf
 const SLOTH_ANCHORS = {
   front: { neck: [600, 282], sh_l: [470, 318], sh_r: [730, 318], hip_l: [532, 545], hip_r: [668, 545], tail: [602, 585] },
-  back: { neck: [603, 282], sh_l: [470, 318], sh_r: [732, 318], hip_l: [520, 584], hip_r: [686, 584], tail: [604, 616] },
+  // tail: direkt unter dem Chalkbag (Unterkante ~y 585), nicht erst unter dem Gesäss
+  back: { neck: [603, 282], sh_l: [470, 318], sh_r: [732, 318], hip_l: [520, 584], hip_r: [686, 584], tail: [604, 588] },
   side: { shoulder: [544, 295], hip: [586, 513], tail: [505, 505], face: [685, 190] },
 };
 // Zeichenreihenfolge (hinten -> vorne)
@@ -618,13 +619,17 @@ const SLOTH_POSES = {
     a: { torso: -4, uarm: 70, farm: 0, thigh: 180, calf: 182 },
     b: { torso: -4, uarm: 70, farm: 0, thigh: 184, calf: 284 }, // über 270° (nach oben) zum Gesäss, nicht durch den Boden
   },
+  // Wie an der Maschine: Oberarme waagrecht, Unterarme senkrecht an den Polstern. Die Ellbogen schwenken
+  // nach vorne zur Mitte (Oberarm verkürzt sich perspektivisch), die Unterarme kommen vor die Brust und
+  // werden dabei etwas grösser -> liest sich als Bewegung zum Betrachter, nicht nach hinten
+  // Seitenansicht, sitzend: die Arme kommen von aussen (zeigen zum Betrachter bzw. vom ihm weg, darum kurz)
+  // nach vorne, bis sie vor der Brust gestreckt nebeneinander liegen. Von vorne wäre "nach vorne" und
+  // "nach hinten" im Bild nicht zu unterscheiden.
   pecdeck: {
-    // Arme kommen nach vorne: Oberarm zeigt zum Betrachter (kürzer), Unterarme
-    // klappen nach innen, bis sich die Hände vor der Brustmitte treffen
-    view: 'front', pin: 'feet', dur: 2.6, floor: 26, armLift: 45, armsFront: true, label: 'Butterfly',
-    props: [{ img: 'butterfly', at: [0, 26], a: [125, 555], k: 3.6, layer: 'back' }],
-    a: { torso: -90, head: -90, uarm_l: 184, farm_l: 184, uarm_r: -4, farm_r: -4, ...STAND_LEGS, tail: 0 },
-    b: { torso: -90, head: -90, uarm_l: 184, farm_l: 184, uarm_r: -4, farm_r: -4, len_uarm_l: 0.4, len_farm_l: -0.85, len_uarm_r: 0.4, len_farm_r: -0.85, ...STAND_LEGS, tail: 0 },
+    view: 'side', pin: 'hip', dur: 2.6, floor: 230, grip: 'fist', label: 'Butterfly',
+    props: [{ img: 'bench', at: [70, 60], a: [442, 422], k: 2, layer: 'back' }],
+    a: { torso: -96, uarm: 8, farm: 24, len_uarm: 0.5, len_farm: 0.55, near_uarm: 1.12, near_farm: 1.25, flen_uarm: 0.5, flen_farm: 0.55, fnear_uarm: 0.88, fnear_farm: 0.82, thigh: -4, calf: 92 },
+    b: { torso: -96, uarm: 4, farm: 10, len_uarm: 1, len_farm: 1, near_uarm: 1, near_farm: 1, flen_uarm: 1, flen_farm: 1, fnear_uarm: 1, fnear_farm: 1, thigh: -4, calf: 92 },
   },
 
   reversefly: {
@@ -827,10 +832,14 @@ function slothRigBuild(pose) {
       // relArms: Armwinkel relativ zum Rumpf (Arme drehen beim Aufrichten mit)
       const v = (k) => (raw(k) != null && ((pose.relArms && /arm|hand/.test(k)) || (pose.relLegs && /thigh|calf/.test(k))) ? raw(k) + s.torso : raw(k));
       const sh = add(t.map(A.shoulder), far ? D : [0, 0]), hip = add(t.map(A.hip), far ? D : [0, 0]);
-      q['uarm' + x] = place('uarm', sh, v('uarm'), 'side_uarm' + x);
+      // len_/near_: Arm zeigt zum Betrachter bzw. von ihm weg (verkürzt, näher = grösser); hinten: flen_/fnear_
+      const fore = (e, k) => { const L = raw('len_' + k) ?? 1, N = raw('near_' + k) ?? 1; if (L === 1 && N === 1) return e;
+        const kk = Array.isArray(e.k) ? e.k : [e.k, e.k], d = sub(e.end, e.P);
+        return { ...e, k: [kk[0] * L * N, kk[1] * N], end: add(e.P, mul(d, L * N)) }; };
+      q['uarm' + x] = fore(place('uarm', sh, v('uarm'), 'side_uarm' + x), 'uarm');
       q['elbow' + x] = ball('side_elbow' + x, q['uarm' + x].end);
       if (hk === 'fist') { // Faust-Teil enthält den Unterarm: sitzt direkt am Ellbogen, kein eigener Unterarm
-        q['farm' + x] = place('fist', q['uarm' + x].end, v('farm'), 'side_fist' + x);
+        q['farm' + x] = fore(place('fist', q['uarm' + x].end, v('farm'), 'side_fist' + x), 'farm');
         q['hand' + x] = { skip: true, end: q['farm' + x].end };
       } else {
         // Offene Hand: Unterarm und Krallenhand aus der Vorlage sind zusammen gut
@@ -875,8 +884,9 @@ function slothRigBuild(pose) {
     q.tail = place('tail', t.map(A.tail), s.torso + 180 + (s.tail || 0));
     const arm = (k) => s[k] + (pose.relArms ? s.torso + 90 : 0), leg = (k) => s[k] + (pose.relLegs ? s.torso + 90 : 0);
     // len_<teil>: Glied verkürzt (zeigt zum Betrachter, z. B. Arme kommen beim Butterfly nach vorne)
-    const shorten = (e, key) => { const L = s['len_' + key]; if (L == null || L === 1) return e;
-      const d = sub(e.end, e.P); return { ...e, k: [e.k * L, e.k], end: add(e.P, mul(d, L)) }; };
+    // near_<teil>: Glied kommt zum Betrachter -> insgesamt etwas grösser (Perspektive)
+    const shorten = (e, key) => { const L = s['len_' + key] ?? 1, N = s['near_' + key] ?? 1; if (L === 1 && N === 1) return e;
+      const d = sub(e.end, e.P); return { ...e, k: [e.k * L * N, e.k * N], end: add(e.P, mul(d, L * N)) }; };
     for (const x of ['l', 'r']) {
       const sh = A['sh_' + x];
       q['uarm_' + x] = shorten(place('uarm_' + x, t.map([sh[0], sh[1] - (pose.armLift || 0)]), arm('uarm_' + x)), 'uarm_' + x);
@@ -1002,12 +1012,22 @@ function slothRigPrepare(name) {
   for (let i = 0; i <= N; i++) {
     const m = amount(i / N), s = {};
     for (const k of new Set([...Object.keys(pose.a), ...Object.keys(pose.b)])) {
-      const a = pose.a[k] ?? (k.startsWith('len_') ? 1 : pose.b[k]); // fehlt in a: Länge 1, sonst wie b
+      const a = pose.a[k] ?? (/^(len|near)_/.test(k) ? 1 : pose.b[k]); // fehlt in a: Länge 1, sonst wie b
       s[k] = a + ((pose.b[k] ?? a) - a) * m;
     }
     // Nachschwingen: der Schwanz pendelt der Bewegung etwas hinterher
     s.tail = (s.tail || 0) + 7 * Math.sin(2 * Math.PI * i / N - 1.2);
     frames.push(build(s));
+  }
+  // Drehwinkel über die Stellungen stetig machen: springt ein Winkel von 180° auf -178°, würde die
+  // CSS-Animation das Teil einmal fast ganz herumdrehen (sichtbares Zucken)
+  for (const key of Object.keys(frames[0])) {
+    for (let i = 1; i < frames.length; i++) {
+      const prev = frames[i - 1][key], cur = frames[i][key];
+      if (!prev || !cur || prev.skip || cur.skip || cur.r == null) continue;
+      while (cur.r - prev.r > 180) cur.r -= 360;
+      while (cur.r - prev.r < -180) cur.r += 360;
+    }
   }
   // Gewichtsstapel heben: halbe Seilverlängerung gegenüber der kürzesten Stellung
   (pose.props || []).forEach((pr, i) => {
