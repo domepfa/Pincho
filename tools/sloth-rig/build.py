@@ -54,7 +54,22 @@ EQUIP = {
 }
 
 # Bereiche, die aus einem Gerät entfernt werden (x0, y0, x1, y1 im Blatt): Griff am Kabelturm, Stange am Latzug
-EQUIP_ERASE = {'cable': [(214, 652, 256, 714)], 'latpull': [(115, 52, 242, 90)]}
+EQUIP_ERASE = {'cable': [(214, 652, 256, 714)], 'latpull': [(115, 52, 242, 90)], 'stack': [(290, 651, 400, 680)]}
+
+# Gesichter (Gemini-Bögen): Kopf-Varianten, alle in den Rahmen des neutralen Kopfes verschoben,
+# damit sie in der Puppe deckungsgleich übereinander liegen
+FACES_FRONT = ('faces_front.jpg', {'neutral': 1, 'effort': 2, 'blink': 3, 'yawn': 4})
+FACES_SIDE = ('faces_side.jpg', {'neutral': 2, 'effort': 3, 'blink': 1})
+# Kragen unter dem Seitenkopf abschneiden: Linie relativ zur linken oberen Ecke des Kopfes, weich auslaufend
+SIDE_COLLAR = ((2, 245), (158, 275), 10)
+# Seitenrumpf ohne eingezeichneten Kopf: alles oberhalb der Linie weg (vorne waagrecht, zum Rücken ansteigend)
+SIDE_NECK_CUT = (560, 246, 0.5, 8)  # x ab dem waagrecht, y, Steigung nach hinten, Weichheit
+
+# Weitere Geräte aus den Gemini-Bögen
+EQUIP2 = {
+    'geraete2.jpg': {'stack': [231], 'calfframe': [229], 'calfpad': [232], 'dipbars': [285], 'nordic': [284], 'abductseat': [248]},
+    'geraete3.jpg': {'edge': [156]},
+}
 
 # Geräte etwas dunkler, damit sie neben dem Faultier zurücktreten
 EQUIP_DARK = 0.62
@@ -75,8 +90,9 @@ def gray(rgb):
     return np.interp(lum, np.linspace(0, 1, len(CURVE)), CURVE) * 255
 
 
-def cut(rgb, lab, ids, g, out, fix=None, dark=1.0, erase=(), holes=True):
+def cut(rgb, lab, ids, g, out, fix=None, dark=1.0, erase=(), holes=True, soft=None, shift=(0, 0)):
     # holes: eingeschlossene weisse Flächen mitnehmen (Augen, Zähne); bei Geräten nicht (Lücken im Rahmen)
+    # soft(xx, yy) -> 0..1: weich ausblenden (Kragen, Kopf am Rumpf); shift: Rechteck in einen anderen Rahmen verschieben
     m = np.isin(lab, ids)
     if holes:
         m = ndi.binary_fill_holes(m)
@@ -95,9 +111,38 @@ def cut(rgb, lab, ids, g, out, fix=None, dark=1.0, erase=(), holes=True):
         g[hole & m] = fill[hole & m]
     g = np.clip(g * dark, 0, 255).astype(np.uint8)
     mask = Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.6))
+    if soft is not None:
+        yy, xx = np.mgrid[0:g.shape[0], 0:g.shape[1]]
+        mask = Image.fromarray((np.asarray(mask).astype(float) * soft(xx, yy)).astype(np.uint8))
     box = mask.getbbox()
     Image.merge('LA', (Image.fromarray(g), mask)).crop(box).save(out, optimize=True)
-    return list(box)
+    return [box[0] - shift[0], box[1] - shift[1], box[2] - shift[0], box[3] - shift[1]]
+
+
+def faces(fname, comps, view, parts, soft_rel=None):
+    rgb, lab = label(os.path.join(HERE, 'sheets', fname))
+    g = gray(rgb)
+    objs = ndi.find_objects(lab)
+    ref = objs[comps['neutral'] - 1]
+    for name, cid in comps.items():
+        sl = objs[cid - 1]
+        dx, dy = sl[1].start - ref[1].start, sl[0].start - ref[0].start
+        soft = soft_rel(sl[1].start, sl[0].start) if soft_rel else None
+        parts[f'{view}_face_{name}'] = cut(rgb, lab, [cid], g, os.path.join(OUT, f'{view}_face_{name}.png'), soft=soft, shift=(dx, dy))
+
+
+def collar(x0, y0):
+    (ax, ay), (bx, by), w = SIDE_COLLAR
+    def f(xx, yy):
+        yl = y0 + ay + (by - ay) * (xx - x0 - ax) / (bx - ax)
+        return np.clip((yl - yy) / w, 0, 1)
+    return f
+
+
+def neck_cut(xx, yy):
+    x0, y0, k, w = SIDE_NECK_CUT
+    yl = np.where(xx >= x0, y0, y0 - (x0 - xx) * k)
+    return np.clip((yy - yl) / w, 0, 1)
 
 
 def main():
@@ -117,6 +162,13 @@ def main():
         g = gray(rgb)
         for name, ids in comps.items():
             parts[f'eq_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'eq_{name}.png'), dark=EQUIP_DARK, erase=EQUIP_ERASE.get(name, ()), holes=False)
+    for fname, comps in EQUIP2.items():
+        rgb, lab = label(os.path.join(HERE, 'sheets', 'equipment', fname))
+        g = gray(rgb)
+        for name, ids in comps.items():
+            parts[f'eq_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'eq_{name}.png'), dark=EQUIP_DARK, erase=EQUIP_ERASE.get(name, ()), holes=False)
+    faces(*FACES_FRONT, 'front', parts)
+    faces(*FACES_SIDE, 'side', parts, soft_rel=collar)
     for fname, comps in SIDE:
         rgb, lab = label(os.path.join(HERE, 'sheets', fname))
         g = gray(rgb)
@@ -126,6 +178,8 @@ def main():
             fix = SIDE_SOCKETS if name == 'torso' else None
             er = SIDE_SHIN_CUT if name == 'shin' else ()
             parts[f'side_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}.png'), fix, erase=er)
+            if name == 'torso':  # Rumpf ohne Kopf (der Kopf kommt einzeln, mit Gesichtern)
+                parts['side_body'] = cut(rgb, lab, ids, g, os.path.join(OUT, 'side_body.png'), fix, soft=neck_cut)
             if name in SIDE_FAR:
                 parts[f'side_{name}_far'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'side_{name}_far.png'), dark=FAR_DARK, erase=er)
     js = open(RIG_JS).read()
