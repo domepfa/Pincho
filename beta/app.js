@@ -5,7 +5,13 @@
 
 const APP_ROOT = document.getElementById('app');
 const TOAST_ROOT = document.getElementById('toast-root');
-const APP_TAGLINE = 'PINCHIBOY, come make me scream!';
+const APP_TAGLINE = 'Poco a poco.';
+// Insider für Salomon: am Hangboard darf's beim letzten Griff auch mal laut werden
+const APP_TAGLINE_SALOMON = 'PINCHIBOY, come make me scream!';
+function appTagline() {
+  const name = state.member && state.member.name ? state.member.name.trim().toLowerCase() : '';
+  return name === 'salomon' ? APP_TAGLINE_SALOMON : APP_TAGLINE;
+}
 let appTaglineTyped = false; // Buchstabe-für-Buchstabe-Effekt läuft nur einmal pro App-Öffnung, nicht bei jeder Navigation
 
 /* Buchstaben-für-Buchstaben-Aufploppen, schnell statt gemächlich — reine
@@ -15,9 +21,10 @@ function typeTagline(el) {
   if (!el) return;
   let i = 0;
   const step = () => {
-    el.textContent = APP_TAGLINE.slice(0, i);
+    const text = appTagline();
+    el.textContent = text.slice(0, i);
     i++;
-    if (i <= APP_TAGLINE.length) setTimeout(step, 16);
+    if (i <= text.length) setTimeout(step, 16);
   };
   step();
 }
@@ -980,7 +987,7 @@ function renderShell(contentHtml) {
     <div class="topbar">
       <div class="brand">
         <span class="mark">PIN<em>CHO</em>${IS_BETA ? ' <span class="beta-badge">BETA</span>' : ''}</span>
-        <p class="app-tagline mono" id="app-tagline">${appTaglineTyped ? esc(APP_TAGLINE) : ''}</p>
+        <p class="app-tagline mono" id="app-tagline">${appTaglineTyped ? esc(appTagline()) : ''}</p>
       </div>
       <a class="who" href="#konto" title="Konto &amp; Crews">
         <span class="name mono">${memberName}</span>
