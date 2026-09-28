@@ -490,6 +490,8 @@ const PINCHO_PROGRAMS = [
     blocks: [...WARMUP_BLOCKS, hangBlock('edge_medium', 5, 10, 180, 0)] },
   { id: 'pp_repeaters', name: 'Repeaters 7/3', note: 'Kraftausdauer: 7 s hängen, 3 s Pause, 6 Wiederholungen je Satz.',
     blocks: [...WARMUP_BLOCKS, hangBlock('edge_medium', 6, 7, 3, 180), hangBlock('edge_medium', 6, 7, 3, 180), hangBlock('edge_medium', 6, 7, 3, 180), hangBlock('sloper_medium', 6, 7, 3, 0)] },
+  { id: 'pp_maxtest', name: 'Max-Hang-Test', note: 'Alle 4–6 Wochen: 3 Versuche à 10 s an der mittleren Kante mit so viel Zusatzgewicht wie sicher geht. Die App merkt sich das beste geschaffte Gewicht und schlägt danach für Max Hangs 85 % davon vor.',
+    blocks: [...WARMUP_BLOCKS, hangBlock('edge_medium', 1, 10, 0, 180), hangBlock('edge_medium', 1, 10, 0, 180), hangBlock('edge_medium', 1, 10, 0, 0)] },
   { id: 'pp_minedge', name: 'Min-Edge', note: 'Für Fortgeschrittene: kleinste Kante ohne Zusatzgewicht, 10 s, lange Pausen.',
     blocks: [...WARMUP_BLOCKS, hangBlock('edge_xsmall', 5, 10, 150, 0)] },
 ];
