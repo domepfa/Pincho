@@ -11580,6 +11580,38 @@ function wishesCardHtml(list) {
     </div>`;
 }
 
+/* Faultier-Animationen: An / Ruhig (ohne Gesichter, Schwanzschwingen, Bahnlinie, Überblenden) / Aus (steht still).
+   Gilt pro Gerät; die Klasse am <html> steuert das Stylesheet (siehe anim-calm / anim-off). */
+const ANIM_KEY = 'pinchobeta_anim';
+const ANIM_LEVELS = [['on', 'An', 'Alles, auch Gesichter und Nachschwingen'], ['calm', 'Ruhig', 'Bewegung ja, ohne Gesichter und Effekte'], ['off', 'Aus', 'Faultier steht still, spart Akku']];
+function animLevel() { try { return localStorage.getItem(ANIM_KEY) || 'on'; } catch (e) { return 'on'; } }
+function applyAnimLevel() {
+  const lvl = animLevel();
+  document.documentElement.classList.toggle('anim-calm', lvl === 'calm');
+  document.documentElement.classList.toggle('anim-off', lvl === 'off');
+}
+applyAnimLevel();
+function renderKontoAnim() {
+  const holder = document.getElementById('konto-anim');
+  if (!holder) return;
+  const lvl = animLevel();
+  holder.innerHTML = `
+    <div class="card">
+      <p class="card-title">Faultier-Animationen</p>
+      <p class="card-sub" style="margin-bottom:10px;">${esc(ANIM_LEVELS.find((l) => l[0] === lvl)[2])}.</p>
+      <div class="chip-row">
+        ${ANIM_LEVELS.map(([k, label]) => `<button type="button" class="chip ${k === lvl ? 'active' : ''}" data-anim-level="${k}">${label}</button>`).join('')}
+      </div>
+    </div>`;
+  holder.querySelectorAll('[data-anim-level]').forEach((b) => {
+    b.onclick = () => {
+      try { localStorage.setItem(ANIM_KEY, b.dataset.animLevel); } catch (e) { /* ignorieren */ }
+      applyAnimLevel();
+      renderKontoAnim();
+    };
+  });
+}
+
 function renderKontoNav() {
   const holder = document.getElementById('konto-nav');
   if (!holder) return;
@@ -11647,6 +11679,7 @@ async function renderKonto() {
       </div>
     </div>
     <div id="konto-nav"></div>
+    <div id="konto-anim"></div>
     <div id="konto-create"></div>
     <div id="konto-wishes"></div>
     <div id="konto-cycle"></div>
@@ -11654,6 +11687,7 @@ async function renderKonto() {
   `);
   document.getElementById('konto-logout').onclick = () => logout();
   renderKontoNav();
+  renderKontoAnim();
   document.getElementById('konto-join').onclick = () => joinCrewWithCode(normalizeInviteCode(document.getElementById('konto-join-code').value));
 
   await loadCrews(); // frisch: neue Mitglieder sollen ohne Neustart erscheinen

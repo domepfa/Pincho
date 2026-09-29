@@ -1,6 +1,6 @@
-const CACHE_NAME = 'pincho-shell-v124';
+const CACHE_NAME = 'pincho-shell-v125';
 const SHELL_ASSETS = [
-  './', './index.html', './styles.css', './data.js', './firebase.js', './app.js',
+  './', './index.html', './styles.css', './data.js', './firebase.js', './sloth-rig.js', './app.js',
   './manifest.json', './assets/icon-512-any.png', './assets/icon-192-any.png', './assets/icon-512-transparent.png', './assets/icon-512-maskable.png',
   './assets/board-bm1000.png', './assets/board-bm2000.png', './assets/board-campus.jpg',
   './assets/ki-anleitung-json.md',

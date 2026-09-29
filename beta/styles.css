@@ -1766,3 +1766,11 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .ex-quick-add { flex: 0 0 calc(100% - 16px); margin: 0 8px 8px; min-height: 44px; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
   font: 700 16px 'Barlow', system-ui, sans-serif; cursor: pointer; animation: riseIn .18s ease both; }
 .ex-quick-add.done { background: var(--surface-2); color: var(--success); }
+
+/* Faultier-Animationen (Konto): Ruhig = ohne Gesichter, Bahnlinie, Überblenden; Aus = steht still */
+.anim-calm .sloth-rig .sf-blink, .anim-calm .sloth-rig .sf-yawn, .anim-calm .sloth-rig .sf-effort { animation: none !important; opacity: 0 !important; }
+.anim-calm .sloth-rig-path, .anim-off .sloth-rig-path { display: none; }
+.anim-calm .sloth-rig.sr-enter, .anim-off .sloth-rig.sr-enter { animation: none; }
+.anim-off .sloth-rig g, .anim-off .sloth-rig image { animation: none !important; }
+.anim-off .sloth-rig .sw-1 { opacity: 0; }
+.anim-off .fb-done-sloth, .anim-off .pg-pr-sloth { animation: none; }
