@@ -1502,7 +1502,10 @@ async function renderLog() {
     const entry = {
       date: (dateInput && dateInput.value) || todayKey(),
       type: hideTypeField ? 'gym' : document.getElementById('log-type').value,
-      exercises: rawExercises.map((g) => ({ exerciseId: g.exerciseId, sets: g.sets })),
+      exercises: rawExercises.map((g) => {
+        const stillLinked = g.superset && rawExercises.filter((x) => x.superset === g.superset).length > 1;
+        return { exerciseId: g.exerciseId, sets: g.sets, ...(stillLinked ? { superset: g.superset } : {}) };
+      }),
       note: document.getElementById('log-note').value.trim(),
       rpe: document.getElementById('log-rpe').value || null,
       totalWorkSec,
@@ -1570,7 +1573,7 @@ async function renderLogHistory() {
       ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => {
         const priorSets = Array.isArray(ex.sets) ? priorSetsForExercise(ex.exerciseId, idx) : null;
         const trend = priorSets ? exerciseTrend(ex.exerciseId, ex.sets, priorSets) : null;
-        return `<div class="ex-log-row"><span>${esc(exerciseName(ex.exerciseId))}${trend ? ` <span class="fs-trend ${trend.cls}">${trend.symbol}</span>` : ''}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>`;
+        return `<div class="ex-log-row"><span>${ex.superset ? `<span class="ss-badge">${supersetLabel(e.exercises, e.exercises.indexOf(ex))}</span>` : ''}${esc(exerciseName(ex.exerciseId))}${trend ? ` <span class="fs-trend ${trend.cls}">${trend.symbol}</span>` : ''}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>`;
       }).join('')}</div>` : ''}
       ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
       ${(e.exercises && e.exercises.length) ? `<button type="button" class="btn ghost small" data-save-plan="${id}" style="width:100%;margin-top:6px;">Als Plan speichern</button>` : ''}
@@ -1601,6 +1604,7 @@ async function renderLogHistory() {
           const last = ex.sets[ex.sets.length - 1];
           return {
             exerciseId: ex.exerciseId,
+            ...(ex.superset ? { superset: ex.superset } : {}),
             sets: ex.sets.length,
             reps: String(last.reps),
             weight: last.weight !== '' && last.weight != null ? last.weight : '',
@@ -2766,6 +2770,7 @@ function renderLogBuilderPanel() {
         exercises: logBuilder.exercises.map((ex) => ({
           exerciseId: ex.exerciseId, sets: [],
           targetSets: ex.sets, targetReps: ex.reps, targetWeight: ex.weight,
+          ...(ex.superset ? { superset: ex.superset } : {}),
         })),
       };
       logMode = 'execute';
@@ -2862,6 +2867,53 @@ function stopAllFsTimers() {
    nächsten NOCH OFFENEN Übung springen (data-activate erlaubt das Antippen
    jeder Übung schon länger) und eine übersprungene später nachholen —
    nur der Fortschritt (erledigt/offen) zählt, nicht die Position. */
+/* ---------- Supersätze ----------
+   Übungen mit gleichem superset-Schlüssel gehören zusammen und werden im Wechsel gemacht
+   (A → B → A → B …); die Pause kommt erst nach einer ganzen Runde. */
+function supersetKey() { return 'ss' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+function supersetMembers(list, i) {
+  const k = list[i] && list[i].superset;
+  if (!k) return [i];
+  return list.map((g, j) => (g.superset === k ? j : -1)).filter((j) => j >= 0);
+}
+/* Zwei Nachbarn verbinden bzw. lösen (a < b). Hängt a schon an einer Gruppe, kommt b dazu. */
+function supersetLink(list, a, b) {
+  const k = list[a].superset || list[b].superset || supersetKey();
+  const old = list[b].superset;
+  list.forEach((g) => { if (old && g.superset === old) g.superset = k; });
+  list[a].superset = k; list[b].superset = k;
+}
+function supersetUnlink(list, a, b) {
+  // Gruppe zwischen a und b trennen: alles ab b bekommt einen neuen Schlüssel, Einzelne verlieren ihn
+  const k = list[a].superset;
+  const members = list.map((g, j) => (g.superset === k ? j : -1)).filter((j) => j >= 0);
+  const after = members.filter((j) => j >= b), before = members.filter((j) => j < b);
+  const k2 = supersetKey();
+  after.forEach((j) => { list[j].superset = after.length > 1 ? k2 : undefined; });
+  before.forEach((j) => { if (before.length < 2) list[j].superset = undefined; });
+  list.forEach((g) => { if (g.superset === undefined) delete g.superset; });
+}
+/* Gruppen mit nur noch einer Übung auflösen */
+function supersetCleanup(list) {
+  const count = {};
+  list.forEach((g) => { if (g.superset) count[g.superset] = (count[g.superset] || 0) + 1; });
+  list.forEach((g) => { if (g.superset && count[g.superset] < 2) delete g.superset; });
+}
+function supersetLabel(list, i, short = false) {
+  const m = supersetMembers(list, i);
+  return m.length > 1 ? `${short ? '' : 'Supersatz '}${String.fromCharCode(65 + m.indexOf(i))}` : '';
+}
+
+/* Nach der Pause: erste noch offene Übung der aktuellen Supersatz-Gruppe (Freestyle: die erste).
+   Nur wenn die Runde gerade mit einem Satz abgeschlossen wurde, nicht nach einem eigenen Wechsel. */
+let fsRoundDone = false;
+function fsRoundStart(builder) {
+  if (!fsRoundDone) return null;
+  const mem = supersetMembers(builder.exercises, builder.activeIndex);
+  if (mem.length < 2) return null;
+  const open = mem.filter((j) => !(logMode === 'execute' && fsExerciseDone(builder.exercises[j])));
+  return open.length ? open[0] : null;
+}
 function fsExerciseDone(g) {
   return g.targetSets != null ? g.sets.length >= g.targetSets : g.sets.length > 0;
 }
@@ -2888,6 +2940,7 @@ function findNextUnfinishedExerciseIndex(builder, fromIndex) {
    für die neue Übung beendet sie dann wirklich. */
 function activateFsGroup(builder, idx) {
   builder.activeIndex = idx;
+  fsRoundDone = false; // selbst gewechselt: nicht automatisch zurückspringen
   fsNoteEditing = false;
   if (fsPhase !== 'resting') {
     fsPhase = 'idle';
@@ -2962,6 +3015,11 @@ function renderFsPanel() {
     // vorschlagen statt eine wirklich offene.
     const nextUnfinishedIdx = isExecute ? findNextUnfinishedExerciseIndex(builder, builder.activeIndex) : null;
     const restHtml = `<div class="fs-rest-timer mono" id="fs-rest-timer">PAUSE ${fmtMinSec(fsRestTimer.seconds)}</div>`;
+    const roundStart = fsRoundStart(builder);
+    if (roundStart != null) {
+      return `${head}${restHtml}
+      <button type="button" class="btn fs-dock-btn" id="fs-next-set" aria-label="Nächste Supersatz-Runde, beginnt mit ${esc(exerciseName(builder.exercises[roundStart].exerciseId))}">▶ Runde ${builder.exercises[roundStart].sets.length + 1}</button>`;
+    }
     if (reachedTarget && nextUnfinishedIdx != null) {
       // Plan-Ziel für diese Übung erreicht — automatisch die nächste offene
       // Übung vorschlagen. Ein Extra-Satz bleibt trotzdem manuell möglich;
@@ -3014,7 +3072,16 @@ function renderFsPanel() {
   const activeGroup = builder.exercises[builder.activeIndex];
   const orderedExercises = builder.exercises.map((g, gi) => ({ g, gi }));
   if (!isExecute) orderedExercises.reverse();
-  holder.innerHTML = `
+  // Freestyle: begonnene Übungen als Reiter oben, ein Tipp wechselt (für Supersätze ohne Suchen)
+  const tabsHtml = !isExecute && builder.exercises.length > 1 ? `
+    <div class="fs-tabs">${builder.exercises.map((g, gi) => `<button type="button" class="chip ${gi === builder.activeIndex ? 'active' : ''} ${g.superset ? 'ss' : ''}" data-activate="${gi}">${g.superset ? `<span class="ss-dot"></span>` : ''}${esc(exerciseName(g.exerciseId))}</button>`).join('')}</div>` : '';
+  const fsLinkHtml = (gi) => {
+    if (isExecute || gi < 1) return '';
+    const prev = builder.exercises[gi - 1], cur = builder.exercises[gi];
+    const linked = cur.superset && cur.superset === prev.superset;
+    return `<button type="button" class="ss-link ${linked ? 'linked' : ''}" data-fs-ss="${gi}">${linked ? 'Supersatz lösen' : `＋ Mit ${esc(exerciseName(prev.exerciseId))} als Supersatz verbinden`}</button>`;
+  };
+  holder.innerHTML = `${tabsHtml}
     ${orderedExercises.map(({ g, gi }) => {
       const isActive = gi === builder.activeIndex;
       const isDone = isExecute && fsExerciseDone(g);
@@ -3024,12 +3091,13 @@ function renderFsPanel() {
       return `
     <div class="fs-group ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}" id="fs-group-${gi}">
       <div class="fs-group-head">
-        <span data-activate="${gi}" style="cursor:pointer;">${isDone ? '<span class="fs-done-check">✓</span> ' : ''}${esc(exerciseName(g.exerciseId))}</span>
+        <span data-activate="${gi}" style="cursor:pointer;">${isDone ? '<span class="fs-done-check">✓</span> ' : ''}${g.superset ? `<span class="ss-badge">${supersetLabel(builder.exercises, gi)}</span>` : ''}${esc(exerciseName(g.exerciseId))}</span>
         <div style="display:flex;gap:6px;flex-shrink:0;">
           <button type="button" class="ex-row-remove" data-info="${gi}" title="Info zur Übung">ℹ</button>
           ${logMode === 'freestyle' ? `<button type="button" class="ex-row-remove" data-remove-group="${gi}" title="Übung entfernen">×</button>` : ''}
         </div>
       </div>
+      ${isActive ? fsLinkHtml(gi) : ''}
       ${isActive && fsPhase === 'entering' ? `<div class="fs-inline-input" id="fs-entry-box">${enteringHtml(g)}</div>` : ''}
       ${g.infoOpen ? fsExerciseInfoHtml(g.exerciseId) : ''}
       ${isActive ? fsMachineNoteHtml(g.exerciseId) : ''}
@@ -3136,6 +3204,9 @@ function renderFsPanel() {
   if (nextSetBtn) {
     nextSetBtn.onclick = () => {
       stopFsRestTimer();
+      const start = fsRoundStart(builder);
+      if (start != null) builder.activeIndex = start;
+      fsRoundDone = false;
       fsPhase = 'working';
       startFsWorkTimer();
       renderFsPanel();
@@ -3165,6 +3236,13 @@ function renderFsPanel() {
       activateFsGroup(builder, idx);
     };
   });
+  holder.querySelectorAll('[data-fs-ss]').forEach((btn) => {
+    btn.onclick = () => {
+      const gi = Number(btn.dataset.fsSs), L = builder.exercises;
+      if (L[gi].superset && L[gi].superset === L[gi - 1].superset) supersetUnlink(L, gi - 1, gi); else supersetLink(L, gi - 1, gi);
+      renderFsPanel();
+    };
+  });
   holder.querySelectorAll('[data-info]').forEach((btn) => {
     btn.onclick = () => {
       const g = builder.exercises[Number(btn.dataset.info)];
@@ -3176,6 +3254,7 @@ function renderFsPanel() {
     btn.onclick = () => {
       const gi = Number(btn.dataset.removeGroup);
       builder.exercises.splice(gi, 1);
+      supersetCleanup(builder.exercises);
       if (builder.activeIndex >= builder.exercises.length) builder.activeIndex = builder.exercises.length - 1;
       renderFsPanel();
     };
@@ -3246,6 +3325,18 @@ function renderFsPanel() {
       setTimeout(() => {
         const unit = exerciseUnit(builder.exercises[builder.activeIndex].exerciseId);
         builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps, elapsedSec: fsCapturedElapsed, unit });
+        // Supersatz: ohne Pause weiter zur nächsten Übung der Runde; Pause erst nach der letzten
+        const mem = supersetMembers(builder.exercises, builder.activeIndex);
+        const nextInRound = mem.find((j) => j > builder.activeIndex && !(logMode === 'execute' && fsExerciseDone(builder.exercises[j])));
+        if (mem.length > 1 && nextInRound != null) {
+          builder.activeIndex = nextInRound;
+          fsPhase = 'idle';
+          fsRoundDone = false;
+          toast(`Supersatz: weiter mit ${exerciseName(builder.exercises[nextInRound].exerciseId)}`);
+          renderFsPanel();
+          return;
+        }
+        fsRoundDone = mem.length > 1; // Runde komplett: nach der Pause wieder bei der ersten Übung
         fsPhase = 'resting';
         startFsRestTimer();
         renderFsPanel();
@@ -3264,16 +3355,30 @@ function renderLogExerciseRows() {
   saveDraft('log_exercises', logBuilder.exercises);
   const holder = document.getElementById('log-exercise-rows');
   if (!holder) return;
-  holder.innerHTML = logBuilder.exercises.length ? logBuilder.exercises.map((ex, i) => `
-    <div class="ex-row" id="log-exercise-row-${i}">
-      <span class="ex-row-name">${esc(exerciseName(ex.exerciseId))}</span>
+  const L = logBuilder.exercises;
+  const linkHtml = (i) => {
+    if (i >= L.length - 1) return '';
+    const linked = L[i].superset && L[i].superset === L[i + 1].superset;
+    return `<button type="button" class="ss-link ${linked ? 'linked' : ''}" data-ss-link="${i}">${linked ? 'Supersatz lösen' : '＋ Als Supersatz verbinden'}</button>`;
+  };
+  holder.innerHTML = L.length ? L.map((ex, i) => `
+    <div class="ex-row ${ex.superset ? 'in-superset' : ''}" id="log-exercise-row-${i}">
+      <span class="ex-row-name">${ex.superset ? `<span class="ss-badge" title="Supersatz">${supersetLabel(L, i, true)}</span>` : ''}${esc(exerciseName(ex.exerciseId))}</span>
       <input type="number" data-i="${i}" data-f="sets" value="${ex.sets}" placeholder="Sätze" class="ex-row-input" title="Sätze">
       <button type="button" class="ex-row-step" data-step="${i}" title="Zusätzlicher Satz">+</button>
       <input type="text" inputmode="numeric" data-i="${i}" data-f="reps" value="${esc(String(ex.reps))}" placeholder="Wdh" class="ex-row-input" title="Wiederholungen">
       <input type="number" data-i="${i}" data-f="weight" value="${ex.weight}" placeholder="kg" step="0.5" class="ex-row-input" title="Gewicht">
       <button type="button" class="ex-row-remove" data-remove="${i}">×</button>
     </div>
+    ${linkHtml(i)}
   `).join('') : '<div class="list-empty" style="margin-bottom:14px;">Noch keine Übungen — Vorlage laden oder unten hinzufügen.</div>';
+  holder.querySelectorAll('[data-ss-link]').forEach((btn) => {
+    btn.onclick = () => {
+      const i = Number(btn.dataset.ssLink);
+      if (L[i].superset && L[i].superset === L[i + 1].superset) supersetUnlink(L, i, i + 1); else supersetLink(L, i, i + 1);
+      renderLogExerciseRows();
+    };
+  });
 
   holder.querySelectorAll('input').forEach((inp) => {
     inp.oninput = () => {
@@ -3293,6 +3398,7 @@ function renderLogExerciseRows() {
   holder.querySelectorAll('[data-remove]').forEach((btn) => {
     btn.onclick = () => {
       logBuilder.exercises.splice(Number(btn.dataset.remove), 1);
+      supersetCleanup(logBuilder.exercises);
       renderLogExerciseRows();
       const startBtn = document.getElementById('plan-start');
       if (startBtn) startBtn.disabled = !logBuilder.exercises.length;

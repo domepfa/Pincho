@@ -1774,3 +1774,14 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .anim-off .sloth-rig g, .anim-off .sloth-rig image { animation: none !important; }
 .anim-off .sloth-rig .sw-1 { opacity: 0; }
 .anim-off .fb-done-sloth, .anim-off .pg-pr-sloth { animation: none; }
+
+/* Supersätze */
+.ss-link { display: block; width: 100%; margin: -2px 0 8px; padding: 8px 12px; border-radius: 12px; border: 1px dashed var(--line);
+  background: none; color: var(--ink-dim); font: 600 14px 'Barlow', system-ui, sans-serif; cursor: pointer; text-align: center; }
+.ss-link.linked { border-style: solid; border-color: rgba(var(--accent-rgb), .5); color: var(--accent); }
+.ex-row.in-superset { border-left: 3px solid var(--accent); }
+.ss-badge { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(var(--accent-rgb), .15);
+  color: var(--accent); font: 700 11px 'Barlow', system-ui, sans-serif; letter-spacing: .04em; vertical-align: middle; }
+.fs-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 6px; scrollbar-width: none; }
+.fs-tabs .chip { flex: none; white-space: nowrap; }
+.ss-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: middle; }
