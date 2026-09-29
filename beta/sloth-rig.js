@@ -1008,13 +1008,14 @@ function slothRigPrepare(name) {
     }
     return keys[keys.length - 1][1];
   };
-  const N = 24, frames = [];
+  const N = 24, frames = [], calmTail = [];
   for (let i = 0; i <= N; i++) {
     const m = amount(i / N), s = {};
     for (const k of new Set([...Object.keys(pose.a), ...Object.keys(pose.b)])) {
       const a = pose.a[k] ?? (/^(len|near)_/.test(k) ? 1 : pose.b[k]); // fehlt in a: Länge 1, sonst wie b
       s[k] = a + ((pose.b[k] ?? a) - a) * m;
     }
+    calmTail.push(build({ ...s }).tail); // Stufe "Ruhig": Schwanz ohne Nachschwingen
     // Nachschwingen: der Schwanz pendelt der Bewegung etwas hinterher
     s.tail = (s.tail || 0) + 7 * Math.sin(2 * Math.PI * i / N - 1.2);
     frames.push(build(s));
@@ -1076,6 +1077,11 @@ function slothRigPrepare(name) {
     if (frames[0][key].skip) continue;
     const steps = frames.map((f, i) => `${+(i * 100 / N).toFixed(2)}%{transform:${tfCss(f[key])}}`).join('');
     css.push(`@keyframes srk-${name}-${key}{${steps}}.sr-${name} .sp-${key}{animation:srk-${name}-${key} ${pose.dur}s linear infinite;animation-delay:var(--srd,0s)}`);
+  }
+  if (frames[0].tail && !frames[0].tail.skip) {
+    for (let i = 1; i < calmTail.length; i++) { while (calmTail[i].r - calmTail[i - 1].r > 180) calmTail[i].r -= 360; while (calmTail[i].r - calmTail[i - 1].r < -180) calmTail[i].r += 360; }
+    const steps = calmTail.map((f, i) => `${+(i * 100 / N).toFixed(2)}%{transform:${tfCss(f)}}`).join('');
+    css.push(`@keyframes srk-${name}-tail-calm{${steps}}.anim-calm .sr-${name} .sp-tail{animation-name:srk-${name}-tail-calm}`);
   }
   // Gesichter: Ebenen über dem neutralen Kopf, per Deckkraft umgeschaltet
   const effort = pose.effort ?? (SLOTH_CALM.has(name) ? false : 'b');
