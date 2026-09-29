@@ -2614,6 +2614,14 @@ function renderLogBuilderPanel() {
     if (addCooldownBtn) addCooldownBtn.onclick = () => addPseudoExercise('cooldown_general');
     wireExercisePickerGrid('fs-exercise-grid', EXERCISE_LIBRARY, freestyleBuilder.pickerExerciseId, (id) => {
       freestyleBuilder.pickerExerciseId = id;
+      // Nur angetippt, aber noch kein Satz gemacht: beim Wechsel zu einer anderen Übung wieder entfernen,
+      // statt als leere Übung unten stehen zu bleiben
+      const keep = (g) => g.exerciseId === id || (g.sets && g.sets.length) || (g.note && g.note.trim());
+      if (freestyleBuilder.exercises.some((g) => !keep(g))) {
+        const activeId = freestyleBuilder.exercises[freestyleBuilder.activeIndex]?.exerciseId;
+        freestyleBuilder.exercises = freestyleBuilder.exercises.filter(keep);
+        freestyleBuilder.activeIndex = freestyleBuilder.exercises.findIndex((g) => g.exerciseId === activeId);
+      }
       if (!freestyleBuilder.exercises.length) freestyleBuilder.sessionStartedAt = Date.now();
       let idx = freestyleBuilder.exercises.findIndex((g) => g.exerciseId === id);
       if (idx === -1) {
