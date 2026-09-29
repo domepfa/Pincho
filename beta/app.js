@@ -1112,6 +1112,7 @@ function ensureFsDock() {
   return el;
 }
 function hideFsDock() {
+  hideFsRestScreen();
   const el = document.getElementById('fs-dock');
   if (el) { el.classList.add('hidden'); el.innerHTML = ''; }
   document.body.classList.remove('has-fs-dock');
@@ -1254,6 +1255,18 @@ function toggleExerciseFavorite(id) {
    späteres Umschalten der Übungs-Voreinstellung alte Sätze NIE rückwirkend
    umdeutet. */
 let exerciseUnitPrefs = {};
+/* Empfohlene Pause pro Übung (Sekunden), Standard 2 min; im Konto gespeichert, auf allen Geräten gleich */
+const REST_DEFAULT_SEC = 120;
+let exerciseRestPrefs = {};
+async function loadExerciseRestPrefs() {
+  const raw = await fbGet(`exerciseRestPrefs/${state.member.id}`);
+  exerciseRestPrefs = raw || {};
+}
+function exerciseRestSec(id) { return Number(exerciseRestPrefs[id]) || REST_DEFAULT_SEC; }
+function setExerciseRestSec(id, sec) {
+  exerciseRestPrefs[id] = sec;
+  fbPut(`exerciseRestPrefs/${state.member.id}/${id}`, sec);
+}
 async function loadExerciseUnitPrefs() {
   const raw = await fbGet(`exerciseUnitPrefs/${state.member.id}`);
   exerciseUnitPrefs = raw || {};
@@ -1436,7 +1449,7 @@ async function renderLog() {
   // fsRecap) — Datum/Typ/Chips/Notiz/RPE wären in diesem Moment nur
   // ablenkende Reste einer bereits abgeschlossenen Session.
   const showingRecap = !!fsRecap;
-  await Promise.all([loadSessionPlans(), loadExerciseSettings(), loadExerciseUnitPrefs(), loadExerciseFavorites(), loadSharedTemplates(), loadWallTemplates(), loadFlowTemplates()]);
+  await Promise.all([loadSessionPlans(), loadExerciseSettings(), loadExerciseUnitPrefs(), loadExerciseRestPrefs(), loadExerciseFavorites(), loadSharedTemplates(), loadWallTemplates(), loadFlowTemplates()]);
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Neue Session</h2><div class="sec-rule"></div></div>
     <div class="card">
@@ -2832,8 +2845,27 @@ function stopFsWorkTimer() {
 
 function updateFsRestTimerUI() {
   const el = document.getElementById('fs-rest-timer');
-  if (!el) return;
-  el.textContent = `PAUSE ${fmtMinSec(fsRestTimer.seconds)}`;
+  if (el) el.textContent = `PAUSE ${fmtMinSec(fsRestTimer.seconds)}`;
+  const big = document.getElementById('fs-rest-big');
+  if (big) {
+    const target = fsRestTargetSec();
+    const ready = fsRestTimer.seconds >= target;
+    big.textContent = fmtMinSec(fsRestTimer.seconds);
+    const ring = document.getElementById('fs-rest-ring');
+    if (ring) ring.style.strokeDashoffset = String(FS_RING_LEN * (1 - Math.min(1, fsRestTimer.seconds / target)));
+    document.getElementById('fs-rest-screen')?.classList.toggle('ready', ready);
+    const st = document.getElementById('fs-rest-state');
+    if (st) st.textContent = ready ? 'Bereit' : `noch ${fmtMinSec(target - fsRestTimer.seconds)}`;
+  }
+  // Einmal kurz vibrieren, sobald die empfohlene Pause um ist
+  if (fsRestTimer.seconds === fsRestTargetSec()) fbBuzz([120, 80, 120]);
+}
+const FS_RING_LEN = 2 * Math.PI * 88;
+/* Zielpause der laufenden Pause: längste eingestellte Pause der Übung bzw. der Supersatz-Gruppe */
+function fsRestTargetSec() {
+  const builder = activeSetBuilder();
+  if (!builder || !builder.exercises.length || builder.activeIndex < 0) return REST_DEFAULT_SEC;
+  return Math.max(...supersetMembers(builder.exercises, builder.activeIndex).map((j) => exerciseRestSec(builder.exercises[j].exerciseId)));
 }
 function startFsRestTimer() {
   requestWakeLock();
@@ -2970,6 +3002,102 @@ function renderFsDiscardButton() {
   };
 }
 
+/* ---------- Pausen-Bildschirm (Gym) ----------
+   Während der Pause gross: Pausenzeit mit Ring bis zur empfohlenen Pause, was als Nächstes kommt
+   (Übung, Satz, Vorschlag) und ein grosser Knopf. Wegwischen/Zurück blendet ihn aus, die Uhr läuft
+   klein in der Leiste weiter (antippen holt ihn zurück). Der grosse Knopf klickt den echten Knopf in
+   der Leiste, damit der Ablauf (nächster Satz, Runde, nächste Übung) nur an einer Stelle steckt. */
+let fsRestHidden = false;
+function fsSetSuggestion(g) {
+  const last = g.sets.length ? g.sets[g.sets.length - 1] : lastValueForExercise(g.exerciseId);
+  if (!last || last.reps === '' || last.reps == null) return '';
+  const w = last.weight !== '' && last.weight != null ? `${String(last.weight).replace('.', ',')} kg × ` : '';
+  const unit = (last.unit || 'reps') === 'time' ? ' s' : '';
+  return `${g.sets.length ? 'eben' : 'letztes Mal'} ${w}${last.reps}${unit}`;
+}
+function hideFsRestScreen() {
+  const el = document.getElementById('fs-rest-screen');
+  if (el) el.remove();
+  if (history.state && history.state.fsRest) history.back();
+}
+window.addEventListener('popstate', () => {
+  if (document.getElementById('fs-rest-screen')) { fsRestHidden = true; document.getElementById('fs-rest-screen').remove(); }
+});
+function renderFsRestScreen(builder) {
+  const dock = document.getElementById('fs-dock');
+  const primary = dock && (dock.querySelector('#fs-next-exercise') || dock.querySelector('#fs-next-set'));
+  if (fsPhase !== 'resting' || fsRestHidden || !primary) {
+    const el = document.getElementById('fs-rest-screen');
+    if (el) { el.remove(); if (history.state && history.state.fsRest) history.back(); }
+    return;
+  }
+  // Was kommt als Nächstes: nächste Übung des Plans, neue Supersatz-Runde oder weiter dieselbe
+  const nextIdx = primary.id === 'fs-next-exercise' ? Number(primary.dataset.nextIdx) : (fsRoundStart(builder) ?? builder.activeIndex);
+  const group = supersetMembers(builder.exercises, nextIdx);
+  const lines = group.map((j) => {
+    const g = builder.exercises[j];
+    const sug = fsSetSuggestion(g);
+    const letter = group.length > 1 ? `<span class="ss-badge">${String.fromCharCode(65 + group.indexOf(j))}</span>` : '';
+    return `<div class="fs-rest-next-row">${letter}<b>${esc(exerciseName(g.exerciseId))}</b><span>Satz ${g.sets.length + 1}${sug ? ' · ' + esc(sug) : ''}</span></div>`;
+  }).join('');
+  const target = fsRestTargetSec();
+  const extra = dock.querySelector('#fs-next-set') && primary.id === 'fs-next-exercise';
+  let el = document.getElementById('fs-rest-screen');
+  const isNew = !el;
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fs-rest-screen';
+    el.className = 'info-sheet-backdrop';
+    document.body.appendChild(el);
+    wireSheetSwipeDown(el, () => { fsRestHidden = true; hideFsRestScreen(); });
+    history.pushState({ fsRest: true }, '');
+  }
+  el.innerHTML = `
+    <div class="info-sheet-card fs-rest-card">
+      <div class="fs-rest-grip" aria-hidden="true"></div>
+      <div class="fs-rest-dial">
+        <svg viewBox="0 0 200 200" aria-hidden="true"><circle class="fs-rest-track" cx="100" cy="100" r="88"/><circle id="fs-rest-ring" class="fs-rest-ring" cx="100" cy="100" r="88" stroke-dasharray="${FS_RING_LEN.toFixed(1)}" stroke-dashoffset="${FS_RING_LEN.toFixed(1)}"/></svg>
+        <div class="fs-rest-center">
+          <span class="fs-rest-label">Pause</span>
+          <span class="fs-rest-big mono" id="fs-rest-big">${fmtMinSec(fsRestTimer.seconds)}</span>
+          <span class="fs-rest-state" id="fs-rest-state"></span>
+        </div>
+      </div>
+      <div class="fs-rest-target">
+        <button type="button" class="fs-rest-adj" data-rest-adj="-15" aria-label="Pause 15 Sekunden kürzer">−15 s</button>
+        <span>Ziel ${fmtMinSec(target)}</span>
+        <button type="button" class="fs-rest-adj" data-rest-adj="15" aria-label="Pause 15 Sekunden länger">+15 s</button>
+      </div>
+      <div class="fs-rest-next">
+        <span class="fs-rest-label">${group.length > 1 ? `Runde ${builder.exercises[group[0]].sets.length + 1}` : 'Als Nächstes'}</span>
+        ${lines}
+      </div>
+      <button type="button" class="btn fs-rest-go" id="fs-rest-go">${primary.innerHTML}</button>
+      <div class="fs-rest-actions">
+        ${extra ? '<button type="button" class="btn ghost small" id="fs-rest-extra">+ Extra-Satz</button>' : ''}
+        <button type="button" class="btn ghost small" id="fs-rest-switch">Übung wechseln</button>
+      </div>
+    </div>`;
+  if (isNew) el.querySelector('.fs-rest-card').style.animation = '';
+  document.getElementById('fs-rest-go').onclick = () => { fsRestHidden = false; primary.click(); };
+  const ex = document.getElementById('fs-rest-extra');
+  if (ex) ex.onclick = () => dock.querySelector('#fs-next-set')?.click();
+  document.getElementById('fs-rest-switch').onclick = () => {
+    fsRestHidden = true;
+    hideFsRestScreen();
+    document.getElementById('fs-dock-add')?.click();
+    if (logMode === 'execute') document.getElementById('fs-panel')?.scrollIntoView({ behavior: 'smooth' });
+  };
+  el.querySelectorAll('[data-rest-adj]').forEach((b) => {
+    b.onclick = () => {
+      const sec = Math.min(600, Math.max(30, fsRestTargetSec() + Number(b.dataset.restAdj)));
+      supersetMembers(builder.exercises, builder.activeIndex).forEach((j) => setExerciseRestSec(builder.exercises[j].exerciseId, sec));
+      renderFsRestScreen(builder);
+    };
+  });
+  updateFsRestTimerUI();
+}
+
 function renderFsPanel() {
   const holder = document.getElementById('fs-panel');
   if (!holder) return;
@@ -2996,7 +3124,9 @@ function renderFsPanel() {
         ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-dock-add">+ Übung</button>` : ''}
       </div>`;
     if (fsPhase === 'idle') {
+      const sug = fsSetSuggestion(g);
       return `${head}
+        <div class="fs-dock-hint">Satz ${g.sets.length + 1}${sug ? ' · ' + esc(sug) : ''}</div>
         <button type="button" class="btn fs-dock-btn" id="fs-start-set">▶ Satz starten</button>`;
     }
     if (fsPhase === 'working') {
@@ -3229,6 +3359,11 @@ function renderFsPanel() {
     };
   }
 
+  // Pausenuhr in der Leiste antippen holt den Pausen-Bildschirm zurück
+  const restPill = document.getElementById('fs-rest-timer');
+  if (restPill) restPill.onclick = () => { fsRestHidden = false; renderFsRestScreen(builder); };
+  renderFsRestScreen(builder);
+
   holder.querySelectorAll('[data-activate]').forEach((el) => {
     el.onclick = () => {
       const idx = Number(el.dataset.activate);
@@ -3337,6 +3472,7 @@ function renderFsPanel() {
           return;
         }
         fsRoundDone = mem.length > 1; // Runde komplett: nach der Pause wieder bei der ersten Übung
+        fsRestHidden = false;
         fsPhase = 'resting';
         startFsRestTimer();
         renderFsPanel();

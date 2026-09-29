@@ -1774,3 +1774,42 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .anim-off .sloth-rig g, .anim-off .sloth-rig image { animation: none !important; }
 .anim-off .sloth-rig .sw-1 { opacity: 0; }
 .anim-off .fb-done-sloth, .anim-off .pg-pr-sloth { animation: none; }
+
+/* Supersätze */
+.ss-link { display: block; width: 100%; margin: -2px 0 8px; padding: 8px 12px; border-radius: 12px; border: 1px dashed var(--line);
+  background: none; color: var(--ink-dim); font: 600 14px 'Barlow', system-ui, sans-serif; cursor: pointer; text-align: center; }
+.ss-link.linked { border-style: solid; border-color: rgba(var(--accent-rgb), .5); color: var(--accent); }
+.ex-row.in-superset { border-left: 3px solid var(--accent); }
+.ss-badge { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(var(--accent-rgb), .15);
+  color: var(--accent); font: 700 11px 'Barlow', system-ui, sans-serif; letter-spacing: .04em; vertical-align: middle; }
+.fs-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 6px; scrollbar-width: none; }
+.fs-tabs .chip { flex: none; white-space: nowrap; }
+.ss-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: middle; }
+
+/* Pausen-Bildschirm (Gym): gross, lesbar aus einem Meter */
+#fs-rest-screen { z-index: 70; align-items: stretch; }
+.fs-rest-card { max-width: 480px; max-height: none; height: 100%; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: calc(14px + var(--safe-top)) 20px calc(20px + var(--safe-bottom)); background: var(--bg); border: 0; overflow-y: auto; }
+.fs-rest-grip { width: 44px; height: 5px; border-radius: 3px; background: var(--line); margin-bottom: 4px; }
+.fs-rest-dial { position: relative; width: min(72vw, 300px); aspect-ratio: 1; }
+.fs-rest-dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.fs-rest-track { fill: none; stroke: var(--surface-2); stroke-width: 12; }
+.fs-rest-ring { fill: none; stroke: #ff6b47; stroke-width: 12; stroke-linecap: round; transition: stroke-dashoffset .9s linear, stroke .3s; }
+#fs-rest-screen.ready .fs-rest-ring { stroke: var(--success); }
+.fs-rest-center { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 2px; }
+.fs-rest-big { font: 700 clamp(56px, 18vw, 84px)/1 'Barlow Condensed', sans-serif; color: var(--ink); }
+.fs-rest-label { font: 600 12px 'Barlow', system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); }
+.fs-rest-state { font: 600 16px 'Barlow', system-ui, sans-serif; color: #ff6b47; }
+#fs-rest-screen.ready .fs-rest-state { color: var(--success); }
+.fs-rest-target { display: flex; align-items: center; gap: 14px; color: var(--ink-dim); font: 600 15px 'Barlow', system-ui, sans-serif; }
+.fs-rest-adj { min-width: 64px; min-height: 40px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: 600 14px 'Barlow', system-ui, sans-serif; cursor: pointer; }
+.fs-rest-next { width: 100%; display: grid; gap: 8px; padding: 14px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line-soft); }
+.fs-rest-next-row { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: baseline; }
+.fs-rest-next-row b { font: 700 22px/1.15 'Barlow Condensed', sans-serif; color: var(--ink); grid-column: 2; }
+.fs-rest-next-row .ss-badge { grid-row: 1 / span 2; align-self: center; }
+.fs-rest-next-row span:last-child { grid-column: 2; font-size: 15px; color: var(--ink-dim); }
+.fs-rest-go { width: 100%; min-height: 76px; font-size: 26px; border-radius: 22px; margin-top: auto; }
+#fs-rest-screen.ready .fs-rest-go { box-shadow: 0 0 0 4px rgba(74, 222, 128, .35); }
+.fs-rest-actions { display: flex; gap: 10px; justify-content: center; }
+#fs-rest-timer { cursor: pointer; }
+.fs-dock-hint { font-size: 14px; color: var(--ink-dim); margin: -2px 0 8px; }
