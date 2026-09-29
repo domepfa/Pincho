@@ -181,11 +181,14 @@ function gripInfo(boardId, gripId) {
    darum wird bei einem Loch bewusst NICHTS behauptet, statt zu raten —
    ausser für die wenigen unten explizit bestätigten Ausnahmen. */
 const GRIP_ARM_OVERRIDE = {
-  // Beim Beastmaker 2000 ist "Grosse Kante" (anders als beim 1000er) real
+  // Beim Beastmaker 2000 ist "Grosse Kante" real
   // zu schmal für zwei Hände nebeneinander — laut Nutzer-Rückmeldung am
   // echten Brett nur einarmig nutzbar, keine gewöhnliche beidhändige
   // Aufwärm-Kante wie sonst bei einem einzelnen Kalibrierpunkt vermutet.
-  bm2000: { edge_large: 'einarmig' },
+  // Die kleine Kante direkt darunter ebenso (Nutzer-Rückmeldung).
+  bm2000: { edge_large: 'einarmig', edge_small: 'einarmig' },
+  // Grosse Kante in der Mitte des 1000ers: ebenfalls nur für eine Hand.
+  bm1000: { edge_large: 'einarmig' },
 };
 function gripArmNote(boardId, gripId) {
   const override = GRIP_ARM_OVERRIDE[boardId] && GRIP_ARM_OVERRIDE[boardId][gripId];
@@ -470,6 +473,28 @@ const ROUTINE_TEMPLATES = [
    (sharedTemplates, kind "fingerboard"). Leeres Array bleibt, damit ältere
    Stellen, die es noch durchsuchen, nicht brechen. */
 const FINGERBOARD_TEMPLATES = [];
+
+/* ---------- Pincho-Programme (mitgeliefert, ausblendbar) ----------
+   Bewährte Fingerboard-Protokolle mit board-neutralen Griff-IDs (gibt es auf
+   BM1000 und BM2000); das Board setzt fbBlocksWithCurrentBoard beim Start.
+   Ausblenden läuft über hiddenTemplates wie bei Crew-Vorlagen. */
+const hangBlock = (grip, reps, hangSec, restSec, blockRestSec) => ({ type: 'hang', board: null, grip, reps, hangSec, restSec, blockRestSec });
+// Nur Griffe, die auf BM1000 und BM2000 beidhändig (zwei Griffpunkte) vorhanden sind
+const WARMUP_BLOCKS = [hangBlock('sloper_easy', 3, 10, 20, 60), hangBlock('edge_medium', 3, 7, 30, 90)];
+const PINCHO_PROGRAMS = [
+  { id: 'pp_warmup', name: 'Aufwärmen', note: 'Vor jedem Board-Training: Sloper locker, dann die mittlere Kante. Nie kalt an kleine Griffe.',
+    blocks: [...WARMUP_BLOCKS, hangBlock('sloper_medium', 2, 10, 30, 60)] },
+  { id: 'pp_beginner', name: 'Einsteiger', note: 'Für die ersten Monate am Board: kurze Hänger auf grossen Griffen, viel Pause. Ein- bis zweimal pro Woche.',
+    blocks: [...WARMUP_BLOCKS, hangBlock('edge_medium', 6, 7, 3, 180), hangBlock('sloper_medium', 6, 7, 3, 180), hangBlock('edge_medium', 4, 7, 3, 120)] },
+  { id: 'pp_maxhang', name: 'Max Hangs 10 s', note: 'Maximalkraft: 10 s an der mittleren Kante, lange Pausen. Zusatzgewicht so wählen, dass 10 s gerade sicher gehen.',
+    blocks: [...WARMUP_BLOCKS, hangBlock('edge_medium', 5, 10, 180, 0)] },
+  { id: 'pp_repeaters', name: 'Repeaters 7/3', note: 'Kraftausdauer: 7 s hängen, 3 s Pause, 6 Wiederholungen je Satz.',
+    blocks: [...WARMUP_BLOCKS, hangBlock('edge_medium', 6, 7, 3, 180), hangBlock('edge_medium', 6, 7, 3, 180), hangBlock('edge_medium', 6, 7, 3, 180), hangBlock('sloper_medium', 6, 7, 3, 0)] },
+  { id: 'pp_maxtest', name: 'Max-Hang-Test', note: 'Alle 4–6 Wochen: 3 Versuche à 10 s an der mittleren Kante mit so viel Zusatzgewicht wie sicher geht. Die App merkt sich das beste geschaffte Gewicht und schlägt danach für Max Hangs 85 % davon vor.',
+    blocks: [...WARMUP_BLOCKS, hangBlock('edge_medium', 1, 10, 0, 180), hangBlock('edge_medium', 1, 10, 0, 180), hangBlock('edge_medium', 1, 10, 0, 0)] },
+  { id: 'pp_minedge', name: 'Min-Edge', note: 'Für Fortgeschrittene: kleinste Kante ohne Zusatzgewicht, 10 s, lange Pausen.',
+    blocks: [...WARMUP_BLOCKS, hangBlock('edge_xsmall', 5, 10, 150, 0)] },
+];
 
 /* ---------- Standard-Wochenplan (Startvorlage) ----------
    Wird pro Mitglied einmalig nach Firebase kopiert und ist dort danach
