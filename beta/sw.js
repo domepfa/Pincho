@@ -1,6 +1,6 @@
-const CACHE_NAME = 'pincho-beta-v64';
+const CACHE_NAME = 'pincho-beta-v65';
 const SHELL_ASSETS = [
-  './', './index.html', './styles.css', './data.js', './firebase.js', './sloth-rig.js', './app.js',
+  './', './index.html', './styles.css', './data.js', './firebase.js', './sloth-rig.js', './figures-data.js', './app.js',
   './manifest.json', '../assets/icon-512-any.png', '../assets/icon-192-any.png', '../assets/icon-512-transparent.png', '../assets/icon-512-maskable.png', '../assets/icon-beta-192-any.png', '../assets/icon-beta-512-maskable.png',
   '../assets/board-bm1000.png', '../assets/board-bm2000.png', '../assets/board-campus.jpg',
   '../assets/ki-anleitung-json.md',
