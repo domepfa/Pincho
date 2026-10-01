@@ -96,8 +96,6 @@ def cut_view(view, cfg, parts, joints, anchors):
     if sho:  # Schulterkugel + ganzer Armstreifen gehören dem Arm, nicht dem Rumpf
         # Arm = Schulterkugel + Armstreifen bis zur Unterkante des Arms (darunter beginnt die Brust)
         shoDisk = shoDisk | ((segd('shR', 'elR') < 85) & (yy <= cfg['arm_low']) & fig & ~head)
-        # was der Arm in der Zeichnung verdeckt (obere Brust, Schulter), wird im Rumpf mit Fell ergänzt
-        shoFill = shoDisk & poly(cfg['torso'])
         torso = torso & ~shoDisk
     sides = 'R' if view == 'side' else 'LR'
     bones = {}
@@ -147,21 +145,11 @@ def cut_view(view, cfg, parts, joints, anchors):
         g[ry, rx] = 0.5 * g[ry, rx] + 0.5 * soft[ry, rx]
         return True
 
-    def save(name, mask, joint=None, src=None, dark=1.0, fill=None, fade=None, ink=False):
+    def save(name, mask, joint=None, src=None, dark=1.0, fade=None, ink=False):
         Gs = G if src is None else src
         # lose Fellsträhnen weg (Oberarm: Achselhaar hängt sonst als Strich herunter)
         mask = biggest(ndi.binary_opening(mask, iterations=6 if name.startswith('uarm') else 2))
         g = Gs.copy(); a0 = alpha.copy()
-        if fill is not None:  # Loch (z. B. unter der Schulter) mit dem eigenen Fell füllen
-            # das Fell des darüber gezeichneten Arms ist Fell wie auf der Brust: behalten, nur seine dunklen Konturstriche wegschliessen
-            disk = np.hypot(*np.mgrid[-4:5, -4:5]) <= 4.2
-            fur = ndi.gaussian_filter(ndi.grey_closing(Gs, footprint=disk), 1.0)
-            w = np.clip(ndi.distance_transform_edt(fill) / 10, 0, 1)  # weich in das echte Brustfell übergehen
-            g[fill] = (w * fur + (1 - w) * Gs)[fill]; a0[fill] = 1.0
-            mask = mask | fill
-            # ergänzte Fläche bekommt am Rand eine gezeichnete Kontur (vordere Brustlinie)
-            edge = fill & (ndi.distance_transform_edt(mask) < 3.5)
-            g = g * (1 - 0.75 * ndi.gaussian_filter(edge.astype(float), 0.9) * mask)
         if joint:  # Gelenk-Überlappung mit eigenem Fell
             r = CAP[re.sub('[LR]$', '', joint)]
             cap = (np.hypot(xx - J[joint][0], yy - J[joint][1]) < r) & ~mask
@@ -189,11 +177,12 @@ def cut_view(view, cfg, parts, joints, anchors):
     sc = lambda p: [round(p[0] * S, 1), round(p[1] * S, 1)]
     jv = joints[view] = {}
     if view == 'side':
-        save('torso', M['torso'], fill=shoFill)
+        # Rumpf aus eigener Zeichnung ohne Arme: in side.jpg verdeckt der Arm die Brust
+        TJ = side_torso(parts, 'v2side_torso', SIDE_TORSO)
         save('face', M['head'], fade=torsoCut)
-        jv['torso'] = [sc(J['hip']), sc(J['shR'])]
+        jv['torso'] = [TJ['hip'], TJ['sh']]
         jv['face'] = [sc(J['neck']), sc(J['top'])]
-        anchors[view] = {'shoulder': sc(J['shR']), 'hip': sc(J['hip']), 'tail': sc(J['hip']), 'face': sc(J['neck'])}
+        anchors[view] = {'shoulder': TJ['sh'], 'hip': TJ['hip'], 'tail': TJ['hip'], 'face': TJ['neck']}
         for far, dark in (('', 1.0), ('_far', FAR_DARK)):
             save('uarm' + far, M['uarmR'], dark=dark)  # ohne Kappe: die Schulter ist schon ganz dabei
             save('farm' + far, M['farmR'], 'elR', dark=dark)
@@ -234,6 +223,39 @@ def cut_view(view, cfg, parts, joints, anchors):
         jv['uarm_' + x] = [sc(J['sh' + s]), sc(J['el' + s])]
         jv['thigh_' + x] = [sc(J['hip' + s]), sc(J['kn' + s])]
         jv['calf_' + x] = [sc(J['kn' + s]), sc(J['an' + s])]
+
+
+# Seitlicher Rumpf ohne Arme (Brust frei). Gelenke in Blatt-Pixeln; sy streckt den Rumpf auf die Länge
+# von side.jpg (Schulter -> Gürtel), damit Kopf, Arm und Beine von dort passen.
+SIDE_TORSO = dict(src='side_torso.jpg', sx=0.95, sy=1.08, rot=6,
+    J=dict(neck=(430, 480), sh=(450, 585), hip=(400, 985)),
+    poly=[(290, 420), (540, 400), (560, 480), (610, 540), (645, 620), (630, 710), (600, 780), (575, 850), (548, 905), (420, 878), (312, 842),
+          (298, 880), (285, 950), (250, 1000), (165, 1005), (140, 940), (150, 800), (195, 785), (285, 780), (290, 700), (290, 600), (285, 500)])
+
+
+def side_torso(parts, key, cfg):
+    A, G, fig, alpha = figure(cfg['src'])
+    H, W = fig.shape
+    im = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(im).polygon(cfg['poly'], fill=1)
+    mask = np.asarray(im).astype(bool) & fig
+    lb, nn = ndi.label(mask)
+    if nn > 1:
+        mask = lb == (np.argmax(ndi.sum(mask, lb, range(1, nn + 1))) + 1)
+    a = ndi.gaussian_filter(mask.astype(float), 0.8) * np.where(mask, alpha, 0)
+    img = Image.fromarray(np.dstack([np.clip(G, 0, 255), np.clip(a * 255, 0, 255)]).astype(np.uint8), 'LA')
+    # Gürtel so schräg wie in side.jpg: Rumpf um die Schulter drehen (PIL: Winkel gegen den Uhrzeiger)
+    c = cfg['J']['sh']; t = np.radians(cfg.get('rot', 0))
+    img = img.rotate(cfg.get('rot', 0), resample=Image.BICUBIC, center=c)
+    rotp = lambda q: (c[0] + (q[0] - c[0]) * np.cos(t) + (q[1] - c[1]) * np.sin(t), c[1] - (q[0] - c[0]) * np.sin(t) + (q[1] - c[1]) * np.cos(t))
+    bb = img.getchannel('A').getbbox()
+    img = img.crop(bb)
+    fx, fy = S * cfg['sx'], S * cfg['sy']
+    img = img.resize((round(img.width * fx), round(img.height * fy)), Image.LANCZOS)
+    img.save(os.path.join(OUT, key + '.png'), optimize=True)
+    x0, y0 = round(bb[0] * fx), round(bb[1] * fy)
+    parts[key] = [x0, y0, x0 + img.width, y0 + img.height]
+    return {k: [round(rotp(q)[0] * fx, 1), round(rotp(q)[1] * fy, 1)] for k, q in cfg['J'].items()}
 
 
 def main():
