@@ -228,7 +228,7 @@ def cut_view(view, cfg, parts, joints, anchors):
 # Seitlicher Rumpf ohne Arme (Brust frei). Gelenke in Blatt-Pixeln; sy streckt den Rumpf auf die Länge
 # von side.jpg (Schulter -> Gürtel), damit Kopf, Arm und Beine von dort passen.
 SIDE_TORSO = dict(src='side_torso.jpg', sx=0.95, sy=1.08, rot=6,
-    J=dict(neck=(430, 480), sh=(450, 585), hip=(400, 985)),
+    J=dict(neck=(485, 485), sh=(450, 585), hip=(400, 985)),
     poly=[(290, 420), (540, 400), (560, 480), (610, 540), (645, 620), (630, 710), (600, 780), (575, 850), (548, 905), (420, 878), (312, 842),
           (298, 880), (285, 950), (250, 1000), (165, 1005), (140, 940), (150, 800), (195, 785), (285, 780), (290, 700), (290, 600), (285, 500)])
 
