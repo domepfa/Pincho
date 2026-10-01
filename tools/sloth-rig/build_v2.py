@@ -200,7 +200,6 @@ def cut_view(view, cfg, parts, joints, anchors):
             save('flat' + far, M['handR'], 'wrR', dark=dark)
         # Beine: stehend + gebeugte Oberschenkel aus der armlosen Serie, Beugewinkel der Zeichnungen merken
         legJ, fl0 = side_leg(parts, SIDE_STAND)  # ganzes Bein aus derselben Zeichnung wie der Rumpf
-        MESH['side'] = side_mesh(parts, SIDE_STAND)  # Bein als verformbares Gitter (neue Darstellung)
         jv['flex'] = {'thigh': round(fl0, 1)}
         # Kniebeugung der Zeichnung je Stellung (Unterschenkel- minus Oberschenkelwinkel)
         kb = lambda c: round(float(np.degrees(np.arctan2(c['an'][1] - c['kn'][1], c['an'][0] - c['kn'][0])
@@ -406,83 +405,13 @@ def side_leg(parts, cfg, sfx=''):
     return out, flex_of(cfg['torso'], cfg['hip'], cfg['kn'])
 
 
-def side_mesh(parts, cfg):
-    """Bein seitlich als EIN Bild mit Dreiecksgitter (Mesh) und Knochengewichten (Rumpf, Oberschenkel,
-    Unterschenkel, Fuss). Die Puppe verformt das Gitter weich (WebGL) – keine Nahtstellen, keine Stellungswechsel."""
-    A, G, fig, alpha = figure(cfg['src'], cfg.get('xr'))
-    H, W = fig.shape
-    yy, xx = np.mgrid[0:H, 0:W]
-    (bx0, by0), (bx1, by1) = cfg['belt']
-    below = yy > by0 + (xx - bx0) * (by1 - by0) / (bx1 - bx0) + 10
-    im = Image.new('L', (W, H), 0)
-    ImageDraw.Draw(im).polygon(cfg['bag'], fill=1)
-    bag = np.asarray(im).astype(bool)
-    leg = ndi.binary_opening(fig & below & ~bag, iterations=2)
-    lb, nn = ndi.label(leg)
-    if nn > 1:
-        leg = lb == (np.argmax(ndi.sum(leg, lb, range(1, nn + 1))) + 1)
-    g = G.copy(); a0 = alpha.copy()
-    leg = under_bag(leg, bag, fig, below, G, g, a0)
-    leg = leg | (ndi.binary_dilation(leg, iterations=2) & ndi.binary_erosion(fig, iterations=3) & ~bag & below)
-    a = ndi.gaussian_filter(leg.astype(float), 0.8) * np.where(leg, a0, 0)
-    f = S * SQ
-    bb = None
-    for far, dark in (('', 1.0), ('_far', FAR_DARK)):
-        img = Image.fromarray(np.dstack([np.clip(g * dark, 0, 255), np.clip(a * 255, 0, 255)]).astype(np.uint8), 'LA')
-        bb = img.getchannel('A').getbbox()
-        img = img.crop(bb).resize((round((bb[2] - bb[0]) * f), round((bb[3] - bb[1]) * f)), Image.LANCZOS)
-        img.save(os.path.join(OUT, f'v2side_legmesh{far}.png'), optimize=True)
-        parts[f'v2side_legmesh{far}'] = [round(bb[0] * f), round(bb[1] * f), round(bb[0] * f) + img.width, round(bb[1] * f) + img.height]
-    # Gitter (Blatt-Pixel), nur wo Bein ist
-    step = 9
-    dil = ndi.binary_dilation(leg, iterations=step + 2)
-    gx = np.arange(bb[0] - step, bb[2] + 2 * step, step); gy = np.arange(bb[1] - step, bb[3] + 2 * step, step)
-    idx = -np.ones((len(gy), len(gx)), int); V = []
-    for j, y in enumerate(gy):
-        for i, x in enumerate(gx):
-            if 0 <= y < H and 0 <= x < W and dil[y, x]:
-                idx[j, i] = len(V); V.append((int(x), int(y)))
-    T = []
-    for j in range(len(gy) - 1):
-        for i in range(len(gx) - 1):
-            q00, q10, q01, q11 = idx[j, i], idx[j, i + 1], idx[j + 1, i], idx[j + 1, i + 1]
-            if min(q00, q10, q01) >= 0: T += [int(q00), int(q10), int(q01)]
-            if min(q10, q11, q01) >= 0: T += [int(q10), int(q11), int(q01)]
-    # Gewichte: nächster Knochen weich gemischt; an der Hüfte grosser, weicher Übergang Rumpf -> Oberschenkel (rundes Gesäss)
-    sh = cfg['torso'][1]
-    bones = [(cfg['hip'], sh), (cfg['hip'], cfg['kn']), (cfg['kn'], cfg['an']), (cfg['an'], cfg['to'])]
-
-    def sd(p, a, b):
-        p = np.array(p, float); a = np.array(a, float); b = np.array(b, float); d = b - a
-        t = np.clip(((p - a) @ d) / (d @ d), 0, 1); return float(np.linalg.norm(p - a - t * d))
-    hip = np.array(cfg['hip'], float); Wt = []
-    for (x, y) in V:
-        if bag[min(y, H - 1), min(x, W - 1)] or y < hip[1] - 90:
-            Wt += [1, 0, 0, 0]; continue
-        d = np.array([sd((x, y), a, b) for a, b in bones])
-        w = 1 / (d + 10) ** 3
-        r = np.hypot(x - hip[0], y - hip[1])
-        if r < 120 and y > hip[1] - 90:
-            u = np.clip((y - (hip[1] - 90)) / 210, 0, 1); sm = u * u * (3 - 2 * u); k = 1 - r / 120
-            w = w / w.sum() * (1 - k) + np.array([1 - sm, sm, 0, 0]) * k
-        w = w / w.sum(); Wt += [round(float(v), 3) for v in w]
-    lt = np.hypot(cfg['kn'][0] - cfg['hip'][0], cfg['kn'][1] - cfg['hip'][1])
-    lc = np.hypot(cfg['an'][0] - cfg['kn'][0], cfg['an'][1] - cfg['kn'][1])
-    fT, fC = S * SQ * LEG_T / lt, S * SQ * LEG_C / lc
-    return {'img': 'v2side_legmesh', 'V': [c for v in V for c in v], 'T': T, 'W': Wt,
-            'f': [round(S * SQ, 5), round(fT, 5), round(fC, 5), round(fC, 5)], 'src': round(f, 5)}
-
-
-MESH = {}
-
-
 def main():
     os.makedirs(OUT, exist_ok=True)
     parts, joints, anchors = {}, {}, {}
     for view, cfg in VIEWS.items():
         cut_view(view, cfg, parts, joints, anchors)
         print(view, 'ok')
-    block = 'const SLOTH_V2 = ' + json.dumps({'parts': parts, 'joints': joints, 'anchors': anchors, 'mesh': MESH}, separators=(',', ':')) + ';'
+    block = 'const SLOTH_V2 = ' + json.dumps({'parts': parts, 'joints': joints, 'anchors': anchors}, separators=(',', ':')) + ';'
     js = open(RIG_JS).read()
     if '/* V2:BEGIN */' in js:
         js = re.sub(r'/\* V2:BEGIN \*/.*?/\* V2:END \*/', '/* V2:BEGIN */\n' + block + '\n/* V2:END */', js, flags=re.S)
