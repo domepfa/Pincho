@@ -391,10 +391,13 @@ def side_leg(parts, cfg, sfx=''):
             x0, y0 = round(bb[0] * f), round(bb[1] * f)
             parts[f'v2side_{key}{far}'] = [x0, y0, x0 + img.width, y0 + img.height]
         return lambda q: [round(q[0] * f, 1), round(q[1] * f, 1)]
-    fT = fC = S * SQ  # Massstab wie gezeichnet (alle Figuren im Blatt sind gleich gross)
+    # Längen angleichen: die Figuren im Blatt sind nicht exakt gleich lang gezeichnet (Wade bis 25 % länger).
+    # Oberschenkel: gleichmässig skaliert. Unterschenkel mit Fuss: Bild in Zeichnungsgrösse (Fuss bleibt gleich gross),
+    # die Puppe staucht ihn nur entlang des Schienbeins (calfK)
+    fT, fC = S * SQ * LEG_T / lt, S * SQ
     sT = cut('thigh' + sfx, Mth, fT)
     sC = cut('calf' + sfx, Mca | Mfo, fC, 'kn', 30)
-    out = {'thigh' + sfx: [sT(cfg['hip']), sT(cfg['kn'])], 'calf' + sfx: [sC(cfg['kn']), sC(cfg['an'])]}
+    out = {'thigh' + sfx: [sT(cfg['hip']), sT(cfg['kn'])], 'calf' + sfx: [sC(cfg['kn']), sC(cfg['an'])], 'calfK' + sfx: round(LEG_C / lc, 3)}
     # Unterschenkel ohne Fuss: die Puppe nimmt für alle Stellungen denselben Fuss (aus der stehenden Figur)
     sS = cut('shin' + sfx, Mca, fC, 'kn', 30)
     out['shin' + sfx] = [sS(cfg['kn']), sS(cfg['an'])]
