@@ -7,10 +7,19 @@
    das sich per innerHTML einsetzen lässt und ohne JS-Schleife animiert. */
 
 const SLOTH_RIG_BASE = '../assets/sloth/rig/';
+const SLOTH_RIG2_BASE = SLOTH_RIG_BASE.replace('/rig/', '/rig2/');
+/* Neue Figur (v2, aus ganzen Zeichnungen geschnitten, siehe tools/sloth-rig/build_v2.py) – im Konto umschaltbar */
+const SLOTH_FIG_KEY = 'pinchobeta_sloth_fig';
+function slothV2On() { try { return localStorage.getItem(SLOTH_FIG_KEY) === 'v2'; } catch (e) { return false; } }
+const slothPartBox = (im) => (im && im.startsWith('v2') ? SLOTH_V2.parts[im] : SLOTH_PARTS[im]);
+const slothPartHref = (im) => (im.startsWith('v2') ? SLOTH_RIG2_BASE : SLOTH_RIG_BASE) + im + '.png';
 
 /* PARTS:BEGIN */
 const SLOTH_PARTS = {"front_head":[510,53,696,293],"front_torso":[456,248,745,582],"front_uarm_l":[296,251,478,388],"front_uarm_r":[723,251,904,388],"front_farm_l":[51,288,294,400],"front_farm_r":[907,288,1150,400],"front_thigh_l":[439,516,582,697],"front_thigh_r":[629,516,773,697],"front_tail":[566,584,643,725],"front_calf_l":[444,678,569,866],"front_calf_r":[643,679,768,866],"back_head":[510,53,696,293],"back_torso":[455,247,745,622],"back_uarm_l":[300,251,478,388],"back_uarm_r":[723,251,900,388],"back_farm_l":[163,288,294,396],"back_farm_r":[906,288,1039,396],"back_elbow_l":[267,315,319,367],"back_elbow_r":[881,314,934,367],"back_grip_l":[195,606,314,813],"back_grip_r":[899,606,1018,813],"back_thigh_l":[439,567,571,697],"back_thigh_r":[641,562,773,697],"back_tail":[566,619,643,741],"back_calf_l":[444,678,569,866],"back_calf_r":[643,678,768,866],"pose_russian_a":[209,33,499,221],"pose_russian_b":[679,29,968,221],"pose_ninety":[339,246,498,434],"pose_frog_a":[252,454,543,618],"pose_frog_b":[697,485,1018,614],"pose_extrot_a":[405,634,537,875],"pose_extrot_b":[633,634,817,876],"eq_plate":[570,40,688,159],"eq_kettlebell":[870,40,962,159],"eq_dumbbell":[184,51,365,151],"eq_dhandle":[178,193,273,328],"eq_rope":[515,183,622,331],"eq_ring":[866,182,955,336],"eq_barend":[66,379,285,434],"eq_bench":[326,418,558,499],"eq_incline":[604,353,821,499],"eq_decline":[887,404,1118,499],"eq_cable":[92,506,252,840],"eq_dipstation":[436,631,630,840],"eq_rack":[890,553,1108,840],"eq_latpull":[68,33,226,248],"eq_legpress":[312,68,575,239],"eq_legext":[657,67,851,241],"eq_legcurl":[917,67,1143,241],"eq_butterfly":[69,324,232,543],"eq_abduction":[362,329,510,543],"eq_calfseated":[657,417,844,543],"eq_calfstanding":[931,326,1134,541],"eq_hyperext":[71,688,280,839],"eq_pullover":[465,604,649,840],"eq_tbar":[877,653,1112,840],"eq_abwheel":[181,58,443,250],"eq_jumprope":[776,42,989,261],"eq_ladder":[93,361,534,514],"eq_stepbox":[748,354,1035,538],"eq_band":[93,682,531,759],"eq_mat":[627,666,1152,759],"eq_stack":[303,516,390,652],"eq_calfframe":[499,491,711,666],"eq_calfpad":[807,531,920,627],"eq_dipbars":[292,735,461,819],"eq_nordic":[535,711,724,819],"eq_abductseat":[1008,654,1141,819],"eq_edge":[818,753,954,823],"front_face_neutral":[106,22,253,213],"front_face_effort":[106,22,251,213],"front_face_blink":[106,22,253,213],"front_face_yawn":[106,22,253,213],"side_face_neutral":[104,40,335,317],"side_face_effort":[103,40,334,317],"side_face_blink":[104,40,332,317],"side_torso":[458,53,699,568],"side_body":[458,220,692,568],"side_tail":[372,453,473,535],"side_uarm":[791,80,910,268],"side_uarm_far":[791,80,910,268],"side_elbow":[811,261,857,307],"side_elbow_far":[811,261,857,307],"side_farm":[770,320,959,400],"side_farm_far":[770,320,959,400],"side_hand":[990,449,1166,539],"side_hand_far":[990,449,1166,539],"side_thigh":[629,516,773,687],"side_thigh_far":[629,516,773,687],"side_knee":[721,652,768,700],"side_knee_far":[721,652,768,700],"side_calf":[1020,689,1180,854],"side_calf_far":[1020,689,1180,854],"side_shin":[1020,689,1122,793],"side_shin_far":[1020,689,1122,793],"side_fist":[59,109,404,284],"side_fist_far":[59,109,404,284],"side_foot":[152,622,370,804],"side_foot_far":[152,622,370,804],"side_flat":[624,706,893,825],"side_flat_far":[624,706,893,825]};
 /* PARTS:END */
+/* V2:BEGIN */
+const SLOTH_V2 = {"parts":{"v2front_torso":[149,183,351,481],"v2front_head":[173,15,331,198],"v2front_uarm_l":[86,206,200,366],"v2front_farm_l":[12,322,139,516],"v2front_farmfist_l":[12,322,139,516],"v2front_thigh_l":[142,400,251,584],"v2front_calf_l":[80,546,224,758],"v2front_uarm_r":[300,206,418,364],"v2front_farm_r":[365,322,497,516],"v2front_farmfist_r":[365,322,497,516],"v2front_thigh_r":[252,400,365,584],"v2front_calf_r":[284,546,428,758],"v2back_torso":[149,182,351,466],"v2back_head":[174,12,338,201],"v2back_uarm_l":[79,204,201,371],"v2back_farm_l":[30,326,142,440],"v2back_grip_l":[12,412,86,518],"v2back_thigh_l":[143,398,252,586],"v2back_calf_l":[78,546,224,753],"v2back_uarm_r":[300,204,429,367],"v2back_farm_r":[370,326,478,438],"v2back_grip_r":[426,412,499,518],"v2back_thigh_r":[250,397,370,585],"v2back_calf_r":[285,546,430,753],"v2hang_torso":[164,216,346,464],"v2hang_head":[196,120,317,263],"v2hang_uarm_l":[126,136,213,334],"v2hang_farm_l":[122,50,192,164],"v2hang_grip_l":[120,13,198,74],"v2hang_thigh_l":[152,400,261,581],"v2hang_calf_l":[136,540,235,754],"v2hang_uarm_r":[297,136,387,348],"v2hang_farm_r":[321,52,391,164],"v2hang_grip_r":[316,13,392,74],"v2hang_thigh_r":[250,400,360,582],"v2hang_calf_r":[277,540,376,754],"v2side_torso":[100,175,270,447],"v2side_face":[92,11,254,191],"v2side_uarm":[157,180,325,270],"v2side_farm":[296,184,442,266],"v2side_hand":[422,190,496,238],"v2side_fist":[296,184,496,266],"v2side_flat":[422,190,496,238],"v2side_thigh":[136,395,280,595],"v2side_calf":[204,556,380,751],"v2side_shin":[204,556,293,744],"v2side_foot":[238,670,380,750],"v2side_uarm_far":[157,180,325,270],"v2side_farm_far":[296,184,442,266],"v2side_hand_far":[422,190,496,238],"v2side_fist_far":[296,184,496,266],"v2side_flat_far":[422,190,496,238],"v2side_thigh_far":[136,395,280,595],"v2side_calf_far":[204,556,380,751],"v2side_shin_far":[204,556,293,744],"v2side_foot_far":[238,670,380,750]},"joints":{"front":{"torso":[[250.0,445.0],[250.0,185.0]],"head":[[250.0,185.0],[250.0,20.0]],"farm_l":[[102.5,345.0],[40.0,495.0]],"uarm_l":[[165.0,240.0],[102.5,345.0]],"thigh_l":[[210.0,445.0],[180.0,575.0]],"calf_l":[[180.0,575.0],[155.0,695.0]],"farm_r":[[397.5,345.0],[462.5,495.0]],"uarm_r":[[335.0,240.0],[397.5,345.0]],"thigh_r":[[290.0,445.0],[320.0,575.0]],"calf_r":[[320.0,575.0],[345.0,695.0]]},"back":{"torso":[[250.0,445.0],[250.0,190.0]],"head":[[250.0,190.0],[250.0,15.0]],"grip_l":[[57.5,430.0],[42.5,500.0]],"farm_l":[[102.5,350.0],[57.5,430.0]],"uarm_l":[[165.0,240.0],[102.5,350.0]],"thigh_l":[[210.0,445.0],[180.0,575.0]],"calf_l":[[180.0,575.0],[155.0,695.0]],"grip_r":[[445.0,430.0],[465.0,500.0]],"farm_r":[[400.0,350.0],[445.0,430.0]],"uarm_r":[[335.0,240.0],[400.0,350.0]],"thigh_r":[[290.0,445.0],[325.0,575.0]],"calf_r":[[325.0,575.0],[350.0,695.0]]},"hang":{"torso":[[255.0,465.0],[255.0,235.0]],"head":[[255.0,235.0],[255.0,120.0]],"grip_l":[[152.5,55.0],[157.5,25.0]],"farm_l":[[150.0,140.0],[152.5,55.0]],"uarm_l":[[177.5,255.0],[150.0,140.0]],"thigh_l":[[222.5,465.0],[187.5,570.0]],"calf_l":[[187.5,570.0],[172.5,700.0]],"grip_r":[[355.0,55.0],[352.5,25.0]],"farm_r":[[357.5,140.0],[355.0,55.0]],"uarm_r":[[332.5,255.0],[357.5,140.0]],"thigh_r":[[287.5,465.0],[322.5,570.0]],"calf_r":[[322.5,570.0],[340.0,700.0]]},"side":{"torso":[[195.0,447.5],[200.0,222.5]],"face":[[200.0,170.0],[165.0,30.0]],"uarm":[[200.0,222.5],[320.0,225.0]],"farm":[[320.0,225.0],[440.0,212.5]],"fist":[[320.0,225.0],[440.0,212.5]],"hand":[[440.0,212.5],[492.5,215.0]],"flat":[[440.0,212.5],[492.5,215.0]],"thigh":[[195.0,447.5],[245.0,585.0]],"calf":[[245.0,585.0],[260.0,695.0]],"shin":[[245.0,585.0],[260.0,695.0]],"foot":[[260.0,695.0],[370.0,735.0]]}},"anchors":{"front":{"neck":[250.0,185.0],"sh_l":[165.0,240.0],"sh_r":[335.0,240.0],"hip_l":[210.0,445.0],"hip_r":[290.0,445.0],"tail":[250.0,445.0]},"back":{"neck":[250.0,190.0],"sh_l":[165.0,240.0],"sh_r":[335.0,240.0],"hip_l":[210.0,445.0],"hip_r":[290.0,445.0],"tail":[250.0,445.0]},"hang":{"neck":[255.0,235.0],"sh_l":[177.5,255.0],"sh_r":[332.5,255.0],"hip_l":[222.5,465.0],"hip_r":[287.5,465.0],"tail":[255.0,465.0]},"side":{"shoulder":[200.0,222.5],"hip":[195.0,447.5],"tail":[195.0,447.5],"face":[200.0,170.0]}}};
+/* V2:END */
 
 // Gelenkpunkte in Vorlagen-Koordinaten (1200 x 896): [nah, fern]
 const SLOTH_JOINTS = {
@@ -807,20 +816,43 @@ function slothPathPoint(pose) {
 // Einheitliche Kamera: Bildausschnitt mindestens so hoch, damit liegende und stehende Figuren gleich gross wirken
 const SLOTH_MIN_H = 780;
 
-function slothRigBuild(pose) {
-  const view = pose.view, J = SLOTH_JOINTS[view], A = SLOTH_ANCHORS[view];
+function slothRigBuild(pose, v2 = false) {
+  const view = pose.view;
+  // v2: Rückansicht mit erhobenen Armen nutzt die Hänge-Zeichnung (keine verbogene Schulter)
+  const armsUp = view === 'back' && ((pose.a.uarm_l ?? 90) < 0 || (pose.a.uarm_r ?? 90) < 0);
+  const vk = v2 ? (armsUp ? 'hang' : view) : view;
+  const J = v2 ? { ...SLOTH_V2.joints[vk], ...(vk === 'front' ? { face: SLOTH_V2.joints.front.head } : {}) } : SLOTH_JOINTS[view];
+  const A = v2 ? SLOTH_V2.anchors[vk] : SLOTH_ANCHORS[view];
+  const tlen = (jj) => Math.hypot(jj.torso[1][0] - jj.torso[0][0], jj.torso[1][1] - jj.torso[0][1]);
+  // Grösse wie die bisherige Figur, damit Geräte und Bänke weiter passen
+  const KV = v2 ? tlen(SLOTH_JOINTS[view]) / tlen(SLOTH_V2.joints[vk === 'hang' ? 'back' : vk]) : 1;
+  const holds = (pose.props || []).some((pr) => /^hand_/.test(pr.at || ''));
+  const img2 = (n) => {
+    if (!v2 || !n || n.startsWith('eq_')) return n;
+    let m = n === 'side_body' ? 'v2side_torso' : n === 'side_face_neutral' ? 'v2side_face' : n === 'front_face_neutral' ? 'v2front_head'
+      : n.replace(/^(side|front|back)_/, 'v2' + vk + '_');
+    if (vk === 'front' && holds) m = m.replace('_farm_', '_farmfist_');
+    return SLOTH_V2.parts[m] ? m : null; // gibt es in v2 nicht (Schwanz, Gelenkkugeln) -> weglassen
+  };
   const rad = (d) => d * Math.PI / 180;
   const rot = (v, d) => { const c = Math.cos(rad(d)), s = Math.sin(rad(d)); return [v[0] * c - v[1] * s, v[0] * s + v[1] * c]; };
   const add = (a, b) => [a[0] + b[0], a[1] + b[1]];
   const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
   const mul = (v, k) => [v[0] * k, v[1] * k];
-  const a0 = (name) => { const [p, d] = J[name]; return Math.atan2(d[1] - p[1], d[0] - p[0]) * 180 / Math.PI; };
+  const a0 = (name) => { if (!J[name]) return 0; const [p, d] = J[name]; return Math.atan2(d[1] - p[1], d[0] - p[0]) * 180 / Math.PI; };
   // Teil so stellen, dass sein Nah-Gelenk auf P liegt und der Knochen in Weltrichtung deg zeigt
-  const place = (name, P, deg, img, km = 1) => {
-    const [p, d, k0 = 1] = J[name], r = deg - a0(name), k = k0 * km * (SLOTH_SCALE[view][name] ?? 1);
-    return { img: img || view + '_' + name, P, r, p, k, map: (q) => add(P, mul(rot(sub(q, p), r), k)), end: add(P, mul(rot(sub(d, p), r), k)) };
+  // alt: Teil aus einer anderen v2-Zeichnung (z. B. hängender Arm beim einarmigen Hängen aus der Rückansicht)
+  const place = (name, P, deg, img, km = 1, alt) => {
+    const JJ = alt ? SLOTH_V2.joints[alt] : J;
+    if (!JJ[name]) return { skip: true, P, r: 0, p: [0, 0], k: 1, map: () => P, end: P };
+    const [p, d, k0 = 1] = JJ[name], [q0, q1] = JJ[name], r = deg - Math.atan2(q1[1] - q0[1], q1[0] - q0[0]) * 180 / Math.PI;
+    const k = k0 * km * (v2 ? KV : (SLOTH_SCALE[view][name] ?? 1));
+    let im = img2(img || view + '_' + name);
+    if (alt && im) im = SLOTH_V2.parts[im.replace('v2' + vk + '_', 'v2' + alt + '_')] ? im.replace('v2' + vk + '_', 'v2' + alt + '_') : im;
+    return { img: im, skip: !im || undefined, P, r, p, k, map: (q) => add(P, mul(rot(sub(q, p), r), k)), end: add(P, mul(rot(sub(d, p), r), k)) };
   };
-  const ball = (img, P) => { const b = SLOTH_PARTS[img]; return { img, P, r: 0, p: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k: SLOTH_SCALE[view].ball ?? 1 }; };
+  const ball = (img, P) => { const im = img2(img), b = slothPartBox(im); if (!b) return { skip: true, P, end: P };
+    return { img: im, P, r: 0, p: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k: SLOTH_SCALE[view].ball ?? 1 }; };
 
   function side(s) {
     const q = {}, hk = pose.grip || 'hand', D = pose.depth || [-14, -8];
@@ -885,13 +917,17 @@ function slothRigBuild(pose) {
     const arm = (k) => s[k] + (pose.relArms ? s.torso + 90 : 0), leg = (k) => s[k] + (pose.relLegs ? s.torso + 90 : 0);
     // len_<teil>: Glied verkürzt (zeigt zum Betrachter, z. B. Arme kommen beim Butterfly nach vorne)
     // near_<teil>: Glied kommt zum Betrachter -> insgesamt etwas grösser (Perspektive)
-    const shorten = (e, key) => { const L = s['len_' + key] ?? 1, N = s['near_' + key] ?? 1; if (L === 1 && N === 1) return e;
+    // v2: len_farm ~0 war nur ein Behelf der alten Greifhand (brachte Unterarm mit); die neue hat einen echten Unterarm
+    const shorten = (e, key) => { const L0 = s['len_' + key] ?? 1, L = v2 && L0 < 0.05 && /^farm_/.test(key) ? 1 : L0, N = s['near_' + key] ?? 1; if (L === 1 && N === 1) return e;
       const d = sub(e.end, e.P); return { ...e, k: [e.k * L * N, e.k * N], end: add(e.P, mul(d, L * N)) }; };
     for (const x of ['l', 'r']) {
       const sh = A['sh_' + x];
-      q['uarm_' + x] = shorten(place('uarm_' + x, t.map([sh[0], sh[1] - (pose.armLift || 0)]), arm('uarm_' + x)), 'uarm_' + x);
-      q['farm_' + x] = shorten(place('farm_' + x, q['uarm_' + x].end, arm('farm_' + x)), 'farm_' + x);
-      if (J['grip_' + x]) q['grip_' + x] = place('grip_' + x, q['farm_' + x].end, arm('grip_' + x));
+      // armLift hob bei der alten Figur das Schultergelenk an (hängende Arme); die neue hat echte Schultern
+      // hängender Arm in der Hänge-Ansicht (je Übung fest, nicht je Bild – sonst springt das Teil)
+      const alt = vk === 'hang' && [pose.a, pose.b].every((k) => (k['uarm_' + x] ?? 90) > 45) ? 'back' : undefined;
+      q['uarm_' + x] = shorten(place('uarm_' + x, t.map([sh[0], sh[1] - (v2 ? 0 : pose.armLift || 0)]), arm('uarm_' + x), undefined, 1, alt), 'uarm_' + x);
+      q['farm_' + x] = shorten(place('farm_' + x, q['uarm_' + x].end, arm('farm_' + x), undefined, 1, alt), 'farm_' + x);
+      if (J['grip_' + x]) q['grip_' + x] = place('grip_' + x, q['farm_' + x].end, arm('grip_' + x), undefined, 1, alt);
       q['thigh_' + x] = shorten(place('thigh_' + x, t.map(A['hip_' + x]), leg('thigh_' + x)), 'thigh_' + x);
       q['calf_' + x] = place('calf_' + x, q['thigh_' + x].end, leg('calf_' + x));
       if (view === 'back') q['elbow_' + x] = ball('back_elbow_' + x, q['uarm_' + x].end);
@@ -909,7 +945,7 @@ function slothRigBuild(pose) {
       q['farm_' + x] = place('farm_' + x, E, Math.atan2(fv[1], fv[0]) * 180 / Math.PI);
     }
     // mirror: Teile an ihrer Knochenachse spiegeln (z. B. Hand beim Winken mit Krallen nach innen)
-    for (const k of pose.mirror || []) q[k].k = [1, -1];
+    for (const k of pose.mirror || []) { const kk = Array.isArray(q[k].k) ? q[k].k[0] : q[k].k; q[k].k = [kk, -kk]; }
     const hand = (x) => (q['grip_' + x] || q['farm_' + x]).end;
     return { q, pts: {
       hand_l: hand('l'), hand_r: hand('r'), foot_l: q.calf_l.end, foot_r: q.calf_r.end, elbow_l: q.uarm_l.end, elbow_r: q.uarm_r.end,
@@ -993,11 +1029,12 @@ const slothKeys = (name, pose) => pose.keys || (SLOTH_CALM.has(name) || SLOTH_NO
   : SLOTH_ECC_AB.has(name) ? SLOTH_KEYS_ECC : SLOTH_KEYS_CON);
 
 const slothRigCache = {};
-function slothRigPrepare(name) {
+function slothRigPrepare(poseName) {
+  const v2 = slothV2On(), name = v2 ? poseName + '-v2' : poseName; // eigener CSS-/Cache-Name je Figur
   if (slothRigCache[name]) return slothRigCache[name];
-  const pose = SLOTH_POSES[name];
-  const build = slothRigBuild(pose);
-  const keys = slothKeys(name, pose);
+  const pose = SLOTH_POSES[poseName];
+  const build = slothRigBuild(pose, v2);
+  const keys = slothKeys(poseName, pose);
   const amount = (t) => {
     for (let i = 1; i < keys.length; i++) {
       if (t <= keys[i][0]) {
@@ -1055,7 +1092,7 @@ function slothRigPrepare(name) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const f of frames) for (const key of order) {
     if (f[key].line || f[key].skip) continue;
-    const { img, P, r, p, k } = f[key], b = SLOTH_PARTS[img], [kx, ky] = Array.isArray(k) ? k : [k, k];
+    const { img, P, r, p, k } = f[key], b = slothPartBox(img), [kx, ky] = Array.isArray(k) ? k : [k, k];
     const c = Math.cos(r * Math.PI / 180), s = Math.sin(r * Math.PI / 180);
     for (const [x, y] of [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]]) {
       const dx = (x - p[0]) * kx, dy = (y - p[1]) * ky, wx = P[0] + dx * c - dy * s, wy = P[1] + dx * s + dy * c;
@@ -1084,7 +1121,7 @@ function slothRigPrepare(name) {
     css.push(`@keyframes srk-${name}-tail-calm{${steps}}.anim-calm .sr-${name} .sp-tail{animation-name:srk-${name}-tail-calm}`);
   }
   // Gesichter: Ebenen über dem neutralen Kopf, per Deckkraft umgeschaltet
-  const effort = pose.effort ?? (SLOTH_CALM.has(name) ? false : 'b');
+  const effort = pose.effort ?? (SLOTH_CALM.has(poseName) ? false : 'b');
   const faceLayers = (img) => ['blink', ...(pose.yawn ? ['yawn'] : []), ...(effort ? ['effort'] : [])]
     .map((l) => [l, img.replace('_neutral', '_' + l)]).filter(([, im]) => SLOTH_PARTS[im]);
   if (effort) {
@@ -1107,7 +1144,7 @@ function slothRigPrepare(name) {
     const e = frames[0][key];
     if (e.skip) return '';
     if (e.line) return `<g class="sp-${key}" transform="${tfAttr(e)}"><rect class="${e.bar ? 'sloth-rig-handle' : 'sloth-rig-cable'}" x="0" y="-3" width="1" height="6"/></g>`;
-    const img = (im, cls = '') => { const b = SLOTH_PARTS[im]; return `<image${cls ? ` class="${cls}"` : ''} href="${SLOTH_RIG_BASE}${im}.png" x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}"/>`; };
+    const img = (im, cls = '') => { const b = slothPartBox(im); return `<image${cls ? ` class="${cls}"` : ''} href="${slothPartHref(im)}" x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}"/>`; };
     const extra = key === 'head' && /_face_neutral$/.test(e.img) ? faceLayers(e.img).map(([l, im]) => img(im, 'sf-' + l)).join('') : '';
     return `<g class="sp-${key}${e.far ? ' sp-far' : ''}" transform="${tfAttr(e)}">${img(e.img)}${extra}</g>`;
   }).join('');
@@ -1167,8 +1204,8 @@ function slothSwapFigure(name, cls) {
 // SVG-Markup einer Pose, z. B. slothFigure('hang', 'ex-figure sloth-img')
 function slothFigure(name, cls = '') {
   if (SLOTH_SWAPS[name]) return slothSwapFigure(name, cls);
-  const r = slothRigPrepare(name), [x, y, w, h] = r.box;
-  return `<svg class="sloth-rig sr-${name} ${cls}" data-dur="${SLOTH_POSES[name].dur}" viewBox="${x} ${y} ${w} ${h}" width="${Math.round(w / 3)}" height="${Math.round(h / 3)}" role="img" aria-label="${SLOTH_POSES[name].label}">${r.body}</svg>`;
+  const r = slothRigPrepare(name), [x, y, w, h] = r.box, nm = slothV2On() ? name + '-v2' : name;
+  return `<svg class="sloth-rig sr-${nm} ${cls}" data-dur="${SLOTH_POSES[name].dur}" viewBox="${x} ${y} ${w} ${h}" width="${Math.round(w / 3)}" height="${Math.round(h / 3)}" role="img" aria-label="${SLOTH_POSES[name].label}">${r.body}</svg>`;
 }
 
 /* Die App baut den Ablauf-Bildschirm immer wieder neu auf (innerHTML); jede neu
