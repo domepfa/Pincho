@@ -115,9 +115,12 @@ wird erst nach dem Testen in die Haupt-App übernommen.
 - **Test:** `node tools/test-beta.mjs` (Haupt-App: `APP=main node tools/test-beta.mjs`)
   startet die App in Chromium mit nachgebildetem Firebase (Node + Playwright
   nötig, keine Zugangsdaten). Prüft Start ohne JS-Fehler, Login, alle Tabs,
-  die Übungsfiguren (Prüfsummen zum Vorher/Nachher-Vergleich), den
-  Offline-Cache und den Offline-Start; Exit-Code 1 bei einem Fehler.
-  Details oben in der Datei.
+  die Übungsfiguren (Prüfsummen zum Vorher/Nachher-Vergleich), Datenschutz
+  (angemeldet/abgemeldet), Hilfe, Daten-Karte mit „Meine Daten herunterladen"
+  und „Konto löschen" (nur bis zur Sicherheitsabfrage), den Offline-Cache
+  und den Offline-Start; Exit-Code 1 bei einem Fehler. Anfragen ausserhalb
+  von localhost werden nachgebildet oder blockiert — echte Firebase-Daten
+  bleiben unberührt. Details oben in der Datei.
 
 ## Offene Punkte / bewusst nicht in v1
 
