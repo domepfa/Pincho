@@ -295,14 +295,14 @@ def side_torso(parts, key, cfg):
 # Beine aus side_squats.png. torso = (Hüfte, Schulter) der Figur für den Beugewinkel; belt = Unterkante Gürtel;
 # bag = Chalkbag (gehört zum Rumpf). Stehend: ganzes Bein (Oberschenkel, Unterschenkel, Fuss); gebeugt: nur Gesäss + Oberschenkel,
 # die Puppe blendet je nach Hüftwinkel zur nächsten Zeichnung über.
-SIDE_STAND = dict(src='side_squats.png', xr=SQX[0], scale=SQ, hip=(170, 612), kn=(190, 768), an=(170, 922), to=(270, 972), torso=((175, 600), (180, 360)),
+SIDE_STAND = dict(src='side_squats.png', xr=SQX[0], scale=SQ, hip=(170, 612), kn=(180, 765), an=(170, 915), to=(268, 962), torso=((175, 600), (180, 360)),
                   belt=((100, 532), (245, 575)), bag=[(22, 512), (112, 512), (112, 648), (22, 648)])
 SIDE_LEGS = {
-    'thighA': dict(src='side_squats.png', xr=SQX[1], scale=SQ, hip=(470, 640), kn=(572, 748), an=(505, 905), to=(620, 968), torso=((485, 640), (510, 370)),
+    'thighA': dict(src='side_squats.png', xr=SQX[1], scale=SQ, hip=(470, 640), kn=(585, 752), an=(520, 900), to=(625, 965), torso=((485, 640), (510, 370)),
                    belt=((445, 568), (608, 600)), bag=[(405, 552), (488, 552), (488, 672), (405, 672)]),
-    'thighB': dict(src='side_squats.png', xr=SQX[2], scale=SQ, hip=(810, 700), kn=(938, 758), an=(860, 905), to=(995, 970), torso=((800, 690), (880, 420)),
+    'thighB': dict(src='side_squats.png', xr=SQX[2], scale=SQ, hip=(810, 700), kn=(950, 762), an=(850, 895), to=(990, 960), torso=((800, 690), (880, 420)),
                    belt=((785, 612), (915, 655)), bag=[(702, 577), (785, 577), (785, 702), (702, 702)]),
-    'thighC': dict(src='side_squats.png', xr=SQX[3], scale=SQ, hip=(1232, 738), kn=(1370, 755), an=(1262, 905), to=(1400, 968), torso=((1185, 740), (1290, 480)),
+    'thighC': dict(src='side_squats.png', xr=SQX[3], scale=SQ, hip=(1232, 738), kn=(1385, 770), an=(1245, 900), to=(1385, 965), torso=((1185, 740), (1290, 480)),
                    belt=((1175, 660), (1325, 712)), bag=[(1078, 628), (1170, 628), (1170, 758), (1078, 758)]),
 }
 
