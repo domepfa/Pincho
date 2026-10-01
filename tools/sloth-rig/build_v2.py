@@ -182,7 +182,7 @@ def cut_view(view, cfg, parts, joints, anchors):
         save('face', M['head'], fade=torsoCut)
         jv['torso'] = [TJ['hip'], TJ['sh']]
         jv['face'] = [sc(J['neck']), sc(J['top'])]
-        anchors[view] = {'shoulder': TJ['sh'], 'hip': TJ['hip'], 'tail': TJ['hip'], 'face': TJ['neck']}
+        anchors[view] = {'shoulder': TJ['sh'], 'hip': TJ['hip'], 'tail': TJ['tail'], 'face': TJ['neck']}  # Schwanz unter dem Chalkbag
         for far, dark in (('', 1.0), ('_far', FAR_DARK)):
             save('uarm' + far, M['uarmR'], dark=dark)  # ohne Kappe: die Schulter ist schon ganz dabei
             save('farm' + far, M['farmR'], 'elR', dark=dark)
@@ -228,7 +228,7 @@ def cut_view(view, cfg, parts, joints, anchors):
 # Seitlicher Rumpf ohne Arme (Brust frei). Gelenke in Blatt-Pixeln; sy streckt den Rumpf auf die Länge
 # von side.jpg (Schulter -> Gürtel), damit Kopf, Arm und Beine von dort passen.
 SIDE_TORSO = dict(src='side_torso.jpg', sx=0.95, sy=1.08, rot=6,
-    J=dict(neck=(485, 485), sh=(450, 585), hip=(400, 985)),
+    J=dict(neck=(520, 490), sh=(450, 585), hip=(400, 985), tail=(245, 990)),
     poly=[(290, 420), (540, 400), (560, 480), (610, 540), (645, 620), (630, 710), (600, 780), (575, 850), (548, 905), (420, 878), (312, 842),
           (298, 880), (285, 950), (250, 1000), (165, 1005), (140, 940), (150, 800), (195, 785), (285, 780), (290, 700), (290, 600), (285, 500)])
 
