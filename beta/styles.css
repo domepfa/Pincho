@@ -1512,6 +1512,7 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .sloth-rig { display: block; overflow: visible; }
 .sloth-rig-bar { fill: #3b4048; stroke: #0a0a0a; stroke-width: 5; }
 .sloth-rig-cable { fill: #6b7079; }
+.sloth-rig-rope { fill: none; stroke: #2b2f36; stroke-width: 7; stroke-linecap: round; }
 .sloth-rig-handle { fill: #2b2f36; }
 .sloth-rig .sp-far { filter: brightness(.6); }
 .sloth-rig-shadow { fill: #000; opacity: .45; }

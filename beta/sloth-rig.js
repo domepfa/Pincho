@@ -18,7 +18,7 @@ const slothPartHref = (im) => (im.startsWith('v2') ? SLOTH_RIG2_BASE : SLOTH_RIG
 const SLOTH_PARTS = {"front_head":[510,53,696,293],"front_torso":[456,248,745,582],"front_uarm_l":[296,251,478,388],"front_uarm_r":[723,251,904,388],"front_farm_l":[51,288,294,400],"front_farm_r":[907,288,1150,400],"front_thigh_l":[439,516,582,697],"front_thigh_r":[629,516,773,697],"front_tail":[566,584,643,725],"front_calf_l":[444,678,569,866],"front_calf_r":[643,679,768,866],"back_head":[510,53,696,293],"back_torso":[455,247,745,622],"back_uarm_l":[300,251,478,388],"back_uarm_r":[723,251,900,388],"back_farm_l":[163,288,294,396],"back_farm_r":[906,288,1039,396],"back_elbow_l":[267,315,319,367],"back_elbow_r":[881,314,934,367],"back_grip_l":[195,606,314,813],"back_grip_r":[899,606,1018,813],"back_thigh_l":[439,567,571,697],"back_thigh_r":[641,562,773,697],"back_tail":[566,619,643,741],"back_calf_l":[444,678,569,866],"back_calf_r":[643,678,768,866],"pose_russian_a":[209,33,499,221],"pose_russian_b":[679,29,968,221],"pose_ninety":[339,246,498,434],"pose_frog_a":[252,454,543,618],"pose_frog_b":[697,485,1018,614],"pose_extrot_a":[405,634,537,875],"pose_extrot_b":[633,634,817,876],"eq_plate":[570,40,688,159],"eq_kettlebell":[870,40,962,159],"eq_dumbbell":[184,51,365,151],"eq_dhandle":[178,193,273,328],"eq_rope":[515,183,622,331],"eq_ring":[866,182,955,336],"eq_barend":[66,379,285,434],"eq_bench":[326,418,558,499],"eq_incline":[604,353,821,499],"eq_decline":[887,404,1118,499],"eq_cable":[92,506,252,840],"eq_dipstation":[436,631,630,840],"eq_rack":[890,553,1108,840],"eq_latpull":[68,33,226,248],"eq_legpress":[312,68,575,239],"eq_legext":[657,67,851,241],"eq_legcurl":[917,67,1143,241],"eq_butterfly":[69,324,232,543],"eq_abduction":[362,329,510,543],"eq_calfseated":[657,417,844,543],"eq_calfstanding":[931,326,1134,541],"eq_hyperext":[71,688,280,839],"eq_pullover":[465,604,649,840],"eq_tbar":[877,653,1112,840],"eq_abwheel":[181,58,443,250],"eq_jumprope":[776,42,989,261],"eq_ladder":[93,361,534,514],"eq_stepbox":[748,354,1035,538],"eq_band":[93,682,531,759],"eq_mat":[627,666,1152,759],"eq_stack":[303,516,390,652],"eq_calfframe":[499,491,711,666],"eq_calfpad":[807,531,920,627],"eq_dipbars":[292,735,461,819],"eq_nordic":[535,711,724,819],"eq_abductseat":[1008,654,1141,819],"eq_edge":[818,753,954,823],"front_face_neutral":[106,22,253,213],"front_face_effort":[106,22,251,213],"front_face_blink":[106,22,253,213],"front_face_yawn":[106,22,253,213],"side_face_neutral":[104,40,335,317],"side_face_effort":[103,40,334,317],"side_face_blink":[104,40,332,317],"side_torso":[458,53,699,568],"side_body":[458,220,692,568],"side_tail":[372,453,473,535],"side_uarm":[791,80,910,268],"side_uarm_far":[791,80,910,268],"side_elbow":[811,261,857,307],"side_elbow_far":[811,261,857,307],"side_farm":[770,320,959,400],"side_farm_far":[770,320,959,400],"side_hand":[990,449,1166,539],"side_hand_far":[990,449,1166,539],"side_thigh":[629,516,773,687],"side_thigh_far":[629,516,773,687],"side_knee":[721,652,768,700],"side_knee_far":[721,652,768,700],"side_calf":[1020,689,1180,854],"side_calf_far":[1020,689,1180,854],"side_shin":[1020,689,1122,793],"side_shin_far":[1020,689,1122,793],"side_fist":[59,109,404,284],"side_fist_far":[59,109,404,284],"side_foot":[152,622,370,804],"side_foot_far":[152,622,370,804],"side_flat":[624,706,893,825],"side_flat_far":[624,706,893,825]};
 /* PARTS:END */
 /* V2:BEGIN */
-const SLOTH_V2 = {"parts":{"v2front_torso":[149,183,351,481],"v2front_head":[173,15,331,198],"v2front_uarm_l":[86,206,200,366],"v2front_farm_l":[12,322,139,516],"v2front_farmfist_l":[16,322,138,468],"v2front_thigh_l":[142,400,251,584],"v2front_calf_l":[80,546,224,758],"v2front_uarm_r":[300,206,418,364],"v2front_farm_r":[365,322,497,516],"v2front_farmfist_r":[370,322,494,468],"v2front_thigh_r":[252,400,365,584],"v2front_calf_r":[284,546,428,758],"v2back_torso":[149,182,351,466],"v2back_head":[174,12,338,201],"v2back_uarm_l":[79,204,201,371],"v2back_farm_l":[30,326,142,440],"v2back_grip_l":[12,412,86,518],"v2back_thigh_l":[143,398,252,586],"v2back_calf_l":[78,546,224,753],"v2back_uarm_r":[300,204,429,367],"v2back_farm_r":[370,326,478,438],"v2back_grip_r":[426,412,499,518],"v2back_thigh_r":[250,397,370,585],"v2back_calf_r":[285,546,430,753],"v2hang_torso":[164,216,346,464],"v2hang_head":[196,120,317,263],"v2hang_uarm_l":[126,136,213,334],"v2hang_farm_l":[122,50,192,164],"v2hang_grip_l":[120,13,198,74],"v2hang_thigh_l":[152,400,261,581],"v2hang_calf_l":[136,540,235,754],"v2hang_uarm_r":[297,136,387,348],"v2hang_farm_r":[321,52,391,164],"v2hang_grip_r":[316,13,392,74],"v2hang_thigh_r":[250,400,360,582],"v2hang_calf_r":[277,540,376,754],"v2sit_torso":[153,184,361,403],"v2sit_head":[176,22,337,196],"v2sit_uarm_l":[78,215,181,389],"v2sit_farm_l":[49,352,150,539],"v2sit_thigh_l":[136,377,258,491],"v2sit_calf_l":[100,453,244,750],"v2sit_uarm_r":[330,216,435,389],"v2sit_farm_r":[362,352,464,539],"v2sit_thigh_r":[254,377,376,489],"v2sit_calf_r":[268,453,412,750],"v2side_torso":[30,238,263,592],"v2side_face":[92,11,254,191],"v2side_uarm":[157,180,325,270],"v2side_farm":[296,184,442,266],"v2side_hand":[422,190,496,238],"v2side_fist":[296,184,496,266],"v2side_flat":[422,190,496,238],"v2side_uarm_far":[157,180,325,270],"v2side_farm_far":[296,184,442,266],"v2side_hand_far":[422,190,496,238],"v2side_fist_far":[296,184,496,266],"v2side_flat_far":[422,190,496,238],"v2side_thigh":[84,498,226,712],"v2side_thigh_far":[84,498,226,712],"v2side_calf":[81,672,276,906],"v2side_calf_far":[81,672,276,906],"v2side_shin":[81,672,208,903],"v2side_shin_far":[81,672,208,903],"v2side_foot":[127,815,275,905],"v2side_foot_far":[127,815,275,905],"v2side_thighA":[394,534,584,722],"v2side_thighA_far":[394,534,584,722],"v2side_thighB":[691,567,927,732],"v2side_thighB_far":[691,567,927,732],"v2side_thighC":[1023,609,1308,753],"v2side_thighC_far":[1023,609,1308,753]},"joints":{"front":{"torso":[[250.0,445.0],[250.0,185.0]],"head":[[250.0,185.0],[250.0,20.0]],"farm_l":[[102.5,345.0],[40.0,495.0]],"uarm_l":[[165.0,240.0],[102.5,345.0]],"thigh_l":[[210.0,445.0],[180.0,575.0]],"calf_l":[[180.0,575.0],[155.0,695.0]],"farm_r":[[397.5,345.0],[462.5,495.0]],"uarm_r":[[335.0,240.0],[397.5,345.0]],"thigh_r":[[290.0,445.0],[320.0,575.0]],"calf_r":[[320.0,575.0],[345.0,695.0]]},"back":{"torso":[[250.0,445.0],[250.0,190.0]],"head":[[250.0,190.0],[250.0,15.0]],"grip_l":[[57.5,430.0],[42.5,500.0]],"farm_l":[[102.5,350.0],[57.5,430.0]],"uarm_l":[[165.0,240.0],[102.5,350.0]],"thigh_l":[[210.0,445.0],[180.0,575.0]],"calf_l":[[180.0,575.0],[155.0,695.0]],"grip_r":[[445.0,430.0],[465.0,500.0]],"farm_r":[[400.0,350.0],[445.0,430.0]],"uarm_r":[[335.0,240.0],[400.0,350.0]],"thigh_r":[[290.0,445.0],[325.0,575.0]],"calf_r":[[325.0,575.0],[350.0,695.0]]},"hang":{"torso":[[255.0,465.0],[255.0,235.0]],"head":[[255.0,235.0],[255.0,120.0]],"grip_l":[[152.5,55.0],[157.5,25.0]],"farm_l":[[150.0,140.0],[152.5,55.0]],"uarm_l":[[177.5,255.0],[150.0,140.0]],"thigh_l":[[222.5,465.0],[187.5,570.0]],"calf_l":[[187.5,570.0],[172.5,700.0]],"grip_r":[[355.0,55.0],[352.5,25.0]],"farm_r":[[357.5,140.0],[355.0,55.0]],"uarm_r":[[332.5,255.0],[357.5,140.0]],"thigh_r":[[287.5,465.0],[322.5,570.0]],"calf_r":[[322.5,570.0],[340.0,700.0]]},"sit":{"torso":[[255.0,415.0],[255.0,190.0]],"head":[[255.0,190.0],[255.0,25.0]],"farm_l":[[105.0,375.0],[75.0,525.0]],"uarm_l":[[145.0,257.5],[105.0,375.0]],"thigh_l":[[190.0,415.0],[192.5,482.5]],"calf_l":[[192.5,482.5],[169.0,660.0]],"farm_r":[[405.0,375.0],[435.0,525.0]],"uarm_r":[[365.0,257.5],[405.0,375.0]],"thigh_r":[[320.0,415.0],[320.0,482.5]],"calf_r":[[320.0,482.5],[340.0,660.0]]},"side":{"torso":[[159.2,546.0],[163.8,327.6]],"face":[[200.0,170.0],[165.0,30.0]],"flex":{"thigh":8.3,"thighA":54.6,"thighB":88.5,"thighC":111.2},"thighA":[[441.4,591.5],[538.7,675.2]],"thighB":[[728.0,637.0],[873.6,684.3]],"thighC":[[1078.4,678.0],[1269.5,680.7]],"uarm":[[200.0,222.5],[320.0,225.0]],"farm":[[320.0,225.0],[440.0,212.5]],"fist":[[320.0,225.0],[440.0,212.5]],"hand":[[440.0,212.5],[492.5,215.0]],"flat":[[440.0,212.5],[492.5,215.0]],"thigh":[[159.2,559.6],[177.5,705.2]],"calf":[[177.5,705.2],[159.2,841.8]],"shin":[[177.5,705.2],[159.2,841.8]],"foot":[[159.2,841.8],[245.7,887.2]]}},"anchors":{"front":{"neck":[250.0,185.0],"sh_l":[165.0,240.0],"sh_r":[335.0,240.0],"hip_l":[210.0,445.0],"hip_r":[290.0,445.0],"tail":[250.0,445.0]},"back":{"neck":[250.0,190.0],"sh_l":[165.0,240.0],"sh_r":[335.0,240.0],"hip_l":[210.0,445.0],"hip_r":[290.0,445.0],"tail":[250.0,445.0]},"hang":{"neck":[255.0,235.0],"sh_l":[177.5,255.0],"sh_r":[332.5,255.0],"hip_l":[222.5,465.0],"hip_r":[287.5,465.0],"tail":[255.0,465.0]},"sit":{"neck":[255.0,190.0],"sh_l":[145.0,257.5],"sh_r":[365.0,257.5],"hip_l":[190.0,415.0],"hip_r":[320.0,415.0],"tail":[255.0,415.0]},"side":{"shoulder":[163.8,327.6],"hip":[159.2,546.0],"tail":[54.6,591.5],"face":[186.6,265.7]}}};
+const SLOTH_V2 = {"parts":{"v2front_torso":[149,183,351,481],"v2front_head":[173,15,331,198],"v2front_uarm_l":[86,206,200,366],"v2front_farm_l":[12,322,139,516],"v2front_farmfist_l":[16,322,138,468],"v2front_thigh_l":[142,400,251,584],"v2front_calf_l":[80,546,224,758],"v2front_uarm_r":[300,206,418,364],"v2front_farm_r":[365,322,497,516],"v2front_farmfist_r":[370,322,494,468],"v2front_thigh_r":[252,400,365,584],"v2front_calf_r":[284,546,428,758],"v2back_torso":[149,182,351,466],"v2back_head":[174,12,338,201],"v2back_uarm_l":[79,204,201,371],"v2back_farm_l":[30,326,142,440],"v2back_grip_l":[12,412,86,518],"v2back_thigh_l":[143,398,252,586],"v2back_calf_l":[78,546,224,753],"v2back_uarm_r":[300,204,429,367],"v2back_farm_r":[370,326,478,438],"v2back_grip_r":[426,412,499,518],"v2back_thigh_r":[250,397,370,585],"v2back_calf_r":[285,546,430,753],"v2hang_torso":[164,216,346,464],"v2hang_head":[196,120,317,263],"v2hang_uarm_l":[126,136,213,334],"v2hang_farm_l":[122,50,192,164],"v2hang_grip_l":[120,13,198,74],"v2hang_thigh_l":[152,400,261,581],"v2hang_calf_l":[136,540,235,754],"v2hang_uarm_r":[297,136,387,348],"v2hang_farm_r":[321,52,391,164],"v2hang_grip_r":[316,13,392,74],"v2hang_thigh_r":[250,400,360,582],"v2hang_calf_r":[277,540,376,754],"v2sit_torso":[153,184,361,403],"v2sit_head":[176,22,337,196],"v2sit_uarm_l":[78,215,181,389],"v2sit_farm_l":[49,352,150,539],"v2sit_thigh_l":[136,377,258,491],"v2sit_calf_l":[100,453,244,750],"v2sit_uarm_r":[330,216,435,389],"v2sit_farm_r":[362,352,464,539],"v2sit_thigh_r":[254,377,376,489],"v2sit_calf_r":[268,453,412,750],"v2side_torso":[30,238,263,592],"v2side_face":[92,11,254,191],"v2side_uarm":[157,180,325,270],"v2side_farm":[296,184,442,266],"v2side_hand":[422,190,496,238],"v2side_fist":[296,184,496,266],"v2side_flat":[422,190,496,238],"v2side_uarm_far":[157,180,325,270],"v2side_farm_far":[296,184,442,266],"v2side_hand_far":[422,190,496,238],"v2side_fist_far":[296,184,496,266],"v2side_flat_far":[422,190,496,238],"v2side_thigh":[84,497,226,704],"v2side_thigh_far":[84,497,226,704],"v2side_calf":[82,678,279,915],"v2side_calf_far":[82,678,279,915],"v2side_shin":[82,678,212,913],"v2side_shin_far":[82,678,212,913],"v2side_foot":[125,825,279,915],"v2side_foot_far":[125,825,279,915],"v2side_thighA":[416,565,617,758],"v2side_thighA_far":[416,565,617,758],"v2side_calfA":[365,600,534,831],"v2side_calfA_far":[365,600,534,831],"v2side_thighB":[772,633,1035,811],"v2side_thighB_far":[772,633,1035,811],"v2side_calfB":[680,624,863,852],"v2side_calfB_far":[680,624,863,852],"v2side_thighC":[1155,687,1477,848],"v2side_thighC_far":[1155,687,1477,848],"v2side_calfC":[915,561,1099,767],"v2side_calfC_far":[915,561,1099,767]},"joints":{"front":{"torso":[[250.0,445.0],[250.0,185.0]],"head":[[250.0,185.0],[250.0,20.0]],"farm_l":[[102.5,345.0],[40.0,495.0]],"uarm_l":[[165.0,240.0],[102.5,345.0]],"thigh_l":[[210.0,445.0],[180.0,575.0]],"calf_l":[[180.0,575.0],[155.0,695.0]],"farm_r":[[397.5,345.0],[462.5,495.0]],"uarm_r":[[335.0,240.0],[397.5,345.0]],"thigh_r":[[290.0,445.0],[320.0,575.0]],"calf_r":[[320.0,575.0],[345.0,695.0]]},"back":{"torso":[[250.0,445.0],[250.0,190.0]],"head":[[250.0,190.0],[250.0,15.0]],"grip_l":[[57.5,430.0],[42.5,500.0]],"farm_l":[[102.5,350.0],[57.5,430.0]],"uarm_l":[[165.0,240.0],[102.5,350.0]],"thigh_l":[[210.0,445.0],[180.0,575.0]],"calf_l":[[180.0,575.0],[155.0,695.0]],"grip_r":[[445.0,430.0],[465.0,500.0]],"farm_r":[[400.0,350.0],[445.0,430.0]],"uarm_r":[[335.0,240.0],[400.0,350.0]],"thigh_r":[[290.0,445.0],[325.0,575.0]],"calf_r":[[325.0,575.0],[350.0,695.0]]},"hang":{"torso":[[255.0,465.0],[255.0,235.0]],"head":[[255.0,235.0],[255.0,120.0]],"grip_l":[[152.5,55.0],[157.5,25.0]],"farm_l":[[150.0,140.0],[152.5,55.0]],"uarm_l":[[177.5,255.0],[150.0,140.0]],"thigh_l":[[222.5,465.0],[187.5,570.0]],"calf_l":[[187.5,570.0],[172.5,700.0]],"grip_r":[[355.0,55.0],[352.5,25.0]],"farm_r":[[357.5,140.0],[355.0,55.0]],"uarm_r":[[332.5,255.0],[357.5,140.0]],"thigh_r":[[287.5,465.0],[322.5,570.0]],"calf_r":[[322.5,570.0],[340.0,700.0]]},"sit":{"torso":[[255.0,415.0],[255.0,190.0]],"head":[[255.0,190.0],[255.0,25.0]],"farm_l":[[105.0,375.0],[75.0,525.0]],"uarm_l":[[145.0,257.5],[105.0,375.0]],"thigh_l":[[190.0,415.0],[192.5,482.5]],"calf_l":[[192.5,482.5],[169.0,660.0]],"farm_r":[[405.0,375.0],[435.0,525.0]],"uarm_r":[[365.0,257.5],[405.0,375.0]],"thigh_r":[[320.0,415.0],[320.0,482.5]],"calf_r":[[320.0,482.5],[340.0,660.0]]},"side":{"torso":[[159.2,546.0],[163.8,327.6]],"face":[[200.0,170.0],[165.0,30.0]],"flex":{"thigh":8.5,"thighA":48.7,"thighB":82.1,"thighC":105.0},"kneeBend":{"thigh":14.7,"thighA":66.5,"thighB":93.6,"thighC":118.7},"thighA":[[452.0,615.5],[550.1,719.4]],"calfA":[[478.7,626.1],[422.7,757.5]],"thighB":[[823.5,711.7],[953.6,770.6]],"calfB":[[805.3,650.8],[738.3,777.0]],"thighC":[[1265.9,758.3],[1407.7,775.8]],"calfC":[[1059.0,583.6],[975.5,699.5]],"uarm":[[200.0,222.5],[320.0,225.0]],"farm":[[320.0,225.0],[440.0,212.5]],"fist":[[320.0,225.0],[440.0,212.5]],"hand":[[440.0,212.5],[492.5,215.0]],"flat":[[440.0,212.5],[492.5,215.0]],"thigh":[[154.4,555.9],[172.6,697.6]],"calf":[[174.8,706.6],[156.4,848.2]],"shin":[[174.8,706.6],[156.4,848.2]],"foot":[[156.4,848.2],[248.4,894.2]]}},"anchors":{"front":{"neck":[250.0,185.0],"sh_l":[165.0,240.0],"sh_r":[335.0,240.0],"hip_l":[210.0,445.0],"hip_r":[290.0,445.0],"tail":[250.0,445.0]},"back":{"neck":[250.0,190.0],"sh_l":[165.0,240.0],"sh_r":[335.0,240.0],"hip_l":[210.0,445.0],"hip_r":[290.0,445.0],"tail":[250.0,445.0]},"hang":{"neck":[255.0,235.0],"sh_l":[177.5,255.0],"sh_r":[332.5,255.0],"hip_l":[222.5,465.0],"hip_r":[287.5,465.0],"tail":[255.0,465.0]},"sit":{"neck":[255.0,190.0],"sh_l":[145.0,257.5],"sh_r":[365.0,257.5],"hip_l":[190.0,415.0],"hip_r":[320.0,415.0],"tail":[255.0,415.0]},"side":{"shoulder":[163.8,327.6],"hip":[159.2,546.0],"tail":[54.6,591.5],"face":[186.6,265.7]}}};
 /* V2:END */
 
 // Gelenkpunkte in Vorlagen-Koordinaten (1200 x 896): [nah, fern]
@@ -248,7 +248,7 @@ const SLOTH_POSES = {
     b: { torso: -96, uarm: 96, farm: 92, thigh: 84, calf: 92, dy: -26 },
   },
   wallsit: {
-    view: 'side', pin: 'ankle', dur: 3.6, floor: 46, wall: { x: -300 }, label: 'Wall Sit',
+    view: 'side', pin: 'ankle', dur: 3.6, floor: 46, wall: { x: -300 }, drawnKnee: false, label: 'Wall Sit', // Schienbein bleibt senkrecht
     a: { torso: -90, uarm: 94, farm: 20, thigh: 2, calf: 92 },
     b: { torso: -90, uarm: 94, farm: 22, thigh: 2, calf: 92 },
   },
@@ -259,7 +259,8 @@ const SLOTH_POSES = {
   },
   wgs: {
     view: 'side', pin: 'ankle', dur: 3.2, floor: 46, grip: 'flat', label: 'Grösste Dehnung der Welt',
-    a: { torso: -26, uarm: 100, farm: 130, hand: 0, fuarm: 96, ffarm: 92, fhand: 0, thigh: 12, calf: 96, fthigh: 160, fcalf: 166 },
+    // Stützarm gerade nach unten neben den vorderen Fuss (Ellbogen nicht nach hinten durchgebogen)
+    a: { torso: -26, uarm: 88, farm: 84, hand: 0, fuarm: 96, ffarm: 92, fhand: 0, thigh: 12, calf: 96, fthigh: 160, fcalf: 166 },
     b: { torso: -26, uarm: -92, farm: -92, hand: -92, fuarm: 96, ffarm: 92, fhand: 0, thigh: 12, calf: 96, fthigh: 160, fcalf: 166 },
   },
   thoracic: {
@@ -311,10 +312,11 @@ const SLOTH_POSES = {
     b: { torso: -96, uarm: 100, farm: 60, fuarm: 100, ffarm: 60, thigh: 88, calf: 94, fthigh: 110, fcalf: 170, dy: -60 },
   },
   bounds: {
-    view: 'front', pin: 'feet', dur: 1.4, floor: 26, armLift: 45, relLegs: true, label: 'Seitsprünge',
-    // Arme mit gebeugten Ellbogen: gestreckt würden sie durch die Waagrechte schwingen und die Figur sehr breit machen
-    a: { torso: -80, head: -84, uarm_l: 125, farm_l: 60, uarm_r: 55, farm_r: 120, thigh_l: 104, calf_l: 94, thigh_r: 120, calf_r: 150, tail: 0 },
-    b: { torso: -100, head: -96, uarm_l: 165, farm_l: 250, uarm_r: 15, farm_r: -70, thigh_l: 60, calf_l: 30, thigh_r: 76, calf_r: 86, tail: 0 },
+    view: 'front', pin: 'feet', dur: 1.4, floor: 26, armLift: 45, label: 'Seitsprünge',
+    // Skater: seitlich von Bein zu Bein springen. Landung auf einem gebeugten Bein, das andere kreuzt schräg
+    // hinter dem Standbein, die Arme schwingen gegengleich zur Seite des Standbeins.
+    a: { torso: -96, head: -92, uarm_l: 96, farm_l: 100, uarm_r: 130, farm_r: 150, thigh_l: 100, calf_l: 86, thigh_r: 104, len_thigh_r: 0.8, calf_r: 112, len_calf_r: 0.85, dx: -70, tail: 0 },
+    b: { torso: -84, head: -88, uarm_l: 50, farm_l: 30, uarm_r: 84, farm_r: 80, thigh_r: 80, calf_r: 94, thigh_l: 76, len_thigh_l: 0.8, calf_l: 68, len_calf_l: 0.85, dx: 70, tail: 0 },
   },
   sprint: {
     view: 'side', pin: 'hip', dur: 0.6, floor: 205, label: 'Sprint',
@@ -338,8 +340,9 @@ const SLOTH_POSES = {
   },
   lateralLunge: {
     view: 'front', pin: 'feet', dur: 3, floor: 26, armLift: 45, label: 'Seitlicher Ausfallschritt',
-    a: { torso: -90, head: -90, uarm_l: 70, farm_l: 30, uarm_r: 110, farm_r: 150, thigh_l: 140, calf_l: 96, thigh_r: 50, calf_r: 52, tail: 0 },
-    b: { torso: -90, head: -90, uarm_l: 70, farm_l: 30, uarm_r: 110, farm_r: 150, thigh_l: 128, calf_l: 128, thigh_r: 40, calf_r: 84, tail: 0 },
+    // Arme hängen locker (Hände nicht an der Hüfte verdreht)
+    a: { torso: -90, head: -90, uarm_l: 104, farm_l: 98, uarm_r: 76, farm_r: 82, thigh_l: 140, calf_l: 96, thigh_r: 50, calf_r: 52, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: 108, farm_l: 100, uarm_r: 72, farm_r: 80, thigh_l: 128, calf_l: 128, thigh_r: 40, calf_r: 84, tail: 0 },
   },
   quadstretch: {
     view: 'side', pin: 'fankle', dur: 3.6, floor: 46, drawLast: ['calf', 'knee', 'farm', 'hand'], label: 'Oberschenkel-Dehnung',
@@ -698,7 +701,7 @@ const SLOTH_POSES = {
   },
   jumprope: {
     view: 'side', pin: 'ankle', dur: 0.6, floor: 46, grip: 'fist', label: 'Seilspringen',
-    props: [{ img: 'jumprope', at: 'grip', a: [882, 150], k: 2.6, layer: 'mid' }],
+    rope: true, // Seil als kreisende Linie um die Figur (siehe slothRigPrepare)
     a: { torso: -94, uarm: 100, farm: 20, thigh: 86, calf: 92, dy: 0 },
     b: { torso: -94, uarm: 100, farm: 30, thigh: 80, calf: 96, dy: -40 },
   },
@@ -922,22 +925,33 @@ function slothRigBuild(pose, v2 = false) {
         q.calf_far = place('calf', th.end, Math.atan2(cv[1], cv[0]) * 180 / Math.PI + (pose.farFoot[2] || 0), 'side_calf_far');
       }
     }
-    // v2: Gesäss + Oberschenkel gibt es gezeichnet stehend und in drei Beugungen (ein Blatt, gleiche Zeichnung).
-    // Je nach Hüftbeugung (Winkel Rumpf -> Oberschenkel) wird zur passenden Zeichnung übergeblendet, statt nur zu drehen.
-    if (sameLegs) for (const k of ['thigh_far', 'knee_far', 'calf_far', 'foot_far']) if (q[k]) q[k] = { skip: true, P: q[k].P, end: q[k].end };
+    // v2: das ganze Bein (Gesäss/Oberschenkel, Unterschenkel mit Fuss) gibt es gezeichnet stehend und in drei
+    // Beugungen aus einem Blatt. Je nach Hüftbeugung (Winkel Rumpf -> Oberschenkel) wird die passende Zeichnung
+    // gezeigt – hart umgeschaltet, damit nie zwei Beine durchscheinen. Alle Stellungen haben dieselben Längen.
     if (v2 && J.flex) for (const x of ['', '_far']) {
       const th = q['thigh' + x];
       if (!th || th.skip) continue;
       const [b0, b1] = J.thigh, deg = th.r + Math.atan2(b1[1] - b0[1], b1[0] - b0[0]) * 180 / Math.PI;
       const f = ((s.torso + 180 - deg) % 360 + 540) % 360 - 180, F = J.flex;
-      const ramp = (lo, hi) => { const u = Math.min(1, Math.max(0, (f - lo) / (hi - lo))); return u * u * (3 - 2 * u); };
-      // kurzer Übergang (±5°) in der Mitte zwischen zwei Zeichnungen; darunterliegende ausblenden, sobald die nächste deckt
       const ks = Object.keys(F).sort((m, n) => F[m] - F[n]);
-      const op = ks.map((k, i) => (i === 0 ? 1 : ramp((F[ks[i - 1]] + F[k]) / 2 - 5, (F[ks[i - 1]] + F[k]) / 2 + 5)));
+      let cur = 0;
+      ks.forEach((k, i) => { if (i && f > (F[ks[i - 1]] + F[k]) / 2) cur = i; });
+      // Füsse am Boden (fester Knöchel): Knie beugt so stark wie in den Zeichnungen (stetig nach Hüftbeugung) –
+      // so bleibt der Fuss flach und die Bewegung sieht aus wie gezeichnet
+      const planted = (x === '' && pose.pin === 'ankle') || (x === '_far' && pose.pin === 'fankle');
+      if (planted && !pose.feet && pose.drawnKnee !== false && J.kneeBend) {
+        const kbv = ks.map((k) => J.kneeBend[k]), fv = ks.map((k) => F[k]);
+        let rel = kbv[0];
+        for (let i = 1; i < ks.length; i++) if (f >= fv[i - 1]) rel = kbv[i - 1] + (kbv[i] - kbv[i - 1]) * Math.min(1, (f - fv[i - 1]) / (fv[i] - fv[i - 1]));
+        if (f < fv[0]) rel = kbv[0] * Math.max(0, f / fv[0]);
+        q['calf' + x] = place('calf', th.end, deg + rel, 'side_calf' + x);
+      }
+      const ca = q['calf' + x], cDeg = ca && !ca.skip ? ca.r + a0('calf') : null;
       ks.forEach((k, i) => {
-        const o = op[i + 1] >= 1 ? 0 : op[i];
-        if (k === 'thigh') th.o = o;
-        else q[k + x] = { ...place(k, th.P, deg, 'side_' + k + x), o };
+        const o = i === cur ? 1 : 0, sfx = k.slice(5); // '' | 'A' | 'B' | 'C'
+        if (!sfx) { th.o = o; if (!pose.feet && ca && !ca.skip) ca.o = o; return; }
+        q[k + x] = { ...place(k, th.P, deg, 'side_' + k + x), o };
+        if (!pose.feet && cDeg != null) q['calf' + sfx + x] = { ...place('calf' + sfx, th.end, cDeg, 'side_calf' + sfx + x), o };
       });
     }
     for (const k of pose.mirror || []) q[k].k = [q[k].k, -q[k].k]; // Teil an der Knochenachse spiegeln
@@ -969,7 +983,7 @@ function slothRigBuild(pose, v2 = false) {
         q['grip_' + x] = shorten(place('grip_' + x, q['farm_' + x].end, arm(gk), undefined, 1, alt), s['len_grip_' + x] != null ? 'grip_' + x : 'farm_' + x);
       }
       q['thigh_' + x] = shorten(place('thigh_' + x, t.map(A['hip_' + x]), leg('thigh_' + x)), 'thigh_' + x);
-      q['calf_' + x] = place('calf_' + x, q['thigh_' + x].end, leg('calf_' + x));
+      q['calf_' + x] = shorten(place('calf_' + x, q['thigh_' + x].end, leg('calf_' + x)), 'calf_' + x);
       if (view === 'back') q['elbow_' + x] = ball('back_elbow_' + x, q['uarm_' + x].end);
     }
     // join: { arm, to, bend } — dieser Arm greift per Zweigelenk-IK an einen Punkt des anderen Arms
@@ -1125,7 +1139,7 @@ function slothRigPrepare(poseName) {
   let base = SLOTH_ORDER[pose.view];
   // gebeugte Oberschenkel-Zeichnungen direkt über dem stehenden Oberschenkel
   const flexKeys = Object.keys(SLOTH_V2.joints.side.flex || {}).filter((k) => k !== 'thigh').sort((m, n) => SLOTH_V2.joints.side.flex[m] - SLOTH_V2.joints.side.flex[n]);
-  base = base.flatMap((k) => { const m = /^thigh(_far)?$/.exec(k); return m && pose.view === 'side' ? [k, ...flexKeys.map((f) => f + (m[1] || ''))] : [k]; });
+  base = base.flatMap((k) => { const m = /^(thigh|calf)(_far)?$/.exec(k); return m && pose.view === 'side' ? [k, ...flexKeys.map((f) => m[1] + f.slice(5) + (m[2] || ''))] : [k]; });
   if (pose.armsFront) { const arms = base.filter((k) => /arm/.test(k)); base = base.filter((k) => !/arm/.test(k)); base.splice(base.indexOf('torso') + 1, 0, ...arms); }
   // drawLast: Teile ganz nach vorne holen (z. B. gefalteter Unterschenkel vor dem eigenen Oberschenkel)
   if (pose.drawLast) { base = base.filter((k) => !pose.drawLast.includes(k)); base.push(...pose.drawLast); }
@@ -1204,6 +1218,12 @@ function slothRigPrepare(poseName) {
   const path = frames.map((f) => f.path).filter(Boolean);
   if (path.length && Math.hypot(...[0, 1].map((a) => Math.max(...path.map((p) => p[a])) - Math.min(...path.map((p) => p[a])))) > 60) {
     extra += `<polyline class="sloth-rig-path" points="${path.map((p) => `${n(p[0])},${n(p[1])}`).join(' ')}"/>`;
+  }
+  // Seilspringen: Seil als Ellipse um die Figur, nur ein Bogen sichtbar, der einmal pro Sprung herumläuft
+  if (pose.rope) {
+    const rx = box[2] * 0.4, ry = box[3] * 0.47, cx = box[0] + box[2] / 2, cy = box[1] + box[3] * 0.5;
+    style.textContent += `\n@keyframes srr-${name}{to{stroke-dashoffset:-100}}.sr-${name} .sloth-rig-rope{animation:srr-${name} ${pose.dur}s linear infinite;animation-delay:var(--srd,0s)}`;
+    extra += `<ellipse class="sloth-rig-rope" pathLength="100" stroke-dasharray="46 54" cx="${n(cx)}" cy="${n(cy)}" rx="${n(rx)}" ry="${n(ry)}"/>`;
   }
   if (pose.floor != null) extra += `<ellipse class="sloth-rig-shadow" cx="${n(box[0] + box[2] / 2)}" cy="${pose.floor}" rx="${n(box[2] * (pose.view === 'side' ? 0.46 : 0.34))}" ry="${n(Math.max(10, box[2] * 0.035))}"/>`;
   if (pose.bar) {
