@@ -50,6 +50,13 @@ VIEWS = {
         hipL=(445, 930), knL=(375, 1140), anL=(345, 1400), toL=(320, 1485), hipR=(575, 930), knR=(645, 1140), anR=(680, 1400), toR=(705, 1485)),
         torso=[(400, 440), (620, 440), (660, 500), (690, 560), (650, 700), (640, 800), (565, 810), (560, 925), (455, 925), (450, 810), (380, 800), (370, 700), (330, 560), (360, 500)],
         head=[(395, 225), (635, 225), (630, 470), (560, 525), (465, 525), (395, 470)]),
+    # Sitzend von vorne (Oberschenkel zeigen zum Betrachter): für Maschinen im Sitzen (Ab-/Adduktoren)
+    'sit': dict(src='front_sit.png', J=FB(
+        top=(510, 50), neck=(510, 380), hip=(510, 830),
+        shL=(290, 515), elL=(210, 750), wrL=(165, 915), fiL=(150, 1050), shR=(730, 515), elR=(810, 750), wrR=(855, 915), fiR=(870, 1050),
+        hipL=(380, 830), knL=(385, 965), anL=(338, 1320), toL=(285, 1440), hipR=(640, 830), knR=(640, 965), anR=(680, 1320), toR=(735, 1440)),
+        torso=[(382, 375), (645, 375), (705, 435), (720, 510), (693, 600), (682, 705), (660, 802), (368, 802), (338, 705), (330, 600), (308, 510), (322, 435)],
+        head=[(345, 45), (675, 45), (675, 360), (600, 390), (420, 390), (345, 360)]),
     # Seite (Blick nach rechts): nur der vordere Arm/das vordere Bein, hinten = abgedunkelte Kopie
     'side': dict(src='side.jpg', J=FB(
         top=(330, 60), neck=(400, 340), hip=(390, 895), shR=(400, 445), elR=(640, 450), wrR=(880, 425), fiR=(985, 430),
@@ -193,6 +200,12 @@ def cut_view(view, cfg, parts, joints, anchors):
             save('calf' + far, M['calfR'] | M['footR'], 'knR', dark=dark)  # Unterschenkel mit Fuss
             save('shin' + far, M['calfR'], 'knR', dark=dark)
             save('foot' + far, M['footR'], 'anR', dark=dark)
+        # gebeugte Oberschenkel: gleiche Länge Hüfte -> Knie wie stehend, Beugewinkel der Zeichnung merken
+        L0 = np.hypot(J['knR'][0] - J['hipR'][0], J['knR'][1] - J['hipR'][1])
+        jv['flex'] = {'thigh': round(flex_of((J['hip'], J['shR']), J['hipR'], J['knR']), 1)}
+        for k, c in SIDE_LEGS.items():
+            jv[k], fl = side_thigh(parts, k, c, L0 / np.hypot(c['kn'][0] - c['hip'][0], c['kn'][1] - c['hip'][1]))
+            jv['flex'][k] = round(fl, 1)
         jv.update(uarm=[sc(J['shR']), sc(J['elR'])], farm=[sc(J['elR']), sc(J['wrR'])], fist=[sc(J['elR']), sc(J['wrR'])],
                   hand=[sc(J['wrR']), sc(J['fiR'])], flat=[sc(J['wrR']), sc(J['fiR'])],
                   thigh=[sc(J['hipR']), sc(J['knR'])], calf=[sc(J['knR']), sc(J['anR'])], shin=[sc(J['knR']), sc(J['anR'])],
@@ -204,7 +217,7 @@ def cut_view(view, cfg, parts, joints, anchors):
     jv['head'] = [sc(J['neck']), sc(J['top'])]
     anchors[view] = {'neck': sc(J['neck']), 'sh_l': sc(J['shL']), 'sh_r': sc(J['shR']), 'hip_l': sc(J['hipL']), 'hip_r': sc(J['hipR']), 'tail': sc(J['hip'])}
     fistG = gray(np.asarray(Image.open(os.path.join(HERE, 'sheets', 'v2', cfg['fist'])).convert('RGB')).astype(float)) if cfg.get('fist') else None
-    grip = view != 'front'  # Rückansicht/Hängen: eigene Greifhand (wie bisher grip_l/grip_r)
+    grip = view not in ('front', 'sit')  # Rückansicht/Hängen: eigene Greifhand (wie bisher grip_l/grip_r)
     for s in 'LR':
         x = s.lower()
         save('uarm_' + x, M['uarm' + s], 'sh' + s)
@@ -256,6 +269,62 @@ def side_torso(parts, key, cfg):
     x0, y0 = round(bb[0] * fx), round(bb[1] * fy)
     parts[key] = [x0, y0, x0 + img.width, y0 + img.height]
     return {k: [round(rotp(q)[0] * fx, 1), round(rotp(q)[1] * fy, 1)] for k, q in cfg['J'].items()}
+
+
+# Gesäss + Oberschenkel in gebeugten Stellungen (Seite, ohne Arme). Die Puppe blendet je nach Hüftwinkel
+# zwischen stehend (side.jpg), halb (45) und tief (90) über, statt den stehenden Oberschenkel nur zu drehen.
+# torso = (Hüfte, Schulter) der Zeichnung für den Rumpfwinkel; belt = Unterkante Gürtel; bag = Chalkbag (gehört zum Rumpf).
+SIDE_LEGS = {
+    'thigh45': dict(src='side_half.png', hip=(300, 985), kn=(545, 1125), an=(400, 1370), to=(560, 1450), torso=((390, 1015), (480, 650)),
+                    belt=((280, 885), (525, 968)), bag=[(160, 812), (325, 815), (320, 860), (268, 895), (262, 1008), (160, 1012)]),
+    'thigh90': dict(src='side_torso.jpg', hip=(320, 1000), kn=(660, 1010), an=(520, 1330), to=(700, 1420), torso=((400, 985), (450, 585)),
+                    belt=((300, 845), (540, 910)), bag=[(140, 785), (305, 785), (300, 830), (222, 880), (220, 1008), (140, 1012)]),
+}
+
+
+def flex_of(torso, hip, kn):
+    """Hüftbeugung in Grad: 0 = Oberschenkel in Rumpfrichtung nach unten, positiv = nach vorne (Blick rechts)."""
+    ta = np.degrees(np.arctan2(torso[1][1] - torso[0][1], torso[1][0] - torso[0][0]))
+    th = np.degrees(np.arctan2(kn[1] - hip[1], kn[0] - hip[0]))
+    return float((ta + 180 - th + 180) % 360 - 180)
+
+
+def side_thigh(parts, key, cfg, scale):
+    A, G, fig, alpha = figure(cfg['src'])
+    H, W = fig.shape
+    yy, xx = np.mgrid[0:H, 0:W]
+    (bx0, by0), (bx1, by1) = cfg['belt']
+    below = yy > by0 + (xx - bx0) * (by1 - by0) / (bx1 - bx0) - 14  # etwas unter den Gürtel, der Rumpf liegt darüber
+    im = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(im).polygon(cfg['bag'], fill=1)
+    bag = np.asarray(im).astype(bool)
+
+    def segd(a, b):
+        a = np.array(a, float); b = np.array(b, float); d = b - a
+        t = np.clip(((xx - a[0]) * d[0] + (yy - a[1]) * d[1]) / (d @ d), 0, 1)
+        return np.hypot(xx - a[0] - t * d[0], yy - a[1] - t * d[1])
+    dth, dca, dfo = segd(cfg['hip'], cfg['kn']), segd(cfg['kn'], cfg['an']), segd(cfg['an'], cfg['to'])
+    # das gebeugte Knie dieser Zeichnung gehört ganz zum Oberschenkel (liegt über dem Unterschenkel)
+    knee = np.hypot(xx - cfg['kn'][0], yy - cfg['kn'][1]) < 80
+    mask = fig & below & ~bag & (((dth <= dca) & (dth <= dfo)) | (knee & (dfo > 60)))
+    mask = ndi.binary_opening(mask, iterations=2)
+    lb, nn = ndi.label(mask)
+    if nn > 1:
+        mask = lb == (np.argmax(ndi.sum(mask, lb, range(1, nn + 1))) + 1)
+    mask = mask | (ndi.binary_dilation(mask, iterations=2) & ndi.binary_erosion(fig, iterations=3) & ~bag & below)
+    a = ndi.gaussian_filter(mask.astype(float), 0.8) * np.where(mask, alpha, 0)
+    f = S * scale
+    out = {}
+    for far, dark in (('', 1.0), ('_far', FAR_DARK)):
+        img = Image.fromarray(np.dstack([np.clip(G * dark, 0, 255), np.clip(a * 255, 0, 255)]).astype(np.uint8), 'LA')
+        bb = img.getchannel('A').getbbox()
+        img = img.crop(bb)
+        img = img.resize((round(img.width * f), round(img.height * f)), Image.LANCZOS)
+        img.save(os.path.join(OUT, f'v2side_{key}{far}.png'), optimize=True)
+        x0, y0 = round(bb[0] * f), round(bb[1] * f)
+        parts[f'v2side_{key}{far}'] = [x0, y0, x0 + img.width, y0 + img.height]
+    sc = lambda q: [round(q[0] * f, 1), round(q[1] * f, 1)]
+    return [sc(cfg['hip']), sc(cfg['kn'])], flex_of(cfg['torso'], cfg['hip'], cfg['kn'])
 
 
 def main():
