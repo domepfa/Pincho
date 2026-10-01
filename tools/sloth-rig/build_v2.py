@@ -342,8 +342,9 @@ LEG_T, LEG_C = 157, 157  # einheitliche Länge Hüfte->Knie und Knie->Knöchel (
 
 
 def side_leg(parts, cfg, sfx=''):
-    """Ganzes Bein einer Figur aus side_squats.png, so wie gezeichnet: thigh<sfx> (mit Gesäss), calf<sfx>
-    (Unterschenkel + Fuss); zusätzlich shin/foot einzeln (für Übungen mit eigenem Fusswinkel)."""
+    """Ganzes Bein einer Figur aus side_squats.png: thigh<sfx> (mit Gesäss), calf<sfx> (Unterschenkel + Fuss);
+    stehend zusätzlich shin/foot einzeln. Jedes Teil wird auf die einheitliche Länge gebracht, damit beim
+    Wechsel der Stellung nichts länger oder kürzer wird (die Figuren sind leicht unterschiedlich lang gezeichnet)."""
     A, G, fig, alpha = figure(cfg['src'], cfg.get('xr'))
     H, W = fig.shape
     yy, xx = np.mgrid[0:H, 0:W]
@@ -391,7 +392,7 @@ def side_leg(parts, cfg, sfx=''):
             x0, y0 = round(bb[0] * f), round(bb[1] * f)
             parts[f'v2side_{key}{far}'] = [x0, y0, x0 + img.width, y0 + img.height]
         return lambda q: [round(q[0] * f, 1), round(q[1] * f, 1)]
-    fT = fC = S * SQ  # Massstab wie gezeichnet (alle Figuren im Blatt sind gleich gross)
+    fT, fC = S * SQ * LEG_T / lt, S * SQ * LEG_C / lc
     sT = cut('thigh' + sfx, Mth, fT)
     sC = cut('calf' + sfx, Mca | Mfo, fC, 'kn', 30)
     out = {'thigh' + sfx: [sT(cfg['hip']), sT(cfg['kn'])], 'calf' + sfx: [sC(cfg['kn']), sC(cfg['an'])]}
