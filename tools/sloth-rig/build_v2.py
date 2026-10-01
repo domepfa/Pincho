@@ -396,8 +396,10 @@ def side_leg(parts, cfg, sfx=''):
     sT = cut('thigh' + sfx, Mth, fT)
     sC = cut('calf' + sfx, Mca | Mfo, fC, 'kn', 30)
     out = {'thigh' + sfx: [sT(cfg['hip']), sT(cfg['kn'])], 'calf' + sfx: [sC(cfg['kn']), sC(cfg['an'])]}
+    # Unterschenkel ohne Fuss: die Puppe nimmt für alle Stellungen denselben Fuss (aus der stehenden Figur)
+    sS = cut('shin' + sfx, Mca, fC, 'kn', 30)
+    out['shin' + sfx] = [sS(cfg['kn']), sS(cfg['an'])]
     if not sfx:
-        sS = cut('shin', Mca, fC, 'kn', 30)
         sF = cut('foot', Mfo, fC, 'an', 24)
         out.update(shin=[sS(cfg['kn']), sS(cfg['an'])], foot=[sF(cfg['an']), sF(cfg['to'])])
     return out, flex_of(cfg['torso'], cfg['hip'], cfg['kn'])
