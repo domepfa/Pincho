@@ -199,10 +199,15 @@ def cut_view(view, cfg, parts, joints, anchors):
             save('fist' + far, M['farmR'] | M['handR'], 'elR', dark=dark)  # Unterarm + Hand in einem Teil (wie bisher 'fist')
             save('flat' + far, M['handR'], 'wrR', dark=dark)
         # Beine: stehend + gebeugte Oberschenkel aus der armlosen Serie, Beugewinkel der Zeichnungen merken
-        legJ, fl0 = side_stand(parts, SIDE_STAND)  # ganzes Bein aus der armlosen Serie (passt zum Rumpf)
+        legJ, fl0 = side_leg(parts, SIDE_STAND)  # ganzes Bein aus derselben Zeichnung wie der Rumpf
         jv['flex'] = {'thigh': round(fl0, 1)}
-        for k, c in SIDE_LEGS.items():
-            jv[k], fl = side_thigh(parts, k, c, c['scale'])
+        # Kniebeugung der Zeichnung je Stellung (Unterschenkel- minus Oberschenkelwinkel)
+        kb = lambda c: round(float(np.degrees(np.arctan2(c['an'][1] - c['kn'][1], c['an'][0] - c['kn'][0])
+                                          - np.arctan2(c['kn'][1] - c['hip'][1], c['kn'][0] - c['hip'][0]))), 1)
+        jv['kneeBend'] = {'thigh': kb(SIDE_STAND), **{k: kb(c) for k, c in SIDE_LEGS.items()}}
+        for k, c in SIDE_LEGS.items():  # gebeugte Stellungen: ganzes Bein (Oberschenkel + Unterschenkel mit Fuss)
+            lj, fl = side_leg(parts, c, k[-1])
+            jv.update(lj)
             jv['flex'][k] = round(fl, 1)
         jv.update(uarm=[sc(J['shR']), sc(J['elR'])], farm=[sc(J['elR']), sc(J['wrR'])], fist=[sc(J['elR']), sc(J['wrR'])],
                   hand=[sc(J['wrR']), sc(J['fiR'])], flat=[sc(J['wrR']), sc(J['fiR'])],
@@ -290,14 +295,14 @@ def side_torso(parts, key, cfg):
 # Beine aus side_squats.png. torso = (Hüfte, Schulter) der Figur für den Beugewinkel; belt = Unterkante Gürtel;
 # bag = Chalkbag (gehört zum Rumpf). Stehend: ganzes Bein (Oberschenkel, Unterschenkel, Fuss); gebeugt: nur Gesäss + Oberschenkel,
 # die Puppe blendet je nach Hüftwinkel zur nächsten Zeichnung über.
-SIDE_STAND = dict(src='side_squats.png', xr=SQX[0], scale=SQ, hip=(175, 615), kn=(195, 775), an=(175, 925), to=(270, 975), torso=((175, 600), (180, 360)),
+SIDE_STAND = dict(src='side_squats.png', xr=SQX[0], scale=SQ, hip=(170, 612), kn=(190, 768), an=(170, 922), to=(270, 972), torso=((175, 600), (180, 360)),
                   belt=((100, 532), (245, 575)), bag=[(22, 512), (112, 512), (112, 648), (22, 648)])
 SIDE_LEGS = {
-    'thighA': dict(src='side_squats.png', xr=SQX[1], scale=SQ, hip=(485, 650), kn=(592, 742), an=(512, 912), to=(620, 968), torso=((485, 640), (510, 370)),
+    'thighA': dict(src='side_squats.png', xr=SQX[1], scale=SQ, hip=(470, 640), kn=(572, 748), an=(505, 905), to=(620, 968), torso=((485, 640), (510, 370)),
                    belt=((445, 568), (608, 600)), bag=[(405, 552), (488, 552), (488, 672), (405, 672)]),
-    'thighB': dict(src='side_squats.png', xr=SQX[2], scale=SQ, hip=(800, 700), kn=(960, 752), an=(862, 912), to=(995, 970), torso=((800, 690), (880, 420)),
+    'thighB': dict(src='side_squats.png', xr=SQX[2], scale=SQ, hip=(810, 700), kn=(938, 758), an=(860, 905), to=(995, 970), torso=((800, 690), (880, 420)),
                    belt=((785, 612), (915, 655)), bag=[(702, 577), (785, 577), (785, 702), (702, 702)]),
-    'thighC': dict(src='side_squats.png', xr=SQX[3], scale=SQ, hip=(1185, 745), kn=(1395, 748), an=(1262, 912), to=(1400, 968), torso=((1185, 740), (1290, 480)),
+    'thighC': dict(src='side_squats.png', xr=SQX[3], scale=SQ, hip=(1232, 738), kn=(1370, 755), an=(1262, 905), to=(1400, 968), torso=((1185, 740), (1290, 480)),
                    belt=((1175, 660), (1325, 712)), bag=[(1078, 628), (1170, 628), (1170, 758), (1078, 758)]),
 }
 
@@ -333,8 +338,13 @@ def flex_of(torso, hip, kn):
     return float((ta + 180 - th + 180) % 360 - 180)
 
 
-def side_stand(parts, cfg):
-    """Stehendes Bein: thigh, calf (mit Fuss), shin, foot, je auch als _far (dunkler)."""
+LEG_T, LEG_C = 157, 157  # einheitliche Länge Hüfte->Knie und Knie->Knöchel (Blatt-Pixel der stehenden Figur)
+
+
+def side_leg(parts, cfg, sfx=''):
+    """Ganzes Bein einer Figur aus side_squats.png: thigh<sfx> (mit Gesäss), calf<sfx> (Unterschenkel + Fuss);
+    stehend zusätzlich shin/foot einzeln. Jedes Teil wird auf die einheitliche Länge gebracht, damit beim
+    Wechsel der Stellung nichts länger oder kürzer wird (die Figuren sind leicht unterschiedlich lang gezeichnet)."""
     A, G, fig, alpha = figure(cfg['src'], cfg.get('xr'))
     H, W = fig.shape
     yy, xx = np.mgrid[0:H, 0:W]
@@ -348,20 +358,23 @@ def side_stand(parts, cfg):
         a = np.array(a, float); b = np.array(b, float); d = b - a
         t = np.clip(((xx - a[0]) * d[0] + (yy - a[1]) * d[1]) / (d @ d), 0, 1)
         return np.hypot(xx - a[0] - t * d[0], yy - a[1] - t * d[1])
-    bones = {'thigh': ('hip', 'kn'), 'calf': ('kn', 'an'), 'foot': ('an', 'to'),}
-    names = list(bones)
-    own = np.argmin(np.stack([segd(cfg[a], cfg[b]) for a, b in bones.values()]), 0)
+    dth, dca, dfo = segd(cfg['hip'], cfg['kn']), segd(cfg['kn'], cfg['an']), segd(cfg['an'], cfg['to'])
     rest = fig & below & ~bag
-    M = {k: rest & (own == i) for i, k in enumerate(names)}
-    f = S * cfg['scale']
+    # gebeugt: das Knie gehört ganz zum Oberschenkel (liegt über dem Unterschenkel)
+    knee = (np.hypot(xx - cfg['kn'][0], yy - cfg['kn'][1]) < 38) & (dfo > 30) if sfx else np.zeros_like(fig)
+    Mth = rest & (((dth <= dca) & (dth <= dfo)) | knee)
+    Mca = rest & ~Mth & (dca <= dfo)
+    Mfo = rest & ~Mth & (dfo < dca)
+    lt = np.hypot(cfg['kn'][0] - cfg['hip'][0], cfg['kn'][1] - cfg['hip'][1])
+    lc = np.hypot(cfg['an'][0] - cfg['kn'][0], cfg['an'][1] - cfg['kn'][1])
 
-    def cut(key, mask, joint=None, r=0):
+    def cut(key, mask, f, joint=None, r=0):
         mask = ndi.binary_opening(mask, iterations=2)
         lb, nn = ndi.label(mask)
         if nn > 1:
             mask = lb == (np.argmax(ndi.sum(mask, lb, range(1, nn + 1))) + 1)
         g = G.copy(); a0 = alpha.copy()
-        if key == 'thigh':
+        if key.startswith('thigh'):
             mask = under_bag(mask, bag, fig, below, G, g, a0)
         if joint:  # Gelenkkappe mit eigenem Fell (liegt unter dem Elternteil)
             cap = (np.hypot(xx - cfg[joint][0], yy - cfg[joint][1]) < r) & ~mask & ndi.binary_erosion(fig, iterations=4)  # nie über den Umriss hinaus
@@ -378,53 +391,16 @@ def side_stand(parts, cfg):
             img.save(os.path.join(OUT, f'v2side_{key}{far}.png'), optimize=True)
             x0, y0 = round(bb[0] * f), round(bb[1] * f)
             parts[f'v2side_{key}{far}'] = [x0, y0, x0 + img.width, y0 + img.height]
-    cut('thigh', M['thigh'])
-    cut('calf', M['calf'] | M['foot'], 'kn', 36)
-    cut('shin', M['calf'], 'kn', 36)
-    cut('foot', M['foot'], 'an', 28)
-    sc = lambda q: [round(q[0] * f, 1), round(q[1] * f, 1)]
-    return {'thigh': [sc(cfg['hip']), sc(cfg['kn'])], 'calf': [sc(cfg['kn']), sc(cfg['an'])], 'shin': [sc(cfg['kn']), sc(cfg['an'])],
-            'foot': [sc(cfg['an']), sc(cfg['to'])]}, flex_of(cfg['torso'], cfg['hip'], cfg['kn'])
-
-
-def side_thigh(parts, key, cfg, scale):
-    A, G, fig, alpha = figure(cfg['src'], cfg.get('xr'))
-    H, W = fig.shape
-    yy, xx = np.mgrid[0:H, 0:W]
-    (bx0, by0), (bx1, by1) = cfg['belt']
-    below = yy > by0 + (xx - bx0) * (by1 - by0) / (bx1 - bx0) + 10  # ganz unter dem Gürtel, der Rumpf liegt darüber
-    im = Image.new('L', (W, H), 0)
-    ImageDraw.Draw(im).polygon(cfg['bag'], fill=1)
-    bag = np.asarray(im).astype(bool)
-
-    def segd(a, b):
-        a = np.array(a, float); b = np.array(b, float); d = b - a
-        t = np.clip(((xx - a[0]) * d[0] + (yy - a[1]) * d[1]) / (d @ d), 0, 1)
-        return np.hypot(xx - a[0] - t * d[0], yy - a[1] - t * d[1])
-    dth, dca, dfo = segd(cfg['hip'], cfg['kn']), segd(cfg['kn'], cfg['an']), segd(cfg['an'], cfg['to'])
-    # das gebeugte Knie dieser Zeichnung gehört ganz zum Oberschenkel (liegt über dem Unterschenkel)
-    knee = np.hypot(xx - cfg['kn'][0], yy - cfg['kn'][1]) < 50
-    mask = fig & below & ~bag & (((dth <= dca) & (dth <= dfo)) | (knee & (dfo > 38)))
-    mask = ndi.binary_opening(mask, iterations=2)
-    lb, nn = ndi.label(mask)
-    if nn > 1:
-        mask = lb == (np.argmax(ndi.sum(mask, lb, range(1, nn + 1))) + 1)
-    mask = mask | (ndi.binary_dilation(mask, iterations=2) & ndi.binary_erosion(fig, iterations=3) & ~bag & below)
-    G = G.copy(); alpha = alpha.copy()
-    mask = under_bag(mask, bag, fig, below, G.copy(), G, alpha)
-    a = ndi.gaussian_filter(mask.astype(float), 0.8) * np.where(mask, alpha, 0)
-    f = S * scale
-    out = {}
-    for far, dark in (('', 1.0), ('_far', FAR_DARK)):
-        img = Image.fromarray(np.dstack([np.clip(G * dark, 0, 255), np.clip(a * 255, 0, 255)]).astype(np.uint8), 'LA')
-        bb = img.getchannel('A').getbbox()
-        img = img.crop(bb)
-        img = img.resize((round(img.width * f), round(img.height * f)), Image.LANCZOS)
-        img.save(os.path.join(OUT, f'v2side_{key}{far}.png'), optimize=True)
-        x0, y0 = round(bb[0] * f), round(bb[1] * f)
-        parts[f'v2side_{key}{far}'] = [x0, y0, x0 + img.width, y0 + img.height]
-    sc = lambda q: [round(q[0] * f, 1), round(q[1] * f, 1)]
-    return [sc(cfg['hip']), sc(cfg['kn'])], flex_of(cfg['torso'], cfg['hip'], cfg['kn'])
+        return lambda q: [round(q[0] * f, 1), round(q[1] * f, 1)]
+    fT, fC = S * SQ * LEG_T / lt, S * SQ * LEG_C / lc
+    sT = cut('thigh' + sfx, Mth, fT)
+    sC = cut('calf' + sfx, Mca | Mfo, fC, 'kn', 30)
+    out = {'thigh' + sfx: [sT(cfg['hip']), sT(cfg['kn'])], 'calf' + sfx: [sC(cfg['kn']), sC(cfg['an'])]}
+    if not sfx:
+        sS = cut('shin', Mca, fC, 'kn', 30)
+        sF = cut('foot', Mfo, fC, 'an', 24)
+        out.update(shin=[sS(cfg['kn']), sS(cfg['an'])], foot=[sF(cfg['an']), sF(cfg['to'])])
+    return out, flex_of(cfg['torso'], cfg['hip'], cfg['kn'])
 
 
 def main():
