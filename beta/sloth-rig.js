@@ -926,16 +926,18 @@ function slothRigBuild(pose, v2 = false) {
       }
     }
     // v2: das ganze Bein (Gesäss/Oberschenkel, Unterschenkel mit Fuss) gibt es gezeichnet stehend und in drei
-    // Beugungen aus einem Blatt. Je nach Hüftbeugung (Winkel Rumpf -> Oberschenkel) wird die passende Zeichnung
-    // gezeigt – hart umgeschaltet, damit nie zwei Beine durchscheinen. Alle Stellungen haben dieselben Längen.
+    // Beugungen aus einem Blatt. Je nach Hüftbeugung (Winkel Rumpf -> Oberschenkel) wird zur passenden Zeichnung
+    // übergeblendet. Alle Stellungen haben dieselben Längen.
     if (v2 && J.flex) for (const x of ['', '_far']) {
       const th = q['thigh' + x];
       if (!th || th.skip) continue;
       const [b0, b1] = J.thigh, deg = th.r + Math.atan2(b1[1] - b0[1], b1[0] - b0[0]) * 180 / Math.PI;
       const f = ((s.torso + 180 - deg) % 360 + 540) % 360 - 180, F = J.flex;
       const ks = Object.keys(F).sort((m, n) => F[m] - F[n]);
-      let cur = 0;
-      ks.forEach((k, i) => { if (i && f > (F[ks[i - 1]] + F[k]) / 2) cur = i; });
+      // weicher Übergang (±6°) in der Mitte zwischen zwei Zeichnungen; die untere wird erst ausgeblendet,
+      // wenn die obere ganz deckt (kein Durchscheinen nach hinten)
+      const ramp = (lo, hi) => { const u = Math.min(1, Math.max(0, (f - lo) / (hi - lo))); return u * u * (3 - 2 * u); };
+      const op = ks.map((k, i) => (i === 0 ? 1 : ramp((F[ks[i - 1]] + F[k]) / 2 - 6, (F[ks[i - 1]] + F[k]) / 2 + 6)));
       // Füsse am Boden (fester Knöchel): Knie beugt so stark wie in den Zeichnungen (stetig nach Hüftbeugung) –
       // so bleibt der Fuss flach und die Bewegung sieht aus wie gezeichnet
       const planted = (x === '' && pose.pin === 'ankle') || (x === '_far' && pose.pin === 'fankle');
@@ -948,7 +950,7 @@ function slothRigBuild(pose, v2 = false) {
       }
       const ca = q['calf' + x], cDeg = ca && !ca.skip ? ca.r + a0('calf') : null;
       ks.forEach((k, i) => {
-        const o = i === cur ? 1 : 0, sfx = k.slice(5); // '' | 'A' | 'B' | 'C'
+        const o = op[i + 1] >= 1 ? 0 : op[i], sfx = k.slice(5); // '' | 'A' | 'B' | 'C'
         if (!sfx) { th.o = o; if (!pose.feet && ca && !ca.skip) ca.o = o; return; }
         q[k + x] = { ...place(k, th.P, deg, 'side_' + k + x), o };
         if (!pose.feet && cDeg != null) q['calf' + sfx + x] = { ...place('calf' + sfx, th.end, cDeg, 'side_calf' + sfx + x), o };
