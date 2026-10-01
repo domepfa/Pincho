@@ -152,11 +152,11 @@ def cut_view(view, cfg, parts, joints, anchors):
         g[ry, rx] = 0.5 * g[ry, rx] + 0.5 * soft[ry, rx]
         return True
 
-    def save(name, mask, joint=None, src=None, dark=1.0, fade=None, ink=False):
+    def save(name, mask, joint=None, src=None, dark=1.0, fade=None, ink=False, src_alpha=None):
         Gs = G if src is None else src
         # lose Fellsträhnen weg (Oberarm: Achselhaar hängt sonst als Strich herunter)
         mask = biggest(ndi.binary_opening(mask, iterations=6 if name.startswith('uarm') else 2))
-        g = Gs.copy(); a0 = alpha.copy()
+        g = Gs.copy(); a0 = (alpha if src_alpha is None else src_alpha).copy()
         if joint:  # Gelenk-Überlappung mit eigenem Fell
             r = CAP[re.sub('[LR]$', '', joint)]
             cap = (np.hypot(xx - J[joint][0], yy - J[joint][1]) < r) & ~mask
@@ -168,7 +168,7 @@ def cut_view(view, cfg, parts, joints, anchors):
             band = ndi.gaussian_filter((ndi.distance_transform_edt(~cut) < 3).astype(float), 1.0) * mask
             g = g * (1 - 0.7 * band)
         # an Schnittkanten (mitten im Fell) 2 px Originalfell dazu, damit die weiche Kante keinen dunklen Strich zeichnet
-        mask = mask | (ndi.binary_dilation(mask, iterations=2) & ndi.binary_erosion(fig, iterations=3))
+        mask = mask | (ndi.binary_dilation(mask, iterations=2) & ndi.binary_erosion(fig if src_alpha is None else src_alpha > 0.5, iterations=3))
         a = ndi.gaussian_filter(mask.astype(float), 0.8) * np.where(mask, a0, 0)
         if fade is not None:  # Schnittkante weich in das darunterliegende Teil auslaufen lassen (Hals)
             d = ndi.distance_transform_edt(~fade)
@@ -196,27 +196,26 @@ def cut_view(view, cfg, parts, joints, anchors):
             save('hand' + far, M['handR'], 'wrR', dark=dark)
             save('fist' + far, M['farmR'] | M['handR'], 'elR', dark=dark)  # Unterarm + Hand in einem Teil (wie bisher 'fist')
             save('flat' + far, M['handR'], 'wrR', dark=dark)
-            save('thigh' + far, M['thighR'], dark=dark, ink='hipR')  # Rumpf endet am Gürtel, Gesäss gehört zum Bein: keine Kappe nötig
-            save('calf' + far, M['calfR'] | M['footR'], 'knR', dark=dark)  # Unterschenkel mit Fuss
-            save('shin' + far, M['calfR'], 'knR', dark=dark)
-            save('foot' + far, M['footR'], 'anR', dark=dark)
-        # gebeugte Oberschenkel: gleiche Länge Hüfte -> Knie wie stehend, Beugewinkel der Zeichnung merken
-        L0 = np.hypot(J['knR'][0] - J['hipR'][0], J['knR'][1] - J['hipR'][1])
-        jv['flex'] = {'thigh': round(flex_of((J['hip'], J['shR']), J['hipR'], J['knR']), 1)}
+        # Beine: stehend + gebeugte Oberschenkel aus der armlosen Serie, Beugewinkel der Zeichnungen merken
+        legJ, fl0 = side_stand(parts, SIDE_STAND)  # ganzes Bein aus der armlosen Serie (passt zum Rumpf)
+        jv['flex'] = {'thigh': round(fl0, 1)}
         for k, c in SIDE_LEGS.items():
-            jv[k], fl = side_thigh(parts, k, c, L0 / np.hypot(c['kn'][0] - c['hip'][0], c['kn'][1] - c['hip'][1]))
+            jv[k], fl = side_thigh(parts, k, c, c['scale'])
             jv['flex'][k] = round(fl, 1)
         jv.update(uarm=[sc(J['shR']), sc(J['elR'])], farm=[sc(J['elR']), sc(J['wrR'])], fist=[sc(J['elR']), sc(J['wrR'])],
                   hand=[sc(J['wrR']), sc(J['fiR'])], flat=[sc(J['wrR']), sc(J['fiR'])],
-                  thigh=[sc(J['hipR']), sc(J['knR'])], calf=[sc(J['knR']), sc(J['anR'])], shin=[sc(J['knR']), sc(J['anR'])],
-                  foot=[sc(J['anR']), sc(J['toR'])])
+                  **legJ)
         return
     save('torso', M['torso'])
     save('head', M['head'], fade=torsoCut)
     jv['torso'] = [sc(J['hip']), sc(J['neck'])]
     jv['head'] = [sc(J['neck']), sc(J['top'])]
     anchors[view] = {'neck': sc(J['neck']), 'sh_l': sc(J['shL']), 'sh_r': sc(J['shR']), 'hip_l': sc(J['hipL']), 'hip_r': sc(J['hipR']), 'tail': sc(J['hip'])}
-    fistG = gray(np.asarray(Image.open(os.path.join(HERE, 'sheets', 'v2', cfg['fist'])).convert('RGB')).astype(float)) if cfg.get('fist') else None
+    # Faust-Zeichnung mit eigenem Umriss und eigener Deckkraft (sonst weisser Rand, wo die offene Hand breiter war)
+    fistG = fistM = fistA = None
+    if cfg.get('fist'):
+        _, fistG, fistFig, fistA = figure(cfg['fist'])
+        fistM = fistFig & ~head & ~torso
     grip = view not in ('front', 'sit')  # Rückansicht/Hängen: eigene Greifhand (wie bisher grip_l/grip_r)
     for s in 'LR':
         x = s.lower()
@@ -229,7 +228,7 @@ def cut_view(view, cfg, parts, joints, anchors):
         else:  # vorne: Unterarm mit Hand (offen) und als Faust-Variante aus front_fist.jpg
             save('farm_' + x, M['farm' + s] | M['hand' + s], 'el' + s)
             if fistG is not None:
-                save('farmfist_' + x, M['farm' + s] | M['hand' + s], 'el' + s, src=fistG)
+                save('farmfist_' + x, fistM & ((own == names.index('farm' + s)) | (own == names.index('hand' + s))), 'el' + s, src=fistG, src_alpha=fistA)
             jv['farm_' + x] = [sc(J['el' + s]), sc(J['fi' + s])]
         save('thigh_' + x, M['thigh' + s], 'hip' + s)
         save('calf_' + x, M['calf' + s] | M['foot' + s], 'kn' + s)
@@ -274,10 +273,15 @@ def side_torso(parts, key, cfg):
 # Gesäss + Oberschenkel in gebeugten Stellungen (Seite, ohne Arme). Die Puppe blendet je nach Hüftwinkel
 # zwischen stehend (side.jpg), halb (45) und tief (90) über, statt den stehenden Oberschenkel nur zu drehen.
 # torso = (Hüfte, Schulter) der Zeichnung für den Rumpfwinkel; belt = Unterkante Gürtel; bag = Chalkbag (gehört zum Rumpf).
+# Stehendes Bein (Seite, ohne Arme): Oberschenkel mit Gesäss, Unterschenkel, Fuss. *L = hinteres Bein (nur zum Ausschliessen).
+# scale: Zeichnungen derselben Serie, auf die Grösse des Rumpfs (side_torso.jpg) gebracht.
+SIDE_STAND = dict(src='side_stand.png', scale=1.2, hip=(480, 875), kn=(530, 1125), an=(530, 1350), to=(740, 1440), torso=((470, 860), (440, 490)),
+                  thL=(430, 1010), knL=(405, 1140), anL=(365, 1335), toL=(470, 1405),
+                  belt=((400, 760), (595, 835)), bag=[(258, 705), (402, 708), (398, 765), (362, 800), (358, 908), (258, 908)])
 SIDE_LEGS = {
-    'thigh45': dict(src='side_half.png', hip=(300, 985), kn=(545, 1125), an=(400, 1370), to=(560, 1450), torso=((390, 1015), (480, 650)),
+    'thigh45': dict(src='side_half.png', scale=1.03, hip=(300, 985), kn=(545, 1125), an=(400, 1370), to=(560, 1450), torso=((390, 1015), (480, 650)),
                     belt=((280, 885), (525, 968)), bag=[(160, 812), (325, 815), (320, 860), (268, 895), (262, 1008), (160, 1012)]),
-    'thigh90': dict(src='side_torso.jpg', hip=(320, 1000), kn=(660, 1010), an=(520, 1330), to=(700, 1420), torso=((400, 985), (450, 585)),
+    'thigh90': dict(src='side_torso.jpg', scale=1.0, hip=(335, 985), kn=(640, 1010), an=(520, 1330), to=(700, 1420), torso=((400, 985), (450, 585)),
                     belt=((300, 845), (540, 910)), bag=[(140, 785), (305, 785), (300, 830), (222, 880), (220, 1008), (140, 1012)]),
 }
 
@@ -287,6 +291,59 @@ def flex_of(torso, hip, kn):
     ta = np.degrees(np.arctan2(torso[1][1] - torso[0][1], torso[1][0] - torso[0][0]))
     th = np.degrees(np.arctan2(kn[1] - hip[1], kn[0] - hip[0]))
     return float((ta + 180 - th + 180) % 360 - 180)
+
+
+def side_stand(parts, cfg):
+    """Stehendes Bein aus side_stand.png: thigh, calf (mit Fuss), shin, foot, je auch als _far (dunkler)."""
+    A, G, fig, alpha = figure(cfg['src'])
+    H, W = fig.shape
+    yy, xx = np.mgrid[0:H, 0:W]
+    (bx0, by0), (bx1, by1) = cfg['belt']
+    below = yy > by0 + (xx - bx0) * (by1 - by0) / (bx1 - bx0) - 14
+    im = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(im).polygon(cfg['bag'], fill=1)
+    bag = np.asarray(im).astype(bool)
+
+    def segd(a, b):
+        a = np.array(a, float); b = np.array(b, float); d = b - a
+        t = np.clip(((xx - a[0]) * d[0] + (yy - a[1]) * d[1]) / (d @ d), 0, 1)
+        return np.hypot(xx - a[0] - t * d[0], yy - a[1] - t * d[1])
+    bones = {'thigh': ('hip', 'kn'), 'calf': ('kn', 'an'), 'foot': ('an', 'to'),
+             'x2': ('knL', 'anL'), 'x3': ('anL', 'toL')}  # hinterer Oberschenkel liegt verdeckt: alles darüber gehört vorne
+    names = list(bones)
+    own = np.argmin(np.stack([segd(cfg[a], cfg[b]) for a, b in bones.values()]), 0)
+    rest = fig & below & ~bag
+    M = {k: rest & (own == i) for i, k in enumerate(names)}
+    f = S * cfg['scale']
+
+    def cut(key, mask, joint=None, r=0):
+        mask = ndi.binary_opening(mask, iterations=2)
+        lb, nn = ndi.label(mask)
+        if nn > 1:
+            mask = lb == (np.argmax(ndi.sum(mask, lb, range(1, nn + 1))) + 1)
+        g = G.copy(); a0 = alpha.copy()
+        if joint:  # Gelenkkappe mit eigenem Fell (liegt unter dem Elternteil)
+            cap = (np.hypot(xx - cfg[joint][0], yy - cfg[joint][1]) < r) & ~mask & ndi.binary_erosion(fig, iterations=4)  # nie über den Umriss hinaus
+            inner = ndi.binary_erosion(mask, iterations=8)
+            _, (iy, ix) = ndi.distance_transform_edt(~inner, return_indices=True)
+            g[cap] = ndi.gaussian_filter(G, 3)[iy[cap], ix[cap]]; a0[cap] = 1.0
+            mask = mask | cap
+        mask = mask | (ndi.binary_dilation(mask, iterations=2) & ndi.binary_erosion(fig, iterations=3) & ~bag & below)
+        a = ndi.gaussian_filter(mask.astype(float), 0.8) * np.where(mask, a0, 0)
+        for far, dark in (('', 1.0), ('_far', FAR_DARK)):
+            img = Image.fromarray(np.dstack([np.clip(g * dark, 0, 255), np.clip(a * 255, 0, 255)]).astype(np.uint8), 'LA')
+            bb = img.getchannel('A').getbbox()
+            img = img.crop(bb).resize((round((bb[2] - bb[0]) * f), round((bb[3] - bb[1]) * f)), Image.LANCZOS)
+            img.save(os.path.join(OUT, f'v2side_{key}{far}.png'), optimize=True)
+            x0, y0 = round(bb[0] * f), round(bb[1] * f)
+            parts[f'v2side_{key}{far}'] = [x0, y0, x0 + img.width, y0 + img.height]
+    cut('thigh', M['thigh'])
+    cut('calf', M['calf'] | M['foot'], 'kn', 58)
+    cut('shin', M['calf'], 'kn', 58)
+    cut('foot', M['foot'], 'an', 44)
+    sc = lambda q: [round(q[0] * f, 1), round(q[1] * f, 1)]
+    return {'thigh': [sc(cfg['hip']), sc(cfg['kn'])], 'calf': [sc(cfg['kn']), sc(cfg['an'])], 'shin': [sc(cfg['kn']), sc(cfg['an'])],
+            'foot': [sc(cfg['an']), sc(cfg['to'])]}, flex_of(cfg['torso'], cfg['hip'], cfg['kn'])
 
 
 def side_thigh(parts, key, cfg, scale):
