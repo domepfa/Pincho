@@ -1960,7 +1960,7 @@ function renderWallOverlay() {
     <button type="button" class="fb-overlay-close" id="wall-close" title="Abbrechen">✕</button>
     <div class="fb-overlay-inner">
       <div class="fb-stage-label mono">SATZ ${wall.blockIndex + 1}/${wallBlocks.length} · ${working ? 'WAND' : 'PAUSE'}</div>
-      <div class="fb-stage-figure" id="wall-figure">${working ? wallFigureSvg() : FB_REST_FIGURE_SVG}</div>
+      <div class="fb-stage-figure" id="wall-figure">${working ? wallFigureSvg() : fbRestFigureSvg()}</div>
       <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
         <div class="fb-timer-ring">
           <svg viewBox="0 0 120 120">
@@ -2463,7 +2463,7 @@ function renderFlowOverlay() {
     <button type="button" class="fb-overlay-close" id="flow-close" title="Abbrechen">✕</button>
     <div class="fb-overlay-inner">
       <div class="fb-stage-label mono">POSE ${flow.blockIndex + 1}/${flowBlocks.length} · ${esc(poseName(block.poseId))}</div>
-      <div class="fb-stage-figure" id="flow-figure">${working ? '<div class="ex-figure-emoji">🧘</div>' : FB_REST_FIGURE_SVG}</div>
+      <div class="fb-stage-figure" id="flow-figure">${working ? '<div class="ex-figure-emoji">🧘</div>' : fbRestFigureSvg()}</div>
       <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
         <div class="fb-timer-ring">
           <svg viewBox="0 0 120 120">
@@ -2503,7 +2503,7 @@ function updateFlowUI() {
   const phaseEl = document.getElementById('flow-phase');
   if (phaseEl) phaseEl.textContent = working ? 'Halten' : 'Wechsel';
   const figureHolder = document.getElementById('flow-figure');
-  if (figureHolder) figureHolder.innerHTML = working ? '<div class="ex-figure-emoji">🧘</div>' : FB_REST_FIGURE_SVG;
+  if (figureHolder) figureHolder.innerHTML = working ? '<div class="ex-figure-emoji">🧘</div>' : fbRestFigureSvg();
 }
 
 /* Läuft die ganze Liste durch ODER wird vorzeitig beendet — landet wie
@@ -9152,8 +9152,9 @@ const SLOTH_FACE = `
   <circle class="sloth-head" cx="100" cy="64" r="19"/>
   <path class="sloth-mask" d="M86 62 q6 -7 12 1 q-6 7 -12 -1z M114 62 q-6 -7 -12 1 q6 7 12 -1z"/>
   <path class="sloth-line" d="M97 71 h6 M94 76 q6 4 12 0"/>`;
-const FB_HANG_FIGURE_SVG = slothFigure('hang', 'ex-figure sloth-img'); // Faultier-Puppe (sloth-rig.js)
-const FB_REST_FIGURE_SVG = slothFigure('rest', 'ex-figure sloth-img');
+// Faultier-Puppe (sloth-rig.js); jedes Mal neu, damit ein Wechsel der Figur im Konto sofort gilt
+const fbHangFigureSvg = () => slothFigure('hang', 'ex-figure sloth-img');
+const fbRestFigureSvg = () => slothFigure('rest', 'ex-figure sloth-img');
 /* Lifting Pin: Faultier steht seitlich und hält den Griffblock mit dem Pin
    und der Scheibe darunter (statisch, siehe Pose 'pinlift' in sloth-rig.js).
    Die Figur schaut nach rechts, man sieht also ihre linke Seite — für die
@@ -9167,7 +9168,7 @@ function blockPinFigureSvg(hand) {
    das Zieh-Strichmännchen mit der gerade aktiven Hand (activeRep kommt
    aus dem rep-Feld des laufenden Sequenz-Schritts, siehe buildBlockSequence). */
 function holdBlockWorkFigure(b, activeRep) {
-  return b.type === 'block' ? blockPinFigureSvg(blockHandForRep(b, activeRep || 0)) : FB_HANG_FIGURE_SVG;
+  return b.type === 'block' ? blockPinFigureSvg(blockHandForRep(b, activeRep || 0)) : fbHangFigureSvg();
 }
 
 function ensureFbOverlay() {
@@ -9570,7 +9571,7 @@ function fbBoardStageHtml(b, hanging, tag, reach) {
       <svg width="0" height="0" class="fbx-clipdef" aria-hidden="true"><clipPath id="fbx-grip-clip" clipPathUnits="objectBoundingBox">${clip}</clipPath></svg>
       ${tag ? `<div class="fbx-tag" style="left:${cx}%;top:${top}%">${esc(tag)}</div>` : ''}
     </div>
-    <div class="fbx-fig" id="fbx-fig" data-fit="${hanging ? 'hang' : 'stand'}">${hanging ? '' : reach ? slothFigure('reach', 'sloth-img') : FB_REST_FIGURE_SVG}</div>
+    <div class="fbx-fig" id="fbx-fig" data-fit="${hanging ? 'hang' : 'stand'}">${hanging ? '' : reach ? slothFigure('reach', 'sloth-img') : fbRestFigureSvg()}</div>
   `;
 }
 
@@ -9685,11 +9686,11 @@ function fbStageInnerHtml(st) {
   let fig;
   if (st.mode === 'work') {
     const b = st.block;
-    fig = isHangLikeBlock(b) ? holdBlockWorkFigure(b, st.activeRep) : b.type === 'campus' ? campusWorkFigureSvg(b, false) : b.type === 'pause' ? FB_REST_FIGURE_SVG : exerciseFigureSvg(b.exerciseId);
+    fig = isHangLikeBlock(b) ? holdBlockWorkFigure(b, st.activeRep) : b.type === 'campus' ? campusWorkFigureSvg(b, false) : b.type === 'pause' ? fbRestFigureSvg() : exerciseFigureSvg(b.exerciseId);
   } else if (st.mode === 'ready' || st.trailing) {
-    fig = d.type === 'campus' ? campusWorkFigureSvg(d) : d.type === 'pause' ? FB_REST_FIGURE_SVG : isHangLikeBlock(d) ? holdBlockWorkFigure(d, 0) : exerciseFigureSvg(d.exerciseId);
+    fig = d.type === 'campus' ? campusWorkFigureSvg(d) : d.type === 'pause' ? fbRestFigureSvg() : isHangLikeBlock(d) ? holdBlockWorkFigure(d, 0) : exerciseFigureSvg(d.exerciseId);
   } else {
-    fig = st.block.type === 'campus' ? campusWorkFigureSvg(st.block) : FB_REST_FIGURE_SVG;
+    fig = st.block.type === 'campus' ? campusWorkFigureSvg(st.block) : fbRestFigureSvg();
   }
   return `<div class="fbx-center">${fig}</div>${tag ? `<div class="fbx-tag fbx-tag-top">${esc(tag)}</div>` : ''}`;
 }
