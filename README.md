@@ -112,6 +112,12 @@ wird erst nach dem Testen in die Haupt-App übernommen.
   zählt die Cache-Version der Haupt-App hoch. `manifest.json`/`sw.js` der
   Haupt-App bleiben eigenständig. Das BETA-Schild erscheint automatisch nur
   unter `/beta/`.
+- **Test:** `node tools/test-beta.mjs` (Haupt-App: `APP=main node tools/test-beta.mjs`)
+  startet die App in Chromium mit nachgebildetem Firebase (Node + Playwright
+  nötig, keine Zugangsdaten). Prüft Start ohne JS-Fehler, Login, alle Tabs,
+  die Übungsfiguren (Prüfsummen zum Vorher/Nachher-Vergleich), den
+  Offline-Cache und den Offline-Start; Exit-Code 1 bei einem Fehler.
+  Details oben in der Datei.
 
 ## Offene Punkte / bewusst nicht in v1
 
