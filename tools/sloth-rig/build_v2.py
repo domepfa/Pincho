@@ -68,8 +68,10 @@ VIEWS = {
 CAP = {'sh': 70, 'el': 46, 'wr': 36, 'hip': 75, 'kn': 58, 'an': 44, 'neck': 60}
 
 
-def figure(path):
+def figure(path, xr=None):
     A = np.asarray(Image.open(os.path.join(HERE, 'sheets', 'v2', path)).convert('RGB')).astype(float)
+    if xr:  # Blatt mit mehreren Figuren: nur die Spalte xr = (x0, x1) behalten
+        A = A.copy(); A[:, :xr[0]] = 255; A[:, xr[1]:] = 255
     white = (A.min(2) > 225) & (np.ptp(A, 2) < 25)
     fig = ndi.binary_fill_holes(~white)
     lab, n = ndi.label(fig)
@@ -239,18 +241,33 @@ def cut_view(view, cfg, parts, joints, anchors):
 
 # Seitlicher Rumpf ohne Arme (Brust frei). Gelenke in Blatt-Pixeln; sy streckt den Rumpf auf die Länge
 # von side.jpg (Schulter -> Gürtel), damit Kopf, Arm und Beine von dort passen.
-SIDE_TORSO = dict(src='side_torso.jpg', sx=0.95, sy=1.08, rot=6,
-    J=dict(neck=(520, 490), sh=(450, 585), hip=(400, 985), tail=(245, 990)),
-    poly=[(290, 420), (540, 400), (560, 480), (610, 540), (645, 620), (630, 710), (600, 780), (575, 850), (548, 905), (420, 878), (312, 842),
-          (298, 880), (285, 950), (250, 1000), (165, 1005), (140, 940), (150, 800), (195, 785), (285, 780), (290, 700), (290, 600), (285, 500)])
+# Seite ohne Arme: Rumpf und alle Beinstellungen aus EINEM Blatt (side_squats.png, vier Figuren nebeneinander:
+# stehend, leicht, halb, tief gebeugt). Ein Blatt = ein Zeichendurchgang -> Fell, Dicke und Gesäss passen zusammen.
+# Alle Teile mit demselben Massstab SQ (Rumpflänge wie bisher, damit Kopf und Arm aus side.jpg passen).
+SQ = 1.82
+SQX = [(0, 340), (340, 680), (680, 1050), (1050, 1536)]
+SIDE_TORSO = dict(src='side_squats.png', xr=SQX[0], sx=SQ, sy=SQ, rot=0,
+    J=dict(neck=(205, 292), sh=(180, 360), hip=(175, 600), tail=(60, 650)),
+    poly=[(85, 300), (150, 270), (250, 262), (282, 318), (300, 395), (294, 460), (265, 515), (250, 592), (100, 556), (80, 450), (70, 350)],
+    bag=[(22, 512), (112, 512), (112, 648), (22, 648)])
 
 
 def side_torso(parts, key, cfg):
-    A, G, fig, alpha = figure(cfg['src'])
+    A, G, fig, alpha = figure(cfg['src'], cfg.get('xr'))
     H, W = fig.shape
     im = Image.new('L', (W, H), 0)
     ImageDraw.Draw(im).polygon(cfg['poly'], fill=1)
     mask = np.asarray(im).astype(bool) & fig
+    if cfg.get('bag'):  # Chalkbag gehört zum Rumpf – nur der Beutel selbst (nicht Fell daneben)
+        bm = Image.new('L', (W, H), 0)
+        ImageDraw.Draw(bm).polygon(cfg['bag'], fill=1)
+        fur = (A[..., 0] - A[..., 2] > 55) & (A.max(2) < 215)
+        bag = np.asarray(bm).astype(bool) & fig & ~fur
+        bag = ndi.binary_fill_holes(ndi.binary_closing(bag, iterations=3))
+        lb, nn = ndi.label(bag)
+        if nn > 1:
+            bag = lb == (np.argmax(ndi.sum(bag, lb, range(1, nn + 1))) + 1)
+        mask = mask | ndi.binary_dilation(bag, iterations=2) & fig
     lb, nn = ndi.label(mask)
     if nn > 1:
         mask = lb == (np.argmax(ndi.sum(mask, lb, range(1, nn + 1))) + 1)
@@ -270,20 +287,43 @@ def side_torso(parts, key, cfg):
     return {k: [round(rotp(q)[0] * fx, 1), round(rotp(q)[1] * fy, 1)] for k, q in cfg['J'].items()}
 
 
-# Gesäss + Oberschenkel in gebeugten Stellungen (Seite, ohne Arme). Die Puppe blendet je nach Hüftwinkel
-# zwischen stehend (side.jpg), halb (45) und tief (90) über, statt den stehenden Oberschenkel nur zu drehen.
-# torso = (Hüfte, Schulter) der Zeichnung für den Rumpfwinkel; belt = Unterkante Gürtel; bag = Chalkbag (gehört zum Rumpf).
-# Stehendes Bein (Seite, ohne Arme): Oberschenkel mit Gesäss, Unterschenkel, Fuss. *L = hinteres Bein (nur zum Ausschliessen).
-# scale: Zeichnungen derselben Serie, auf die Grösse des Rumpfs (side_torso.jpg) gebracht.
-SIDE_STAND = dict(src='side_stand.png', scale=1.2, hip=(480, 875), kn=(530, 1125), an=(530, 1350), to=(740, 1440), torso=((470, 860), (440, 490)),
-                  thL=(430, 1010), knL=(405, 1140), anL=(365, 1335), toL=(470, 1405),
-                  belt=((400, 760), (595, 835)), bag=[(258, 705), (402, 708), (398, 765), (362, 800), (358, 908), (258, 908)])
+# Beine aus side_squats.png. torso = (Hüfte, Schulter) der Figur für den Beugewinkel; belt = Unterkante Gürtel;
+# bag = Chalkbag (gehört zum Rumpf). Stehend: ganzes Bein (Oberschenkel, Unterschenkel, Fuss); gebeugt: nur Gesäss + Oberschenkel,
+# die Puppe blendet je nach Hüftwinkel zur nächsten Zeichnung über.
+SIDE_STAND = dict(src='side_squats.png', xr=SQX[0], scale=SQ, hip=(175, 615), kn=(195, 775), an=(175, 925), to=(270, 975), torso=((175, 600), (180, 360)),
+                  belt=((100, 532), (245, 575)), bag=[(22, 512), (112, 512), (112, 648), (22, 648)])
 SIDE_LEGS = {
-    'thigh45': dict(src='side_half.png', scale=1.03, hip=(300, 985), kn=(545, 1125), an=(400, 1370), to=(560, 1450), torso=((390, 1015), (480, 650)),
-                    belt=((280, 885), (525, 968)), bag=[(160, 812), (325, 815), (320, 860), (268, 895), (262, 1008), (160, 1012)]),
-    'thigh90': dict(src='side_torso.jpg', scale=1.0, hip=(335, 985), kn=(640, 1010), an=(520, 1330), to=(700, 1420), torso=((400, 985), (450, 585)),
-                    belt=((300, 845), (540, 910)), bag=[(140, 785), (305, 785), (300, 830), (222, 880), (220, 1008), (140, 1012)]),
+    'thighA': dict(src='side_squats.png', xr=SQX[1], scale=SQ, hip=(485, 650), kn=(592, 742), an=(512, 912), to=(620, 968), torso=((485, 640), (510, 370)),
+                   belt=((445, 568), (608, 600)), bag=[(405, 552), (488, 552), (488, 672), (405, 672)]),
+    'thighB': dict(src='side_squats.png', xr=SQX[2], scale=SQ, hip=(800, 700), kn=(960, 752), an=(862, 912), to=(995, 970), torso=((800, 690), (880, 420)),
+                   belt=((785, 612), (915, 655)), bag=[(702, 577), (785, 577), (785, 702), (702, 702)]),
+    'thighC': dict(src='side_squats.png', xr=SQX[3], scale=SQ, hip=(1185, 745), kn=(1395, 748), an=(1262, 912), to=(1400, 968), torso=((1185, 740), (1290, 480)),
+                   belt=((1175, 660), (1325, 712)), bag=[(1078, 628), (1170, 628), (1170, 758), (1078, 758)]),
 }
+
+
+def under_bag(mask, bag, fig, below, G, g, a0):
+    """Gesäss hinter dem Chalkbag ergänzen: Bag-Fläche innerhalb der konvexen Hülle des Beins mit Fell
+    (an der nächsten Beinkante gespiegelt) füllen, damit beim Drehen keine gerade Schnittkante sichtbar wird."""
+    from scipy.spatial import ConvexHull
+    pts = np.argwhere(mask)[:, ::-1]
+    H, W = mask.shape
+    hm = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(hm).polygon([tuple(map(int, q)) for q in pts[ConvexHull(pts).vertices]], fill=1)
+    ry, rx = np.nonzero(bag & fig & below & ~mask & np.asarray(hm).astype(bool))
+    if not len(ry):
+        return mask
+    fill = np.zeros_like(mask); fill[ry, rx] = True
+    inner = ndi.binary_erosion(mask, iterations=6)
+    _, (iy, ix) = ndi.distance_transform_edt(~inner, return_indices=True)
+    qy, qx = iy[ry, rx], ix[ry, rx]
+    my = np.clip(2 * qy - ry, 0, H - 1); mx = np.clip(2 * qx - rx, 0, W - 1)
+    ok = inner[my, mx]
+    g[ry, rx] = np.where(ok, G[my, mx], G[qy, qx]); a0[ry, rx] = 1.0
+    # Umrisslinie am neuen Rand (wie gezeichnet)
+    edge = fill & ~ndi.binary_erosion(fill | mask, iterations=3)
+    g[:] = g * (1 - 0.8 * ndi.gaussian_filter(edge.astype(float), 0.8))
+    return mask | fill
 
 
 def flex_of(torso, hip, kn):
@@ -294,12 +334,12 @@ def flex_of(torso, hip, kn):
 
 
 def side_stand(parts, cfg):
-    """Stehendes Bein aus side_stand.png: thigh, calf (mit Fuss), shin, foot, je auch als _far (dunkler)."""
-    A, G, fig, alpha = figure(cfg['src'])
+    """Stehendes Bein: thigh, calf (mit Fuss), shin, foot, je auch als _far (dunkler)."""
+    A, G, fig, alpha = figure(cfg['src'], cfg.get('xr'))
     H, W = fig.shape
     yy, xx = np.mgrid[0:H, 0:W]
     (bx0, by0), (bx1, by1) = cfg['belt']
-    below = yy > by0 + (xx - bx0) * (by1 - by0) / (bx1 - bx0) - 14
+    below = yy > by0 + (xx - bx0) * (by1 - by0) / (bx1 - bx0) + 10  # ganz unter dem Gürtel, der Rumpf liegt darüber
     im = Image.new('L', (W, H), 0)
     ImageDraw.Draw(im).polygon(cfg['bag'], fill=1)
     bag = np.asarray(im).astype(bool)
@@ -308,8 +348,7 @@ def side_stand(parts, cfg):
         a = np.array(a, float); b = np.array(b, float); d = b - a
         t = np.clip(((xx - a[0]) * d[0] + (yy - a[1]) * d[1]) / (d @ d), 0, 1)
         return np.hypot(xx - a[0] - t * d[0], yy - a[1] - t * d[1])
-    bones = {'thigh': ('hip', 'kn'), 'calf': ('kn', 'an'), 'foot': ('an', 'to'),
-             'x2': ('knL', 'anL'), 'x3': ('anL', 'toL')}  # hinterer Oberschenkel liegt verdeckt: alles darüber gehört vorne
+    bones = {'thigh': ('hip', 'kn'), 'calf': ('kn', 'an'), 'foot': ('an', 'to'),}
     names = list(bones)
     own = np.argmin(np.stack([segd(cfg[a], cfg[b]) for a, b in bones.values()]), 0)
     rest = fig & below & ~bag
@@ -322,11 +361,13 @@ def side_stand(parts, cfg):
         if nn > 1:
             mask = lb == (np.argmax(ndi.sum(mask, lb, range(1, nn + 1))) + 1)
         g = G.copy(); a0 = alpha.copy()
+        if key == 'thigh':
+            mask = under_bag(mask, bag, fig, below, G, g, a0)
         if joint:  # Gelenkkappe mit eigenem Fell (liegt unter dem Elternteil)
             cap = (np.hypot(xx - cfg[joint][0], yy - cfg[joint][1]) < r) & ~mask & ndi.binary_erosion(fig, iterations=4)  # nie über den Umriss hinaus
             inner = ndi.binary_erosion(mask, iterations=8)
             _, (iy, ix) = ndi.distance_transform_edt(~inner, return_indices=True)
-            g[cap] = ndi.gaussian_filter(G, 3)[iy[cap], ix[cap]]; a0[cap] = 1.0
+            g[cap] = G[iy[cap], ix[cap]]; a0[cap] = 1.0
             mask = mask | cap
         mask = mask | (ndi.binary_dilation(mask, iterations=2) & ndi.binary_erosion(fig, iterations=3) & ~bag & below)
         a = ndi.gaussian_filter(mask.astype(float), 0.8) * np.where(mask, a0, 0)
@@ -338,20 +379,20 @@ def side_stand(parts, cfg):
             x0, y0 = round(bb[0] * f), round(bb[1] * f)
             parts[f'v2side_{key}{far}'] = [x0, y0, x0 + img.width, y0 + img.height]
     cut('thigh', M['thigh'])
-    cut('calf', M['calf'] | M['foot'], 'kn', 58)
-    cut('shin', M['calf'], 'kn', 58)
-    cut('foot', M['foot'], 'an', 44)
+    cut('calf', M['calf'] | M['foot'], 'kn', 36)
+    cut('shin', M['calf'], 'kn', 36)
+    cut('foot', M['foot'], 'an', 28)
     sc = lambda q: [round(q[0] * f, 1), round(q[1] * f, 1)]
     return {'thigh': [sc(cfg['hip']), sc(cfg['kn'])], 'calf': [sc(cfg['kn']), sc(cfg['an'])], 'shin': [sc(cfg['kn']), sc(cfg['an'])],
             'foot': [sc(cfg['an']), sc(cfg['to'])]}, flex_of(cfg['torso'], cfg['hip'], cfg['kn'])
 
 
 def side_thigh(parts, key, cfg, scale):
-    A, G, fig, alpha = figure(cfg['src'])
+    A, G, fig, alpha = figure(cfg['src'], cfg.get('xr'))
     H, W = fig.shape
     yy, xx = np.mgrid[0:H, 0:W]
     (bx0, by0), (bx1, by1) = cfg['belt']
-    below = yy > by0 + (xx - bx0) * (by1 - by0) / (bx1 - bx0) - 14  # etwas unter den Gürtel, der Rumpf liegt darüber
+    below = yy > by0 + (xx - bx0) * (by1 - by0) / (bx1 - bx0) + 10  # ganz unter dem Gürtel, der Rumpf liegt darüber
     im = Image.new('L', (W, H), 0)
     ImageDraw.Draw(im).polygon(cfg['bag'], fill=1)
     bag = np.asarray(im).astype(bool)
@@ -362,13 +403,15 @@ def side_thigh(parts, key, cfg, scale):
         return np.hypot(xx - a[0] - t * d[0], yy - a[1] - t * d[1])
     dth, dca, dfo = segd(cfg['hip'], cfg['kn']), segd(cfg['kn'], cfg['an']), segd(cfg['an'], cfg['to'])
     # das gebeugte Knie dieser Zeichnung gehört ganz zum Oberschenkel (liegt über dem Unterschenkel)
-    knee = np.hypot(xx - cfg['kn'][0], yy - cfg['kn'][1]) < 80
-    mask = fig & below & ~bag & (((dth <= dca) & (dth <= dfo)) | (knee & (dfo > 60)))
+    knee = np.hypot(xx - cfg['kn'][0], yy - cfg['kn'][1]) < 50
+    mask = fig & below & ~bag & (((dth <= dca) & (dth <= dfo)) | (knee & (dfo > 38)))
     mask = ndi.binary_opening(mask, iterations=2)
     lb, nn = ndi.label(mask)
     if nn > 1:
         mask = lb == (np.argmax(ndi.sum(mask, lb, range(1, nn + 1))) + 1)
     mask = mask | (ndi.binary_dilation(mask, iterations=2) & ndi.binary_erosion(fig, iterations=3) & ~bag & below)
+    G = G.copy(); alpha = alpha.copy()
+    mask = under_bag(mask, bag, fig, below, G.copy(), G, alpha)
     a = ndi.gaussian_filter(mask.astype(float), 0.8) * np.where(mask, alpha, 0)
     f = S * scale
     out = {}
