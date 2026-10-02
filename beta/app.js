@@ -212,7 +212,7 @@ let exBodyMapOpen = (() => { try { const v = localStorage.getItem('pinchobeta_bo
 function exBodyMapIsOpen(useRecents) {
   return exBodyMapOpen ?? !(useRecents && recentExerciseIds(1).length);
 }
-function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll) {
+function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll, dice = false) {
   list = list.filter((e) => !e.hidden);
   const muscleLabel = muscle ? (MUSCLE_ZONE_LABEL[muscle] || muscle) : '';
   const mapOpen = exBodyMapIsOpen(useRecents) || !!muscle;
@@ -221,6 +221,7 @@ function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents,
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input type="search" class="ex-search-input" placeholder="Übung suchen …" aria-label="Übung suchen" value="${esc(query || '')}">
     </label>
+    ${dice ? '<div class="ex-dice-row"><button type="button" class="btn ghost small ex-dice-btn" id="ex-dice-btn" title="Zufällige Übung aus dem gewählten Bereich">🎲 Übung würfeln</button></div><div id="ex-dice-result"></div>' : ''}
     <button type="button" class="ex-body-toggle" id="ex-body-toggle" aria-expanded="${mapOpen}">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 10l4 2 4-2M10 21l2-6 2 6"/></svg>
       ${mapOpen ? 'Körperkarte ausblenden' : 'Nach Muskel wählen'}
@@ -343,7 +344,22 @@ function showExerciseInfoSheet(exerciseId, onChange) {
    früher (getrennte HTML-Erzeugung + Verdrahtung) muss diese Funktion beim
    Wechsel der Körperregion sich selbst neu aufrufen können, da sich dabei
    die sichtbare Übungsliste komplett ändert. */
-function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, scrollTargetId, useRecents = true) {
+/* Übung würfeln (nur Freestyle): zufällig aus dem gewählten Muskel bzw.
+   Bereich, sonst aus allem ausser Stretch; heute schon gemachte Übungen
+   (excludeIds) und der letzte Wurf fallen raus. Nur ein Vorschlag —
+   erst "Übernehmen" wählt die Übung aus. */
+function rollExercise(list, sg, muscle, excludeIds, lastId) {
+  let pool = list.filter((e) => !e.hidden);
+  if (muscle) pool = pool.filter((e) => e.muscles && e.muscles.primary.includes(muscle));
+  else if (sg) pool = pool.filter((e) => exerciseSupergroup(e) === sg);
+  else pool = pool.filter((e) => exerciseSupergroup(e) !== 'stretch');
+  const fresh = pool.filter((e) => !excludeIds.includes(e.id));
+  if (fresh.length) pool = fresh;
+  if (pool.length > 1) pool = pool.filter((e) => e.id !== lastId);
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)].id : null;
+}
+
+function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, scrollTargetId, useRecents = true, opts = {}) {
   const holder = document.getElementById(containerId);
   if (!holder) return;
   let selectedId = initialSelectedId;
@@ -399,7 +415,31 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
     wireList();
   };
   const render = () => {
-    holder.innerHTML = exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll);
+    holder.innerHTML = exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll, !!opts.dice);
+    const diceBtn = holder.querySelector('#ex-dice-btn');
+    if (diceBtn) {
+      let lastRoll = null;
+      const roll = () => {
+        const id = rollExercise(list, sg, muscle, opts.excludeIds ? opts.excludeIds() : [], lastRoll);
+        const out = holder.querySelector('#ex-dice-result');
+        if (!id) { out.innerHTML = '<p class="login-hint">Hier gibt es nichts zu würfeln.</p>'; return; }
+        lastRoll = id;
+        const ex = list.find((e) => e.id === id);
+        const where = muscle ? (MUSCLE_ZONE_LABEL[muscle] || muscle) : EX_SUPERGROUP_LABEL[exerciseSupergroup(ex)] || '';
+        out.innerHTML = `
+          <div class="ex-dice-card">
+            <span class="ex-dice-label">🎲 Vorschlag${where ? ' · ' + esc(where) : ''}</span>
+            <b class="ex-dice-name">${esc(ex.name)}</b>
+            <div class="ex-dice-actions">
+              <button type="button" class="btn small" id="ex-dice-take">Übernehmen</button>
+              <button type="button" class="btn ghost small" id="ex-dice-again">Nochmal 🎲</button>
+            </div>
+          </div>`;
+        out.querySelector('#ex-dice-take').onclick = () => { selectedId = id; out.innerHTML = ''; onSelect(id); };
+        out.querySelector('#ex-dice-again').onclick = roll;
+      };
+      diceBtn.onclick = roll;
+    }
     holder.querySelectorAll('.body-zone').forEach((el) => {
       el.onclick = () => {
         const m = el.dataset.muscle;
@@ -429,6 +469,8 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
     setSearching(!!query);
     search.onfocus = () => {
       setSearching(true);
+      // Steht schon etwas drin: markieren, damit Tippen es direkt ersetzt
+      if (search.value) search.select();
       setTimeout(() => {
         // Feld knapp unter die feste Kopfzeile holen (scrollIntoView landete dahinter)
         const bar = document.querySelector('.topbar');
@@ -1101,6 +1143,19 @@ function showFabStart(label, targetId) {
    unter dem Daumen, statt die kleine Box in der Liste suchen zu müssen.
    Nur die Eingabe von Gewicht/Wdh. bleibt in der Karte der Übung (unten
    würde die Tastatur sie verdecken). Inhalt baut renderFsPanel(). */
+/* Workout-Uhr: gesamte Trainingszeit seit Start der Session (sessionStartedAt),
+   klein oben in der Leiste. Ein einziges Intervall aktualisiert sie, solange
+   sie im DOM steht — rechnet wie die Satz-Uhren aus der echten Uhrzeit. */
+function fmtSessionClock(startedAt) {
+  const sec = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+setInterval(() => {
+  const el = document.getElementById('fs-session-clock');
+  const b = el && activeSetBuilder();
+  if (b && b.sessionStartedAt) el.textContent = `⏱ ${fmtSessionClock(b.sessionStartedAt)}`;
+}, 1000);
 function ensureFsDock() {
   let el = document.getElementById('fs-dock');
   if (!el) {
@@ -1338,7 +1393,7 @@ function lastValueForExercise(exerciseId) {
       if (Array.isArray(ex.sets)) {
         if (ex.sets.length) {
           const last = ex.sets[ex.sets.length - 1];
-          return { weight: last.weight, reps: last.reps };
+          return { weight: last.weight, reps: last.reps, note: last.note || '' };
         }
       } else if (ex.reps !== '' && ex.reps != null) {
         return { weight: ex.weight, reps: ex.reps };
@@ -2565,7 +2620,8 @@ function fbExerciseSetsText(ex) {
   if (Array.isArray(ex.sets)) {
     return ex.sets.map((s) => {
       const suffix = setUnitSuffix(ex.exerciseId, s);
-      return s.weight !== '' && s.weight != null ? `${s.weight}kg×${s.reps}${suffix}` : `${s.reps}${suffix}`;
+      const note = s.note ? ` (${s.note})` : '';
+      return (s.weight !== '' && s.weight != null ? `${s.weight}kg×${s.reps}${suffix}` : `${s.reps}${suffix}`) + note;
     }).join(', ');
   }
   const suffix = exerciseIsHold(ex.exerciseId) ? 's' : '';
@@ -2650,7 +2706,7 @@ function renderLogBuilderPanel() {
       // Zur aktiven Übung scrollen statt zu einer festen Stelle — das
       // Eingabefeld steht jetzt direkt bei ihr, nicht mehr fest oben.
       document.getElementById(`fs-group-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, null);
+    }, null, true, { dice: true, excludeIds: () => freestyleBuilder.exercises.filter((g) => g.sets && g.sets.length).map((g) => g.exerciseId) });
     renderFsPanel();
   } else if (logMode === 'execute') {
     holder.innerHTML = `
@@ -2827,6 +2883,8 @@ let fsPhase = 'idle';
 let fsWorkTimer = { seconds: 0, intervalId: null, startedAt: 0 };
 let fsRestTimer = { seconds: 0, intervalId: null, startedAt: 0 };
 let fsCapturedElapsed = 0;
+// Satz, zu dem die Notiz im Pausen-Screen gehört (zuletzt gespeicherter Satz)
+let fsNoteTarget = null;
 
 function updateFsWorkTimerUI() {
   const el = document.getElementById('fs-work-timer');
@@ -3024,7 +3082,8 @@ function fsSetSuggestion(g) {
   if (!last || last.reps === '' || last.reps == null) return '';
   const w = last.weight !== '' && last.weight != null ? `${String(last.weight).replace('.', ',')} kg × ` : '';
   const unit = (last.unit || 'reps') === 'time' ? ' s' : '';
-  return `${g.sets.length ? 'eben' : 'letztes Mal'} ${w}${last.reps}${unit}`;
+  const note = last.note ? ` · „${last.note}“` : '';
+  return `${g.sets.length ? 'eben' : 'letztes Mal'} ${w}${last.reps}${unit}${note}`;
 }
 function hideFsRestScreen() {
   const el = document.getElementById('fs-rest-screen');
@@ -3053,6 +3112,7 @@ function renderFsRestScreen(builder) {
   }).join('');
   const target = fsRestTargetSec();
   const extra = dock.querySelector('#fs-next-set') && primary.id === 'fs-next-exercise';
+  const noteSet = fsNoteTarget && builder.exercises[fsNoteTarget.gi] ? builder.exercises[fsNoteTarget.gi].sets[fsNoteTarget.si] : null;
   let el = document.getElementById('fs-rest-screen');
   const isNew = !el;
   if (!el) {
@@ -3079,6 +3139,8 @@ function renderFsRestScreen(builder) {
         <span>Ziel ${fmtMinSec(target)}</span>
         <button type="button" class="fs-rest-adj" data-rest-adj="15" aria-label="Pause 15 Sekunden länger">+15 s</button>
       </div>
+      ${noteSet ? `<label class="fs-rest-label fs-rest-note-label" for="fs-rest-note">Notiz zu ${esc(exerciseName(builder.exercises[fsNoteTarget.gi].exerciseId))} · Satz ${fsNoteTarget.si + 1}</label>` : ''}
+      ${noteSet ? `<input type="text" class="fs-rest-note" id="fs-rest-note" enterkeyhint="done" maxlength="80" placeholder="Notiz zum Satz, z. B. Untergriff, Sitz 4" value="${esc(noteSet.note || '')}">` : ''}
       <div class="fs-rest-next">
         <span class="fs-rest-label">${group.length > 1 ? `Runde ${builder.exercises[group[0]].sets.length + 1}` : 'Als Nächstes'}</span>
         ${lines}
@@ -3091,6 +3153,15 @@ function renderFsRestScreen(builder) {
     </div>`;
   if (isNew) el.querySelector('.fs-rest-card').style.animation = '';
   document.getElementById('fs-rest-go').onclick = () => { fsRestHidden = false; primary.click(); };
+  const noteInput = document.getElementById('fs-rest-note');
+  if (noteInput) {
+    noteInput.oninput = () => {
+      noteSet.note = noteInput.value.trim();
+      if (!noteSet.note) delete noteSet.note;
+      if (logMode === 'freestyle') saveDraft('freestyle', builder);
+    };
+    noteInput.onkeydown = (e) => { if (e.key === 'Enter') noteInput.blur(); };
+  }
   const ex = document.getElementById('fs-rest-extra');
   if (ex) ex.onclick = () => dock.querySelector('#fs-next-set')?.click();
   document.getElementById('fs-rest-switch').onclick = () => {
@@ -3132,6 +3203,7 @@ function renderFsPanel() {
     const head = `
       <div class="fs-dock-head mono">
         <span class="fs-dock-name">▸ ${esc(exerciseName(g.exerciseId))}</span>
+        ${builder.sessionStartedAt ? `<span class="fs-session-clock" id="fs-session-clock" title="Trainingszeit gesamt">⏱ ${fmtSessionClock(builder.sessionStartedAt)}</span>` : ''}
         ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-dock-add">+ Übung</button>` : ''}
       </div>`;
     if (fsPhase === 'idle') {
@@ -3285,6 +3357,7 @@ function renderFsPanel() {
           <input type="text" inputmode="numeric" class="ex-row-input" data-edit="${gi}:${si}:reps" value="${esc(String(s.reps))}" placeholder="${setIsHold ? 's' : 'Wdh'}" title="${setIsHold ? 'Dauer (s)' : 'Wiederholungen'}">
           <button type="button" class="ex-row-remove" data-remove-set="${gi}:${si}" title="Satz entfernen">×</button>
         </div>
+        ${s.note ? `<div class="fs-set-note">${esc(s.note)}</div>` : ''}
       `;
         }).join('') : '<div class="fs-set-row mono" style="color:var(--ink-faint);">noch keine Sätze</div>';
       })()}
@@ -3484,6 +3557,7 @@ function renderFsPanel() {
       setTimeout(() => {
         const unit = exerciseUnit(builder.exercises[builder.activeIndex].exerciseId);
         builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps, elapsedSec: fsCapturedElapsed, unit });
+        fsNoteTarget = { gi: builder.activeIndex, si: builder.exercises[builder.activeIndex].sets.length - 1 };
         // Supersatz: ohne Pause weiter zur nächsten Übung der Runde; Pause erst nach der letzten
         const mem = supersetMembers(builder.exercises, builder.activeIndex);
         const nextInRound = mem.find((j) => j > builder.activeIndex && !(logMode === 'execute' && fsExerciseDone(builder.exercises[j])));
@@ -7933,6 +8007,27 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="99" cy="60" r="5.5"/>
     </g>
   ` },
+  dip_machine: { kind: 'dynamic', caption: 'Seitenansicht, sitzend an der Maschine · Griffe neben dem Körper, Arme drücken nach unten durch', svg: `
+    <line class="fig-rig" x1="80" y1="142" x2="150" y2="142"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="55" r="14"/>
+      <line x1="97" y1="69" x2="99" y2="140"/>
+      <line x1="99" y1="140" x2="150" y2="140"/>
+      <line x1="150" y1="140" x2="152" y2="192"/>
+    </g>
+    <circle class="fig-joint" cx="98" cy="80" r="5"/>
+    <path class="fig-motion" d="M104,100 L104,128"/>
+    <polygon class="fig-arrow" points="104,134 98,122 110,122"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.9s;">
+      <line x1="98" y1="80" x2="74" y2="106"/>
+      <line x1="74" y1="106" x2="94" y2="104"/>
+      <circle class="fig-joint fig-hi" cx="94" cy="104" r="5"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.9s;">
+      <line x1="98" y1="80" x2="92" y2="132"/>
+      <circle class="fig-joint fig-hi" cx="92" cy="132" r="5"/>
+    </g>
+  ` },
   pullover_machine: { kind: 'dynamic', caption: 'Seitenansicht, sitzend an der Maschine · Arme ziehen von oben nach unten vor dem Körper, Ellbogen leicht gebeugt', svg: `
     <line class="fig-rig" x1="99" y1="196" x2="99" y2="150"/>
     <g class="fig-pose fig-fixed">
@@ -8233,7 +8328,7 @@ const SLOTH_EXERCISE_POSES = {
   leg_press: 'legpress', leg_extension: 'legext', leg_curl_lying: 'legcurl', butterfly: 'pecdeck',
   reverse_butterfly: 'reversefly', hip_abduction_machine: 'abduction', hip_adduction_machine: 'abduction',
   hip_abduction_cable: 'abductioncable', calf_raise_seated: 'calfseated', calf_raise_machine: 'calfmachine',
-  back_extension: 'backext', pullover_machine: 'pullovermachine', t_bar_row: 'tbarrow', ab_wheel_rollout: 'abwheel',
+  back_extension: 'backext', pullover_machine: 'pullovermachine', dip_machine: 'dipmachine', t_bar_row: 'tbarrow', ab_wheel_rollout: 'abwheel',
   jump_rope: 'jumprope', agility_ladder_run: 'ladder', zercher_squat_rotation: 'goblet', carioca: 'shuffle',
   russian_twist: 'russian', hip_9090: 'ninety', frog_stretch: 'frog', ext_rotation: 'extrot',
   tibialis_raise: 'tibialis', wrist_curl: 'wristcurl', wrist_ext: 'wristcurl', wrist_mobility: 'wristmob',

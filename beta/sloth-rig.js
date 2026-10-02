@@ -711,6 +711,13 @@ const SLOTH_POSES = {
     a: { torso: -104, uarm: -110, farm: -110, thigh: -4, calf: 92 },
     b: { torso: -104, uarm: 70, farm: 70, thigh: -4, calf: 92 },
   },
+  dipmachine: {
+    // Wie Dips (gleiche Armstellungen), aber sitzend: a = Arme durchgestreckt, b = Ellbogen gebeugt
+    view: 'side', pin: 'hip', dur: 2.6, floor: 230, grip: 'fist', label: 'Dip-Maschine sitzend',
+    props: [{ img: 'stack', at: [-250, 230], a: [346, 652], k: 2.4, layer: 'back' }, { img: 'bench', at: [-40, 22], a: [442, 422], k: 1.6, layer: 'back' }],
+    a: { torso: -96, uarm: 100, farm: 98, hand: 0, thigh: -4, calf: 92 },
+    b: { torso: -96, uarm: 170, farm: 80, hand: 0, thigh: -4, calf: 92 },
+  },
   abwheel: {
     view: 'side', pin: 'knee', dur: 3, floor: 30, grip: 'fist', label: 'Ab Wheel Rollout',
     props: [{ img: 'plate', at: 'grip', k: 0.8 }],
@@ -1122,7 +1129,7 @@ const SLOTH_EFFORT_THRESHOLD = 0.8;
 /* Tempo wie im Training statt Gleichtakt: kraftvoll hin (konzentrisch), kurz halten, langsam zurück.
    SLOTH_ECC_AB: Übungen, bei denen a -> b das Absenken ist (dort a -> b langsam, b -> a zügig). */
 const SLOTH_ECC_AB = new Set(['pushup', 'squat', 'splitsquat', 'lunge', 'goblet', 'sumosquat', 'benchpress', 'dbbench', 'inclinebench',
-  'declinebench', 'skullcrusher', 'dbpullover', 'dips', 'rdl', 'abwheel']);
+  'declinebench', 'skullcrusher', 'dbpullover', 'dips', 'dipmachine', 'rdl', 'abwheel']);
 const SLOTH_NO_TEMPO = new Set(['hang', 'hang1l', 'hang1r', 'flex', 'wave', 'pinlift', 'sideplank', 'frontlever']);
 const SLOTH_KEYS_CON = [[0, 0], [0.3, 1], [0.42, 1], [0.92, 0], [1, 0]];
 const SLOTH_KEYS_ECC = [[0, 0], [0.5, 1], [0.58, 1], [0.9, 0], [1, 0]];
