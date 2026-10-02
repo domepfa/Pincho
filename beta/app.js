@@ -4982,6 +4982,165 @@ function renderCampusAddPanel(holder) {
   };
 }
 
+/* ---------- Würfeln am Board ----------
+   Ein Satz (füllt nur das Formular, Hinzufügen wie gewohnt) oder ein ganzer
+   Ablauf (Vorschau, erst "Übernehmen" ersetzt den Ablauf). Sicherheit:
+   gewürfelt wird nach Schwierigkeitsstufe — am Anfang nur grosse Griffe,
+   kleine Leisten/Taschen erst nach ein paar Sätzen, Monos nie. */
+const FB_DICE_TIER = {
+  jug: 0, edge_large: 0, sloper_easy: 0,
+  edge_medium: 1, sloper_medium: 1, pocket3: 1, pocket3_deep: 1, pocket2_deep: 1, edge3: 1,
+  edge_small: 2, pocket3_small: 2, pocket2: 2, pocket2_offset: 2, sloper_hard: 2,
+  edge_xsmall: 3, pocket2_small: 3,
+};
+const FB_DICE_CAMPUS_TIER = { rundleiste_gross: 0, leiste_gross: 0, leiste_35: 1, kugel_gross: 1, leiste_27: 2, kugel_klein: 2, leiste_19: 3 };
+// Sprossenfolgen (Stationen), vom Leichten zum Schweren
+const FB_DICE_CAMPUS_ROUTES = [
+  [[1, 2, 3, 4], [1, 3, 5]],
+  [[1, 3, 5, 7], [1, 4, 7], [1, 2, 3, 4, 5, 6]],
+  [[1, 4, 7, 9], [1, 3, 5, 7, 9], [1, 5, 8]],
+  [[1, 5, 9], [1, 4, 7, 10], [1, 4, 2, 5, 3, 6]],
+];
+let fbDice = { what: 'set', kind: 'hang', len: 15, preview: null };
+const diceInt = (min, max, step = 1) => min + step * Math.floor(Math.random() * (Math.floor((max - min) / step) + 1));
+const dicePick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+// Höchste erlaubte Stufe je nach Anzahl Arbeitssätze davor
+const fbDiceMaxTier = (workBefore) => (workBefore < 2 ? 1 : workBefore < 4 ? 2 : 3);
+
+/* Letzter Hang-Satz an diesem Griff aus dem Verlauf (für Hängezeit/Sätze) */
+function fbDiceLastHang(board, grip) {
+  for (const sn of fbSessionsCache) {
+    const b = (sn.blocks || []).find((x) => x.type === 'hang' && x.board === board && x.grip === grip);
+    if (b) return b;
+  }
+  return null;
+}
+function fbDiceHang(board, maxTier, lastGrip, warm = false) {
+  // Einarmige Griffe nie würfeln — einarmig hängen ist zu hart für einen Zufallsvorschlag
+  const grips = BOARDS[board].grips.filter((g) => FB_DICE_TIER[g.id] != null && FB_DICE_TIER[g.id] <= maxTier && g.id !== lastGrip && gripArmNote(board, g.id) !== 'einarmig');
+  // Aufwärmen: grosse Griffe bevorzugen; danach schwerere Stufen etwas bevorzugen (sonst fast nur Aufwärmgriffe)
+  const weighted = grips.flatMap((g) => Array(warm ? 2 - FB_DICE_TIER[g.id] : FB_DICE_TIER[g.id] + 1).fill(g));
+  const g = dicePick(weighted.length ? weighted : BOARDS[board].grips.filter((x) => FB_DICE_TIER[x.id] === 0 && gripArmNote(board, x.id) !== 'einarmig'));
+  const tier = FB_DICE_TIER[g.id] ?? 1;
+  const last = fbDiceLastHang(board, g.id);
+  const [lo, hi] = [[8, 12], [7, 10], [6, 10], [5, 8]][tier];
+  const hangSec = last ? Math.min(hi + 2, Math.max(lo, last.hangSec + diceInt(-1, 1))) : diceInt(lo, hi);
+  const b = { type: 'hang', board, grip: g.id, reps: diceInt(2, 4), hangSec, restSec: diceInt(30, 60, 15), blockRestSec: diceInt(90, 150, 30) };
+  return b;
+}
+function fbDiceCampus(maxTier) {
+  maxTier = Math.max(0, maxTier);
+  const types = CAMPUS_RUNG_TYPES.filter((t) => (FB_DICE_CAMPUS_TIER[t.id] ?? 1) <= maxTier);
+  const t = dicePick(types.length ? types : CAMPUS_RUNG_TYPES);
+  const routeTier = Math.min(maxTier, FB_DICE_CAMPUS_ROUTES.length - 1);
+  const stops = dicePick(FB_DICE_CAMPUS_ROUTES[diceInt(0, routeTier)]);
+  return { rungType: t.id, stops, reps: diceInt(3, 5), workSec: 3, restSec: diceInt(15, 30, 15), blockRestSec: diceInt(90, 150, 30) };
+}
+function fbDiceCampusBlock(maxTier) {
+  const d = fbDiceCampus(maxTier);
+  const c = { ...fb.newCampus, rungType: d.rungType, rungSides: 'same', armMode: 'both', reps: d.reps, workSec: d.workSec, restSec: d.restSec, blockRestSec: d.blockRestSec };
+  campusSetStops(c, d.stops);
+  const out = { type: 'campus', ...c, pattern: (c.pattern || []).slice() };
+  delete out.rungSides; delete out.pickHand; delete out.routeFresh; delete out.hands; delete out.skipEnd; delete out.rungTypeRight;
+  return out;
+}
+/* Ganzer Ablauf: Aufwärmen auf grossen Griffen, dann ansteigend, bis die Ziellänge erreicht ist */
+function fbDiceAblauf(kind, minutes) {
+  const board = fb.board || currentMemberBoard();
+  const blocks = [];
+  let work = 0, lastGrip = null;
+  const total = () => blocks.reduce((sum, b) => sum + fbBlockSeconds(b), 0);
+  while (total() < minutes * 60 && blocks.length < 30) {
+    const campusTurn = kind === 'campus' ? work >= 1 : kind === 'mix' ? work >= 2 && work % 2 === 1 : false;
+    let b;
+    if (campusTurn) b = fbDiceCampusBlock(fbDiceMaxTier(work) - 1);
+    else { b = fbDiceHang(board, fbDiceMaxTier(work), lastGrip, work < 2); lastGrip = b.grip; }
+    blocks.push(b);
+    work++;
+  }
+  return blocks;
+}
+function fbDiceSet() {
+  const workBefore = fb.blocks.filter((b) => b.type !== 'pause').length;
+  const maxTier = fbDiceMaxTier(workBefore);
+  if (fbDice.kind === 'campus') {
+    const d = fbDiceCampus(maxTier);
+    const c = fb.newCampus;
+    Object.assign(c, { rungType: d.rungType, rungSides: 'same', reps: d.reps, workSec: d.workSec, restSec: d.restSec, blockRestSec: d.blockRestSec });
+    campusSetStops(c, d.stops);
+    fb.addType = 'campus';
+  } else {
+    const b = fbDiceHang(fb.board, maxTier, fb.selectedGrip);
+    fb.addType = 'hang';
+    fb.gripMode = 'same';
+    fb.selectedGrip = b.grip;
+    Object.assign(fb.newHang, { reps: b.reps, hangSec: b.hangSec, restSec: b.restSec, blockRestSec: b.blockRestSec });
+  }
+  document.querySelectorAll('[data-add-type]').forEach((x) => x.classList.toggle('active', x.dataset.addType === fb.addType));
+  const wf = document.getElementById('fb-weight-field');
+  if (wf) wf.hidden = false;
+  renderFbAddPanel();
+}
+function openFbDiceSheet() {
+  let el = document.getElementById('fb-dice-sheet');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fb-dice-sheet';
+    el.className = 'info-sheet-backdrop';
+    document.body.appendChild(el);
+    el.onclick = (e) => { if (e.target === el) el.remove(); };
+    wireSheetSwipeDown(el, () => el.remove());
+  }
+  const d = fbDice;
+  const chip = (attr, val, cur, label) => `<button type="button" class="chip ${val === cur ? 'active' : ''}" data-${attr}="${val}">${label}</button>`;
+  const totalSec = d.preview ? d.preview.reduce((sum, b) => sum + fbBlockSeconds(b), 0) : 0;
+  el.innerHTML = `
+    <div class="info-sheet-card fb-dice-card">
+      <div class="fs-rest-grip" aria-hidden="true"></div>
+      <h3 class="fb-dice-title">🎲 Würfeln</h3>
+      <div class="chip-row">${chip('dice-what', 'set', d.what, 'Ein Satz')}${chip('dice-what', 'ablauf', d.what, 'Ganzer Ablauf')}</div>
+      <label class="fs-rest-label fb-dice-label">Art</label>
+      <div class="chip-row">${chip('dice-kind', 'hang', d.kind, 'Board')}${chip('dice-kind', 'campus', d.kind, 'Campus')}${d.what === 'ablauf' ? chip('dice-kind', 'mix', d.kind, 'Mix') : ''}</div>
+      ${d.what === 'ablauf' ? `<label class="fs-rest-label fb-dice-label">Länge</label>
+      <div class="chip-row">${chip('dice-len', '15', String(d.len), '~15 min')}${chip('dice-len', '30', String(d.len), '~30 min')}</div>` : ''}
+      ${d.what === 'ablauf' && d.preview ? `
+        <div class="fb-dice-preview">
+          <span class="fs-rest-label">${d.preview.length} Sätze · ~${fmtMinSec(totalSec)}</span>
+          <ol>${d.preview.map((b) => `<li>${fbBlockTitle(b)} <small>${b.type === 'campus' ? `${b.reps}×` : `${b.reps}× ${b.hangSec}s`}</small></li>`).join('')}</ol>
+          ${fb.blocks.length ? '<p class="login-hint">Übernehmen ersetzt den aktuellen Ablauf.</p>' : ''}
+        </div>
+        <div class="fb-dice-actions">
+          <button type="button" class="btn" id="fb-dice-take">Übernehmen</button>
+          <button type="button" class="btn ghost" id="fb-dice-roll">Nochmal 🎲</button>
+        </div>` : `<button type="button" class="btn fb-dice-go" id="fb-dice-roll">🎲 Würfeln</button>`}
+      ${d.what === 'set' ? '<p class="login-hint">Der Satz landet im Formular — dort wie gewohnt hinzufügen.</p>' : ''}
+    </div>`;
+  el.querySelectorAll('[data-dice-what]').forEach((b) => { b.onclick = () => { d.what = b.dataset.diceWhat; if (d.what === 'set' && d.kind === 'mix') d.kind = 'hang'; d.preview = null; openFbDiceSheet(); }; });
+  el.querySelectorAll('[data-dice-kind]').forEach((b) => { b.onclick = () => { d.kind = b.dataset.diceKind; d.preview = null; openFbDiceSheet(); }; });
+  el.querySelectorAll('[data-dice-len]').forEach((b) => { b.onclick = () => { d.len = Number(b.dataset.diceLen); d.preview = null; openFbDiceSheet(); }; });
+  el.querySelector('#fb-dice-roll').onclick = () => {
+    if (d.what === 'set') {
+      el.remove();
+      fbDiceSet();
+      document.getElementById('fb-add-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    d.preview = fbDiceAblauf(d.kind, d.len);
+    openFbDiceSheet();
+  };
+  const take = el.querySelector('#fb-dice-take');
+  if (take) take.onclick = () => {
+    fb.blocks = d.preview;
+    d.preview = null;
+    const picker = document.getElementById('fb-template-picker');
+    if (picker) picker.value = '';
+    el.remove();
+    renderFbBlocksList();
+    document.getElementById('fb-blocks-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    toast('Gewürfelter Ablauf übernommen', 'ok');
+  };
+}
+
 async function renderFingerboard() {
   if (!fb.board) fb.board = currentMemberBoard();
 
@@ -4997,7 +5156,10 @@ async function renderFingerboard() {
 
     <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Eigenen Ablauf bauen</h2><div class="sec-rule"></div></div>
 
-    <button type="button" class="btn" id="fb-new-ablauf" style="width:100%;margin-bottom:12px;">＋ Neuer Ablauf</button>
+    <div class="fb-new-row">
+      <button type="button" class="btn" id="fb-new-ablauf">＋ Neuer Ablauf</button>
+      <button type="button" class="btn ghost fb-dice-open" id="fb-dice-open" title="Satz oder Ablauf würfeln" aria-label="Würfeln">🎲</button>
+    </div>
 
     <div class="chip-row fb-addtype-row">
       <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Board</button>
@@ -5072,6 +5234,7 @@ async function renderFingerboard() {
     };
   });
   document.getElementById('fb-weight').oninput = (e) => { fb.weight = e.target.value; };
+  document.getElementById('fb-dice-open').onclick = openFbDiceSheet;
   document.getElementById('fb-new-ablauf').onclick = () => {
     if (fb.blocks.length && !confirm('Aktuellen Ablauf verwerfen und ganz neu (leer) beginnen?')) return;
     fb.blocks = [];
@@ -10711,20 +10874,42 @@ function bestSetOf(exerciseId, sets) {
    Wiederholungen): pro Einheit die im Check-in erfassten Wdh./Gewichte als
    "Sätze" — so lässt sich derselbe bestSetOf-Vergleich wie im Gym nutzen. */
 const PG_BLOCK_ID = '__liftingpin';
+/* Hangs zählen als eigene "Übung" je Griff (id grip:<board>:<griff>), Wert =
+   Hängezeit bzw. Zusatzgewicht der Einheit. Übungen ohne Eingabe im Check-in
+   zählen mit den geplanten Wdh., sobald der Satz erreicht wurde (bzw. bei
+   ganz abgeschlossenen Einheiten auch ohne gespeichertes Ergebnis). */
+const PG_GRIP_PREFIX = 'grip:';
 function boardExerciseSets(sn) {
   const out = {};
   (sn.blocks || []).forEach((b, i) => {
     const r = (sn.results || [])[i];
-    if (!r || r.reps === '' || r.reps == null) return;
+    const reached = !!r || !sn.partial;
+    if (!reached) return;
+    if (b.type === 'hang' && b.grip) {
+      const done = r && Array.isArray(r.doneReps) ? r.doneReps.filter(Boolean).length : Number(b.reps) || 0;
+      if (!done) return;
+      const id = `${PG_GRIP_PREFIX}${b.board || sn.board}:${b.grip}`;
+      (out[id] = out[id] || []).push({ reps: Number(b.hangSec) || 0, weight: Number(sn.weight) || '', unit: 'time' });
+      return;
+    }
     let id = null;
-    if (b.type === 'exercise' && r.type === 'exercise') id = b.exerciseId;
+    if (b.type === 'exercise' && !['warmup_general', 'cooldown_general'].includes(b.exerciseId)) id = b.exerciseId;
     else if (b.type === 'block' && b.mode === 'reps') id = PG_BLOCK_ID;
     if (!id) return;
-    (out[id] = out[id] || []).push({ reps: r.reps, weight: r.weight });
+    const entered = r && r.reps !== '' && r.reps != null;
+    // Halte-Übung ohne Eingabe: geplante Dauer statt "1 Wdh."
+    if (!entered && id !== PG_BLOCK_ID && exerciseIsHold(id)) { (out[id] = out[id] || []).push({ reps: b.workSec, weight: '', unit: 'time' }); return; }
+    const reps = entered ? r.reps : b.reps;
+    if (reps === '' || reps == null) return;
+    (out[id] = out[id] || []).push({ reps, weight: r ? r.weight : '' });
   });
   return out;
 }
 function progressExerciseName(id) {
+  if (id.startsWith(PG_GRIP_PREFIX)) {
+    const [board, grip] = id.slice(PG_GRIP_PREFIX.length).split(':');
+    return `Hang ${gripLabel(board, grip)}${board === 'bm1000' ? ' (BM 1000)' : ''}`;
+  }
   return id === PG_BLOCK_ID ? 'Lifting Pin (Wiederholungen)' : exerciseName(id);
 }
 /* Alle Übungen der gewählten Quelle (Gym-Logs bzw. Board-Einheiten). */
@@ -10761,8 +10946,10 @@ function progressOverviewHtml(exIds, days) {
     const pts = progressSeries(id, days);
     const last = pts[pts.length - 1];
     let change = '<span class="pg-muted">—</span>';
-    if (pts.length >= 2 && pts[0].value) {
-      const pct = Math.round(((last.value - pts[0].value) / pts[0].value) * 100);
+    // Nur Gleiches vergleichen: mit Gewicht (kg) gegen mit Gewicht, sonst Wdh./Sekunden
+    const first = pts.find((p) => (p.w > 0) === (last.w > 0));
+    if (pts.length >= 2 && first && first !== last && first.value) {
+      const pct = Math.round(((last.value - first.value) / first.value) * 100);
       change = `<span class="${pct > 0 ? 'up' : pct < 0 ? 'down' : ''}">${pct > 0 ? '+' : ''}${pct} %</span>`;
     }
     return `<button type="button" class="pg-ex-row ${id === progressExerciseId ? 'active' : ''}" data-pg-ex="${esc(id)}">
@@ -11211,15 +11398,18 @@ async function renderProgress() {
 function drawProgress() {
   const root = document.getElementById('pg-root');
   if (!root) return;
-  const exIds = progressExerciseIds(progressSource);
-  if (!progressExerciseId || !exIds.includes(progressExerciseId)) progressExerciseId = exIds[0] || null;
   const days = PROGRESS_RANGES.find((r) => r[0] === progressRange)[2];
+  // Nur Übungen, die im gewählten Zeitraum wirklich gemacht wurden (keine "nicht im Zeitraum"-Zeilen)
+  const exIds = progressExerciseIds(progressSource).filter((id) => progressSeries(id, days).length);
+  if (!progressExerciseId || !exIds.includes(progressExerciseId)) progressExerciseId = exIds[0] || null;
   const pts = progressExerciseId ? progressSeries(progressExerciseId, days) : [];
   let headline = '';
-  if (pts.length >= 2) {
-    const first = pts[0].value, last = pts[pts.length - 1].value;
+  const lastPt = pts[pts.length - 1];
+  const firstPt = lastPt && pts.find((p) => (p.w > 0) === (lastPt.w > 0)); // nur Gleiches vergleichen (kg mit kg)
+  if (pts.length >= 2 && firstPt && firstPt !== lastPt) {
+    const first = firstPt.value, last = lastPt.value;
     const pct = first ? Math.round(((last - first) / first) * 100) : 0;
-    headline = `<div class="pg-hero"><span class="pg-hero-num ${pct >= 0 ? 'up' : 'down'}">${pct > 0 ? '+' : ''}${pct} %</span><span class="pg-hero-sub">${esc(pts[0].label)} → ${esc(pts[pts.length - 1].label)}</span></div>`;
+    headline = `<div class="pg-hero"><span class="pg-hero-num ${pct >= 0 ? 'up' : 'down'}">${pct > 0 ? '+' : ''}${pct} %</span><span class="pg-hero-sub">${esc(firstPt.label)} → ${esc(lastPt.label)}</span></div>`;
   }
   const isNewPr = pts.length >= 2 && pts[pts.length - 1].value > Math.max(...pts.slice(0, -1).map((p) => p.value));
   const stats = progressStats();
@@ -11262,7 +11452,7 @@ function drawProgress() {
       ${exIds.length ? `<p class="pg-ex-current">${esc(progressExerciseName(progressExerciseId))}</p>` : ''}
       ${isNewPr ? `<div class="pg-pr-wrap">${slothFigure('flex', 'pg-pr-sloth')}<div class="pg-pr">Neuer Rekord: <b>${esc(pts[pts.length - 1].label)}</b></div></div>` : ''}
       ${headline}
-      ${exIds.length ? progressLineChart('pg-ex', pts, 'Bester Satz je Training') : `<div class="list-empty">${progressSource === 'board' ? 'Noch keine Übungen im Board-Ablauf erfasst (Wdh./Gewicht im Check-in).' : 'Noch keine Gym-Sätze geloggt.'}</div>`}
+      ${exIds.length ? progressLineChart('pg-ex', pts, 'Bester Satz je Training') : `<div class="list-empty">${progressExerciseIds(progressSource).length ? 'In diesem Zeitraum nichts trainiert — längeren Zeitraum wählen.' : progressSource === 'board' ? 'Noch keine Board-Einheit gespeichert.' : 'Noch keine Gym-Sätze geloggt.'}</div>`}
       ${exIds.length && pts.length ? cycleLegendHtml() : ''}
       ${exIds.length ? progressOverviewHtml(exIds, days) : ''}
     </div>
