@@ -1902,7 +1902,7 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 #duel .score { flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; }
 #duel .score .p { display: flex; align-items: center; gap: 6px; font-size: 15px; }
 #duel .score .p i { width: 10px; height: 10px; border-radius: 50%; }
-#duel .score .pts { font: 700 26px 'Barlow Condensed', sans-serif; }
+#duel .score .pts { font: 700 22px 'Barlow Condensed', sans-serif; white-space: nowrap; }
 #duel .score .colon { color: var(--faint); font-size: 20px; }
 #duel .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; font-size: 16px; flex: none; }
 #duel .speed { font-size: 12px; font-weight: 700; padding: 0 10px; height: 28px; border-radius: 14px; border: 1px solid var(--line); color: var(--faint); flex: none; }
@@ -1973,3 +1973,6 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 #duel td.c, #duel th.c { text-align: center; }
 #duel .winner { text-align: center; }
 #duel .winner b { display: block; font: 700 48px 'Barlow Condensed', sans-serif; line-height: 1; }
+#duel .duel-totals { display: flex; justify-content: center; gap: 28px; margin-top: 8px; }
+#duel .duel-totals b { display: block; font: 700 48px 'Barlow Condensed', sans-serif; line-height: 1; }
+#duel .duel-totals span { font-size: 15px; color: var(--dim); }

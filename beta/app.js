@@ -5145,8 +5145,10 @@ function openFbDiceSheet() {
    Vollbild über der App, aus beta/entwurf-wuerfelspiel.html übernommen.
    Ablauf je Runde: gemeinsamen Griff würfeln (wird jede Runde kleiner,
    keine Monos/einarmigen Griffe), dann würfelt jeder dem anderen die
-   Hängezeit; gehalten = 1 Punkt, Gleichstand: mehr Sekunden gewinnt.
-   Zwischen den eigenen Hangs mindestens 90 s Pause. Wird nicht gespeichert. */
+   Hängezeit. Kein Sieger — gezählt wird die gehaltene Zeit ("wer länger
+   hängt, hat Kraft gewonnen"). Zwischen den eigenen Hangs mindestens 90 s
+   Pause. Die eigenen Hangs (Spieler 1 = angemeldete Person) landen als
+   Board-Einheit (templateId 'duel') im Verlauf und im Fortschritt. */
 function openDuel() {
   if (document.getElementById('duel')) return;
   const root = document.createElement('div');
@@ -5205,7 +5207,7 @@ function topBar(showRound = true) {
       <button class="icon-btn" id="quit" aria-label="Beenden">✕</button>
       <div class="score">
         <span class="p"><i style="background:var(--pa)"></i>${esc(g.names[0])}</span>
-        <span class="pts">${g.score[0]}</span><span class="colon">:</span><span class="pts">${g.score[1]}</span>
+        <span class="pts">${g.held[0]} s</span><span class="colon">·</span><span class="pts">${g.held[1]} s</span>
         <span class="p">${esc(g.names[1])}<i style="background:var(--pb)"></i></span>
       </div>
       <span style="width:40px;flex:none"></span>
@@ -5254,7 +5256,7 @@ function setup() {
     <div class="field"><label>Hängezeit</label><div class="chips">${[[5, 10], [6, 12], [8, 15]].map(([a, b]) => `<button class="chip ${g.min === a ? 'on' : ''}" data-range="${a}-${b}">${a}–${b} s</button>`).join('')}</div></div>
     <ul class="rules">
       <li>Am Anfang grosse Griffe, jede Runde wird es kleiner.</li>
-      <li>Gehalten = 1 Punkt. Gleichstand: mehr Sekunden gewinnt.</li>
+      <li>Jede gehaltene Sekunde zählt. Deine Hängezeit (Spieler 1) landet im Fortschritt.</li>
       <li>Zwischen deinen Hangs mindestens ${REST_SEC} s Pause.</li>
     </ul>
     <div class="actions"><button class="btn" id="go">Los geht's</button></div>`;
@@ -5370,7 +5372,7 @@ function hang() {
     g.lastHangEnd[i] = now();
     g.held[i] += heldSec;
     if (ok) g.score[i]++;
-    g.log.push({ round: g.round, who: i, grip: g.grip.label, target, held: heldSec, ok });
+    g.log.push({ round: g.round, who: i, grip: g.grip.label, gripId: g.grip.id, target, held: heldSec, ok });
     buzz(ok ? [80, 60, 200] : 300);
     g.screen = 'result'; render();
   };
@@ -5394,7 +5396,7 @@ function result() {
   app.innerHTML = `${topBar()}
     <div class="main">
       <div class="result ${last.ok ? 'ok' : 'fail'}">
-        <b>${last.ok ? 'Gehalten! +1' : 'Losgelassen'}</b>
+        <b>${last.ok ? `Gehalten! ${last.held} s` : 'Losgelassen'}</b>
         <span>${esc(g.names[last.who])}: ${last.held} von ${last.target} s</span>
       </div>
     </div>
@@ -5408,8 +5410,7 @@ function result() {
 }
 
 function end() {
-  const [a, b] = g.score;
-  const w = a !== b ? (a > b ? 0 : 1) : g.held[0] !== g.held[1] ? (g.held[0] > g.held[1] ? 0 : 1) : -1;
+  saveDuel();
   const rows = [];
   for (let r = 0; r < g.rounds; r++) {
     const l = g.log.filter((x) => x.round === r);
@@ -5419,20 +5420,36 @@ function end() {
   }
   app.innerHTML = `${topBar(false)}
     <div class="main">
-      <div class="winner">${w < 0 ? '<b>Unentschieden</b>' : `<span>🏆 Sieg für</span><b style="color:var(--p${w ? 'b' : 'a'})">${esc(g.names[w])}</b>`}
-        <p class="who" style="font-size:14px;margin-top:6px">${a} : ${b} Punkte · ${g.held[0]} s : ${g.held[1]} s gehalten${a === b && w >= 0 ? ' (entscheidet)' : ''}</p></div>
+      <div class="winner"><span>💪 Gewonnen haben beide: Kraft</span>
+        <div class="duel-totals">${[0, 1].map((i) => `<div><b style="color:var(--p${i ? 'b' : 'a'})">${g.held[i]} s</b><span>${esc(g.names[i])}</span></div>`).join('')}</div>
+        <p class="who" style="font-size:14px;margin-top:6px">${g.saved ? 'Deine Hängezeit ist im Fortschritt gespeichert.' : ''}</p></div>
       <table><thead><tr><th>#</th><th>Griff</th><th class="c">${esc(g.names[0])}</th><th class="c">${esc(g.names[1])}</th></tr></thead><tbody>${rows.join('')}</tbody></table>
     </div>
     <div class="actions"><button class="btn" id="again">Revanche</button><button class="btn ghost" id="setup">Einstellungen</button></div>`;
-  document.getElementById('again').onclick = () => { Object.assign(g, { round: 0, turn: 0, grip: null, score: [0, 0], held: [0, 0], lastHangEnd: [0, 0], log: [] }); g.screen = 'grip'; render(); };
+  document.getElementById('again').onclick = () => { Object.assign(g, { round: 0, turn: 0, grip: null, score: [0, 0], held: [0, 0], lastHangEnd: [0, 0], log: [], saved: false }); g.screen = 'grip'; render(); };
   document.getElementById('setup').onclick = () => { g.screen = 'setup'; render(); };
 }
 
 
+  /* Eigene Hangs (Spieler 1) als Board-Einheit speichern — einmal pro Spiel,
+     auch beim vorzeitigen Schliessen; gehaltene Sekunden = Hängezeit. */
+  function saveDuel() {
+    if (g.saved) return;
+    const own = g.log.filter((l) => l.who === 0 && l.held > 0);
+    if (!own.length || !state.member) return;
+    g.saved = true;
+    const session = {
+      date: todayKey(), board: g.board, weight: 0, templateId: 'duel',
+      blocks: own.map((l) => ({ type: 'hang', board: g.board, grip: l.gripId, reps: 1, hangSec: l.held, restSec: 0, blockRestSec: 0 })),
+      results: own.map(() => ({ type: 'hang', doneReps: [true] })),
+      createdAt: Date.now(),
+    };
+    fbPush(`fingerboardSessions/${state.member.id}`, session).then(() => { if (document.getElementById('fb-history-list')) renderFbHistory(); });
+  }
   g.names = [(state.member && state.member.name) || 'Ich', 'Partner'];
   g.board = fb.board || currentMemberBoard();
   const onPop = () => { stop(); root.remove(); releaseWakeLock(); window.removeEventListener('popstate', onPop); };
-  const close = () => { onPop(); if (history.state && history.state.duel) history.back(); };
+  const close = () => { saveDuel(); onPop(); if (history.state && history.state.duel) history.back(); };
   history.pushState({ duel: true }, '');
   window.addEventListener('popstate', onPop);
   requestWakeLock();
@@ -5602,7 +5619,7 @@ async function renderFbHistory() {
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
   list.innerHTML = entries.length ? entries.map(([id, s]) => `
     <div class="log-item">
-      <div class="top"><span>${esc(fmtDayKey(s.date))}</span><span class="type">${esc((BOARDS[s.board] && BOARDS[s.board].label) || s.board)}${s.partial ? ' · UNVOLLSTÄNDIG' : ''}</span></div>
+      <div class="top"><span>${esc(fmtDayKey(s.date))}</span><span class="type">${s.templateId === 'duel' ? '🎲 Würfelduell · ' : ''}${esc((BOARDS[s.board] && BOARDS[s.board].label) || s.board)}${s.partial ? ' · UNVOLLSTÄNDIG' : ''}</span></div>
       <div class="ex-log-list">${fbResultsSummaryHtml(s.blocks || [], s.results || [])}</div>
       ${challengeDurationChipsHtml(`fb-history-share-${id}`, CHALLENGE_WINDOW_H)}
       <div class="field-row" style="margin-top:6px;">
