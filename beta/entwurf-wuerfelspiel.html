@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pincho – Entwurf Würfelspiel</title>
+<meta name="theme-color" content="#0c0e12">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<!--
+  Klickbarer Entwurf: Würfelduell für zwei am Board, EIN Handy (wird
+  weitergereicht), noch ohne Joker. Ablauf je Runde:
+  1. Gemeinsamer Griff wird gewürfelt (am Anfang nur grosse Griffe,
+     dann immer kleiner; keine Monos, keine einarmigen Griffe).
+  2. A würfelt B die Hängezeit (6–12 s), B hängt. Dann umgekehrt.
+  3. Geschafft = 1 Punkt. Gleichstand am Ende: mehr gehaltene Sekunden gewinnt.
+  Zwischen den eigenen Hangs mindestens 90 s Pause (Anzeige statt Start-Knopf).
+  "Demo ×5" spult Zeiten schneller ab, nur für den Entwurf.
+-->
+<style>
+  :root {
+    --bg: #0c0e12; --surface: #1b2028; --surface2: #232a34;
+    --line: #3a4250; --line-soft: #2a3140;
+    --ink: #f2efe6; --dim: #96a0ae; --faint: #8f97a5;
+    --blue: #4fc3ff; --on-blue: #06202f; --orange: #ff6b47; --good: #4ade80;
+    --pa: #4fc3ff; --pb: #ff6b47;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--ink); font-family: Barlow, system-ui, sans-serif; }
+  body { -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  input { font: inherit; }
+  .cond { font-family: 'Barlow Condensed', Barlow, sans-serif; }
+  .screen { min-height: 100dvh; max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); }
+
+  /* Kopf: Punktestand + Runde + Demo */
+  .top { display: flex; align-items: center; gap: 10px; height: 52px; }
+  .score { flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; }
+  .score .p { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+  .score .p i { width: 10px; height: 10px; border-radius: 50%; }
+  .score .pts { font: 700 26px 'Barlow Condensed', sans-serif; }
+  .score .colon { color: var(--faint); font-size: 20px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; font-size: 16px; flex: none; }
+  .speed { font-size: 12px; font-weight: 700; padding: 0 10px; height: 28px; border-radius: 14px; border: 1px solid var(--line); color: var(--faint); flex: none; }
+  .speed.on { color: var(--on-blue); background: var(--blue); border-color: var(--blue); }
+  .round { text-align: center; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin: 4px 0 10px; }
+
+  .main { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+  .who { text-align: center; font-size: 18px; font-weight: 600; color: var(--dim); }
+  .who b { color: var(--ink); }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 700; color: var(--bg); }
+
+  /* Board mit markiertem Griff */
+  .board { position: relative; border-radius: 16px; overflow: hidden; background: radial-gradient(120% 80% at 50% 0%, #141b23 0%, var(--bg) 70%); padding: 10px; }
+  .board-in { position: relative; }
+  .board img { display: block; width: 100%; }
+  .dot { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 3px solid var(--ink); background: rgba(79, 195, 255, .45); box-shadow: 0 0 0 4px rgba(79, 195, 255, .25); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 10px rgba(79, 195, 255, 0); } }
+  .grip-name { text-align: center; }
+  .grip-name b { display: block; font: 700 30px 'Barlow Condensed', sans-serif; line-height: 1.05; }
+  .grip-name span { font-size: 15px; color: var(--dim); }
+  .tier { display: flex; justify-content: center; gap: 4px; margin-top: 6px; }
+  .tier i { width: 18px; height: 5px; border-radius: 3px; background: var(--line); }
+  .tier i.on { background: var(--orange); }
+
+  /* Würfel */
+  .die { align-self: center; width: 150px; height: 150px; border-radius: 30px; background: var(--surface); border: 2px solid var(--line); display: grid; place-items: center; font: 700 76px 'Barlow Condensed', sans-serif; line-height: 1; }
+  .die small { display: block; font-size: 20px; color: var(--dim); margin-top: -6px; text-align: center; }
+  .die.rolling { animation: wobble .12s linear infinite; }
+  .die.done { border-color: var(--blue); animation: pop .35s ease-out; }
+  @keyframes wobble { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+  @keyframes pop { 50% { transform: scale(1.08); } }
+
+  /* Hang-Timer */
+  .timer { align-self: center; position: relative; width: 240px; height: 240px; }
+  .timer svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .timer .track { fill: none; stroke: var(--line-soft); stroke-width: 12; }
+  .timer .ring { fill: none; stroke: var(--blue); stroke-width: 12; stroke-linecap: round; transition: stroke-dashoffset .1s linear; }
+  .timer .num { position: absolute; inset: 0; display: grid; place-items: center; font: 700 96px 'Barlow Condensed', sans-serif; }
+  .timer .num small { position: absolute; bottom: 52px; font: 600 15px Barlow, sans-serif; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; }
+  .count { align-self: center; font: 700 140px 'Barlow Condensed', sans-serif; color: var(--orange); }
+  .rest { text-align: center; }
+  .rest b { display: block; font: 700 54px 'Barlow Condensed', sans-serif; color: var(--orange); line-height: 1; }
+  .rest span { color: var(--dim); }
+  .result { text-align: center; }
+  .result b { display: block; font: 700 46px 'Barlow Condensed', sans-serif; line-height: 1.05; }
+  .result.ok b { color: var(--good); }
+  .result.fail b { color: var(--orange); }
+  .result span { color: var(--dim); font-size: 16px; }
+
+  /* Steuerung unten */
+  .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .btn { width: 100%; padding: 18px 12px; border-radius: 18px; background: var(--blue); color: var(--on-blue); font-size: 22px; font-weight: 700; }
+  .btn.release { background: var(--orange); color: #210800; padding: 28px 12px; font-size: 26px; }
+  .btn.ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line); font-size: 16px; padding: 12px; }
+  .link { align-self: center; font-size: 14px; color: var(--dim); text-decoration: underline; padding: 6px; }
+
+  /* Einstellungen / Ende */
+  h1 { font: 700 34px 'Barlow Condensed', sans-serif; margin: 8px 0 4px; }
+  .intro { color: var(--dim); font-size: 15px; margin-bottom: 16px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin-bottom: 6px; }
+  .names { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .names input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface2); color: var(--ink); font-size: 16px; font-weight: 600; }
+  .names input:nth-child(1) { border-left: 4px solid var(--pa); }
+  .names input:nth-child(2) { border-left: 4px solid var(--pb); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface2); color: var(--dim); }
+  .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .rules { font-size: 14px; color: var(--dim); background: var(--surface); border: 1px solid var(--line-soft); border-radius: 14px; padding: 12px 14px; line-height: 1.45; }
+  .rules li { margin-left: 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 7px 4px; border-bottom: 1px solid var(--line-soft); text-align: left; }
+  th { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .08em; }
+  td.c, th.c { text-align: center; }
+  .winner { text-align: center; }
+  .winner b { display: block; font: 700 48px 'Barlow Condensed', sans-serif; line-height: 1; }
+</style>
+</head>
+<body>
+<div class="screen" id="app"></div>
+<script src="./data.js"></script>
+<script>
+/* Schwierigkeit je Griff: 0 = Aufwärmen, 3 = klein. Monos und einarmige Griffe fehlen bewusst. */
+const TIER = {
+  jug: 0, edge_large: 0, sloper_easy: 0,
+  edge_medium: 1, sloper_medium: 1, pocket3: 1, pocket3_deep: 1, pocket2_deep: 1, edge3: 1,
+  edge_small: 2, pocket3_small: 2, pocket2: 2, pocket2_offset: 2, sloper_hard: 2,
+  edge_xsmall: 3, pocket2_small: 3,
+};
+const REST_SEC = 90;
+const g = {
+  names: ['Anna', 'Ben'], board: 'bm2000', rounds: 5, min: 6, max: 12,
+  round: 0, turn: 0, grip: null, rolled: null, score: [0, 0], held: [0, 0],
+  lastHangEnd: [0, 0], log: [], screen: 'setup', speed: 1,
+};
+const app = document.getElementById('app');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const buzz = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { /* egal */ } };
+const now = () => Date.now();
+const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+let timer = null;
+const stop = () => { clearInterval(timer); timer = null; };
+
+function armNote(board, id) {
+  const ov = (typeof GRIP_ARM_OVERRIDE !== 'undefined' && GRIP_ARM_OVERRIDE[board]) || {};
+  return ov[id] || '';
+}
+function maxTier() { // Runde 1–2 nur grosse Griffe, dann immer kleiner
+  const r = g.round + 1;
+  return r <= 2 ? 1 : Math.min(3, 1 + Math.ceil((r - 2) / Math.max(1, (g.rounds - 2) / 2)));
+}
+function rollGrip() {
+  const mt = maxTier();
+  const pool = BOARDS[g.board].grips.filter((x) => TIER[x.id] != null && TIER[x.id] <= mt && armNote(g.board, x.id) !== 'einarmig' && (!g.grip || x.id !== g.grip.id));
+  // In späteren Runden die schwerste erlaubte Stufe bevorzugen
+  const weighted = pool.flatMap((x) => Array(g.round < 2 ? 1 : TIER[x.id] + 1).fill(x));
+  return weighted[Math.floor(Math.random() * weighted.length)];
+}
+function gripHtml(grip) {
+  const b = BOARDS[g.board];
+  const dots = b.hotspots.filter((h) => h.grip === grip.id).map((h) => `<span class="dot" style="left:${h.hx ?? h.x}%;top:${h.hy ?? h.y}%"></span>`).join('');
+  const t = TIER[grip.id];
+  return `
+    <div class="board"><div class="board-in"><img src="${b.image}" alt="${esc(b.label)}">${dots}</div></div>
+    <div class="grip-name"><b>${esc(grip.label)}</b><span>${esc(grip.note || ' ')}</span>
+      <div class="tier" aria-label="Schwierigkeit ${t + 1} von 4">${[0, 1, 2, 3].map((i) => `<i class="${i <= t ? 'on' : ''}"></i>`).join('')}</div></div>`;
+}
+function topBar(showRound = true) {
+  return `
+    <div class="top">
+      <button class="icon-btn" id="quit" aria-label="Beenden">✕</button>
+      <div class="score">
+        <span class="p"><i style="background:var(--pa)"></i>${esc(g.names[0])}</span>
+        <span class="pts">${g.score[0]}</span><span class="colon">:</span><span class="pts">${g.score[1]}</span>
+        <span class="p">${esc(g.names[1])}<i style="background:var(--pb)"></i></span>
+      </div>
+      <button class="speed ${g.speed > 1 ? 'on' : ''}" id="speed">Demo ×5</button>
+    </div>
+    ${showRound ? `<div class="round">Runde ${g.round + 1} von ${g.rounds}</div>` : ''}`;
+}
+const tag = (i) => `<span class="tag" style="background:var(--p${i ? 'b' : 'a'})">${esc(g.names[i])}</span>`;
+function wireTop() {
+  const q = document.getElementById('quit');
+  if (q) q.onclick = () => { if (confirm('Spiel beenden?')) { stop(); g.screen = 'setup'; render(); } };
+  const s = document.getElementById('speed');
+  if (s) s.onclick = () => { g.speed = g.speed > 1 ? 1 : 5; s.classList.toggle('on', g.speed > 1); };
+}
+
+/* Würfel: kurz durchrollen, dann stehen bleiben */
+function rollDie(el, values, final, done) {
+  el.classList.add('rolling');
+  let n = 0;
+  const id = setInterval(() => {
+    el.firstChild.textContent = values[Math.floor(Math.random() * values.length)];
+    if (++n > 10) {
+      clearInterval(id);
+      el.classList.remove('rolling');
+      el.firstChild.textContent = final;
+      el.classList.add('done');
+      buzz(60);
+      done();
+    }
+  }, 80);
+}
+
+function render() {
+  stop();
+  ({ setup, grip, rollTime, ready, countdown, hang, result, end }[g.screen])();
+  wireTop();
+}
+
+function setup() {
+  app.innerHTML = `
+    <h1>🎲 Würfelduell</h1>
+    <p class="intro">Zu zweit am Board, ein Handy. Ihr würfelt den Griff gemeinsam und dem anderen die Hängezeit.</p>
+    <div class="field"><label>Spieler</label><div class="names"><input id="n0" value="${esc(g.names[0])}" maxlength="12"><input id="n1" value="${esc(g.names[1])}" maxlength="12"></div></div>
+    <div class="field"><label>Board</label><div class="chips">${['bm1000', 'bm2000'].map((b) => `<button class="chip ${g.board === b ? 'on' : ''}" data-board="${b}">${b === 'bm1000' ? 'BM 1000' : 'BM 2000'}</button>`).join('')}</div></div>
+    <div class="field"><label>Runden</label><div class="chips">${[3, 5, 8].map((r) => `<button class="chip ${g.rounds === r ? 'on' : ''}" data-rounds="${r}">${r}</button>`).join('')}</div></div>
+    <div class="field"><label>Hängezeit</label><div class="chips">${[[5, 10], [6, 12], [8, 15]].map(([a, b]) => `<button class="chip ${g.min === a ? 'on' : ''}" data-range="${a}-${b}">${a}–${b} s</button>`).join('')}</div></div>
+    <ul class="rules">
+      <li>Am Anfang grosse Griffe, jede Runde wird es kleiner.</li>
+      <li>Gehalten = 1 Punkt. Gleichstand: mehr Sekunden gewinnt.</li>
+      <li>Zwischen deinen Hangs mindestens ${REST_SEC} s Pause.</li>
+    </ul>
+    <div class="actions"><button class="btn" id="go">Los geht's</button></div>`;
+  app.querySelectorAll('[data-board]').forEach((b) => { b.onclick = () => { g.board = b.dataset.board; setup(); }; });
+  app.querySelectorAll('[data-rounds]').forEach((b) => { b.onclick = () => { g.rounds = Number(b.dataset.rounds); setup(); }; });
+  app.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => { [g.min, g.max] = b.dataset.range.split('-').map(Number); setup(); }; });
+  ['n0', 'n1'].forEach((id, i) => { document.getElementById(id).oninput = (e) => { g.names[i] = e.target.value.trim() || (i ? 'B' : 'A'); }; });
+  document.getElementById('go').onclick = () => {
+    Object.assign(g, { round: 0, turn: 0, grip: null, score: [0, 0], held: [0, 0], lastHangEnd: [0, 0], log: [] });
+    g.screen = 'grip'; render();
+  };
+}
+
+function grip() {
+  const pick = rollGrip();
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <p class="who">Gemeinsamer Griff für diese Runde</p>
+      <div id="grip-box" style="opacity:.25">${gripHtml(pick)}</div>
+    </div>
+    <div class="actions" id="act"><button class="btn" id="roll">🎲 Griff würfeln</button></div>`;
+  document.getElementById('roll').onclick = () => {
+    const box = document.getElementById('grip-box');
+    const grips = BOARDS[g.board].grips.filter((x) => TIER[x.id] != null);
+    let n = 0;
+    document.getElementById('act').innerHTML = '';
+    const id = setInterval(() => {
+      box.innerHTML = gripHtml(grips[Math.floor(Math.random() * grips.length)]);
+      if (++n > 9) {
+        clearInterval(id);
+        g.grip = pick;
+        box.innerHTML = gripHtml(pick);
+        box.style.opacity = 1;
+        buzz(80);
+        document.getElementById('act').innerHTML = `<button class="btn" id="next">Weiter: ${esc(g.names[1 - g.turn])} würfelt</button>`;
+        document.getElementById('next').onclick = () => { g.screen = 'rollTime'; render(); };
+      }
+    }, 90);
+  };
+}
+
+function rollTime() {
+  const hanger = g.turn, roller = 1 - g.turn;
+  const values = []; for (let s = g.min; s <= g.max; s++) values.push(s);
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <p class="who">${tag(roller)} würfelt für ${tag(hanger)}</p>
+      <div class="die" id="die"><span>?</span><small>Sek.</small></div>
+      <p class="who" style="font-size:15px">${esc(g.grip.label)}</p>
+    </div>
+    <div class="actions" id="act"><button class="btn" id="roll">🎲 Zeit würfeln</button></div>`;
+  document.getElementById('roll').onclick = () => {
+    document.getElementById('act').innerHTML = '';
+    g.rolled = values[Math.floor(Math.random() * values.length)];
+    rollDie(document.getElementById('die'), values, g.rolled, () => {
+      document.getElementById('act').innerHTML = `<button class="btn" id="next">Handy an ${esc(g.names[hanger])} →</button>`;
+      document.getElementById('next').onclick = () => { g.screen = 'ready'; render(); };
+    });
+  };
+}
+
+function restLeft(i) {
+  if (!g.lastHangEnd[i]) return 0;
+  return Math.max(0, Math.ceil(REST_SEC - ((now() - g.lastHangEnd[i]) / 1000) * g.speed));
+}
+function ready() {
+  const i = g.turn;
+  const draw = () => {
+    const left = restLeft(i);
+    app.innerHTML = `${topBar()}
+      <div class="main">
+        <p class="who">${tag(i)} hängt <b>${g.rolled} s</b></p>
+        ${gripHtml(g.grip)}
+        ${left ? `<div class="rest"><b>${fmt(left)}</b><span>Pause für ${esc(g.names[i])}</span></div>` : ''}
+      </div>
+      <div class="actions">
+        ${left ? '<button class="link" id="skip">Jetzt schon hängen</button>' : '<button class="btn" id="start">▶ Start</button>'}
+      </div>`;
+    wireTop();
+    const st = document.getElementById('start');
+    if (st) st.onclick = () => { g.screen = 'countdown'; render(); };
+    const sk = document.getElementById('skip');
+    if (sk) sk.onclick = () => { g.lastHangEnd[i] = 0; draw(); };
+    return left;
+  };
+  if (draw()) timer = setInterval(() => { if (!draw()) { stop(); buzz([100, 60, 100]); } }, 1000);
+}
+
+function countdown() {
+  let n = 3;
+  app.innerHTML = `${topBar()}<div class="main"><p class="who">Hände an den Griff</p><div class="count cond" id="cnt">3</div></div>`;
+  buzz(60);
+  timer = setInterval(() => {
+    n--;
+    if (n <= 0) { g.screen = 'hang'; render(); return; }
+    document.getElementById('cnt').textContent = n;
+    buzz(60);
+  }, 1000 / Math.min(g.speed, 2));
+}
+
+function hang() {
+  const i = g.turn, target = g.rolled, L = 2 * Math.PI * 104;
+  const started = now();
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <p class="who">${tag(i)} · ${esc(g.grip.label)}</p>
+      <div class="timer"><svg viewBox="0 0 240 240"><circle class="track" cx="120" cy="120" r="104"/><circle class="ring" id="ring" cx="120" cy="120" r="104" stroke-dasharray="${L}" stroke-dashoffset="0"/></svg>
+        <div class="num"><span id="num">${target}</span><small>hängen</small></div></div>
+    </div>
+    <div class="actions"><button class="btn release" id="rel">Losgelassen</button></div>`;
+  const finish = (heldSec, ok) => {
+    stop();
+    g.lastHangEnd[i] = now();
+    g.held[i] += heldSec;
+    if (ok) g.score[i]++;
+    g.log.push({ round: g.round, who: i, grip: g.grip.label, target, held: heldSec, ok });
+    buzz(ok ? [80, 60, 200] : 300);
+    g.screen = 'result'; render();
+  };
+  timer = setInterval(() => {
+    const el = ((now() - started) / 1000) * g.speed;
+    const left = Math.max(0, target - el);
+    document.getElementById('num').textContent = Math.ceil(left);
+    document.getElementById('ring').style.strokeDashoffset = String(L * (el / target));
+    if (left <= 0) finish(target, true);
+  }, 100);
+  document.getElementById('rel').onclick = () => {
+    const el = Math.min(target, Math.floor(((now() - started) / 1000) * g.speed));
+    finish(el, el >= target);
+  };
+}
+
+function result() {
+  const last = g.log[g.log.length - 1];
+  const bothDone = g.log.filter((l) => l.round === g.round).length === 2;
+  const lastRound = g.round + 1 >= g.rounds;
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <div class="result ${last.ok ? 'ok' : 'fail'}">
+        <b>${last.ok ? 'Gehalten! +1' : 'Losgelassen'}</b>
+        <span>${esc(g.names[last.who])}: ${last.held} von ${last.target} s</span>
+      </div>
+    </div>
+    <div class="actions"><button class="btn" id="next">${!bothDone ? `Jetzt ${esc(g.names[1 - last.who])}` : lastRound ? 'Zum Ergebnis' : 'Nächste Runde'}</button></div>`;
+  document.getElementById('next').onclick = () => {
+    if (!bothDone) { g.turn = 1 - g.turn; g.screen = 'rollTime'; }
+    else if (lastRound) g.screen = 'end';
+    else { g.round++; g.turn = g.round % 2; g.screen = 'grip'; } // abwechselnd beginnen
+    render();
+  };
+}
+
+function end() {
+  const [a, b] = g.score;
+  const w = a !== b ? (a > b ? 0 : 1) : g.held[0] !== g.held[1] ? (g.held[0] > g.held[1] ? 0 : 1) : -1;
+  const rows = [];
+  for (let r = 0; r < g.rounds; r++) {
+    const l = g.log.filter((x) => x.round === r);
+    if (!l.length) continue;
+    const cell = (i) => { const x = l.find((y) => y.who === i); return x ? `${x.ok ? '✓' : '✗'} ${x.held}/${x.target}s` : '–'; };
+    rows.push(`<tr><td>${r + 1}</td><td>${esc(l[0].grip)}</td><td class="c">${cell(0)}</td><td class="c">${cell(1)}</td></tr>`);
+  }
+  app.innerHTML = `${topBar(false)}
+    <div class="main">
+      <div class="winner">${w < 0 ? '<b>Unentschieden</b>' : `<span>🏆 Sieg für</span><b style="color:var(--p${w ? 'b' : 'a'})">${esc(g.names[w])}</b>`}
+        <p class="who" style="font-size:14px;margin-top:6px">${a} : ${b} Punkte · ${g.held[0]} s : ${g.held[1]} s gehalten${a === b && w >= 0 ? ' (entscheidet)' : ''}</p></div>
+      <table><thead><tr><th>#</th><th>Griff</th><th class="c">${esc(g.names[0])}</th><th class="c">${esc(g.names[1])}</th></tr></thead><tbody>${rows.join('')}</tbody></table>
+    </div>
+    <div class="actions"><button class="btn" id="again">Revanche</button><button class="btn ghost" id="setup">Einstellungen</button></div>`;
+  document.getElementById('again').onclick = () => { Object.assign(g, { round: 0, turn: 0, grip: null, score: [0, 0], held: [0, 0], lastHangEnd: [0, 0], log: [] }); g.screen = 'grip'; render(); };
+  document.getElementById('setup').onclick = () => { g.screen = 'setup'; render(); };
+}
+
+render();
+</script>
+</body>
+</html>
