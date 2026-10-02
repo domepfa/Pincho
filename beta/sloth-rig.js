@@ -314,7 +314,7 @@ const SLOTH_POSES = {
     b: { torso: -96, uarm: 100, farm: 60, fuarm: 100, ffarm: 60, thigh: 88, calf: 94, fthigh: 110, fcalf: 170, dy: -60 },
   },
   bounds: {
-    view: 'front', pin: 'feet', dur: 1.4, floor: 26, armLift: 45, label: 'Seitsprünge',
+    view: 'front', pin: 'feet', dur: 1.4, floor: 26, armLift: 45, armsFront: true, label: 'Seitsprünge',
     // Skater: seitlich von Bein zu Bein springen. Landung auf einem gebeugten Bein, das andere kreuzt schräg
     // hinter dem Standbein, die Arme schwingen gegengleich zur Seite des Standbeins.
     a: { torso: -96, head: -92, uarm_l: 96, farm_l: 100, uarm_r: 130, farm_r: 150, thigh_l: 100, calf_l: 86, thigh_r: 104, len_thigh_r: 0.8, calf_r: 112, len_calf_r: 0.85, dx: -70, tail: 0 },
@@ -425,6 +425,13 @@ const SLOTH_POSES = {
 
   barbellrow: {
     view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Langhantel-Rudern', props: [{ img: 'plate', at: 'grip', k: 1.3 }],
+    a: { torso: -36, uarm: 92, farm: 90, thigh: 70, calf: 102 },
+    b: { torso: -36, uarm: 170, farm: 70, thigh: 70, calf: 102 },
+  },
+  tbarrow: {
+    // T-Bar-Rudern: Stange vom Drehpunkt am Boden hinter der Figur bis über die Hände, Scheibe am Stangenende
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'T-Bar-Rudern',
+    props: [{ line: [-330, 40], to: 'grip', thick: 14, over: 40, end: true, layer: 'mid' }, { img: 'plate', at: 'lever:0', k: 1.3, layer: 'mid' }],
     a: { torso: -36, uarm: 92, farm: 90, thigh: 70, calf: 102 },
     b: { torso: -36, uarm: 170, farm: 70, thigh: 70, calf: 102 },
   },
@@ -573,10 +580,12 @@ const SLOTH_POSES = {
     b: { torso: -10, uarm: 170, farm: -10, thigh: 110, calf: 180, fthigh: 110, fcalf: 180 },
   },
   pallof: {
-    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Pallof Press',
-    props: [cableTower(470), cableLine('mid')],
-    a: { torso: -94, uarm: 100, farm: -12, thigh: 80, calf: 96 },
-    b: { torso: -94, uarm: -4, farm: -4, thigh: 80, calf: 96 },
+    // Pallof Press (Vorderansicht): Kabelturm seitlich, beide Hände am Griff vor der Brust; die Arme strecken nach vorne
+    // (zum Betrachter, verkürzt), der Rumpf hält gegen den seitlichen Zug
+    view: 'front', pin: 'feet', dur: 3, floor: 26, armsFront: true, label: 'Pallof Press',
+    props: [{ img: 'cable', at: [-460, 26], a: [171, 838], k: 2.7, layer: 'back' }, cableLine('mid', 'hands')],
+    a: { torso: -90, head: -90, uarm_l: 115, len_uarm_l: 0.75, farm_l: 10, len_farm_l: 0.75, uarm_r: 65, len_uarm_r: 0.75, farm_r: 170, len_farm_r: 0.75, ...STAND_LEGS, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: 100, len_uarm_l: 0.3, near_uarm_l: 1.15, farm_l: 60, len_farm_l: 0.3, near_farm_l: 1.2, uarm_r: 80, len_uarm_r: 0.3, near_uarm_r: 1.15, farm_r: 120, len_farm_r: 0.3, near_farm_r: 1.2, ...STAND_LEGS, tail: 0 },
   },
   kickback: {
     // feet: eigener Fuss, damit er beim Zurückdrücken nicht mit dem Unterschenkel mitdreht (Zehen zeigen zum Boden)
@@ -638,25 +647,32 @@ const SLOTH_POSES = {
   // nach vorne, bis sie vor der Brust gestreckt nebeneinander liegen. Von vorne wäre "nach vorne" und
   // "nach hinten" im Bild nicht zu unterscheiden.
   pecdeck: {
-    view: 'side', pin: 'hip', dur: 2.6, floor: 230, grip: 'fist', label: 'Butterfly',
-    props: [{ img: 'bench', at: [70, 60], a: [442, 422], k: 2, layer: 'back' }],
-    a: { torso: -96, uarm: 8, farm: 24, len_uarm: 0.5, len_farm: 0.55, near_uarm: 1.12, near_farm: 1.25, flen_uarm: 0.5, flen_farm: 0.55, fnear_uarm: 0.88, fnear_farm: 0.82, thigh: -4, calf: 92 },
-    b: { torso: -96, uarm: 4, farm: 10, len_uarm: 1, len_farm: 1, near_uarm: 1, near_farm: 1, flen_uarm: 1, flen_farm: 1, fnear_uarm: 1, fnear_farm: 1, thigh: -4, calf: 92 },
+    // Butterfly (Vorderansicht, sitzend vor der Maschine): Oberarme auf Schulterhöhe, Unterarme senkrecht an den
+    // Polstern; die Arme schwenken nach vorne zusammen (Oberarm zeigt dann zum Betrachter -> verkürzt)
+    view: 'front', pin: 'feet', dur: 2.6, floor: 20, legsFront: true, armsFront: true, label: 'Butterfly',
+    props: [{ img: 'butterfly', at: [0, 20], a: [150, 541], k: 4.2, layer: 'back' }],
+    a: { torso: -90, head: -90, uarm_l: 180, farm_l: -90, uarm_r: 0, farm_r: -90, thigh_l: 104, len_thigh_l: 0.3, calf_l: 92, thigh_r: 76, len_thigh_r: 0.3, calf_r: 88, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: 180, len_uarm_l: 0.3, near_uarm_l: 1.15, farm_l: -90, near_farm_l: 1.15, uarm_r: 0, len_uarm_r: 0.3, near_uarm_r: 1.15, farm_r: -90, near_farm_r: 1.15, thigh_l: 104, len_thigh_l: 0.3, calf_l: 92, thigh_r: 76, len_thigh_r: 0.3, calf_r: 88, tail: 0 },
+    v2: {
+      a: { thigh_l: 90, len_thigh_l: 1, calf_l: 90, thigh_r: 90, len_thigh_r: 1, calf_r: 90 },
+      b: { thigh_l: 90, len_thigh_l: 1, calf_l: 90, thigh_r: 90, len_thigh_r: 1, calf_r: 90 },
+    },
   },
 
   reversefly: {
-    // Rückansicht: Arme starten vorne vor der Brust (verdeckt, len < 0) und gehen auf Schulterhöhe nach hinten in die T-Position
+    // Rückansicht: Arme starten nach vorne gestreckt (stark verkürzt) und öffnen sich auf Schulterhöhe in die T-Position
     view: 'back', pin: 'feet', dur: 2.6, floor: 26, label: 'Reverse Butterfly',
     props: [{ img: 'butterfly', at: [0, 26], a: [125, 555], k: 3.6, layer: 'back' }],
-    a: { torso: -90, head: -90, uarm_l: 180, len_uarm_l: -0.3, farm_l: 180, len_farm_l: -0.3, uarm_r: 0, len_uarm_r: -0.3, farm_r: 0, len_farm_r: -0.3, ...STAND_LEGS, tail: 0 },
+    a: { torso: -90, head: -90, uarm_l: 180, len_uarm_l: 0.2, farm_l: 180, len_farm_l: 0.2, uarm_r: 0, len_uarm_r: 0.2, farm_r: 0, len_farm_r: 0.2, ...STAND_LEGS, tail: 0 },
     b: { torso: -90, head: -90, uarm_l: 180, len_uarm_l: 1, farm_l: 180, len_farm_l: 1, uarm_r: 0, len_uarm_r: 1, farm_r: 0, len_farm_r: 1, ...STAND_LEGS, tail: 0 },
   },
   extrot: {
-    // Aussenrotation am Kabel (Vorderansicht): Ellbogen bleibt am Körper, Unterarm dreht von vor dem Bauch nach aussen
-    view: 'front', pin: 'feet', dur: 2.6, floor: 26, label: 'Aussenrotation am Kabel',
+    // Aussenrotation am Kabel (Vorderansicht): Ellbogen am Körper, Unterarm bleibt waagrecht auf Bauchhöhe vor dem
+    // Körper und dreht von quer über den Bauch (len < 0) über „nach vorne“ (verkürzt) nach aussen
+    view: 'front', pin: 'feet', dur: 2.6, floor: 26, armsFront: true, label: 'Aussenrotation am Kabel',
     props: [{ img: 'cable', at: [-420, 26], a: [171, 838], k: 2.7, layer: 'back' }, cableLine('mid', 'hand_r')],
-    a: { torso: -90, head: -90, uarm_l: 100, farm_l: 96, uarm_r: 86, farm_r: 172, len_farm_r: 0.55, ...STAND_LEGS, tail: 0 },
-    b: { torso: -90, head: -90, uarm_l: 100, farm_l: 96, uarm_r: 86, farm_r: 4, len_farm_r: 0.85, ...STAND_LEGS, tail: 0 },
+    a: { torso: -90, head: -90, uarm_l: 100, farm_l: 96, uarm_r: 88, len_uarm_r: 0.9, farm_r: 0, len_farm_r: -0.75, ...STAND_LEGS, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: 100, farm_l: 96, uarm_r: 88, len_uarm_r: 0.9, farm_r: 0, len_farm_r: 0.8, ...STAND_LEGS, tail: 0 },
   },
   // Sitzend von vorne: Oberschenkel zeigen zum Betrachter (verkürzt), Knie drücken nach aussen gegen die Polster
   abduction: {
@@ -844,7 +860,7 @@ function slothRigBuild(pose, v2 = false) {
   const tlen = (jj) => Math.hypot(jj.torso[1][0] - jj.torso[0][0], jj.torso[1][1] - jj.torso[0][1]);
   // Grösse wie die bisherige Figur, damit Geräte und Bänke weiter passen
   const KV = v2 ? tlen(SLOTH_JOINTS[view]) / tlen(SLOTH_V2.joints[vk === 'hang' ? 'back' : vk]) : 1;
-  const holds = (pose.props || []).some((pr) => /^hand_/.test(pr.at || pr.to || '')); // Hantel oder Kabel in der Hand -> Faust
+  const holds = (pose.props || []).some((pr) => /^hands?(_|$)/.test(pr.at || pr.to || '')); // Hantel oder Kabel in der Hand -> Faust
   const img2 = (n) => {
     if (!v2 || !n || n.startsWith('eq_')) return n;
     let m = n === 'side_body' ? 'v2side_torso' : n === 'side_face_neutral' ? 'v2side_face' : n === 'front_face_neutral' ? 'v2' + vk + '_head'
@@ -869,7 +885,10 @@ function slothRigBuild(pose, v2 = false) {
     // sitzend von vorne verschwindet der Schwanz unter dem Gesäss
     let im = oldTail ? (vk !== 'sit' && SLOTH_PARTS[view + '_tail'] ? view + '_tail' : null) : img2(img || view + '_' + name);
     if (alt && im) im = SLOTH_V2.parts[im.replace('v2' + vk + '_', 'v2' + alt + '_')] ? im.replace('v2' + vk + '_', 'v2' + alt + '_') : im;
-    return { img: im, skip: !im || undefined, P, r, p, k, map: (q) => add(P, mul(rot(sub(q, p), r), k)), end: add(P, mul(rot(sub(d, p), r), k)) };
+    // ba (neue Figur): Winkel des Knochens im Bild. Ungleiches Strecken (len_/near_, Spiegeln) wirkt dann entlang
+    // des Knochens statt entlang der Bild-x-Achse (die Zeichnungen haben schräge Glieder)
+    const ba = v2 ? Math.atan2(q1[1] - q0[1], q1[0] - q0[0]) * 180 / Math.PI : undefined;
+    return { img: im, skip: !im || undefined, P, r, p, k, ba, map: (q) => add(P, mul(rot(sub(q, p), r), k)), end: add(P, mul(rot(sub(d, p), r), k)) };
   };
   const ball = (img, P) => { const im = img2(img), b = slothPartBox(im); if (!b) return { skip: true, P, end: P };
     return { img: im, P, r: 0, p: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k: SLOTH_SCALE[view].ball ?? 1 }; };
@@ -1064,12 +1083,12 @@ function slothRigBuild(pose, v2 = false) {
     // dx/dy: ganze Figur verschieben (Hüpfen, Fersen heben)
     const pin = sub(pts[pose.pin], [s.dx || 0, s.dy || 0]);
     for (const k in q) q[k] = q[k].skip ? { skip: true } : q[k].mesh ? { mesh: true, far: q[k].far, bones: q[k].bones.map((m) => ({ ...m, P: sub(m.P, pin) })) }
-      : { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k, o: q[k].o };
+      : { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k, o: q[k].o, ba: q[k].ba };
     const pathPt = slothPathPoint(pose);
     if (pathPt && pts[pathPt]) Object.defineProperty(q, 'path', { value: sub(pts[pathPt], pin), enumerable: false });
     // Requisiten: an einem Punkt der Figur (z. B. 'grip') oder fest im Bild ([x, y] relativ zum festen Punkt)
     (pose.props || []).forEach((pr, i) => {
-      const pt = (at) => (Array.isArray(at) ? at : sub(pts[at], pin));
+      const pt = (at) => (Array.isArray(at) ? at : /^lever:/.test(at) ? q['leverEnd' + at.slice(6)] : sub(pts[at], pin));
       if (pr.bar) { // Hantelstange von der Scheibe in der Hand schräg nach hinten zur zweiten Scheibe
         const A0 = add(pt(pr.at), [pr.dx, pr.dy]);
         q['prop' + i] = { line: true, bar: true, P: A0, r: Math.atan2(pr.d[1], pr.d[0]) * 180 / Math.PI, p: [0, 0], k: [Math.hypot(pr.d[0], pr.d[1]), pr.w / 6] };
@@ -1079,8 +1098,10 @@ function slothRigBuild(pose, v2 = false) {
         // line: [x, y] fest, Punktname der Figur, oder { prop: i, pt: [x, y] } = Punkt auf einem Gerät (Blatt-Koordinaten)
         const onProp = (o) => { const e = q['prop' + o.prop], [kx, ky] = Array.isArray(e.k) ? e.k : [e.k, e.k];
           return add(e.P, rot([(o.pt[0] - e.p[0]) * kx, (o.pt[1] - e.p[1]) * ky], e.r)); };
-        const A0 = pr.line.prop != null ? onProp(pr.line) : pt(pr.line), B = pt(pr.to), d = sub(B, A0);
-        q['prop' + i] = { line: true, P: A0, r: Math.atan2(d[1], d[0]) * 180 / Math.PI, p: [0, 0], k: [Math.hypot(d[0], d[1]), 1] };
+        const A0 = pr.line.prop != null ? onProp(pr.line) : pt(pr.line), B = pt(pr.to), d = sub(B, A0), L = Math.hypot(d[0], d[1]);
+        // thick: Stange statt Seil (z. B. T-Bar), over: so weit über den Punkt hinaus
+        q['prop' + i] = { line: true, bar: !!pr.thick, P: A0, r: Math.atan2(d[1], d[0]) * 180 / Math.PI, p: [0, 0], k: [L + (pr.over || 0), (pr.thick || 6) / 6] };
+        if (pr.end) Object.defineProperty(q, 'leverEnd' + i, { value: add(A0, mul(d, (L + (pr.over || 0)) / L)), enumerable: false });
         return;
       }
       const b = SLOTH_PARTS['eq_' + pr.img], p = pr.a || [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k = pr.k || 1;
@@ -1306,10 +1327,11 @@ function slothRigPrepare(poseName) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const f of frames) for (const key of order) {
     if (!f[key] || f[key].line || f[key].skip || f[key].mesh || f[key].o === 0) continue;
-    const { img, P, r, p, k } = f[key], b = slothPartBox(img), [kx, ky] = Array.isArray(k) ? k : [k, k];
-    const c = Math.cos(r * Math.PI / 180), s = Math.sin(r * Math.PI / 180);
+    const { img, P, r, p, k, ba = 0 } = f[key], b = slothPartBox(img), [kx, ky] = Array.isArray(k) ? k : [k, k];
+    const c = Math.cos((r + ba) * Math.PI / 180), s = Math.sin((r + ba) * Math.PI / 180), cb = Math.cos(ba * Math.PI / 180), sb = Math.sin(ba * Math.PI / 180);
     for (const [x, y] of [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]]) {
-      const dx = (x - p[0]) * kx, dy = (y - p[1]) * ky, wx = P[0] + dx * c - dy * s, wy = P[1] + dx * s + dy * c;
+      const ux = (x - p[0]) * cb + (y - p[1]) * sb, uy = -(x - p[0]) * sb + (y - p[1]) * cb;
+      const dx = ux * kx, dy = uy * ky, wx = P[0] + dx * c - dy * s, wy = P[1] + dx * s + dy * c;
       x0 = Math.min(x0, wx); x1 = Math.max(x1, wx); y0 = Math.min(y0, wy); y1 = Math.max(y1, wy);
     }
   }
@@ -1321,8 +1343,14 @@ function slothRigPrepare(poseName) {
   const n = (v) => +v.toFixed(1);
   const sc = (e) => (Array.isArray(e.k) ? ` scale(${n(e.k[0])}, ${n(e.k[1])})` : e.k !== 1 ? ` scale(${e.k})` : '');
   // SVG-Attribut (Startstellung) und CSS-Transform (Keyframes) derselben Stellung
-  const tfAttr = (e) => `translate(${n(e.P[0])} ${n(e.P[1])}) rotate(${+e.r.toFixed(2)})${sc(e)} translate(${n(-e.p[0])} ${n(-e.p[1])})`;
-  const tfCss = (e) => `translate(${n(e.P[0])}px,${n(e.P[1])}px) rotate(${+e.r.toFixed(2)}deg)${sc(e)} translate(${n(-e.p[0])}px,${n(-e.p[1])}px)`;
+  // ba: in Knochenrichtung drehen, dort strecken, zurückdrehen (immer gleiche Funktionsliste, damit CSS sauber interpoliert)
+  const sc2 = (e) => { const [kx, ky] = Array.isArray(e.k) ? e.k : [e.k, e.k]; return ` scale(${n(kx)}, ${n(ky)})`; };
+  const tfAttr = (e) => (e.ba != null
+    ? `translate(${n(e.P[0])} ${n(e.P[1])}) rotate(${+(e.r + e.ba).toFixed(2)})${sc2(e)} rotate(${+(-e.ba).toFixed(2)}) translate(${n(-e.p[0])} ${n(-e.p[1])})`
+    : `translate(${n(e.P[0])} ${n(e.P[1])}) rotate(${+e.r.toFixed(2)})${sc(e)} translate(${n(-e.p[0])} ${n(-e.p[1])})`);
+  const tfCss = (e) => (e.ba != null
+    ? `translate(${n(e.P[0])}px,${n(e.P[1])}px) rotate(${+(e.r + e.ba).toFixed(2)}deg)${sc2(e)} rotate(${+(-e.ba).toFixed(2)}deg) translate(${n(-e.p[0])}px,${n(-e.p[1])}px)`
+    : `translate(${n(e.P[0])}px,${n(e.P[1])}px) rotate(${+e.r.toFixed(2)}deg)${sc(e)} translate(${n(-e.p[0])}px,${n(-e.p[1])}px)`);
   const css = [];
   for (const key of order) {
     if (!frames[0][key] || frames[0][key].skip || frames[0][key].mesh) continue;
