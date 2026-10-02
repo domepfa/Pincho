@@ -562,6 +562,7 @@ async function boot() {
   // bei Bedarf ein Nachrendern aus (Fingerboard/Challenges nutzen sie).
   render();
   const [, customsLoaded] = await Promise.all([loadCrews(), loadCustomExercises()]);
+  importDuelInbox();
   if (['fingerboard', 'challenges', 'konto'].includes(state.route) || (customsLoaded && Object.keys(customExercises).length && ['log', 'progress'].includes(state.route))) render();
   refreshChallengeUnseen();
   refreshWishDot();
@@ -5142,6 +5143,51 @@ function openFbDiceSheet() {
   };
 }
 
+/* Mitspieler fürs Würfelduell: alle Crew-Mitglieder mit Konto (ohne mich),
+   je Person einmal, aktive Crew zuerst. */
+function duelCrewMates() {
+  const out = [];
+  const crewIds = Object.keys(state.crews || {}).sort((a, b) => (a === state.crewId ? -1 : b === state.crewId ? 1 : 0));
+  crewIds.forEach((crewId) => Object.entries((state.crews[crewId] || {}).members || {}).forEach(([mid, m]) => {
+    if (!state.member || mid === state.member.id || out.some((x) => x.mid === mid) || !m || !m.name) return;
+    out.push({ mid, crewId, name: m.name });
+  }));
+  return out;
+}
+/* Würfelduell-Ergebnisse, die jemand aus der Crew für mich gespeichert hat
+   (crewData/<crew>/duelInbox/<ich>), in den eigenen Verlauf übernehmen und
+   aus dem Briefkasten löschen. Nur frisch vom Server (kein Doppel-Import aus
+   dem Offline-Cache). */
+async function importDuelInbox() {
+  if (!state.member) return;
+  let n = 0, from = '';
+  for (const crewId of Object.keys(state.crews || {})) {
+    const r = await fbGetNow(`crewData/${crewId}/duelInbox/${state.member.id}`);
+    if (!r.ok || !r.value) continue;
+    for (const [key, item] of Object.entries(r.value)) {
+      const sn = item && item.session;
+      const ok = sn && Array.isArray(sn.blocks) && sn.blocks.length && sn.blocks.every((b) => b && b.type === 'hang' && BOARDS[b.board] && Number(b.hangSec) > 0);
+      if (ok) {
+        const clean = {
+          date: String(sn.date || todayKey()).slice(0, 10), board: BOARDS[sn.board] ? sn.board : sn.blocks[0].board, weight: 0, templateId: 'duel',
+          blocks: sn.blocks.map((b) => ({ type: 'hang', board: b.board, grip: String(b.grip), reps: 1, hangSec: Math.min(120, Number(b.hangSec)), restSec: 0, blockRestSec: 0 })),
+          results: sn.blocks.map(() => ({ type: 'hang', doneReps: [true] })),
+          createdAt: Number(sn.createdAt) || Date.now(),
+        };
+        // Feste ID statt Push: wird der Briefkasten doppelt gelesen (Löschen noch nicht hochgeladen), entsteht kein Duplikat
+        await fbPut(`fingerboardSessions/${state.member.id}/duel_${key}`, clean);
+        n++; from = String(item.fromName || '').slice(0, 24);
+      }
+      await fbDelete(`crewData/${crewId}/duelInbox/${state.member.id}/${key}`);
+    }
+  }
+  if (n) {
+    toast(n === 1 ? `🎲 Würfelduell${from ? ' mit ' + from : ''} übernommen` : `🎲 ${n} Würfelduelle übernommen`, 'ok');
+    if (document.getElementById('fb-history-list')) renderFbHistory();
+    if (state.route === 'progress') renderProgress();
+  }
+}
+
 /* ---------- Würfelduell (zu zweit, ein Handy) ----------
    Vollbild über der App, aus beta/entwurf-wuerfelspiel.html übernommen.
    Ablauf je Runde: gemeinsamen Griff würfeln (wird jede Runde kleiner,
@@ -5251,20 +5297,32 @@ function setup() {
     <div class="top"><button class="icon-btn" id="quit" aria-label="Schliessen">✕</button></div>
     <h1>🎲 Würfelduell</h1>
     <p class="intro">Zu zweit am Board, ein Handy. Ihr würfelt den Griff gemeinsam und dem anderen die Hängezeit.</p>
-    <div class="field"><label>Spieler</label><div class="names"><input id="n0" value="${esc(g.names[0])}" maxlength="12"><input id="n1" value="${esc(g.names[1])}" maxlength="12"></div></div>
+    <div class="field"><label>Du</label><div class="names one"><input id="n0" value="${esc(g.names[0])}" maxlength="12"></div></div>
+    <div class="field"><label>Mitspieler</label>
+      ${duelCrewMates().length ? `<div class="chips" style="margin-bottom:8px">${duelCrewMates().map((m) => `<button class="chip ${g.partner && g.partner.mid === m.mid ? 'on' : ''}" data-mate="${esc(m.mid)}">${esc(m.name)}</button>`).join('')}<button class="chip ${g.partner ? '' : 'on'}" data-mate="">Gast</button></div>` : ''}
+      ${g.partner ? '' : `<div class="names one"><input id="n1" class="mate" value="${esc(g.names[1])}" maxlength="12" placeholder="Name"></div>`}
+    </div>
     <div class="field"><label>Board</label><div class="chips">${['bm1000', 'bm2000'].map((b) => `<button class="chip ${g.board === b ? 'on' : ''}" data-board="${b}">${b === 'bm1000' ? 'BM 1000' : 'BM 2000'}</button>`).join('')}</div></div>
     <div class="field"><label>Runden</label><div class="chips">${[3, 5, 8].map((r) => `<button class="chip ${g.rounds === r ? 'on' : ''}" data-rounds="${r}">${r}</button>`).join('')}</div></div>
     <div class="field"><label>Hängezeit</label><div class="chips">${[[5, 10], [6, 12], [8, 15]].map(([a, b]) => `<button class="chip ${g.min === a ? 'on' : ''}" data-range="${a}-${b}">${a}–${b} s</button>`).join('')}</div></div>
     <ul class="rules">
       <li>Am Anfang grosse Griffe, jede Runde wird es kleiner.</li>
-      <li>Jede gehaltene Sekunde zählt. Deine Hängezeit (Spieler 1) landet im Fortschritt.</li>
+      <li>Jede gehaltene Sekunde zählt. Deine Hängezeit landet im Fortschritt${g.partner ? `, die von ${esc(g.partner.name)} in ${esc(g.partner.name)}s Fortschritt` : ''}.</li>
       <li>Zwischen deinen Hangs mindestens ${REST_SEC} s Pause.</li>
     </ul>
     <div class="actions"><button class="btn" id="go">Los geht's</button></div>`;
   app.querySelectorAll('[data-board]').forEach((b) => { b.onclick = () => { g.board = b.dataset.board; setup(); }; });
   app.querySelectorAll('[data-rounds]').forEach((b) => { b.onclick = () => { g.rounds = Number(b.dataset.rounds); setup(); }; });
   app.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => { [g.min, g.max] = b.dataset.range.split('-').map(Number); setup(); }; });
-  ['n0', 'n1'].forEach((id, i) => { document.getElementById(id).oninput = (e) => { g.names[i] = e.target.value.trim() || (i ? 'B' : 'A'); }; });
+  ['n0', 'n1'].forEach((id, i) => { const el = document.getElementById(id); if (el) el.oninput = (e) => { g.names[i] = e.target.value.trim() || (i ? 'B' : 'A'); }; });
+  app.querySelectorAll('[data-mate]').forEach((b) => {
+    b.onclick = () => {
+      const m = duelCrewMates().find((x) => x.mid === b.dataset.mate);
+      g.partner = m || null;
+      g.names[1] = m ? m.name : 'Gast';
+      setup();
+    };
+  });
   document.getElementById('go').onclick = () => {
     Object.assign(g, { round: 0, turn: 0, grip: null, score: [0, 0], held: [0, 0], lastHangEnd: [0, 0], log: [] });
     g.screen = 'grip'; render();
@@ -5423,7 +5481,7 @@ function end() {
     <div class="main">
       <div class="winner"><span>💪 Gewonnen haben beide: Kraft</span>
         <div class="duel-totals">${[0, 1].map((i) => `<div><b style="color:var(--p${i ? 'b' : 'a'})">${g.held[i]} s</b><span>${esc(g.names[i])}</span></div>`).join('')}</div>
-        <p class="who" style="font-size:14px;margin-top:6px">${g.saved ? 'Deine Hängezeit ist im Fortschritt gespeichert.' : ''}</p></div>
+        <p class="who" style="font-size:14px;margin-top:6px">${g.saved ? `Hängezeit im Fortschritt gespeichert${g.partner ? ` – auch bei ${esc(g.partner.name)}` : ''}.` : ''}</p></div>
       <table><thead><tr><th>#</th><th>Griff</th><th class="c">${esc(g.names[0])}</th><th class="c">${esc(g.names[1])}</th></tr></thead><tbody>${rows.join('')}</tbody></table>
     </div>
     <div class="actions"><button class="btn" id="again">Revanche</button><button class="btn ghost" id="setup">Einstellungen</button></div>`;
@@ -5435,19 +5493,25 @@ function end() {
   /* Eigene Hangs (Spieler 1) als Board-Einheit speichern — einmal pro Spiel,
      auch beim vorzeitigen Schliessen; gehaltene Sekunden = Hängezeit. */
   function saveDuel() {
-    if (g.saved) return;
-    const own = g.log.filter((l) => l.who === 0 && l.held > 0);
-    if (!own.length || !state.member) return;
-    g.saved = true;
-    const session = {
-      date: todayKey(), board: g.board, weight: 0, templateId: 'duel',
-      blocks: own.map((l) => ({ type: 'hang', board: g.board, grip: l.gripId, reps: 1, hangSec: l.held, restSec: 0, blockRestSec: 0 })),
-      results: own.map(() => ({ type: 'hang', doneReps: [true] })),
-      createdAt: Date.now(),
+    if (g.saved || !state.member) return;
+    const sessionOf = (who) => {
+      const hangs = g.log.filter((l) => l.who === who && l.held > 0);
+      return hangs.length ? {
+        date: todayKey(), board: g.board, weight: 0, templateId: 'duel',
+        blocks: hangs.map((l) => ({ type: 'hang', board: g.board, grip: l.gripId, reps: 1, hangSec: l.held, restSec: 0, blockRestSec: 0 })),
+        results: hangs.map(() => ({ type: 'hang', doneReps: [true] })),
+        createdAt: Date.now(),
+      } : null;
     };
-    fbPush(`fingerboardSessions/${state.member.id}`, session).then(() => { if (document.getElementById('fb-history-list')) renderFbHistory(); });
+    const own = sessionOf(0), mate = g.partner ? sessionOf(1) : null;
+    if (!own && !mate) return;
+    g.saved = true;
+    if (own) fbPush(`fingerboardSessions/${state.member.id}`, own).then(() => { if (document.getElementById('fb-history-list')) renderFbHistory(); });
+    // Mitspieler aus der Crew: über den Crew-Briefkasten, die App der anderen Person übernimmt es (importDuelInbox)
+    if (mate) fbPush(`crewData/${g.partner.crewId}/duelInbox/${g.partner.mid}`, { fromId: state.member.id, fromName: g.names[0], session: mate });
   }
-  g.names = [(state.member && state.member.name) || 'Ich', 'Partner'];
+  g.names = [(state.member && state.member.name) || 'Ich', 'Gast'];
+  g.partner = null;
   g.board = fb.board || currentMemberBoard();
   const onPop = () => { stop(); root.remove(); releaseWakeLock(); window.removeEventListener('popstate', onPop); };
   const close = () => { saveDuel(); onPop(); if (history.state && history.state.duel) history.back(); };
