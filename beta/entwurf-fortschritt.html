@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pincho – Entwurf Fortschritt</title>
+<meta name="theme-color" content="#0c0e12">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<!--
+  Klickbarer Entwurf für die Fortschritt-Seite aus Trainer-Sicht, noch nicht
+  in der App verdrahtet, Zahlen sind Beispieldaten. Ideen:
+  - Woche im Mittelpunkt: Zeit, Sätze, Volumen mit Vergleich zur Vorwoche.
+  - Harte Sätze pro Muskelgruppe mit Zielbereich 10–20 (gängige Trainer-Zahl).
+  - Kraftverlauf als geschätztes Maximalgewicht (1RM), Board pro Griff.
+  - Rekorde und kurze Hinweise statt Nullen-Tabellen.
+-->
+<style>
+  :root {
+    --bg: #0c0e12; --surface: #1b2028; --surface2: #232a34;
+    --line: #3a4250; --line-soft: #2a3140;
+    --ink: #f2efe6; --dim: #96a0ae; --faint: #8f97a5;
+    --blue: #4fc3ff; --on-blue: #06202f; --orange: #ff6b47; --good: #4ade80;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); font-family: Barlow, system-ui, sans-serif; }
+  body { -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 16px 16px 48px; }
+  .draft { font-size: 12px; color: var(--faint); border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 14px; }
+  h1 { font: 700 28px 'Barlow Condensed', Barlow, sans-serif; letter-spacing: .01em; margin-bottom: 12px; }
+  h2 { font-size: 16px; font-weight: 700; }
+  .sub { font-size: 12.5px; color: var(--dim); margin-top: 2px; }
+  .card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 16px; padding: 14px; margin-bottom: 14px; }
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .card-head .chips { flex-wrap: nowrap; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface2); color: var(--dim); }
+  .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  /* Woche: Kopf mit Pfeilen + drei Kacheln */
+  .week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .week-nav button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); font-size: 18px; }
+  .week-nav button[hidden] { visibility: hidden; display: block; }
+  .week-label { text-align: center; }
+  .week-label b { display: block; font-size: 17px; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+  .tile { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 14px; padding: 12px 10px; }
+  .tile b { display: block; font: 700 26px 'Barlow Condensed', Barlow, sans-serif; line-height: 1.05; }
+  .tile span { font-size: 12px; color: var(--dim); }
+  .delta { display: block; font-size: 12px; font-weight: 700; margin-top: 4px; color: var(--dim); }
+  .delta.up { color: var(--good); }
+  .delta.down { color: var(--orange); }
+
+  /* Sätze pro Muskelgruppe: Balken mit Zielbereich */
+  .mg-row { display: grid; grid-template-columns: 92px 1fr 34px; align-items: center; gap: 8px; padding: 5px 0; }
+  .mg-name { font-size: 14px; font-weight: 600; }
+  .mg-track { position: relative; height: 16px; }
+  .mg-band { position: absolute; top: 0; bottom: 0; background: rgba(74, 222, 128, .12); border-left: 1px dashed rgba(74, 222, 128, .5); border-right: 1px dashed rgba(74, 222, 128, .5); }
+  .mg-bar { position: absolute; left: 0; top: 3px; height: 10px; background: var(--blue); border-radius: 0 4px 4px 0; }
+  .mg-num { font: 700 17px 'Barlow Condensed', Barlow, sans-serif; text-align: right; }
+  .mg-flag { font-size: 11px; color: var(--orange); font-weight: 700; }
+  .mg-scale { display: grid; grid-template-columns: 92px 1fr 34px; gap: 8px; font-size: 11px; color: var(--faint); margin-top: 4px; }
+  .mg-scale div { position: relative; height: 14px; }
+  .mg-scale span { position: absolute; transform: translateX(-50%); }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--dim); margin-top: 10px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 5px; }
+
+  /* Diagramme */
+  svg { display: block; width: 100%; overflow: visible; }
+  .axis { font-size: 11px; fill: var(--faint); font-family: Barlow, sans-serif; }
+  .grid { stroke: var(--line-soft); stroke-width: 1; }
+  .readout { min-height: 22px; font-size: 13.5px; color: var(--ink); margin-top: 8px; }
+  .readout b { font-weight: 700; }
+  .hit { fill: transparent; cursor: pointer; }
+
+  /* Listen */
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line-soft); }
+  .row:first-child { border-top: 0; }
+  .row b { font-size: 15px; }
+  .row small { display: block; font-size: 12px; color: var(--dim); }
+  .row .val { text-align: right; font-weight: 700; white-space: nowrap; }
+  .row .val small { font-weight: 500; }
+  .hint { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line-soft); font-size: 14px; }
+  .hint:first-child { border-top: 0; }
+  .hint .ico { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; background: var(--surface2); }
+  select { width: 100%; font: 600 15px Barlow, sans-serif; color: var(--ink); background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+  .big { font: 700 34px 'Barlow Condensed', Barlow, sans-serif; line-height: 1; }
+  .big small { font-size: 16px; color: var(--dim); font-weight: 600; margin-left: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="draft">Entwurf mit Beispieldaten – alles antippbar, noch nicht in der App.</p>
+  <h1>Fortschritt</h1>
+
+  <div class="week-nav">
+    <button type="button" id="wk-prev" aria-label="Vorherige Woche">‹</button>
+    <div class="week-label"><b id="wk-title">Diese Woche</b><span class="sub" id="wk-range"></span></div>
+    <button type="button" id="wk-next" aria-label="Nächste Woche">›</button>
+  </div>
+  <div class="tiles" id="tiles"></div>
+
+  <section class="card">
+    <div class="card-head">
+      <div><h2>Harte Sätze pro Muskelgruppe</h2><p class="sub">Gym und Board zusammen · Zielbereich 10–20 pro Woche</p></div>
+    </div>
+    <div id="mg"></div>
+    <div class="mg-scale" id="mg-scale"></div>
+    <div class="legend"><span><i style="background:var(--blue)"></i>Sätze diese Woche</span><span><i style="background:rgba(74,222,128,.25);border:1px dashed rgba(74,222,128,.6)"></i>Zielbereich</span></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div><h2>Wochenvolumen</h2><p class="sub">letzte 8 Wochen</p></div>
+      <div class="chips" id="vol-metric">
+        <button type="button" class="chip on" data-m="sets">Sätze</button>
+        <button type="button" class="chip" data-m="time">Zeit</button>
+        <button type="button" class="chip" data-m="kg">kg</button>
+      </div>
+    </div>
+    <div id="vol-chart"></div>
+    <p class="readout" id="vol-readout">Balken antippen für Details.</p>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><div><h2>Kraftverlauf</h2><p class="sub">geschätztes Maximalgewicht (1RM) je Training – 8 × 60 kg und 5 × 70 kg werden vergleichbar</p></div></div>
+    <select id="ex-pick"></select>
+    <div class="big" id="ex-big"></div>
+    <div id="ex-chart"></div>
+    <p class="readout" id="ex-readout">Punkt antippen für den Satz dahinter.</p>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><div><h2>Board pro Griff</h2><p class="sub">bester Hang je Griff · Veränderung zu vor 4 Wochen</p></div></div>
+    <div id="grips"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><div><h2>Rekorde</h2><p class="sub">neue Bestwerte der letzten 30 Tage</p></div></div>
+    <div id="prs"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><div><h2>Hinweise</h2><p class="sub">was dem Trainer auffallen würde</p></div></div>
+    <div id="hints"></div>
+  </section>
+</div>
+
+<script>
+/* ---------- Beispieldaten ---------- */
+const WEEKS = [ // älteste zuerst; letzte = diese Woche
+  { label: 'KW 33', range: '11.–17. Aug', sets: 38, min: 165, kg: 6400 },
+  { label: 'KW 34', range: '18.–24. Aug', sets: 44, min: 190, kg: 7100 },
+  { label: 'KW 35', range: '25.–31. Aug', sets: 29, min: 120, kg: 4900 },
+  { label: 'KW 36', range: '1.–7. Sep', sets: 47, min: 205, kg: 7900 },
+  { label: 'KW 37', range: '8.–14. Sep', sets: 51, min: 215, kg: 8300 },
+  { label: 'KW 38', range: '15.–21. Sep', sets: 20, min: 85, kg: 3100 },
+  { label: 'KW 39', range: '22.–28. Sep', sets: 49, min: 210, kg: 8000 },
+  { label: 'KW 40', range: '29. Sep – 5. Okt', sets: 46, min: 220, kg: 8200 },
+];
+const MUSCLES = [ // harte Sätze je Woche (gleiche Reihenfolge wie WEEKS)
+  { name: 'Finger', sets: [12, 14, 9, 15, 16, 6, 15, 16] },
+  { name: 'Zug / Rücken', sets: [10, 12, 8, 13, 14, 5, 12, 13] },
+  { name: 'Druck / Brust', sets: [6, 7, 4, 8, 8, 3, 9, 8] },
+  { name: 'Schultern', sets: [4, 5, 3, 6, 6, 2, 5, 3] },
+  { name: 'Beine', sets: [3, 4, 3, 3, 5, 2, 6, 4] },
+  { name: 'Rumpf', sets: [5, 6, 4, 6, 7, 3, 8, 7] },
+];
+const EXERCISES = {
+  'Bankdrücken': [[60, 8], [60, 9], [62.5, 8], [65, 6], [65, 7], [67.5, 6], [70, 5], [70, 6]],
+  'Klimmzug (Zusatzgewicht)': [[10, 6], [10, 7], [12.5, 5], [12.5, 6], [15, 5], [15, 5], [17.5, 4], [17.5, 5]],
+  'Kreuzheben': [[90, 6], [95, 5], [95, 6], [100, 5], [100, 5], [105, 4], [105, 5], [110, 4]],
+};
+const EX_DATES = ['12.08.', '19.08.', '27.08.', '03.09.', '10.09.', '17.09.', '24.09.', '01.10.'];
+const GRIPS = [
+  { name: 'Mittlere Kante 20 mm', now: '+8 kg × 10 s', before: '+5 kg × 10 s', trend: 'up' },
+  { name: 'Kleinste Kante 15 mm', now: '0 kg × 8 s', before: '0 kg × 6 s', trend: 'up' },
+  { name: '3-Finger-Tasche', now: '+5 kg × 10 s', before: '+5 kg × 10 s', trend: 'flat' },
+  { name: 'Sloper 35°', now: '0 kg × 9 s', before: '0 kg × 10 s', trend: 'down' },
+];
+const PRS = [
+  { name: 'Bankdrücken', val: '70 kg × 6', when: 'vor 1 Tag', est: '≈ 84 kg 1RM' },
+  { name: 'Hang Mittlere Kante 20 mm', val: '+8 kg × 10 s', when: 'vor 3 Tagen', est: 'bisher +7 kg' },
+  { name: 'Kreuzheben', val: '110 kg × 4', when: 'vor 1 Tag', est: '≈ 125 kg 1RM' },
+];
+const HINTS = [
+  { ico: '⚠', text: '<b>Schultern</b> nur 3 harte Sätze diese Woche – deutlich unter dem Zielbereich.' },
+  { ico: '⏸', text: '<b>Beine</b> seit 6 Tagen nicht trainiert.' },
+  { ico: '↗', text: 'Volumen <b>+5 %</b> zur Vorwoche – gut, über 10 % pro Woche wäre zu schnell.' },
+  { ico: '💤', text: 'KW 38 war eine Entlastungswoche (−60 %). Passt nach drei harten Wochen.' },
+];
+
+/* ---------- Woche ---------- */
+let wk = WEEKS.length - 1;
+const fmtMin = (m) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} h`;
+const fmtKg = (k) => k >= 1000 ? `${(k / 1000).toFixed(1).replace('.', ',')} t` : `${k} kg`;
+function deltaHtml(cur, prev) {
+  if (prev == null) return '<span class="delta">–</span>';
+  const p = Math.round(((cur - prev) / prev) * 100);
+  return `<span class="delta ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">${p > 0 ? '▲ +' : p < 0 ? '▼ ' : ''}${p} % zur Vorwoche</span>`;
+}
+function renderWeek() {
+  const w = WEEKS[wk], p = WEEKS[wk - 1];
+  document.getElementById('wk-title').textContent = wk === WEEKS.length - 1 ? 'Diese Woche' : w.label;
+  document.getElementById('wk-range').textContent = w.range;
+  document.getElementById('wk-prev').hidden = wk === 0;
+  document.getElementById('wk-next').hidden = wk === WEEKS.length - 1;
+  document.getElementById('tiles').innerHTML = `
+    <div class="tile"><b>${fmtMin(w.min)}</b><span>Trainingszeit</span>${deltaHtml(w.min, p && p.min)}</div>
+    <div class="tile"><b>${w.sets}</b><span>harte Sätze</span>${deltaHtml(w.sets, p && p.sets)}</div>
+    <div class="tile"><b>${fmtKg(w.kg)}</b><span>bewegt</span>${deltaHtml(w.kg, p && p.kg)}</div>`;
+  renderMuscles();
+}
+document.getElementById('wk-prev').onclick = () => { wk = Math.max(0, wk - 1); renderWeek(); };
+document.getElementById('wk-next').onclick = () => { wk = Math.min(WEEKS.length - 1, wk + 1); renderWeek(); };
+
+/* ---------- Muskelgruppen ---------- */
+const MG_MAX = 24;
+function renderMuscles() {
+  const pct = (v) => `${(v / MG_MAX) * 100}%`;
+  document.getElementById('mg').innerHTML = MUSCLES.map((m) => {
+    const v = m.sets[wk];
+    const flag = v < 10 ? '<div class="mg-flag">unter Ziel</div>' : v > 20 ? '<div class="mg-flag">viel</div>' : '';
+    return `<div class="mg-row" title="${m.name}: ${v} harte Sätze">
+      <div><div class="mg-name">${m.name}</div>${flag}</div>
+      <div class="mg-track"><div class="mg-band" style="left:${pct(10)};width:${pct(10)}"></div><div class="mg-bar" style="width:${pct(v)}"></div></div>
+      <div class="mg-num">${v}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('mg-scale').innerHTML = `<div></div><div>${[0, 10, 20].map((t) => `<span style="left:${pct(t)}">${t}</span>`).join('')}</div><div></div>`;
+}
+
+/* ---------- Wochenvolumen (Balken) ---------- */
+let volMetric = 'sets';
+const VOL = { sets: { key: 'sets', fmt: (v) => `${v} Sätze` }, time: { key: 'min', fmt: fmtMin }, kg: { key: 'kg', fmt: fmtKg } };
+function renderVolume() {
+  const m = VOL[volMetric];
+  const vals = WEEKS.map((w) => w[m.key]);
+  const max = Math.max(...vals) * 1.1;
+  const W = 340, H = 150, padB = 20, bw = (W / vals.length) - 8;
+  const y = (v) => (H - padB) - (v / max) * (H - padB - 6);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wochenvolumen letzte 8 Wochen">`;
+  [0.5, 1].forEach((f) => { const yy = y(max / 1.1 * f); svg += `<line class="grid" x1="0" x2="${W}" y1="${yy}" y2="${yy}"/>`; });
+  vals.forEach((v, i) => {
+    const x = i * (W / vals.length) + 4, top = y(v), h = (H - padB) - top;
+    const cur = i === WEEKS.length - 1;
+    svg += `<path d="M${x},${H - padB} V${top + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${H - padB} Z" fill="var(--blue)" opacity="${cur ? 1 : 0.55}"/>`;
+    svg += `<text class="axis" x="${x + bw / 2}" y="${H - 4}" text-anchor="middle">${WEEKS[i].label.replace('KW ', '')}</text>`;
+    svg += `<rect class="hit" x="${x - 4}" y="0" width="${bw + 8}" height="${H}" data-i="${i}"/>`;
+  });
+  svg += `<text class="axis" x="${W}" y="${y(max / 1.1) - 4}" text-anchor="end">${m.fmt(Math.round(max / 1.1))}</text></svg>`;
+  document.getElementById('vol-chart').innerHTML = svg;
+  document.querySelectorAll('#vol-chart .hit').forEach((r) => {
+    r.onclick = () => { const w = WEEKS[r.dataset.i]; document.getElementById('vol-readout').innerHTML = `<b>${w.label}</b> (${w.range}): ${m.fmt(w[m.key])}`; };
+  });
+}
+document.querySelectorAll('#vol-metric .chip').forEach((b) => {
+  b.onclick = () => { volMetric = b.dataset.m; document.querySelectorAll('#vol-metric .chip').forEach((x) => x.classList.toggle('on', x === b)); renderVolume(); document.getElementById('vol-readout').textContent = 'Balken antippen für Details.'; };
+});
+
+/* ---------- Kraftverlauf (Linie, 1RM nach Epley) ---------- */
+const epley = (w, r) => Math.round(w * (1 + r / 30));
+const pick = document.getElementById('ex-pick');
+pick.innerHTML = Object.keys(EXERCISES).map((n) => `<option>${n}</option>`).join('');
+function renderStrength() {
+  const sets = EXERCISES[pick.value];
+  const vals = sets.map(([w, r]) => epley(w, r));
+  const first = vals[0], last = vals[vals.length - 1];
+  const pct = Math.round(((last - first) / first) * 100);
+  document.getElementById('ex-big').innerHTML = `${last} kg<small>${pct >= 0 ? '+' : ''}${pct} % seit ${EX_DATES[0]}</small>`;
+  const W = 340, H = 140, pad = 14;
+  const lo = Math.min(...vals) * 0.97, hi = Math.max(...vals) * 1.02;
+  const x = (i) => pad + i * ((W - 2 * pad) / (vals.length - 1));
+  const y = (v) => H - 18 - ((v - lo) / (hi - lo)) * (H - 30);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Geschätztes Maximalgewicht ${pick.value}">`;
+  svg += `<line class="grid" x1="0" x2="${W}" y1="${H - 18}" y2="${H - 18}"/>`;
+  svg += `<polyline points="${vals.map((v, i) => `${x(i)},${y(v)}`).join(' ')}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round"/>`;
+  vals.forEach((v, i) => {
+    svg += `<circle cx="${x(i)}" cy="${y(v)}" r="4.5" fill="var(--blue)" stroke="var(--surface)" stroke-width="2"/>`;
+    svg += `<circle class="hit" cx="${x(i)}" cy="${y(v)}" r="18" data-i="${i}"/>`;
+  });
+  [0, vals.length - 1].forEach((i) => { svg += `<text class="axis" x="${x(i)}" y="${H - 3}" text-anchor="${i ? 'end' : 'start'}">${EX_DATES[i]}</text>`; });
+  svg += '</svg>';
+  document.getElementById('ex-chart').innerHTML = svg;
+  document.getElementById('ex-readout').textContent = 'Punkt antippen für den Satz dahinter.';
+  document.querySelectorAll('#ex-chart .hit').forEach((c) => {
+    c.onclick = () => { const i = Number(c.dataset.i); const [w, r] = sets[i]; document.getElementById('ex-readout').innerHTML = `<b>${EX_DATES[i]}</b>: ${String(w).replace('.', ',')} kg × ${r} → ≈ <b>${vals[i]} kg</b> 1RM`; };
+  });
+}
+pick.onchange = renderStrength;
+
+/* ---------- Listen ---------- */
+document.getElementById('grips').innerHTML = GRIPS.map((g) => `
+  <div class="row"><div><b>${g.name}</b><small>vor 4 Wochen: ${g.before}</small></div>
+  <div class="val">${g.now}<small style="display:block;color:${g.trend === 'up' ? 'var(--good)' : g.trend === 'down' ? 'var(--orange)' : 'var(--dim)'}">${g.trend === 'up' ? '▲ besser' : g.trend === 'down' ? '▼ schwächer' : '= gleich'}</small></div></div>`).join('');
+document.getElementById('prs').innerHTML = PRS.map((p) => `
+  <div class="row"><div><b>🏆 ${p.name}</b><small>${p.when}</small></div><div class="val">${p.val}<small style="display:block">${p.est}</small></div></div>`).join('');
+document.getElementById('hints').innerHTML = HINTS.map((h) => `<div class="hint"><span class="ico">${h.ico}</span><span>${h.text}</span></div>`).join('');
+
+renderWeek();
+renderVolume();
+renderStrength();
+</script>
+</body>
+</html>
