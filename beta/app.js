@@ -10858,16 +10858,23 @@ function entryTime(e) { return e.createdAt || new Date(e.date + 'T12:00').getTim
 
 /* Bester Satz einer Übung in einem Training: mit Gewicht = schwerstes
    Gewicht (bei Gleichstand mehr Wdh.), ohne Gewicht = meiste Wdh./Sekunden. */
+/* Bester Satz: Sätze mit Gewicht und Wiederholungen werden über das
+   geschätzte Maximalgewicht (1RM nach Epley: kg × (1 + Wdh./30)) verglichen —
+   so sind 8 × 60 kg und 5 × 70 kg vergleichbar. Halte-Sätze (Sekunden) und
+   Sätze ohne Gewicht wie bisher über Gewicht bzw. Wdh./Sekunden. */
 function bestSetOf(exerciseId, sets) {
   let best = null;
   sets.forEach((st) => {
     const w = st.weight !== '' && st.weight != null ? Number(st.weight) : 0;
     const r = Number(st.reps) || 0;
-    const score = w > 0 ? w * 1000 + r : r;
-    if (!best || score > best.score) best = { w, r, score, suffix: setUnitSuffix(exerciseId, st) };
+    const suffix = setUnitSuffix(exerciseId, st);
+    const e1 = w > 0 && r > 0 && suffix !== 's' ? Math.round(w * (1 + Math.min(r, 12) / 30)) : 0;
+    const score = e1 ? e1 * 1000 + r : w > 0 ? w * 1000 + r : r;
+    if (!best || score > best.score) best = { w, r, e1, score, suffix };
   });
   if (!best) return null;
-  return { ...best, value: best.w > 0 ? best.w : best.r, label: best.w > 0 ? `${best.w} kg × ${best.r}${best.suffix}` : `${best.r}${best.suffix || ' Wdh.'}` };
+  const label = best.w > 0 ? `${best.w} kg × ${best.r}${best.suffix}${best.e1 && best.r > 1 ? ` (≈ ${best.e1} kg 1RM)` : ''}` : `${best.r}${best.suffix || ' Wdh.'}`;
+  return { ...best, value: best.e1 || (best.w > 0 ? best.w : best.r), label };
 }
 
 /* Übungen im Board-Ablauf (Fixübungen wie Kniebeugen, Lifting-Pin mit
@@ -11035,6 +11042,197 @@ function progressStats() {
     if (w > 0 && r > 0 && setUnitSuffix(ex.exerciseId, st) !== 's') kg += w * r;
   })));
   return { last30, streak, kg };
+}
+
+/* ---------- Wochen-Auswertung (Trainer-Sicht) ----------
+   Harte Sätze: jeder Arbeitssatz im Gym (ohne Warm-up/Cooldown/Stretch)
+   zählt 1 für jeden Hauptmuskel; Board: jede geschaffte Hang-/Campus-
+   Wiederholung zählt 1 für die Finger (Campus auch Zug), Fixübungen 1 je
+   Satz. Gruppen zählen einen Satz nur einmal, auch wenn er mehrere ihrer
+   Muskeln trifft. Zielbereich 10–20 harte Sätze pro Gruppe und Woche. */
+const PG_GROUPS = [
+  { id: 'finger', label: 'Finger', muscles: ['forearms_front', 'forearms_back'] },
+  { id: 'zug', label: 'Zug / Rücken', muscles: ['lats', 'traps', 'biceps'] },
+  { id: 'druck', label: 'Druck / Brust', muscles: ['chest', 'triceps'] },
+  { id: 'schultern', label: 'Schultern', muscles: ['shoulders', 'rear_delts', 'neck_traps'] },
+  { id: 'beine', label: 'Beine', muscles: ['quads', 'hamstrings', 'glutes', 'calves', 'shins'] },
+  { id: 'rumpf', label: 'Rumpf', muscles: ['abs', 'obliques', 'lower_back'] },
+];
+const PG_TARGET = [10, 20];
+let progressWeekOffset = 0; // 0 = diese Woche, 1 = letzte …
+let progressVolMetric = 'sets';
+function pgIsHardExercise(id) {
+  if (id === 'warmup_general' || id === 'cooldown_general') return false;
+  const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
+  return !!(ex && ex.muscles && ex.muscles.primary.length && exerciseSupergroup(ex) !== 'stretch');
+}
+function pgWeekStats(offset) {
+  const mon = mondayOf(new Date()); mon.setDate(mon.getDate() - offset * 7);
+  const from = mon.getTime(), to = from + 7 * 86400000;
+  const out = { from, sets: 0, min: 0, kg: 0, zones: {}, groups: {} };
+  PG_GROUPS.forEach((g) => { out.groups[g.id] = 0; });
+  const addSet = (primary, n = 1) => {
+    out.sets += n;
+    primary.forEach((m) => { out.zones[m] = (out.zones[m] || 0) + n; });
+    PG_GROUPS.forEach((g) => { if (primary.some((m) => g.muscles.includes(m))) out.groups[g.id] += n; });
+  };
+  state.logs.forEach((e) => {
+    const t = entryTime(e);
+    if (t < from || t >= to) return;
+    out.min += e.totalSessionSec ? e.totalSessionSec / 60 : Number(e.durationMin) || 0;
+    (e.exercises || []).forEach((ex) => {
+      const sets = Array.isArray(ex.sets) ? ex.sets : [];
+      sets.forEach((st) => {
+        const w = Number(st.weight), r = Number(st.reps);
+        if (w > 0 && r > 0 && setUnitSuffix(ex.exerciseId, st) !== 's') out.kg += w * r;
+      });
+      if (pgIsHardExercise(ex.exerciseId) && sets.length) addSet(exerciseMuscles(ex.exerciseId).primary, sets.length);
+    });
+  });
+  progressFbSessions.forEach((sn) => {
+    const t = entryTime(sn);
+    if (t < from || t >= to) return;
+    (sn.blocks || []).forEach((b, i) => {
+      const r = (sn.results || [])[i];
+      if (!r && sn.partial) return;
+      out.min += fbBlockSeconds(b) / 60;
+      const done = r && Array.isArray(r.doneReps) ? r.doneReps.filter(Boolean).length : Number(b.reps) || 0;
+      if (b.type === 'hang' || (b.type === 'block' && b.mode !== 'reps')) addSet(['forearms_front'], done);
+      else if (b.type === 'block') addSet(['forearms_front'], 1);
+      else if (b.type === 'campus') addSet(['forearms_front', 'lats'], done);
+      else if (b.type === 'exercise' && pgIsHardExercise(b.exerciseId)) addSet(exerciseMuscles(b.exerciseId).primary, 1);
+    });
+  });
+  out.min = Math.round(out.min);
+  return out;
+}
+const pgFmtMin = (m) => (m >= 60 ? `${Math.floor(m / 60)}:${pad2(m % 60)} h` : `${m} min`);
+const pgFmtKg = (k) => (k >= 1000 ? `${(k / 1000).toFixed(1).replace('.', ',')} t` : `${Math.round(k)} kg`);
+function pgDeltaHtml(cur, prev) {
+  if (!prev) return '';
+  const p = Math.round(((cur - prev) / prev) * 100);
+  return `<span class="pg-delta ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">${p > 0 ? '▲ +' : p < 0 ? '▼ ' : ''}${p} %</span>`;
+}
+function pgWeekHtml(w, prev, streak) {
+  const end = new Date(w.from + 6 * 86400000), start = new Date(w.from);
+  const title = progressWeekOffset === 0 ? 'Diese Woche' : progressWeekOffset === 1 ? 'Letzte Woche' : `vor ${progressWeekOffset} Wochen`;
+  return `
+    <div class="pg-weeknav">
+      <button type="button" class="pg-weeknav-btn" data-wk="1" aria-label="Vorherige Woche">‹</button>
+      <div class="pg-weeknav-label"><b>${title}</b><span>${pad2(start.getDate())}.${pad2(start.getMonth() + 1)}. – ${pad2(end.getDate())}.${pad2(end.getMonth() + 1)}.${streak ? ` · ${streak} ${streak === 1 ? 'Woche' : 'Wochen'} in Folge` : ''}</span></div>
+      <button type="button" class="pg-weeknav-btn" data-wk="-1" aria-label="Nächste Woche" ${progressWeekOffset === 0 ? 'style="visibility:hidden"' : ''}>›</button>
+    </div>
+    <div class="pg-tiles">
+      <div class="pg-tile"><b>${pgFmtMin(w.min)}</b><span>Trainingszeit</span>${pgDeltaHtml(w.min, prev.min)}</div>
+      <div class="pg-tile"><b class="accent">${w.sets}</b><span>harte Sätze</span>${pgDeltaHtml(w.sets, prev.sets)}</div>
+      <div class="pg-tile"><b>${pgFmtKg(w.kg)}</b><span>bewegt</span>${pgDeltaHtml(w.kg, prev.kg)}</div>
+    </div>`;
+}
+function pgGroupsHtml(w) {
+  const max = 24, pct = (v) => `${(Math.min(v, max) / max) * 100}%`;
+  return `
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Harte Sätze pro Muskelgruppe</h3><span class="pg-muted">Ziel ${PG_TARGET[0]}–${PG_TARGET[1]}</span></div>
+      ${PG_GROUPS.map((g) => {
+        const v = w.groups[g.id];
+        const flag = v < PG_TARGET[0] ? 'unter Ziel' : v > PG_TARGET[1] ? 'viel' : '';
+        return `<div class="pg-mg-row"><div><div class="pg-mg-name">${g.label}</div>${flag ? `<div class="pg-mg-flag">${flag}</div>` : ''}</div>
+          <div class="pg-mg-track"><div class="pg-mg-band" style="left:${pct(PG_TARGET[0])};width:${pct(PG_TARGET[1] - PG_TARGET[0])}"></div><div class="pg-mg-bar" style="width:${pct(v)}"></div></div>
+          <div class="pg-mg-num">${v}</div></div>`;
+      }).join('')}
+      <div class="pg-mg-scale"><div></div><div>${[0, 10, 20].map((t) => `<span style="left:${pct(t)}">${t}</span>`).join('')}</div><div></div></div>
+      <p class="pg-muted" style="margin:8px 0 0;">Gym und Board zusammen. Board: jede geschaffte Hang-Wiederholung zählt als Satz für die Finger.</p>
+    </div>`;
+}
+const PG_HEAT_STEPS = [
+  { min: 0, label: '0', color: '#2a3140' }, { min: 1, label: '1–4', color: '#1f4a66' },
+  { min: 5, label: '5–9', color: '#2a75a3' }, { min: 10, label: '10–14', color: '#3aa3dc' }, { min: 15, label: '15+', color: '#8fdcff' },
+];
+let pgHeatSel = null;
+function pgHeatHtml(w) {
+  const step = (v) => [...PG_HEAT_STEPS].reverse().find((h) => v >= h.min);
+  const zones = Object.entries(MUSCLE_ZONES_SVG).map(([id, shape]) => `<g class="pg-heat-zone ${id === pgHeatSel ? 'sel' : ''}" data-heat="${id}" fill="${step(w.zones[id] || 0).color}">${shape}</g>`).join('');
+  const sel = pgHeatSel ? w.zones[pgHeatSel] || 0 : null;
+  return `
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Muskel-Heatmap</h3><span class="pg-muted">harte Sätze · antippen</span></div>
+      <div class="pg-heat-wrap">
+        <svg viewBox="${BODY_VIEWBOX}" class="muscle-map pg-heat-map" role="group" aria-label="Muskel-Heatmap">${BODY_BASE_SVG}${zones}${BODY_DECO_SVG}</svg>
+        <div class="ex-body-labels"><span>VORNE</span><span>HINTEN</span></div>
+      </div>
+      <div class="pg-heat-legend">${PG_HEAT_STEPS.map((h) => `<div><i style="background:${h.color}"></i>${h.label}</div>`).join('')}</div>
+      <p class="pg-readout">${pgHeatSel ? `<b>${esc(MUSCLE_ZONE_LABEL[pgHeatSel])}</b>: ${sel} harte ${sel === 1 ? 'Satz' : 'Sätze'}` : 'Muskel antippen für die Zahl.'}</p>
+    </div>`;
+}
+function pgVolumeHtml(weeks) {
+  const M = { sets: { k: 'sets', f: (v) => `${v} Sätze` }, time: { k: 'min', f: pgFmtMin }, kg: { k: 'kg', f: pgFmtKg } }[progressVolMetric];
+  const vals = weeks.map((w) => w[M.k]);
+  const max = Math.max(1, ...vals) * 1.1;
+  const W = 340, H = 140, padB = 20, slot = W / vals.length, bw = slot - 8;
+  const y = (v) => (H - padB) - (v / max) * (H - padB - 6);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" class="pg-vol" role="img" aria-label="Wochenvolumen">`;
+  vals.forEach((v, i) => {
+    const x = i * slot + 4, top = y(v), cur = i === vals.length - 1 - progressWeekOffset;
+    if (v > 0) svg += `<path d="M${x},${H - padB} V${Math.min(top + 4, H - padB)} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${H - padB} Z" fill="var(--accent)" opacity="${cur ? 1 : 0.5}"/>`;
+    const d = new Date(weeks[i].from);
+    svg += `<text x="${x + bw / 2}" y="${H - 4}" text-anchor="middle" class="pg-vol-axis">${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.</text>`;
+    svg += `<rect class="pg-vol-hit" x="${x - 4}" y="0" width="${slot}" height="${H}" data-vol="${i}" fill="transparent"/>`;
+  });
+  svg += `<line x1="0" x2="${W}" y1="${H - padB}" y2="${H - padB}" stroke="var(--line-soft)"/></svg>`;
+  return `
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Wochenvolumen</h3>
+        <div class="chip-row pg-ranges">${[['sets', 'Sätze'], ['time', 'Zeit'], ['kg', 'kg']].map(([k, l]) => `<button type="button" class="chip small ${k === progressVolMetric ? 'active' : ''}" data-vol-metric="${k}">${l}</button>`).join('')}</div>
+      </div>
+      ${svg}
+      <p class="pg-readout" id="pg-vol-readout">Balken antippen für die Woche.</p>
+    </div>`;
+}
+/* Rekorde: Übungen, deren letzter Bestwert in den letzten 30 Tagen alle früheren schlägt */
+function pgRecordsHtml() {
+  const since = Date.now() - 30 * 86400000;
+  const recs = [];
+  ['gym', 'board'].forEach((src) => progressExerciseIds(src).forEach((id) => {
+    const pts = progressSeries(id, 100000, src);
+    if (pts.length < 2) return;
+    const best = pts.reduce((a, b) => (b.score > a.score ? b : a));
+    const earlier = pts.filter((p) => p.t < best.t);
+    if (best.t >= since && earlier.length && best.score > Math.max(...earlier.map((p) => p.score))) recs.push({ id, best });
+  }));
+  recs.sort((a, b) => b.best.t - a.best.t);
+  if (!recs.length) return '';
+  return `
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Rekorde</h3><span class="pg-muted">letzte 30 Tage</span></div>
+      ${recs.slice(0, 5).map((r) => `<div class="pg-record"><span>🏆 ${esc(progressExerciseName(r.id))}<small>${esc(fmtDateShort(new Date(r.best.t)))}</small></span><b>${esc(r.best.label)}</b></div>`).join('')}
+    </div>`;
+}
+/* Hinweise wie von einem Trainer: Gruppen unter Ziel, lange nicht trainiert, Volumensprung */
+function pgHintsHtml(w, prev) {
+  const hints = [];
+  if (progressWeekOffset === 0) {
+    const lastBy = {};
+    for (let o = 0; o < 6; o++) {
+      const ws = pgWeekStats(o);
+      PG_GROUPS.forEach((g) => { if (lastBy[g.id] == null && ws.groups[g.id]) lastBy[g.id] = o; });
+    }
+    PG_GROUPS.forEach((g) => {
+      if (lastBy[g.id] == null) return; // nie trainiert: kein Hinweis (z. B. reine Kletterer ohne Beine)
+      if (lastBy[g.id] >= 2) hints.push(['⏸', `<b>${g.label}</b> seit ${lastBy[g.id]} Wochen nicht trainiert.`]);
+      else if (w.groups[g.id] && w.groups[g.id] < PG_TARGET[0] / 2 && new Date().getDay() !== 1) hints.push(['⚠', `<b>${g.label}</b> erst ${w.groups[g.id]} harte Sätze diese Woche.`]);
+    });
+  }
+  if (prev.sets >= 10 && progressWeekOffset > 0) {
+    const p = Math.round(((w.sets - prev.sets) / prev.sets) * 100);
+    if (p > 25) hints.push(['↗', `Volumen <b>+${p} %</b> zur Vorwoche – mehr als 10–20 % pro Woche erhöht das Verletzungsrisiko.`]);
+    else if (p < -40) hints.push(['💤', `Volumen ${p} % zur Vorwoche – passt als Entlastungswoche nach harten Wochen.`]);
+  }
+  if (!hints.length) return '';
+  return `
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Hinweise</h3></div>
+      ${hints.map(([ico, t]) => `<div class="pg-hint"><span class="pg-hint-ico">${ico}</span><span>${t}</span></div>`).join('')}
+    </div>`;
 }
 
 const RECOVERY_AREAS = [
@@ -11433,12 +11631,17 @@ function drawProgress() {
     return;
   }
 
+  const weeks = []; for (let o = 7; o >= 0; o--) weeks.push(pgWeekStats(o));
+  if (progressWeekOffset > 7) progressWeekOffset = 7;
+  const wkCur = weeks[7 - progressWeekOffset];
+  const wkPrev = progressWeekOffset < 7 ? weeks[6 - progressWeekOffset] : pgWeekStats(progressWeekOffset + 1);
   root.innerHTML = `
-    <div class="pg-tiles">
-      <div class="pg-tile"><b>${stats.last30}</b><span>Einheiten in 30 Tagen</span></div>
-      <div class="pg-tile"><b class="accent">${stats.streak}</b><span>${stats.streak === 1 ? 'Woche' : 'Wochen'} in Folge</span></div>
-      <div class="pg-tile"><b>${stats.kg >= 1000 ? (stats.kg / 1000).toFixed(1).replace('.', ',') + ' t' : Math.round(stats.kg) + ' kg'}</b><span>bewegt diese Woche</span></div>
-    </div>
+    ${pgWeekHtml(wkCur, wkPrev, stats.streak)}
+    ${pgGroupsHtml(wkCur)}
+    ${pgHeatHtml(wkCur)}
+    ${pgHintsHtml(wkCur, wkPrev)}
+    ${pgVolumeHtml(weeks)}
+    ${pgRecordsHtml()}
 
     <div class="pg-card">
       <div class="pg-card-head">
@@ -11452,7 +11655,7 @@ function drawProgress() {
       ${exIds.length ? `<p class="pg-ex-current">${esc(progressExerciseName(progressExerciseId))}</p>` : ''}
       ${isNewPr ? `<div class="pg-pr-wrap">${slothFigure('flex', 'pg-pr-sloth')}<div class="pg-pr">Neuer Rekord: <b>${esc(pts[pts.length - 1].label)}</b></div></div>` : ''}
       ${headline}
-      ${exIds.length ? progressLineChart('pg-ex', pts, 'Bester Satz je Training') : `<div class="list-empty">${progressExerciseIds(progressSource).length ? 'In diesem Zeitraum nichts trainiert — längeren Zeitraum wählen.' : progressSource === 'board' ? 'Noch keine Board-Einheit gespeichert.' : 'Noch keine Gym-Sätze geloggt.'}</div>`}
+      ${exIds.length ? progressLineChart('pg-ex', pts, pts.some((p) => p.e1) ? 'Geschätztes Maximalgewicht (1RM) je Training' : 'Bester Satz je Training') : `<div class="list-empty">${progressExerciseIds(progressSource).length ? 'In diesem Zeitraum nichts trainiert — längeren Zeitraum wählen.' : progressSource === 'board' ? 'Noch keine Board-Einheit gespeichert.' : 'Noch keine Gym-Sätze geloggt.'}</div>`}
       ${exIds.length && pts.length ? cycleLegendHtml() : ''}
       ${exIds.length ? progressOverviewHtml(exIds, days) : ''}
     </div>
@@ -11487,6 +11690,22 @@ function drawProgress() {
     </div>
   `;
   root.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => { progressRange = b.dataset.range; drawProgress(); }; });
+  root.querySelectorAll('[data-wk]').forEach((b) => { b.onclick = () => { progressWeekOffset = Math.max(0, Math.min(7, progressWeekOffset + Number(b.dataset.wk))); drawProgress(); }; });
+  root.querySelectorAll('[data-vol-metric]').forEach((b) => { b.onclick = () => { progressVolMetric = b.dataset.volMetric; drawProgress(); }; });
+  root.querySelectorAll('[data-vol]').forEach((r) => {
+    r.onclick = () => {
+      const i = Number(r.dataset.vol), w = weeks[i], d = new Date(w.from);
+      document.getElementById('pg-vol-readout').innerHTML = `<b>Woche ab ${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.</b> · ${w.sets} Sätze · ${pgFmtMin(w.min)} · ${pgFmtKg(w.kg)}`;
+    };
+  });
+  root.querySelectorAll('[data-heat]').forEach((z) => {
+    z.onclick = () => {
+      const y = window.scrollY;
+      pgHeatSel = z.dataset.heat;
+      drawProgress();
+      window.scrollTo(0, y);
+    };
+  });
   wireCycleCard();
   root.querySelectorAll('[data-pg-source]').forEach((b) => {
     b.onclick = () => {

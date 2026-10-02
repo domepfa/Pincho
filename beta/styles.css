@@ -1842,3 +1842,42 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .fb-dice-preview small { color: var(--ink-faint); }
 .fb-dice-actions { display: flex; gap: 8px; margin-top: 12px; }
 .fb-dice-actions .btn { flex: 1; }
+
+/* Fortschritt: Woche, Muskelgruppen, Heatmap, Volumen, Rekorde, Hinweise */
+.pg-weeknav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.pg-weeknav-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 20px; cursor: pointer; }
+.pg-weeknav-label { text-align: center; }
+.pg-weeknav-label b { display: block; font-size: 17px; }
+.pg-weeknav-label span { font-size: 12px; color: var(--ink-faint); }
+.pg-delta { display: block; font-size: 11.5px; font-weight: 700; margin-top: 3px; color: var(--ink-faint); }
+.pg-delta.up { color: var(--success); }
+.pg-delta.down { color: var(--accent2); }
+.pg-mg-row { display: grid; grid-template-columns: 96px 1fr 30px; align-items: center; gap: 8px; padding: 5px 0; }
+.pg-mg-name { font-size: 14px; font-weight: 600; }
+.pg-mg-flag { font-size: 11px; color: var(--accent2); font-weight: 700; }
+.pg-mg-track { position: relative; height: 16px; }
+.pg-mg-band { position: absolute; top: 0; bottom: 0; background: rgba(74, 222, 128, .12); border-left: 1px dashed rgba(74, 222, 128, .5); border-right: 1px dashed rgba(74, 222, 128, .5); }
+.pg-mg-bar { position: absolute; left: 0; top: 3px; height: 10px; background: var(--accent); border-radius: 0 4px 4px 0; }
+.pg-mg-num { font: 700 17px 'Barlow Condensed', sans-serif; text-align: right; }
+.pg-mg-scale { display: grid; grid-template-columns: 96px 1fr 30px; gap: 8px; font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
+.pg-mg-scale > div { position: relative; height: 14px; }
+.pg-mg-scale span { position: absolute; transform: translateX(-50%); }
+.pg-heat-wrap { max-width: 300px; margin: 0 auto; }
+.muscle-map.pg-heat-map { width: 100%; }
+.pg-heat-map .body-base { pointer-events: none; }
+.pg-heat-map .pg-heat-zone path { stroke: var(--surface); stroke-width: .8; cursor: pointer; opacity: 1; }
+.pg-heat-map .pg-heat-zone.sel path { stroke: var(--ink); stroke-width: 1.6; }
+.pg-heat-legend { display: flex; justify-content: center; gap: 2px; margin-top: 10px; font-size: 11px; color: var(--ink-faint); }
+.pg-heat-legend div { text-align: center; width: 54px; }
+.pg-heat-legend i { display: block; height: 10px; border-radius: 2px; margin-bottom: 3px; }
+.pg-readout { font-size: 13.5px; margin: 8px 0 0; min-height: 20px; }
+.pg-vol { display: block; width: 100%; }
+.pg-vol-axis { font-size: 10.5px; fill: var(--ink-faint); font-family: Barlow, sans-serif; }
+.pg-vol-hit { cursor: pointer; }
+.pg-record { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-soft); font-size: 14.5px; }
+.pg-record:first-of-type { border-top: 0; }
+.pg-record small { display: block; font-size: 12px; color: var(--ink-faint); }
+.pg-record b { white-space: nowrap; }
+.pg-hint { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-soft); font-size: 14px; }
+.pg-hint:first-of-type { border-top: 0; }
+.pg-hint-ico { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); font-size: 13px; }
