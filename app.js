@@ -212,7 +212,7 @@ let exBodyMapOpen = (() => { try { const v = localStorage.getItem('pincho_bodyma
 function exBodyMapIsOpen(useRecents) {
   return exBodyMapOpen ?? !(useRecents && recentExerciseIds(1).length);
 }
-function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll) {
+function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll, dice = false) {
   list = list.filter((e) => !e.hidden);
   const muscleLabel = muscle ? (MUSCLE_ZONE_LABEL[muscle] || muscle) : '';
   const mapOpen = exBodyMapIsOpen(useRecents) || !!muscle;
@@ -221,6 +221,7 @@ function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents,
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input type="search" class="ex-search-input" placeholder="Übung suchen …" aria-label="Übung suchen" value="${esc(query || '')}">
     </label>
+    ${dice ? '<div class="ex-dice-row"><button type="button" class="btn ghost small ex-dice-btn" id="ex-dice-btn" title="Zufällige Übung aus dem gewählten Bereich">🎲 Übung würfeln</button></div><div id="ex-dice-result"></div>' : ''}
     <button type="button" class="ex-body-toggle" id="ex-body-toggle" aria-expanded="${mapOpen}">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 10l4 2 4-2M10 21l2-6 2 6"/></svg>
       ${mapOpen ? 'Körperkarte ausblenden' : 'Nach Muskel wählen'}
@@ -343,7 +344,22 @@ function showExerciseInfoSheet(exerciseId, onChange) {
    früher (getrennte HTML-Erzeugung + Verdrahtung) muss diese Funktion beim
    Wechsel der Körperregion sich selbst neu aufrufen können, da sich dabei
    die sichtbare Übungsliste komplett ändert. */
-function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, scrollTargetId, useRecents = true) {
+/* Übung würfeln (nur Freestyle): zufällig aus dem gewählten Muskel bzw.
+   Bereich, sonst aus allem ausser Stretch; heute schon gemachte Übungen
+   (excludeIds) und der letzte Wurf fallen raus. Nur ein Vorschlag —
+   erst "Übernehmen" wählt die Übung aus. */
+function rollExercise(list, sg, muscle, excludeIds, lastId) {
+  let pool = list.filter((e) => !e.hidden);
+  if (muscle) pool = pool.filter((e) => e.muscles && e.muscles.primary.includes(muscle));
+  else if (sg) pool = pool.filter((e) => exerciseSupergroup(e) === sg);
+  else pool = pool.filter((e) => exerciseSupergroup(e) !== 'stretch');
+  const fresh = pool.filter((e) => !excludeIds.includes(e.id));
+  if (fresh.length) pool = fresh;
+  if (pool.length > 1) pool = pool.filter((e) => e.id !== lastId);
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)].id : null;
+}
+
+function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, scrollTargetId, useRecents = true, opts = {}) {
   const holder = document.getElementById(containerId);
   if (!holder) return;
   let selectedId = initialSelectedId;
@@ -399,7 +415,31 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
     wireList();
   };
   const render = () => {
-    holder.innerHTML = exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll);
+    holder.innerHTML = exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents, showAll, !!opts.dice);
+    const diceBtn = holder.querySelector('#ex-dice-btn');
+    if (diceBtn) {
+      let lastRoll = null;
+      const roll = () => {
+        const id = rollExercise(list, sg, muscle, opts.excludeIds ? opts.excludeIds() : [], lastRoll);
+        const out = holder.querySelector('#ex-dice-result');
+        if (!id) { out.innerHTML = '<p class="login-hint">Hier gibt es nichts zu würfeln.</p>'; return; }
+        lastRoll = id;
+        const ex = list.find((e) => e.id === id);
+        const where = muscle ? (MUSCLE_ZONE_LABEL[muscle] || muscle) : EX_SUPERGROUP_LABEL[exerciseSupergroup(ex)] || '';
+        out.innerHTML = `
+          <div class="ex-dice-card">
+            <span class="ex-dice-label">🎲 Vorschlag${where ? ' · ' + esc(where) : ''}</span>
+            <b class="ex-dice-name">${esc(ex.name)}</b>
+            <div class="ex-dice-actions">
+              <button type="button" class="btn small" id="ex-dice-take">Übernehmen</button>
+              <button type="button" class="btn ghost small" id="ex-dice-again">Nochmal 🎲</button>
+            </div>
+          </div>`;
+        out.querySelector('#ex-dice-take').onclick = () => { selectedId = id; out.innerHTML = ''; onSelect(id); };
+        out.querySelector('#ex-dice-again').onclick = roll;
+      };
+      diceBtn.onclick = roll;
+    }
     holder.querySelectorAll('.body-zone').forEach((el) => {
       el.onclick = () => {
         const m = el.dataset.muscle;
@@ -429,6 +469,8 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
     setSearching(!!query);
     search.onfocus = () => {
       setSearching(true);
+      // Steht schon etwas drin: markieren, damit Tippen es direkt ersetzt
+      if (search.value) search.select();
       setTimeout(() => {
         // Feld knapp unter die feste Kopfzeile holen (scrollIntoView landete dahinter)
         const bar = document.querySelector('.topbar');
@@ -1101,6 +1143,19 @@ function showFabStart(label, targetId) {
    unter dem Daumen, statt die kleine Box in der Liste suchen zu müssen.
    Nur die Eingabe von Gewicht/Wdh. bleibt in der Karte der Übung (unten
    würde die Tastatur sie verdecken). Inhalt baut renderFsPanel(). */
+/* Workout-Uhr: gesamte Trainingszeit seit Start der Session (sessionStartedAt),
+   klein oben in der Leiste. Ein einziges Intervall aktualisiert sie, solange
+   sie im DOM steht — rechnet wie die Satz-Uhren aus der echten Uhrzeit. */
+function fmtSessionClock(startedAt) {
+  const sec = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+setInterval(() => {
+  const el = document.getElementById('fs-session-clock');
+  const b = el && activeSetBuilder();
+  if (b && b.sessionStartedAt) el.textContent = `⏱ ${fmtSessionClock(b.sessionStartedAt)}`;
+}, 1000);
 function ensureFsDock() {
   let el = document.getElementById('fs-dock');
   if (!el) {
@@ -1123,6 +1178,7 @@ function render() {
   if (!state.member) { boot(); return; }
   hideFabStart(); // jede Route entscheidet selbst, ob/wofür sie ihn zeigt
   hideFsDock();
+  document.getElementById('fb-dice-sheet')?.remove(); // Würfel-Fenster gehört zum Board-Tab
   switch (state.route) {
     case 'log': renderLog(); break;
     case 'fingerboard': renderFingerboard(); break;
@@ -1338,7 +1394,7 @@ function lastValueForExercise(exerciseId) {
       if (Array.isArray(ex.sets)) {
         if (ex.sets.length) {
           const last = ex.sets[ex.sets.length - 1];
-          return { weight: last.weight, reps: last.reps };
+          return { weight: last.weight, reps: last.reps, note: last.note || '' };
         }
       } else if (ex.reps !== '' && ex.reps != null) {
         return { weight: ex.weight, reps: ex.reps };
@@ -1960,7 +2016,7 @@ function renderWallOverlay() {
     <button type="button" class="fb-overlay-close" id="wall-close" title="Abbrechen">✕</button>
     <div class="fb-overlay-inner">
       <div class="fb-stage-label mono">SATZ ${wall.blockIndex + 1}/${wallBlocks.length} · ${working ? 'WAND' : 'PAUSE'}</div>
-      <div class="fb-stage-figure" id="wall-figure">${working ? wallFigureSvg() : FB_REST_FIGURE_SVG}</div>
+      <div class="fb-stage-figure" id="wall-figure">${working ? wallFigureSvg() : fbRestFigureSvg()}</div>
       <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
         <div class="fb-timer-ring">
           <svg viewBox="0 0 120 120">
@@ -2463,7 +2519,7 @@ function renderFlowOverlay() {
     <button type="button" class="fb-overlay-close" id="flow-close" title="Abbrechen">✕</button>
     <div class="fb-overlay-inner">
       <div class="fb-stage-label mono">POSE ${flow.blockIndex + 1}/${flowBlocks.length} · ${esc(poseName(block.poseId))}</div>
-      <div class="fb-stage-figure" id="flow-figure">${working ? '<div class="ex-figure-emoji">🧘</div>' : FB_REST_FIGURE_SVG}</div>
+      <div class="fb-stage-figure" id="flow-figure">${working ? '<div class="ex-figure-emoji">🧘</div>' : fbRestFigureSvg()}</div>
       <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
         <div class="fb-timer-ring">
           <svg viewBox="0 0 120 120">
@@ -2503,7 +2559,7 @@ function updateFlowUI() {
   const phaseEl = document.getElementById('flow-phase');
   if (phaseEl) phaseEl.textContent = working ? 'Halten' : 'Wechsel';
   const figureHolder = document.getElementById('flow-figure');
-  if (figureHolder) figureHolder.innerHTML = working ? '<div class="ex-figure-emoji">🧘</div>' : FB_REST_FIGURE_SVG;
+  if (figureHolder) figureHolder.innerHTML = working ? '<div class="ex-figure-emoji">🧘</div>' : fbRestFigureSvg();
 }
 
 /* Läuft die ganze Liste durch ODER wird vorzeitig beendet — landet wie
@@ -2565,7 +2621,8 @@ function fbExerciseSetsText(ex) {
   if (Array.isArray(ex.sets)) {
     return ex.sets.map((s) => {
       const suffix = setUnitSuffix(ex.exerciseId, s);
-      return s.weight !== '' && s.weight != null ? `${s.weight}kg×${s.reps}${suffix}` : `${s.reps}${suffix}`;
+      const note = s.note ? ` (${s.note})` : '';
+      return (s.weight !== '' && s.weight != null ? `${s.weight}kg×${s.reps}${suffix}` : `${s.reps}${suffix}`) + note;
     }).join(', ');
   }
   const suffix = exerciseIsHold(ex.exerciseId) ? 's' : '';
@@ -2650,7 +2707,7 @@ function renderLogBuilderPanel() {
       // Zur aktiven Übung scrollen statt zu einer festen Stelle — das
       // Eingabefeld steht jetzt direkt bei ihr, nicht mehr fest oben.
       document.getElementById(`fs-group-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, null);
+    }, null, true, { dice: true, excludeIds: () => freestyleBuilder.exercises.filter((g) => g.sets && g.sets.length).map((g) => g.exerciseId) });
     renderFsPanel();
   } else if (logMode === 'execute') {
     holder.innerHTML = `
@@ -2820,9 +2877,15 @@ function renderLogBuilderPanel() {
    Eine einzige, modul-globale Phase/Uhr reicht, da jeweils nur eine
    Übung gleichzeitig aktiv ist. */
 let fsPhase = 'idle';
-let fsWorkTimer = { seconds: 0, intervalId: null };
-let fsRestTimer = { seconds: 0, intervalId: null };
+// startedAt: Zeitstempel statt reinem Hochzählen — bei ausgeschaltetem
+// Display drosselt/stoppt das Handy setInterval, die Sekunden werden daher
+// bei jedem Tick aus der echten Uhr berechnet (sonst stand z. B. der
+// Cooldown-Timer still, solange der Bildschirm aus war).
+let fsWorkTimer = { seconds: 0, intervalId: null, startedAt: 0 };
+let fsRestTimer = { seconds: 0, intervalId: null, startedAt: 0 };
 let fsCapturedElapsed = 0;
+// Satz, zu dem die Notiz im Pausen-Screen gehört (zuletzt gespeicherter Satz)
+let fsNoteTarget = null;
 
 function updateFsWorkTimerUI() {
   const el = document.getElementById('fs-work-timer');
@@ -2832,9 +2895,10 @@ function startFsWorkTimer() {
   requestWakeLock(); // Bildschirm soll während einer laufenden Session nicht ausgehen (dieselbe Sperre wie im Fingerboard-Ablauf)
   clearInterval(fsWorkTimer.intervalId);
   fsWorkTimer.seconds = 0;
+  fsWorkTimer.startedAt = Date.now();
   updateFsWorkTimerUI();
   fsWorkTimer.intervalId = setInterval(() => {
-    fsWorkTimer.seconds++;
+    fsWorkTimer.seconds = Math.floor((Date.now() - fsWorkTimer.startedAt) / 1000);
     updateFsWorkTimerUI();
   }, 1000);
 }
@@ -2871,12 +2935,18 @@ function startFsRestTimer() {
   requestWakeLock();
   clearInterval(fsRestTimer.intervalId);
   fsRestTimer.seconds = 0;
+  fsRestTimer.startedAt = Date.now();
   updateFsRestTimerUI();
   fsRestTimer.intervalId = setInterval(() => {
-    fsRestTimer.seconds++;
+    const prev = fsRestTimer.seconds;
+    fsRestTimer.seconds = Math.floor((Date.now() - fsRestTimer.startedAt) / 1000);
+    if (fsRestTimer.seconds === prev) return;
     updateFsRestTimerUI();
     // Gong je 30s: 0:30 → 1×, 1:00 → 2×, 1:30 → 3×, ab 2:00 → 4× (Obergrenze).
-    if (fsRestTimer.seconds % 30 === 0) gongStrikes(Math.min(4, fsRestTimer.seconds / 30));
+    // Nur wenn die 30er-Marke in diesem Tick überschritten wurde und nicht
+    // nach langem Display-aus nachträglich (dann würde es verspätet gongen).
+    const mark = Math.floor(fsRestTimer.seconds / 30);
+    if (mark > Math.floor(prev / 30) && fsRestTimer.seconds - prev <= 2) gongStrikes(Math.min(4, mark));
   }, 1000);
 }
 // Ohne explizites Stoppen lief die Pausenuhr bisher im Hintergrund einfach
@@ -3013,7 +3083,8 @@ function fsSetSuggestion(g) {
   if (!last || last.reps === '' || last.reps == null) return '';
   const w = last.weight !== '' && last.weight != null ? `${String(last.weight).replace('.', ',')} kg × ` : '';
   const unit = (last.unit || 'reps') === 'time' ? ' s' : '';
-  return `${g.sets.length ? 'eben' : 'letztes Mal'} ${w}${last.reps}${unit}`;
+  const note = last.note ? ` · „${last.note}“` : '';
+  return `${g.sets.length ? 'eben' : 'letztes Mal'} ${w}${last.reps}${unit}${note}`;
 }
 function hideFsRestScreen() {
   const el = document.getElementById('fs-rest-screen');
@@ -3042,6 +3113,7 @@ function renderFsRestScreen(builder) {
   }).join('');
   const target = fsRestTargetSec();
   const extra = dock.querySelector('#fs-next-set') && primary.id === 'fs-next-exercise';
+  const noteSet = fsNoteTarget && builder.exercises[fsNoteTarget.gi] ? builder.exercises[fsNoteTarget.gi].sets[fsNoteTarget.si] : null;
   let el = document.getElementById('fs-rest-screen');
   const isNew = !el;
   if (!el) {
@@ -3068,6 +3140,8 @@ function renderFsRestScreen(builder) {
         <span>Ziel ${fmtMinSec(target)}</span>
         <button type="button" class="fs-rest-adj" data-rest-adj="15" aria-label="Pause 15 Sekunden länger">+15 s</button>
       </div>
+      ${noteSet ? `<label class="fs-rest-label fs-rest-note-label" for="fs-rest-note">Notiz zu ${esc(exerciseName(builder.exercises[fsNoteTarget.gi].exerciseId))} · Satz ${fsNoteTarget.si + 1}</label>` : ''}
+      ${noteSet ? `<input type="text" class="fs-rest-note" id="fs-rest-note" enterkeyhint="done" maxlength="80" placeholder="Notiz zum Satz, z. B. Untergriff, Sitz 4" value="${esc(noteSet.note || '')}">` : ''}
       <div class="fs-rest-next">
         <span class="fs-rest-label">${group.length > 1 ? `Runde ${builder.exercises[group[0]].sets.length + 1}` : 'Als Nächstes'}</span>
         ${lines}
@@ -3080,6 +3154,15 @@ function renderFsRestScreen(builder) {
     </div>`;
   if (isNew) el.querySelector('.fs-rest-card').style.animation = '';
   document.getElementById('fs-rest-go').onclick = () => { fsRestHidden = false; primary.click(); };
+  const noteInput = document.getElementById('fs-rest-note');
+  if (noteInput) {
+    noteInput.oninput = () => {
+      noteSet.note = noteInput.value.trim();
+      if (!noteSet.note) delete noteSet.note;
+      if (logMode === 'freestyle') saveDraft('freestyle', builder);
+    };
+    noteInput.onkeydown = (e) => { if (e.key === 'Enter') noteInput.blur(); };
+  }
   const ex = document.getElementById('fs-rest-extra');
   if (ex) ex.onclick = () => dock.querySelector('#fs-next-set')?.click();
   document.getElementById('fs-rest-switch').onclick = () => {
@@ -3121,6 +3204,7 @@ function renderFsPanel() {
     const head = `
       <div class="fs-dock-head mono">
         <span class="fs-dock-name">▸ ${esc(exerciseName(g.exerciseId))}</span>
+        ${builder.sessionStartedAt ? `<span class="fs-session-clock" id="fs-session-clock" title="Trainingszeit gesamt">⏱ ${fmtSessionClock(builder.sessionStartedAt)}</span>` : ''}
         ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-dock-add">+ Übung</button>` : ''}
       </div>`;
     if (fsPhase === 'idle') {
@@ -3189,8 +3273,8 @@ function renderFsPanel() {
         <button type="button" class="chip ${isHold ? 'active' : ''}" data-unit="time">Zeit</button>
       </div>
       <div class="field-row">
-        <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" enterkeyhint="next" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
-        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" value="${isHold ? fsCapturedElapsed : esc(prevReps)}"></div>
+        <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" enterkeyhint="next" id="fs-weight" data-entry-key="${builder.activeIndex}:${g.sets.length}" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
+        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" data-entry-key="${builder.activeIndex}:${g.sets.length}:${unit}" value="${isHold ? fsCapturedElapsed : esc(prevReps)}"></div>
       </div>
       <button type="button" class="btn small" id="fs-add-set" style="width:100%;">Satz speichern</button>
     `;
@@ -3211,6 +3295,14 @@ function renderFsPanel() {
     const linked = cur.superset && cur.superset === prev.superset;
     return `<button type="button" class="ss-link ${linked ? 'linked' : ''}" data-fs-ss="${gi}">${linked ? 'Supersatz lösen' : `＋ Mit ${esc(exerciseName(prev.exerciseId))} als Supersatz verbinden`}</button>`;
   };
+  // Schon eingetippte Werte (Gewicht/Wdh.) über das Neu-Zeichnen retten —
+  // z. B. ✎ Maschineneinstellungen zeichnet die Karte neu, und die Felder
+  // kämen sonst wieder mit dem Vorschlag vom letzten Mal zurück.
+  const prevWeightEl = document.getElementById('fs-weight');
+  const prevRepsEl = document.getElementById('fs-reps');
+  const typedEntry = prevWeightEl && prevRepsEl
+    ? { key: prevWeightEl.dataset.entryKey, unitKey: prevRepsEl.dataset.entryKey, weight: prevWeightEl.value, reps: prevRepsEl.value }
+    : null;
   holder.innerHTML = `${tabsHtml}
     ${orderedExercises.map(({ g, gi }) => {
       const isActive = gi === builder.activeIndex;
@@ -3266,6 +3358,7 @@ function renderFsPanel() {
           <input type="text" inputmode="numeric" class="ex-row-input" data-edit="${gi}:${si}:reps" value="${esc(String(s.reps))}" placeholder="${setIsHold ? 's' : 'Wdh'}" title="${setIsHold ? 'Dauer (s)' : 'Wiederholungen'}">
           <button type="button" class="ex-row-remove" data-remove-set="${gi}:${si}" title="Satz entfernen">×</button>
         </div>
+        ${s.note ? `<div class="fs-set-note">${esc(s.note)}</div>` : ''}
       `;
         }).join('') : '<div class="fs-set-row mono" style="color:var(--ink-faint);">noch keine Sätze</div>';
       })()}
@@ -3437,6 +3530,11 @@ function renderFsPanel() {
   const weightEl = document.getElementById('fs-weight');
   const repsEl = document.getElementById('fs-reps');
   if (weightEl) {
+    if (typedEntry && typedEntry.key === weightEl.dataset.entryKey) {
+      weightEl.value = typedEntry.weight;
+      // Wdh. nur bei gleicher Einheit übernehmen (Umschalten auf Zeit setzt die gestoppte Dauer ein)
+      if (typedEntry.unitKey === repsEl.dataset.entryKey) repsEl.value = typedEntry.reps;
+    }
     // Beim Fokussieren den Wert markieren statt zu löschen — Tippen
     // ersetzt eine markierte Auswahl automatisch, aber man sieht den
     // vorgeschlagenen Wert noch kurz, bevor man drüberschreibt. Wichtig
@@ -3460,6 +3558,7 @@ function renderFsPanel() {
       setTimeout(() => {
         const unit = exerciseUnit(builder.exercises[builder.activeIndex].exerciseId);
         builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps, elapsedSec: fsCapturedElapsed, unit });
+        fsNoteTarget = { gi: builder.activeIndex, si: builder.exercises[builder.activeIndex].sets.length - 1 };
         // Supersatz: ohne Pause weiter zur nächsten Übung der Runde; Pause erst nach der letzten
         const mem = supersetMembers(builder.exercises, builder.activeIndex);
         const nextInRound = mem.find((j) => j > builder.activeIndex && !(logMode === 'execute' && fsExerciseDone(builder.exercises[j])));
@@ -4884,12 +4983,487 @@ function renderCampusAddPanel(holder) {
   };
 }
 
+/* ---------- Würfeln am Board ----------
+   Ein Satz (füllt nur das Formular, Hinzufügen wie gewohnt) oder ein ganzer
+   Ablauf (Vorschau, erst "Übernehmen" ersetzt den Ablauf). Sicherheit:
+   gewürfelt wird nach Schwierigkeitsstufe — am Anfang nur grosse Griffe,
+   kleine Leisten/Taschen erst nach ein paar Sätzen, Monos nie. */
+const FB_DICE_TIER = {
+  jug: 0, edge_large: 0, sloper_easy: 0,
+  edge_medium: 1, sloper_medium: 1, pocket3: 1, pocket3_deep: 1, pocket2_deep: 1, edge3: 1,
+  edge_small: 2, pocket3_small: 2, pocket2: 2, pocket2_offset: 2, sloper_hard: 2,
+  edge_xsmall: 3, pocket2_small: 3,
+};
+const FB_DICE_CAMPUS_TIER = { rundleiste_gross: 0, leiste_gross: 0, leiste_35: 1, kugel_gross: 1, leiste_27: 2, kugel_klein: 2, leiste_19: 3 };
+// Sprossenfolgen (Stationen), vom Leichten zum Schweren
+const FB_DICE_CAMPUS_ROUTES = [
+  [[1, 2, 3, 4], [1, 3, 5]],
+  [[1, 3, 5, 7], [1, 4, 7], [1, 2, 3, 4, 5, 6]],
+  [[1, 4, 7, 9], [1, 3, 5, 7, 9], [1, 5, 8]],
+  [[1, 5, 9], [1, 4, 7, 10], [1, 4, 2, 5, 3, 6]],
+];
+let fbDice = { what: 'set', kind: 'hang', len: 15, preview: null };
+const diceInt = (min, max, step = 1) => min + step * Math.floor(Math.random() * (Math.floor((max - min) / step) + 1));
+const dicePick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+// Höchste erlaubte Stufe je nach Anzahl Arbeitssätze davor
+const fbDiceMaxTier = (workBefore) => (workBefore < 2 ? 1 : workBefore < 4 ? 2 : 3);
+
+/* Letzter Hang-Satz an diesem Griff aus dem Verlauf (für Hängezeit/Sätze) */
+function fbDiceLastHang(board, grip) {
+  for (const sn of fbSessionsCache) {
+    const b = (sn.blocks || []).find((x) => x.type === 'hang' && x.board === board && x.grip === grip);
+    if (b) return b;
+  }
+  return null;
+}
+function fbDiceHang(board, maxTier, lastGrip, warm = false) {
+  // Einarmige Griffe nie würfeln — einarmig hängen ist zu hart für einen Zufallsvorschlag
+  const grips = BOARDS[board].grips.filter((g) => FB_DICE_TIER[g.id] != null && FB_DICE_TIER[g.id] <= maxTier && g.id !== lastGrip && gripArmNote(board, g.id) !== 'einarmig');
+  // Aufwärmen: grosse Griffe bevorzugen; danach schwerere Stufen etwas bevorzugen (sonst fast nur Aufwärmgriffe)
+  const weighted = grips.flatMap((g) => Array(warm ? 2 - FB_DICE_TIER[g.id] : FB_DICE_TIER[g.id] + 1).fill(g));
+  const g = dicePick(weighted.length ? weighted : BOARDS[board].grips.filter((x) => FB_DICE_TIER[x.id] === 0 && gripArmNote(board, x.id) !== 'einarmig'));
+  const tier = FB_DICE_TIER[g.id] ?? 1;
+  const last = fbDiceLastHang(board, g.id);
+  const [lo, hi] = [[8, 12], [7, 10], [6, 10], [5, 8]][tier];
+  const hangSec = last ? Math.min(hi + 2, Math.max(lo, last.hangSec + diceInt(-1, 1))) : diceInt(lo, hi);
+  const b = { type: 'hang', board, grip: g.id, reps: diceInt(2, 4), hangSec, restSec: diceInt(30, 60, 15), blockRestSec: diceInt(90, 150, 30) };
+  return b;
+}
+function fbDiceCampus(maxTier) {
+  maxTier = Math.max(0, maxTier);
+  const types = CAMPUS_RUNG_TYPES.filter((t) => (FB_DICE_CAMPUS_TIER[t.id] ?? 1) <= maxTier);
+  const t = dicePick(types.length ? types : CAMPUS_RUNG_TYPES);
+  const routeTier = Math.min(maxTier, FB_DICE_CAMPUS_ROUTES.length - 1);
+  const stops = dicePick(FB_DICE_CAMPUS_ROUTES[diceInt(0, routeTier)]);
+  return { rungType: t.id, stops, reps: diceInt(3, 5), workSec: 3, restSec: diceInt(15, 30, 15), blockRestSec: diceInt(90, 150, 30) };
+}
+function fbDiceCampusBlock(maxTier) {
+  const d = fbDiceCampus(maxTier);
+  const c = { ...fb.newCampus, rungType: d.rungType, rungSides: 'same', armMode: 'both', reps: d.reps, workSec: d.workSec, restSec: d.restSec, blockRestSec: d.blockRestSec };
+  campusSetStops(c, d.stops);
+  const out = { type: 'campus', ...c, pattern: (c.pattern || []).slice() };
+  delete out.rungSides; delete out.pickHand; delete out.routeFresh; delete out.hands; delete out.skipEnd; delete out.rungTypeRight;
+  return out;
+}
+/* Ganzer Ablauf: Aufwärmen auf grossen Griffen, dann ansteigend, bis die Ziellänge erreicht ist */
+function fbDiceAblauf(kind, minutes) {
+  const board = fb.board || currentMemberBoard();
+  const blocks = [];
+  let work = 0, lastGrip = null;
+  const total = () => blocks.reduce((sum, b) => sum + fbBlockSeconds(b), 0);
+  while (total() < minutes * 60 && blocks.length < 30) {
+    const campusTurn = kind === 'campus' ? work >= 1 : kind === 'mix' ? work >= 2 && work % 2 === 1 : false;
+    let b;
+    if (campusTurn) b = fbDiceCampusBlock(fbDiceMaxTier(work) - 1);
+    else { b = fbDiceHang(board, fbDiceMaxTier(work), lastGrip, work < 2); lastGrip = b.grip; }
+    blocks.push(b);
+    work++;
+  }
+  return blocks;
+}
+function fbDiceSet() {
+  const workBefore = fb.blocks.filter((b) => b.type !== 'pause').length;
+  const maxTier = fbDiceMaxTier(workBefore);
+  if (fbDice.kind === 'campus') {
+    const d = fbDiceCampus(maxTier);
+    const c = fb.newCampus;
+    Object.assign(c, { rungType: d.rungType, rungSides: 'same', reps: d.reps, workSec: d.workSec, restSec: d.restSec, blockRestSec: d.blockRestSec });
+    campusSetStops(c, d.stops);
+    fb.addType = 'campus';
+  } else {
+    const b = fbDiceHang(fb.board, maxTier, fb.selectedGrip);
+    fb.addType = 'hang';
+    fb.gripMode = 'same';
+    fb.selectedGrip = b.grip;
+    Object.assign(fb.newHang, { reps: b.reps, hangSec: b.hangSec, restSec: b.restSec, blockRestSec: b.blockRestSec });
+  }
+  document.querySelectorAll('[data-add-type]').forEach((x) => x.classList.toggle('active', x.dataset.addType === fb.addType));
+  const wf = document.getElementById('fb-weight-field');
+  if (wf) wf.hidden = false;
+  renderFbAddPanel();
+}
+function openFbDiceSheet() {
+  let el = document.getElementById('fb-dice-sheet');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fb-dice-sheet';
+    el.className = 'info-sheet-backdrop';
+    document.body.appendChild(el);
+    el.onclick = (e) => { if (e.target === el) el.remove(); };
+    wireSheetSwipeDown(el, () => el.remove());
+  }
+  const d = fbDice;
+  const chip = (attr, val, cur, label) => `<button type="button" class="chip ${val === cur ? 'active' : ''}" data-${attr}="${val}">${label}</button>`;
+  const totalSec = d.preview ? d.preview.reduce((sum, b) => sum + fbBlockSeconds(b), 0) : 0;
+  el.innerHTML = `
+    <div class="info-sheet-card fb-dice-card">
+      <div class="fs-rest-grip" aria-hidden="true"></div>
+      <h3 class="fb-dice-title">🎲 Würfeln</h3>
+      <div class="chip-row">${chip('dice-what', 'set', d.what, 'Ein Satz')}${chip('dice-what', 'ablauf', d.what, 'Ganzer Ablauf')}</div>
+      <label class="fs-rest-label fb-dice-label">Art</label>
+      <div class="chip-row">${chip('dice-kind', 'hang', d.kind, 'Board')}${chip('dice-kind', 'campus', d.kind, 'Campus')}${d.what === 'ablauf' ? chip('dice-kind', 'mix', d.kind, 'Mix') : ''}</div>
+      ${d.what === 'ablauf' ? `<label class="fs-rest-label fb-dice-label">Länge</label>
+      <div class="chip-row">${chip('dice-len', '15', String(d.len), '~15 min')}${chip('dice-len', '30', String(d.len), '~30 min')}</div>` : ''}
+      ${d.what === 'ablauf' && d.preview ? `
+        <div class="fb-dice-preview">
+          <span class="fs-rest-label">${d.preview.length} Sätze · ~${fmtMinSec(totalSec)}</span>
+          <ol>${d.preview.map((b) => `<li>${fbBlockTitle(b)} <small>${b.type === 'campus' ? `${b.reps}×` : `${b.reps}× ${b.hangSec}s`}</small></li>`).join('')}</ol>
+          ${fb.blocks.length ? '<p class="login-hint">Übernehmen ersetzt den aktuellen Ablauf.</p>' : ''}
+        </div>
+        <div class="fb-dice-actions">
+          <button type="button" class="btn" id="fb-dice-take">Übernehmen</button>
+          <button type="button" class="btn ghost" id="fb-dice-roll">Nochmal 🎲</button>
+        </div>` : `<button type="button" class="btn fb-dice-go" id="fb-dice-roll">🎲 Würfeln</button>`}
+      ${d.what === 'set' ? '<p class="login-hint">Der Satz landet im Formular — dort wie gewohnt hinzufügen.</p>' : ''}
+    </div>`;
+  el.querySelectorAll('[data-dice-what]').forEach((b) => { b.onclick = () => { d.what = b.dataset.diceWhat; if (d.what === 'set' && d.kind === 'mix') d.kind = 'hang'; d.preview = null; openFbDiceSheet(); }; });
+  el.querySelectorAll('[data-dice-kind]').forEach((b) => { b.onclick = () => { d.kind = b.dataset.diceKind; d.preview = null; openFbDiceSheet(); }; });
+  el.querySelectorAll('[data-dice-len]').forEach((b) => { b.onclick = () => { d.len = Number(b.dataset.diceLen); d.preview = null; openFbDiceSheet(); }; });
+  el.querySelector('#fb-dice-roll').onclick = () => {
+    if (d.what === 'set') {
+      el.remove();
+      fbDiceSet();
+      document.getElementById('fb-add-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    d.preview = fbDiceAblauf(d.kind, d.len);
+    openFbDiceSheet();
+  };
+  const take = el.querySelector('#fb-dice-take');
+  if (take) take.onclick = () => {
+    fb.blocks = d.preview;
+    d.preview = null;
+    const picker = document.getElementById('fb-template-picker');
+    if (picker) picker.value = '';
+    el.remove();
+    renderFbBlocksList();
+    document.getElementById('fb-blocks-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    toast('Gewürfelter Ablauf übernommen', 'ok');
+  };
+}
+
+/* ---------- Würfelduell (zu zweit, ein Handy) ----------
+   Vollbild über der App, aus beta/entwurf-wuerfelspiel.html übernommen.
+   Ablauf je Runde: gemeinsamen Griff würfeln (wird jede Runde kleiner,
+   keine Monos/einarmigen Griffe), dann würfelt jeder dem anderen die
+   Hängezeit. Kein Sieger — gezählt wird die gehaltene Zeit ("wer länger
+   hängt, hat Kraft gewonnen"). Zwischen den eigenen Hangs mindestens 90 s
+   Pause. Die eigenen Hangs (Spieler 1 = angemeldete Person) landen als
+   Board-Einheit (templateId 'duel') im Verlauf und im Fortschritt. */
+function openDuel() {
+  if (document.getElementById('duel')) return;
+  const root = document.createElement('div');
+  root.id = 'duel';
+  root.innerHTML = '<div class="screen"></div>';
+  document.body.appendChild(root);
+  const app = root.firstChild;
+
+/* Schwierigkeit je Griff: 0 = Aufwärmen, 3 = klein. Monos und einarmige Griffe fehlen bewusst. */
+const TIER = {
+  jug: 0, edge_large: 0, sloper_easy: 0,
+  edge_medium: 1, sloper_medium: 1, pocket3: 1, pocket3_deep: 1, pocket2_deep: 1, edge3: 1,
+  edge_small: 2, pocket3_small: 2, pocket2: 2, pocket2_offset: 2, sloper_hard: 2,
+  edge_xsmall: 3, pocket2_small: 3,
+};
+const REST_SEC = 90;
+const g = {
+  names: ['Anna', 'Ben'], board: 'bm2000', rounds: 5, min: 6, max: 12,
+  round: 0, turn: 0, grip: null, rolled: null, score: [0, 0], held: [0, 0],
+  lastHangEnd: [0, 0], log: [], screen: 'setup', speed: 1,
+};
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const buzz = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { /* egal */ } };
+const now = () => Date.now();
+const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+let timer = null;
+const stop = () => { clearInterval(timer); timer = null; };
+
+function armNote(board, id) {
+  const ov = (typeof GRIP_ARM_OVERRIDE !== 'undefined' && GRIP_ARM_OVERRIDE[board]) || {};
+  return ov[id] || '';
+}
+function maxTier() { // Runde 1–2 nur grosse Griffe, dann immer kleiner
+  const r = g.round + 1;
+  return r <= 2 ? 1 : Math.min(3, 1 + Math.ceil((r - 2) / Math.max(1, (g.rounds - 2) / 2)));
+}
+function rollGrip() {
+  const mt = maxTier();
+  const pool = BOARDS[g.board].grips.filter((x) => TIER[x.id] != null && TIER[x.id] <= mt && armNote(g.board, x.id) !== 'einarmig' && (!g.grip || x.id !== g.grip.id));
+  // In späteren Runden die schwerste erlaubte Stufe bevorzugen
+  const weighted = pool.flatMap((x) => Array(g.round < 2 ? 1 : TIER[x.id] + 1).fill(x));
+  return weighted[Math.floor(Math.random() * weighted.length)];
+}
+function gripHtml(grip) {
+  const b = BOARDS[g.board];
+  const dots = b.hotspots.filter((h) => h.grip === grip.id).map((h) => `<span class="dot" style="left:${h.hx ?? h.x}%;top:${h.hy ?? h.y}%"></span>`).join('');
+  const t = TIER[grip.id];
+  return `
+    <div class="board"><div class="board-in"><img src="${b.image}" alt="${esc(b.label)}">${dots}</div></div>
+    <div class="grip-name"><b>${esc(grip.label)}</b><span>${esc(grip.note || ' ')}</span>
+      <div class="tier" aria-label="Schwierigkeit ${t + 1} von 4">${[0, 1, 2, 3].map((i) => `<i class="${i <= t ? 'on' : ''}"></i>`).join('')}</div></div>`;
+}
+function topBar(showRound = true) {
+  return `
+    <div class="top">
+      <button class="icon-btn" id="quit" aria-label="Beenden">✕</button>
+      <div class="score">
+        <span class="p"><i style="background:var(--pa)"></i>${esc(g.names[0])}</span>
+        <span class="pts">${g.held[0]} s</span><span class="colon">·</span><span class="pts">${g.held[1]} s</span>
+        <span class="p">${esc(g.names[1])}<i style="background:var(--pb)"></i></span>
+      </div>
+      <span style="width:40px;flex:none"></span>
+    </div>
+    ${showRound ? `<div class="round">Runde ${g.round + 1} von ${g.rounds}</div>` : ''}`;
+}
+const tag = (i) => `<span class="tag" style="background:var(--p${i ? 'b' : 'a'})">${esc(g.names[i])}</span>`;
+function wireTop() {
+  const q = document.getElementById('quit');
+  if (q) q.onclick = () => { if (g.screen === 'setup' || g.screen === 'end' || confirm('Würfelduell beenden?')) close(); };
+  const s = document.getElementById('speed');
+  if (s) s.onclick = () => { g.speed = g.speed > 1 ? 1 : 5; s.classList.toggle('on', g.speed > 1); };
+}
+
+/* Würfel: kurz durchrollen, dann stehen bleiben */
+function rollDie(el, values, final, done) {
+  el.classList.add('rolling');
+  let n = 0;
+  const id = setInterval(() => {
+    el.firstChild.textContent = values[Math.floor(Math.random() * values.length)];
+    if (++n > 10) {
+      clearInterval(id);
+      el.classList.remove('rolling');
+      el.firstChild.textContent = final;
+      el.classList.add('done');
+      buzz(60);
+      done();
+    }
+  }, 80);
+}
+
+function render() {
+  stop();
+  ({ setup, grip, rollTime, ready, countdown, hang, result, end }[g.screen])();
+  wireTop();
+}
+
+function setup() {
+  app.innerHTML = `
+    <div class="top"><button class="icon-btn" id="quit" aria-label="Schliessen">✕</button></div>
+    <h1>🎲 Würfelduell</h1>
+    <p class="intro">Zu zweit am Board, ein Handy. Ihr würfelt den Griff gemeinsam und dem anderen die Hängezeit.</p>
+    <div class="field"><label>Spieler</label><div class="names"><input id="n0" value="${esc(g.names[0])}" maxlength="12"><input id="n1" value="${esc(g.names[1])}" maxlength="12"></div></div>
+    <div class="field"><label>Board</label><div class="chips">${['bm1000', 'bm2000'].map((b) => `<button class="chip ${g.board === b ? 'on' : ''}" data-board="${b}">${b === 'bm1000' ? 'BM 1000' : 'BM 2000'}</button>`).join('')}</div></div>
+    <div class="field"><label>Runden</label><div class="chips">${[3, 5, 8].map((r) => `<button class="chip ${g.rounds === r ? 'on' : ''}" data-rounds="${r}">${r}</button>`).join('')}</div></div>
+    <div class="field"><label>Hängezeit</label><div class="chips">${[[5, 10], [6, 12], [8, 15]].map(([a, b]) => `<button class="chip ${g.min === a ? 'on' : ''}" data-range="${a}-${b}">${a}–${b} s</button>`).join('')}</div></div>
+    <ul class="rules">
+      <li>Am Anfang grosse Griffe, jede Runde wird es kleiner.</li>
+      <li>Jede gehaltene Sekunde zählt. Deine Hängezeit (Spieler 1) landet im Fortschritt.</li>
+      <li>Zwischen deinen Hangs mindestens ${REST_SEC} s Pause.</li>
+    </ul>
+    <div class="actions"><button class="btn" id="go">Los geht's</button></div>`;
+  app.querySelectorAll('[data-board]').forEach((b) => { b.onclick = () => { g.board = b.dataset.board; setup(); }; });
+  app.querySelectorAll('[data-rounds]').forEach((b) => { b.onclick = () => { g.rounds = Number(b.dataset.rounds); setup(); }; });
+  app.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => { [g.min, g.max] = b.dataset.range.split('-').map(Number); setup(); }; });
+  ['n0', 'n1'].forEach((id, i) => { document.getElementById(id).oninput = (e) => { g.names[i] = e.target.value.trim() || (i ? 'B' : 'A'); }; });
+  document.getElementById('go').onclick = () => {
+    Object.assign(g, { round: 0, turn: 0, grip: null, score: [0, 0], held: [0, 0], lastHangEnd: [0, 0], log: [] });
+    g.screen = 'grip'; render();
+  };
+}
+
+function grip() {
+  const pick = rollGrip();
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <p class="who">Gemeinsamer Griff für diese Runde</p>
+      <div id="grip-box" style="opacity:.25">${gripHtml(pick)}</div>
+    </div>
+    <div class="actions" id="act"><button class="btn" id="roll">🎲 Griff würfeln</button></div>`;
+  document.getElementById('roll').onclick = () => {
+    const box = document.getElementById('grip-box');
+    const grips = BOARDS[g.board].grips.filter((x) => TIER[x.id] != null);
+    let n = 0;
+    document.getElementById('act').innerHTML = '';
+    const id = setInterval(() => {
+      box.innerHTML = gripHtml(grips[Math.floor(Math.random() * grips.length)]);
+      if (++n > 9) {
+        clearInterval(id);
+        g.grip = pick;
+        box.innerHTML = gripHtml(pick);
+        box.style.opacity = 1;
+        buzz(80);
+        document.getElementById('act').innerHTML = `<button class="btn" id="next">Weiter: ${esc(g.names[1 - g.turn])} würfelt</button>`;
+        document.getElementById('next').onclick = () => { g.screen = 'rollTime'; render(); };
+      }
+    }, 90);
+  };
+}
+
+function rollTime() {
+  const hanger = g.turn, roller = 1 - g.turn;
+  const values = []; for (let s = g.min; s <= g.max; s++) values.push(s);
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <p class="who">${tag(roller)} würfelt für ${tag(hanger)}</p>
+      <div class="die" id="die"><span>?</span><small>Sek.</small></div>
+      <p class="who" style="font-size:15px">${esc(g.grip.label)}</p>
+    </div>
+    <div class="actions" id="act"><button class="btn" id="roll">🎲 Zeit würfeln</button></div>`;
+  document.getElementById('roll').onclick = () => {
+    document.getElementById('act').innerHTML = '';
+    g.rolled = values[Math.floor(Math.random() * values.length)];
+    rollDie(document.getElementById('die'), values, g.rolled, () => {
+      document.getElementById('act').innerHTML = `<button class="btn" id="next">Handy an ${esc(g.names[hanger])} →</button>`;
+      document.getElementById('next').onclick = () => { g.screen = 'ready'; render(); };
+    });
+  };
+}
+
+function restLeft(i) {
+  if (!g.lastHangEnd[i]) return 0;
+  return Math.max(0, Math.ceil(REST_SEC - ((now() - g.lastHangEnd[i]) / 1000) * g.speed));
+}
+function ready() {
+  const i = g.turn;
+  const draw = () => {
+    const left = restLeft(i);
+    app.innerHTML = `${topBar()}
+      <div class="main">
+        <p class="who">${tag(i)} hängt <b>${g.rolled} s</b></p>
+        ${gripHtml(g.grip)}
+        ${left ? `<div class="rest"><b>${fmt(left)}</b><span>Pause für ${esc(g.names[i])}</span></div>` : ''}
+      </div>
+      <div class="actions">
+        ${left ? '<button class="link" id="skip">Jetzt schon hängen</button>' : '<button class="btn" id="start">▶ Start</button>'}
+      </div>`;
+    wireTop();
+    const st = document.getElementById('start');
+    if (st) st.onclick = () => { g.screen = 'countdown'; render(); };
+    const sk = document.getElementById('skip');
+    if (sk) sk.onclick = () => { g.lastHangEnd[i] = 0; draw(); };
+    return left;
+  };
+  if (draw()) timer = setInterval(() => { if (!draw()) { stop(); buzz([100, 60, 100]); } }, 1000);
+}
+
+function countdown() {
+  let n = 3;
+  app.innerHTML = `${topBar()}<div class="main"><p class="who">Hände an den Griff</p><div class="count cond" id="cnt">3</div></div>`;
+  buzz(60); beepTick();
+  timer = setInterval(() => {
+    n--;
+    if (n <= 0) { beepStart(); g.screen = 'hang'; render(); return; }
+    document.getElementById('cnt').textContent = n;
+    buzz(60); beepTick();
+  }, 1000 / Math.min(g.speed, 2));
+}
+
+function hang() {
+  const i = g.turn, target = g.rolled, L = 2 * Math.PI * 104;
+  const started = now();
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <p class="who">${tag(i)} · ${esc(g.grip.label)}</p>
+      <div class="timer"><svg viewBox="0 0 240 240"><circle class="track" cx="120" cy="120" r="104"/><circle class="ring" id="ring" cx="120" cy="120" r="104" stroke-dasharray="${L}" stroke-dashoffset="0"/></svg>
+        <div class="num"><span id="num">${target}</span><small>hängen</small></div></div>
+    </div>
+    <div class="actions"><button class="btn release" id="rel">Losgelassen</button></div>`;
+  const finish = (heldSec, ok) => {
+    stop();
+    g.lastHangEnd[i] = now();
+    g.held[i] += heldSec;
+    if (ok) g.score[i]++;
+    g.log.push({ round: g.round, who: i, grip: g.grip.label, gripId: g.grip.id, target, held: heldSec, ok });
+    buzz(ok ? [80, 60, 200] : 300);
+    g.screen = 'result'; render();
+  };
+  timer = setInterval(() => {
+    const el = ((now() - started) / 1000) * g.speed;
+    const left = Math.max(0, target - el);
+    document.getElementById('num').textContent = Math.ceil(left);
+    document.getElementById('ring').style.strokeDashoffset = String(L * (el / target));
+    if (left <= 0) finish(target, true);
+  }, 100);
+  document.getElementById('rel').onclick = () => {
+    const el = Math.min(target, Math.floor(((now() - started) / 1000) * g.speed));
+    finish(el, el >= target);
+  };
+}
+
+function result() {
+  const last = g.log[g.log.length - 1];
+  const bothDone = g.log.filter((l) => l.round === g.round).length === 2;
+  const lastRound = g.round + 1 >= g.rounds;
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <div class="result ${last.ok ? 'ok' : 'fail'}">
+        <b>${last.ok ? `Gehalten! ${last.held} s` : 'Losgelassen'}</b>
+        <span>${esc(g.names[last.who])}: ${last.held} von ${last.target} s</span>
+      </div>
+    </div>
+    <div class="actions"><button class="btn" id="next">${!bothDone ? `Jetzt ${esc(g.names[1 - last.who])}` : lastRound ? 'Zum Ergebnis' : 'Nächste Runde'}</button></div>`;
+  document.getElementById('next').onclick = () => {
+    if (!bothDone) { g.turn = 1 - g.turn; g.screen = 'rollTime'; }
+    else if (lastRound) g.screen = 'end';
+    else { g.round++; g.turn = g.round % 2; g.screen = 'grip'; } // abwechselnd beginnen
+    render();
+  };
+}
+
+function end() {
+  saveDuel();
+  const rows = [];
+  for (let r = 0; r < g.rounds; r++) {
+    const l = g.log.filter((x) => x.round === r);
+    if (!l.length) continue;
+    const cell = (i) => { const x = l.find((y) => y.who === i); return x ? `${x.ok ? '✓' : '✗'} ${x.held}/${x.target}s` : '–'; };
+    rows.push(`<tr><td>${r + 1}</td><td>${esc(l[0].grip)}</td><td class="c">${cell(0)}</td><td class="c">${cell(1)}</td></tr>`);
+  }
+  app.innerHTML = `${topBar(false)}
+    <div class="main">
+      <div class="winner"><span>💪 Gewonnen haben beide: Kraft</span>
+        <div class="duel-totals">${[0, 1].map((i) => `<div><b style="color:var(--p${i ? 'b' : 'a'})">${g.held[i]} s</b><span>${esc(g.names[i])}</span></div>`).join('')}</div>
+        <p class="who" style="font-size:14px;margin-top:6px">${g.saved ? 'Deine Hängezeit ist im Fortschritt gespeichert.' : ''}</p></div>
+      <table><thead><tr><th>#</th><th>Griff</th><th class="c">${esc(g.names[0])}</th><th class="c">${esc(g.names[1])}</th></tr></thead><tbody>${rows.join('')}</tbody></table>
+    </div>
+    <div class="actions"><button class="btn" id="again">Revanche</button><button class="btn ghost" id="setup">Einstellungen</button></div>`;
+  document.getElementById('again').onclick = () => { Object.assign(g, { round: 0, turn: 0, grip: null, score: [0, 0], held: [0, 0], lastHangEnd: [0, 0], log: [], saved: false }); g.screen = 'grip'; render(); };
+  document.getElementById('setup').onclick = () => { g.screen = 'setup'; render(); };
+}
+
+
+  /* Eigene Hangs (Spieler 1) als Board-Einheit speichern — einmal pro Spiel,
+     auch beim vorzeitigen Schliessen; gehaltene Sekunden = Hängezeit. */
+  function saveDuel() {
+    if (g.saved) return;
+    const own = g.log.filter((l) => l.who === 0 && l.held > 0);
+    if (!own.length || !state.member) return;
+    g.saved = true;
+    const session = {
+      date: todayKey(), board: g.board, weight: 0, templateId: 'duel',
+      blocks: own.map((l) => ({ type: 'hang', board: g.board, grip: l.gripId, reps: 1, hangSec: l.held, restSec: 0, blockRestSec: 0 })),
+      results: own.map(() => ({ type: 'hang', doneReps: [true] })),
+      createdAt: Date.now(),
+    };
+    fbPush(`fingerboardSessions/${state.member.id}`, session).then(() => { if (document.getElementById('fb-history-list')) renderFbHistory(); });
+  }
+  g.names = [(state.member && state.member.name) || 'Ich', 'Partner'];
+  g.board = fb.board || currentMemberBoard();
+  const onPop = () => { stop(); root.remove(); releaseWakeLock(); window.removeEventListener('popstate', onPop); };
+  const close = () => { saveDuel(); onPop(); if (history.state && history.state.duel) history.back(); };
+  history.pushState({ duel: true }, '');
+  window.addEventListener('popstate', onPop);
+  requestWakeLock();
+  render();
+}
+
 async function renderFingerboard() {
   if (!fb.board) fb.board = currentMemberBoard();
 
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Fingerboard</h2><div class="sec-rule"></div></div>
     <div id="fb-start-card-holder">${fbStartCardHtml()}</div>
+    <button type="button" class="btn ghost fb-duel-open" id="fb-duel-open">🎲 Würfelduell zu zweit</button>
 
     <div class="sec-head" id="fb-quickstart-toggle" style="cursor:pointer;">
       <h2 class="sec-title" style="font-size:18px;">Schnelltraining</h2><div class="sec-rule"></div>
@@ -4899,7 +5473,10 @@ async function renderFingerboard() {
 
     <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Eigenen Ablauf bauen</h2><div class="sec-rule"></div></div>
 
-    <button type="button" class="btn" id="fb-new-ablauf" style="width:100%;margin-bottom:12px;">＋ Neuer Ablauf</button>
+    <div class="fb-new-row">
+      <button type="button" class="btn" id="fb-new-ablauf">＋ Neuer Ablauf</button>
+      <button type="button" class="btn ghost fb-dice-open" id="fb-dice-open" title="Satz oder Ablauf würfeln" aria-label="Würfeln">🎲</button>
+    </div>
 
     <div class="chip-row fb-addtype-row">
       <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Board</button>
@@ -4974,6 +5551,8 @@ async function renderFingerboard() {
     };
   });
   document.getElementById('fb-weight').oninput = (e) => { fb.weight = e.target.value; };
+  document.getElementById('fb-dice-open').onclick = openFbDiceSheet;
+  document.getElementById('fb-duel-open').onclick = openDuel;
   document.getElementById('fb-new-ablauf').onclick = () => {
     if (fb.blocks.length && !confirm('Aktuellen Ablauf verwerfen und ganz neu (leer) beginnen?')) return;
     fb.blocks = [];
@@ -5041,7 +5620,7 @@ async function renderFbHistory() {
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
   list.innerHTML = entries.length ? entries.map(([id, s]) => `
     <div class="log-item">
-      <div class="top"><span>${esc(fmtDayKey(s.date))}</span><span class="type">${esc((BOARDS[s.board] && BOARDS[s.board].label) || s.board)}${s.partial ? ' · UNVOLLSTÄNDIG' : ''}</span></div>
+      <div class="top"><span>${esc(fmtDayKey(s.date))}</span><span class="type">${s.templateId === 'duel' ? '🎲 Würfelduell · ' : ''}${esc((BOARDS[s.board] && BOARDS[s.board].label) || s.board)}${s.partial ? ' · UNVOLLSTÄNDIG' : ''}</span></div>
       <div class="ex-log-list">${fbResultsSummaryHtml(s.blocks || [], s.results || [])}</div>
       ${challengeDurationChipsHtml(`fb-history-share-${id}`, CHALLENGE_WINDOW_H)}
       <div class="field-row" style="margin-top:6px;">
@@ -7909,6 +8488,27 @@ const EXERCISE_FIGURES = {
       <circle class="fig-joint fig-hi" cx="99" cy="60" r="5.5"/>
     </g>
   ` },
+  dip_machine: { kind: 'dynamic', caption: 'Seitenansicht, sitzend an der Maschine · Griffe neben dem Körper, Arme drücken nach unten durch', svg: `
+    <line class="fig-rig" x1="80" y1="142" x2="150" y2="142"/>
+    <g class="fig-pose fig-fixed">
+      <circle cx="97" cy="55" r="14"/>
+      <line x1="97" y1="69" x2="99" y2="140"/>
+      <line x1="99" y1="140" x2="150" y2="140"/>
+      <line x1="150" y1="140" x2="152" y2="192"/>
+    </g>
+    <circle class="fig-joint" cx="98" cy="80" r="5"/>
+    <path class="fig-motion" d="M104,100 L104,128"/>
+    <polygon class="fig-arrow" points="104,134 98,122 110,122"/>
+    <g class="fig-pose fig-a" style="animation-duration:1.9s;">
+      <line x1="98" y1="80" x2="74" y2="106"/>
+      <line x1="74" y1="106" x2="94" y2="104"/>
+      <circle class="fig-joint fig-hi" cx="94" cy="104" r="5"/>
+    </g>
+    <g class="fig-pose fig-b" style="animation-duration:1.9s;">
+      <line x1="98" y1="80" x2="92" y2="132"/>
+      <circle class="fig-joint fig-hi" cx="92" cy="132" r="5"/>
+    </g>
+  ` },
   pullover_machine: { kind: 'dynamic', caption: 'Seitenansicht, sitzend an der Maschine · Arme ziehen von oben nach unten vor dem Körper, Ellbogen leicht gebeugt', svg: `
     <line class="fig-rig" x1="99" y1="196" x2="99" y2="150"/>
     <g class="fig-pose fig-fixed">
@@ -8209,7 +8809,7 @@ const SLOTH_EXERCISE_POSES = {
   leg_press: 'legpress', leg_extension: 'legext', leg_curl_lying: 'legcurl', butterfly: 'pecdeck',
   reverse_butterfly: 'reversefly', hip_abduction_machine: 'abduction', hip_adduction_machine: 'abduction',
   hip_abduction_cable: 'abductioncable', calf_raise_seated: 'calfseated', calf_raise_machine: 'calfmachine',
-  back_extension: 'backext', pullover_machine: 'pullovermachine', t_bar_row: 'barbellrow', ab_wheel_rollout: 'abwheel',
+  back_extension: 'backext', pullover_machine: 'pullovermachine', dip_machine: 'dipmachine', t_bar_row: 'tbarrow', ab_wheel_rollout: 'abwheel',
   jump_rope: 'jumprope', agility_ladder_run: 'ladder', zercher_squat_rotation: 'goblet', carioca: 'shuffle',
   russian_twist: 'russian', hip_9090: 'ninety', frog_stretch: 'frog', ext_rotation: 'extrot',
   tibialis_raise: 'tibialis', wrist_curl: 'wristcurl', wrist_ext: 'wristcurl', wrist_mobility: 'wristmob',
@@ -9152,8 +9752,9 @@ const SLOTH_FACE = `
   <circle class="sloth-head" cx="100" cy="64" r="19"/>
   <path class="sloth-mask" d="M86 62 q6 -7 12 1 q-6 7 -12 -1z M114 62 q-6 -7 -12 1 q6 7 12 -1z"/>
   <path class="sloth-line" d="M97 71 h6 M94 76 q6 4 12 0"/>`;
-const FB_HANG_FIGURE_SVG = slothFigure('hang', 'ex-figure sloth-img'); // Faultier-Puppe (sloth-rig.js)
-const FB_REST_FIGURE_SVG = slothFigure('rest', 'ex-figure sloth-img');
+// Faultier-Puppe (sloth-rig.js); jedes Mal neu, damit ein Wechsel der Figur im Konto sofort gilt
+const fbHangFigureSvg = () => slothFigure('hang', 'ex-figure sloth-img');
+const fbRestFigureSvg = () => slothFigure('rest', 'ex-figure sloth-img');
 /* Lifting Pin: Faultier steht seitlich und hält den Griffblock mit dem Pin
    und der Scheibe darunter (statisch, siehe Pose 'pinlift' in sloth-rig.js).
    Die Figur schaut nach rechts, man sieht also ihre linke Seite — für die
@@ -9167,7 +9768,7 @@ function blockPinFigureSvg(hand) {
    das Zieh-Strichmännchen mit der gerade aktiven Hand (activeRep kommt
    aus dem rep-Feld des laufenden Sequenz-Schritts, siehe buildBlockSequence). */
 function holdBlockWorkFigure(b, activeRep) {
-  return b.type === 'block' ? blockPinFigureSvg(blockHandForRep(b, activeRep || 0)) : FB_HANG_FIGURE_SVG;
+  return b.type === 'block' ? blockPinFigureSvg(blockHandForRep(b, activeRep || 0)) : fbHangFigureSvg();
 }
 
 function ensureFbOverlay() {
@@ -9570,7 +10171,7 @@ function fbBoardStageHtml(b, hanging, tag, reach) {
       <svg width="0" height="0" class="fbx-clipdef" aria-hidden="true"><clipPath id="fbx-grip-clip" clipPathUnits="objectBoundingBox">${clip}</clipPath></svg>
       ${tag ? `<div class="fbx-tag" style="left:${cx}%;top:${top}%">${esc(tag)}</div>` : ''}
     </div>
-    <div class="fbx-fig" id="fbx-fig" data-fit="${hanging ? 'hang' : 'stand'}">${hanging ? '' : reach ? slothFigure('reach', 'sloth-img') : FB_REST_FIGURE_SVG}</div>
+    <div class="fbx-fig" id="fbx-fig" data-fit="${hanging ? 'hang' : 'stand'}">${hanging ? '' : reach ? slothFigure('reach', 'sloth-img') : fbRestFigureSvg()}</div>
   `;
 }
 
@@ -9685,11 +10286,11 @@ function fbStageInnerHtml(st) {
   let fig;
   if (st.mode === 'work') {
     const b = st.block;
-    fig = isHangLikeBlock(b) ? holdBlockWorkFigure(b, st.activeRep) : b.type === 'campus' ? campusWorkFigureSvg(b, false) : b.type === 'pause' ? FB_REST_FIGURE_SVG : exerciseFigureSvg(b.exerciseId);
+    fig = isHangLikeBlock(b) ? holdBlockWorkFigure(b, st.activeRep) : b.type === 'campus' ? campusWorkFigureSvg(b, false) : b.type === 'pause' ? fbRestFigureSvg() : exerciseFigureSvg(b.exerciseId);
   } else if (st.mode === 'ready' || st.trailing) {
-    fig = d.type === 'campus' ? campusWorkFigureSvg(d) : d.type === 'pause' ? FB_REST_FIGURE_SVG : isHangLikeBlock(d) ? holdBlockWorkFigure(d, 0) : exerciseFigureSvg(d.exerciseId);
+    fig = d.type === 'campus' ? campusWorkFigureSvg(d) : d.type === 'pause' ? fbRestFigureSvg() : isHangLikeBlock(d) ? holdBlockWorkFigure(d, 0) : exerciseFigureSvg(d.exerciseId);
   } else {
-    fig = st.block.type === 'campus' ? campusWorkFigureSvg(st.block) : FB_REST_FIGURE_SVG;
+    fig = st.block.type === 'campus' ? campusWorkFigureSvg(st.block) : fbRestFigureSvg();
   }
   return `<div class="fbx-center">${fig}</div>${tag ? `<div class="fbx-tag fbx-tag-top">${esc(tag)}</div>` : ''}`;
 }
@@ -10342,8 +10943,16 @@ function syncFbRingAnimation() {
 function tickBlock() {
   if (fbCheckinTyping) return; // Zeit angehalten, solange man im Check-in tippt
   audioKeepWarm();
-  fb.secondsLeft--;
   const step = fb.sequence[fb.stepIndex];
+  // Display war aus (Ticks gedrosselt/ausgefallen): verpasste Sekunden des
+  // laufenden Schritts aus der echten Uhr nachholen, statt dort
+  // weiterzuzählen, wo der Bildschirm ausging. Nur innerhalb des aktuellen
+  // Schritts — bei 0 geht es wie gewohnt einen Schritt weiter.
+  if (step && fb.stepStartedAt && !fb.pausedAt) {
+    const real = step.seconds - Math.floor((Date.now() - fb.stepStartedAt) / 1000);
+    if (fb.secondsLeft - real > 2) fb.secondsLeft = Math.max(1, real + 1);
+  }
+  fb.secondsLeft--;
   if (fb.secondsLeft <= 0) {
     if (advanceToNextStep()) return; // advanceBlock() hat schon (inkl. Ring) neu gerendert
     if (fbIsTrailingPause()) {
@@ -10567,36 +11176,65 @@ function entryTime(e) { return e.createdAt || new Date(e.date + 'T12:00').getTim
 
 /* Bester Satz einer Übung in einem Training: mit Gewicht = schwerstes
    Gewicht (bei Gleichstand mehr Wdh.), ohne Gewicht = meiste Wdh./Sekunden. */
+/* Bester Satz: Sätze mit Gewicht und Wiederholungen werden über das
+   geschätzte Maximalgewicht (1RM nach Epley: kg × (1 + Wdh./30)) verglichen —
+   so sind 8 × 60 kg und 5 × 70 kg vergleichbar. Halte-Sätze (Sekunden) und
+   Sätze ohne Gewicht wie bisher über Gewicht bzw. Wdh./Sekunden. */
 function bestSetOf(exerciseId, sets) {
   let best = null;
   sets.forEach((st) => {
     const w = st.weight !== '' && st.weight != null ? Number(st.weight) : 0;
     const r = Number(st.reps) || 0;
-    const score = w > 0 ? w * 1000 + r : r;
-    if (!best || score > best.score) best = { w, r, score, suffix: setUnitSuffix(exerciseId, st) };
+    const suffix = setUnitSuffix(exerciseId, st);
+    const e1 = w > 0 && r > 0 && suffix !== 's' ? Math.round(w * (1 + Math.min(r, 12) / 30)) : 0;
+    const score = e1 ? e1 * 1000 + r : w > 0 ? w * 1000 + r : r;
+    if (!best || score > best.score) best = { w, r, e1, score, suffix };
   });
   if (!best) return null;
-  return { ...best, value: best.w > 0 ? best.w : best.r, label: best.w > 0 ? `${best.w} kg × ${best.r}${best.suffix}` : `${best.r}${best.suffix || ' Wdh.'}` };
+  const label = best.w > 0 ? `${best.w} kg × ${best.r}${best.suffix}${best.e1 && best.r > 1 ? ` (≈ ${best.e1} kg 1RM)` : ''}` : `${best.r}${best.suffix || ' Wdh.'}`;
+  return { ...best, value: best.e1 || (best.w > 0 ? best.w : best.r), label };
 }
 
 /* Übungen im Board-Ablauf (Fixübungen wie Kniebeugen, Lifting-Pin mit
    Wiederholungen): pro Einheit die im Check-in erfassten Wdh./Gewichte als
    "Sätze" — so lässt sich derselbe bestSetOf-Vergleich wie im Gym nutzen. */
 const PG_BLOCK_ID = '__liftingpin';
+/* Hangs zählen als eigene "Übung" je Griff (id grip:<board>:<griff>), Wert =
+   Hängezeit bzw. Zusatzgewicht der Einheit. Übungen ohne Eingabe im Check-in
+   zählen mit den geplanten Wdh., sobald der Satz erreicht wurde (bzw. bei
+   ganz abgeschlossenen Einheiten auch ohne gespeichertes Ergebnis). */
+const PG_GRIP_PREFIX = 'grip:';
 function boardExerciseSets(sn) {
   const out = {};
   (sn.blocks || []).forEach((b, i) => {
     const r = (sn.results || [])[i];
-    if (!r || r.reps === '' || r.reps == null) return;
+    const reached = !!r || !sn.partial;
+    if (!reached) return;
+    if (b.type === 'hang' && b.grip) {
+      const done = r && Array.isArray(r.doneReps) ? r.doneReps.filter(Boolean).length : Number(b.reps) || 0;
+      if (!done) return;
+      const id = `${PG_GRIP_PREFIX}${b.board || sn.board}:${b.grip}`;
+      (out[id] = out[id] || []).push({ reps: Number(b.hangSec) || 0, weight: Number(sn.weight) || '', unit: 'time' });
+      return;
+    }
     let id = null;
-    if (b.type === 'exercise' && r.type === 'exercise') id = b.exerciseId;
+    if (b.type === 'exercise' && !['warmup_general', 'cooldown_general'].includes(b.exerciseId)) id = b.exerciseId;
     else if (b.type === 'block' && b.mode === 'reps') id = PG_BLOCK_ID;
     if (!id) return;
-    (out[id] = out[id] || []).push({ reps: r.reps, weight: r.weight });
+    const entered = r && r.reps !== '' && r.reps != null;
+    // Halte-Übung ohne Eingabe: geplante Dauer statt "1 Wdh."
+    if (!entered && id !== PG_BLOCK_ID && exerciseIsHold(id)) { (out[id] = out[id] || []).push({ reps: b.workSec, weight: '', unit: 'time' }); return; }
+    const reps = entered ? r.reps : b.reps;
+    if (reps === '' || reps == null) return;
+    (out[id] = out[id] || []).push({ reps, weight: r ? r.weight : '' });
   });
   return out;
 }
 function progressExerciseName(id) {
+  if (id.startsWith(PG_GRIP_PREFIX)) {
+    const [board, grip] = id.slice(PG_GRIP_PREFIX.length).split(':');
+    return `Hang ${gripLabel(board, grip)}${board === 'bm1000' ? ' (BM 1000)' : ''}`;
+  }
   return id === PG_BLOCK_ID ? 'Lifting Pin (Wiederholungen)' : exerciseName(id);
 }
 /* Alle Übungen der gewählten Quelle (Gym-Logs bzw. Board-Einheiten). */
@@ -10633,8 +11271,10 @@ function progressOverviewHtml(exIds, days) {
     const pts = progressSeries(id, days);
     const last = pts[pts.length - 1];
     let change = '<span class="pg-muted">—</span>';
-    if (pts.length >= 2 && pts[0].value) {
-      const pct = Math.round(((last.value - pts[0].value) / pts[0].value) * 100);
+    // Nur Gleiches vergleichen: mit Gewicht (kg) gegen mit Gewicht, sonst Wdh./Sekunden
+    const first = pts.find((p) => (p.w > 0) === (last.w > 0));
+    if (pts.length >= 2 && first && first !== last && first.value) {
+      const pct = Math.round(((last.value - first.value) / first.value) * 100);
       change = `<span class="${pct > 0 ? 'up' : pct < 0 ? 'down' : ''}">${pct > 0 ? '+' : ''}${pct} %</span>`;
     }
     return `<button type="button" class="pg-ex-row ${id === progressExerciseId ? 'active' : ''}" data-pg-ex="${esc(id)}">
@@ -10720,6 +11360,197 @@ function progressStats() {
     if (w > 0 && r > 0 && setUnitSuffix(ex.exerciseId, st) !== 's') kg += w * r;
   })));
   return { last30, streak, kg };
+}
+
+/* ---------- Wochen-Auswertung (Trainer-Sicht) ----------
+   Harte Sätze: jeder Arbeitssatz im Gym (ohne Warm-up/Cooldown/Stretch)
+   zählt 1 für jeden Hauptmuskel; Board: jede geschaffte Hang-/Campus-
+   Wiederholung zählt 1 für die Finger (Campus auch Zug), Fixübungen 1 je
+   Satz. Gruppen zählen einen Satz nur einmal, auch wenn er mehrere ihrer
+   Muskeln trifft. Zielbereich 10–20 harte Sätze pro Gruppe und Woche. */
+const PG_GROUPS = [
+  { id: 'finger', label: 'Finger', muscles: ['forearms_front', 'forearms_back'] },
+  { id: 'zug', label: 'Zug / Rücken', muscles: ['lats', 'traps', 'biceps'] },
+  { id: 'druck', label: 'Druck / Brust', muscles: ['chest', 'triceps'] },
+  { id: 'schultern', label: 'Schultern', muscles: ['shoulders', 'rear_delts', 'neck_traps'] },
+  { id: 'beine', label: 'Beine', muscles: ['quads', 'hamstrings', 'glutes', 'calves', 'shins'] },
+  { id: 'rumpf', label: 'Rumpf', muscles: ['abs', 'obliques', 'lower_back'] },
+];
+const PG_TARGET = [10, 20];
+let progressWeekOffset = 0; // 0 = diese Woche, 1 = letzte …
+let progressVolMetric = 'sets';
+function pgIsHardExercise(id) {
+  if (id === 'warmup_general' || id === 'cooldown_general') return false;
+  const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
+  return !!(ex && ex.muscles && ex.muscles.primary.length && exerciseSupergroup(ex) !== 'stretch');
+}
+function pgWeekStats(offset) {
+  const mon = mondayOf(new Date()); mon.setDate(mon.getDate() - offset * 7);
+  const from = mon.getTime(), to = from + 7 * 86400000;
+  const out = { from, sets: 0, min: 0, kg: 0, zones: {}, groups: {} };
+  PG_GROUPS.forEach((g) => { out.groups[g.id] = 0; });
+  const addSet = (primary, n = 1) => {
+    out.sets += n;
+    primary.forEach((m) => { out.zones[m] = (out.zones[m] || 0) + n; });
+    PG_GROUPS.forEach((g) => { if (primary.some((m) => g.muscles.includes(m))) out.groups[g.id] += n; });
+  };
+  state.logs.forEach((e) => {
+    const t = entryTime(e);
+    if (t < from || t >= to) return;
+    out.min += e.totalSessionSec ? e.totalSessionSec / 60 : Number(e.durationMin) || 0;
+    (e.exercises || []).forEach((ex) => {
+      const sets = Array.isArray(ex.sets) ? ex.sets : [];
+      sets.forEach((st) => {
+        const w = Number(st.weight), r = Number(st.reps);
+        if (w > 0 && r > 0 && setUnitSuffix(ex.exerciseId, st) !== 's') out.kg += w * r;
+      });
+      if (pgIsHardExercise(ex.exerciseId) && sets.length) addSet(exerciseMuscles(ex.exerciseId).primary, sets.length);
+    });
+  });
+  progressFbSessions.forEach((sn) => {
+    const t = entryTime(sn);
+    if (t < from || t >= to) return;
+    (sn.blocks || []).forEach((b, i) => {
+      const r = (sn.results || [])[i];
+      if (!r && sn.partial) return;
+      out.min += fbBlockSeconds(b) / 60;
+      const done = r && Array.isArray(r.doneReps) ? r.doneReps.filter(Boolean).length : Number(b.reps) || 0;
+      if (b.type === 'hang' || (b.type === 'block' && b.mode !== 'reps')) addSet(['forearms_front'], done);
+      else if (b.type === 'block') addSet(['forearms_front'], 1);
+      else if (b.type === 'campus') addSet(['forearms_front', 'lats'], done);
+      else if (b.type === 'exercise' && pgIsHardExercise(b.exerciseId)) addSet(exerciseMuscles(b.exerciseId).primary, 1);
+    });
+  });
+  out.min = Math.round(out.min);
+  return out;
+}
+const pgFmtMin = (m) => (m >= 60 ? `${Math.floor(m / 60)}:${pad2(m % 60)} h` : `${m} min`);
+const pgFmtKg = (k) => (k >= 1000 ? `${(k / 1000).toFixed(1).replace('.', ',')} t` : `${Math.round(k)} kg`);
+function pgDeltaHtml(cur, prev) {
+  if (!prev) return '';
+  const p = Math.round(((cur - prev) / prev) * 100);
+  return `<span class="pg-delta ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">${p > 0 ? '▲ +' : p < 0 ? '▼ ' : ''}${p} %</span>`;
+}
+function pgWeekHtml(w, prev, streak) {
+  const end = new Date(w.from + 6 * 86400000), start = new Date(w.from);
+  const title = progressWeekOffset === 0 ? 'Diese Woche' : progressWeekOffset === 1 ? 'Letzte Woche' : `vor ${progressWeekOffset} Wochen`;
+  return `
+    <div class="pg-weeknav">
+      <button type="button" class="pg-weeknav-btn" data-wk="1" aria-label="Vorherige Woche">‹</button>
+      <div class="pg-weeknav-label"><b>${title}</b><span>${pad2(start.getDate())}.${pad2(start.getMonth() + 1)}. – ${pad2(end.getDate())}.${pad2(end.getMonth() + 1)}.${streak ? ` · ${streak} ${streak === 1 ? 'Woche' : 'Wochen'} in Folge` : ''}</span></div>
+      <button type="button" class="pg-weeknav-btn" data-wk="-1" aria-label="Nächste Woche" ${progressWeekOffset === 0 ? 'style="visibility:hidden"' : ''}>›</button>
+    </div>
+    <div class="pg-tiles">
+      <div class="pg-tile"><b>${pgFmtMin(w.min)}</b><span>Trainingszeit</span>${pgDeltaHtml(w.min, prev.min)}</div>
+      <div class="pg-tile"><b class="accent">${w.sets}</b><span>harte Sätze</span>${pgDeltaHtml(w.sets, prev.sets)}</div>
+      <div class="pg-tile"><b>${pgFmtKg(w.kg)}</b><span>bewegt</span>${pgDeltaHtml(w.kg, prev.kg)}</div>
+    </div>`;
+}
+function pgGroupsHtml(w) {
+  const max = 24, pct = (v) => `${(Math.min(v, max) / max) * 100}%`;
+  return `
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Harte Sätze pro Muskelgruppe</h3><span class="pg-muted">Ziel ${PG_TARGET[0]}–${PG_TARGET[1]}</span></div>
+      ${PG_GROUPS.map((g) => {
+        const v = w.groups[g.id];
+        const flag = v < PG_TARGET[0] ? 'unter Ziel' : v > PG_TARGET[1] ? 'viel' : '';
+        return `<div class="pg-mg-row"><div><div class="pg-mg-name">${g.label}</div>${flag ? `<div class="pg-mg-flag">${flag}</div>` : ''}</div>
+          <div class="pg-mg-track"><div class="pg-mg-band" style="left:${pct(PG_TARGET[0])};width:${pct(PG_TARGET[1] - PG_TARGET[0])}"></div><div class="pg-mg-bar" style="width:${pct(v)}"></div></div>
+          <div class="pg-mg-num">${v}</div></div>`;
+      }).join('')}
+      <div class="pg-mg-scale"><div></div><div>${[0, 10, 20].map((t) => `<span style="left:${pct(t)}">${t}</span>`).join('')}</div><div></div></div>
+      <p class="pg-muted" style="margin:8px 0 0;">Gym und Board zusammen. Board: jede geschaffte Hang-Wiederholung zählt als Satz für die Finger.</p>
+    </div>`;
+}
+const PG_HEAT_STEPS = [
+  { min: 0, label: '0', color: '#2a3140' }, { min: 1, label: '1–4', color: '#1f4a66' },
+  { min: 5, label: '5–9', color: '#2a75a3' }, { min: 10, label: '10–14', color: '#3aa3dc' }, { min: 15, label: '15+', color: '#8fdcff' },
+];
+let pgHeatSel = null;
+function pgHeatHtml(w) {
+  const step = (v) => [...PG_HEAT_STEPS].reverse().find((h) => v >= h.min);
+  const zones = Object.entries(MUSCLE_ZONES_SVG).map(([id, shape]) => `<g class="pg-heat-zone ${id === pgHeatSel ? 'sel' : ''}" data-heat="${id}" fill="${step(w.zones[id] || 0).color}">${shape}</g>`).join('');
+  const sel = pgHeatSel ? w.zones[pgHeatSel] || 0 : null;
+  return `
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Muskel-Heatmap</h3><span class="pg-muted">harte Sätze · antippen</span></div>
+      <div class="pg-heat-wrap">
+        <svg viewBox="${BODY_VIEWBOX}" class="muscle-map pg-heat-map" role="group" aria-label="Muskel-Heatmap">${BODY_BASE_SVG}${zones}${BODY_DECO_SVG}</svg>
+        <div class="ex-body-labels"><span>VORNE</span><span>HINTEN</span></div>
+      </div>
+      <div class="pg-heat-legend">${PG_HEAT_STEPS.map((h) => `<div><i style="background:${h.color}"></i>${h.label}</div>`).join('')}</div>
+      <p class="pg-readout">${pgHeatSel ? `<b>${esc(MUSCLE_ZONE_LABEL[pgHeatSel])}</b>: ${sel} harte ${sel === 1 ? 'Satz' : 'Sätze'}` : 'Muskel antippen für die Zahl.'}</p>
+    </div>`;
+}
+function pgVolumeHtml(weeks) {
+  const M = { sets: { k: 'sets', f: (v) => `${v} Sätze` }, time: { k: 'min', f: pgFmtMin }, kg: { k: 'kg', f: pgFmtKg } }[progressVolMetric];
+  const vals = weeks.map((w) => w[M.k]);
+  const max = Math.max(1, ...vals) * 1.1;
+  const W = 340, H = 140, padB = 20, slot = W / vals.length, bw = slot - 8;
+  const y = (v) => (H - padB) - (v / max) * (H - padB - 6);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" class="pg-vol" role="img" aria-label="Wochenvolumen">`;
+  vals.forEach((v, i) => {
+    const x = i * slot + 4, top = y(v), cur = i === vals.length - 1 - progressWeekOffset;
+    if (v > 0) svg += `<path d="M${x},${H - padB} V${Math.min(top + 4, H - padB)} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${H - padB} Z" fill="var(--accent)" opacity="${cur ? 1 : 0.5}"/>`;
+    const d = new Date(weeks[i].from);
+    svg += `<text x="${x + bw / 2}" y="${H - 4}" text-anchor="middle" class="pg-vol-axis">${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.</text>`;
+    svg += `<rect class="pg-vol-hit" x="${x - 4}" y="0" width="${slot}" height="${H}" data-vol="${i}" fill="transparent"/>`;
+  });
+  svg += `<line x1="0" x2="${W}" y1="${H - padB}" y2="${H - padB}" stroke="var(--line-soft)"/></svg>`;
+  return `
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Wochenvolumen</h3>
+        <div class="chip-row pg-ranges">${[['sets', 'Sätze'], ['time', 'Zeit'], ['kg', 'kg']].map(([k, l]) => `<button type="button" class="chip small ${k === progressVolMetric ? 'active' : ''}" data-vol-metric="${k}">${l}</button>`).join('')}</div>
+      </div>
+      ${svg}
+      <p class="pg-readout" id="pg-vol-readout">Balken antippen für die Woche.</p>
+    </div>`;
+}
+/* Rekorde: Übungen, deren letzter Bestwert in den letzten 30 Tagen alle früheren schlägt */
+function pgRecordsHtml() {
+  const since = Date.now() - 30 * 86400000;
+  const recs = [];
+  ['gym', 'board'].forEach((src) => progressExerciseIds(src).forEach((id) => {
+    const pts = progressSeries(id, 100000, src);
+    if (pts.length < 2) return;
+    const best = pts.reduce((a, b) => (b.score > a.score ? b : a));
+    const earlier = pts.filter((p) => p.t < best.t);
+    if (best.t >= since && earlier.length && best.score > Math.max(...earlier.map((p) => p.score))) recs.push({ id, best });
+  }));
+  recs.sort((a, b) => b.best.t - a.best.t);
+  if (!recs.length) return '';
+  return `
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Rekorde</h3><span class="pg-muted">letzte 30 Tage</span></div>
+      ${recs.slice(0, 5).map((r) => `<div class="pg-record"><span>🏆 ${esc(progressExerciseName(r.id))}<small>${esc(fmtDateShort(new Date(r.best.t)))}</small></span><b>${esc(r.best.label)}</b></div>`).join('')}
+    </div>`;
+}
+/* Hinweise wie von einem Trainer: Gruppen unter Ziel, lange nicht trainiert, Volumensprung */
+function pgHintsHtml(w, prev) {
+  const hints = [];
+  if (progressWeekOffset === 0) {
+    const lastBy = {};
+    for (let o = 0; o < 6; o++) {
+      const ws = pgWeekStats(o);
+      PG_GROUPS.forEach((g) => { if (lastBy[g.id] == null && ws.groups[g.id]) lastBy[g.id] = o; });
+    }
+    PG_GROUPS.forEach((g) => {
+      if (lastBy[g.id] == null) return; // nie trainiert: kein Hinweis (z. B. reine Kletterer ohne Beine)
+      if (lastBy[g.id] >= 2) hints.push(['⏸', `<b>${g.label}</b> seit ${lastBy[g.id]} Wochen nicht trainiert.`]);
+      else if (w.groups[g.id] && w.groups[g.id] < PG_TARGET[0] / 2 && new Date().getDay() !== 1) hints.push(['⚠', `<b>${g.label}</b> erst ${w.groups[g.id]} harte Sätze diese Woche.`]);
+    });
+  }
+  if (prev.sets >= 10 && progressWeekOffset > 0) {
+    const p = Math.round(((w.sets - prev.sets) / prev.sets) * 100);
+    if (p > 25) hints.push(['↗', `Volumen <b>+${p} %</b> zur Vorwoche – mehr als 10–20 % pro Woche erhöht das Verletzungsrisiko.`]);
+    else if (p < -40) hints.push(['💤', `Volumen ${p} % zur Vorwoche – passt als Entlastungswoche nach harten Wochen.`]);
+  }
+  if (!hints.length) return '';
+  return `
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Hinweise</h3></div>
+      ${hints.map(([ico, t]) => `<div class="pg-hint"><span class="pg-hint-ico">${ico}</span><span>${t}</span></div>`).join('')}
+    </div>`;
 }
 
 const RECOVERY_AREAS = [
@@ -11083,15 +11914,18 @@ async function renderProgress() {
 function drawProgress() {
   const root = document.getElementById('pg-root');
   if (!root) return;
-  const exIds = progressExerciseIds(progressSource);
-  if (!progressExerciseId || !exIds.includes(progressExerciseId)) progressExerciseId = exIds[0] || null;
   const days = PROGRESS_RANGES.find((r) => r[0] === progressRange)[2];
+  // Nur Übungen, die im gewählten Zeitraum wirklich gemacht wurden (keine "nicht im Zeitraum"-Zeilen)
+  const exIds = progressExerciseIds(progressSource).filter((id) => progressSeries(id, days).length);
+  if (!progressExerciseId || !exIds.includes(progressExerciseId)) progressExerciseId = exIds[0] || null;
   const pts = progressExerciseId ? progressSeries(progressExerciseId, days) : [];
   let headline = '';
-  if (pts.length >= 2) {
-    const first = pts[0].value, last = pts[pts.length - 1].value;
+  const lastPt = pts[pts.length - 1];
+  const firstPt = lastPt && pts.find((p) => (p.w > 0) === (lastPt.w > 0)); // nur Gleiches vergleichen (kg mit kg)
+  if (pts.length >= 2 && firstPt && firstPt !== lastPt) {
+    const first = firstPt.value, last = lastPt.value;
     const pct = first ? Math.round(((last - first) / first) * 100) : 0;
-    headline = `<div class="pg-hero"><span class="pg-hero-num ${pct >= 0 ? 'up' : 'down'}">${pct > 0 ? '+' : ''}${pct} %</span><span class="pg-hero-sub">${esc(pts[0].label)} → ${esc(pts[pts.length - 1].label)}</span></div>`;
+    headline = `<div class="pg-hero"><span class="pg-hero-num ${pct >= 0 ? 'up' : 'down'}">${pct > 0 ? '+' : ''}${pct} %</span><span class="pg-hero-sub">${esc(firstPt.label)} → ${esc(lastPt.label)}</span></div>`;
   }
   const isNewPr = pts.length >= 2 && pts[pts.length - 1].value > Math.max(...pts.slice(0, -1).map((p) => p.value));
   const stats = progressStats();
@@ -11115,12 +11949,17 @@ function drawProgress() {
     return;
   }
 
+  const weeks = []; for (let o = 7; o >= 0; o--) weeks.push(pgWeekStats(o));
+  if (progressWeekOffset > 7) progressWeekOffset = 7;
+  const wkCur = weeks[7 - progressWeekOffset];
+  const wkPrev = progressWeekOffset < 7 ? weeks[6 - progressWeekOffset] : pgWeekStats(progressWeekOffset + 1);
   root.innerHTML = `
-    <div class="pg-tiles">
-      <div class="pg-tile"><b>${stats.last30}</b><span>Einheiten in 30 Tagen</span></div>
-      <div class="pg-tile"><b class="accent">${stats.streak}</b><span>${stats.streak === 1 ? 'Woche' : 'Wochen'} in Folge</span></div>
-      <div class="pg-tile"><b>${stats.kg >= 1000 ? (stats.kg / 1000).toFixed(1).replace('.', ',') + ' t' : Math.round(stats.kg) + ' kg'}</b><span>bewegt diese Woche</span></div>
-    </div>
+    ${pgWeekHtml(wkCur, wkPrev, stats.streak)}
+    ${pgGroupsHtml(wkCur)}
+    ${pgHeatHtml(wkCur)}
+    ${pgHintsHtml(wkCur, wkPrev)}
+    ${pgVolumeHtml(weeks)}
+    ${pgRecordsHtml()}
 
     <div class="pg-card">
       <div class="pg-card-head">
@@ -11134,7 +11973,7 @@ function drawProgress() {
       ${exIds.length ? `<p class="pg-ex-current">${esc(progressExerciseName(progressExerciseId))}</p>` : ''}
       ${isNewPr ? `<div class="pg-pr-wrap">${slothFigure('flex', 'pg-pr-sloth')}<div class="pg-pr">Neuer Rekord: <b>${esc(pts[pts.length - 1].label)}</b></div></div>` : ''}
       ${headline}
-      ${exIds.length ? progressLineChart('pg-ex', pts, 'Bester Satz je Training') : `<div class="list-empty">${progressSource === 'board' ? 'Noch keine Übungen im Board-Ablauf erfasst (Wdh./Gewicht im Check-in).' : 'Noch keine Gym-Sätze geloggt.'}</div>`}
+      ${exIds.length ? progressLineChart('pg-ex', pts, pts.some((p) => p.e1) ? 'Geschätztes Maximalgewicht (1RM) je Training' : 'Bester Satz je Training') : `<div class="list-empty">${progressExerciseIds(progressSource).length ? 'In diesem Zeitraum nichts trainiert — längeren Zeitraum wählen.' : progressSource === 'board' ? 'Noch keine Board-Einheit gespeichert.' : 'Noch keine Gym-Sätze geloggt.'}</div>`}
       ${exIds.length && pts.length ? cycleLegendHtml() : ''}
       ${exIds.length ? progressOverviewHtml(exIds, days) : ''}
     </div>
@@ -11169,6 +12008,22 @@ function drawProgress() {
     </div>
   `;
   root.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => { progressRange = b.dataset.range; drawProgress(); }; });
+  root.querySelectorAll('[data-wk]').forEach((b) => { b.onclick = () => { progressWeekOffset = Math.max(0, Math.min(7, progressWeekOffset + Number(b.dataset.wk))); drawProgress(); }; });
+  root.querySelectorAll('[data-vol-metric]').forEach((b) => { b.onclick = () => { progressVolMetric = b.dataset.volMetric; drawProgress(); }; });
+  root.querySelectorAll('[data-vol]').forEach((r) => {
+    r.onclick = () => {
+      const i = Number(r.dataset.vol), w = weeks[i], d = new Date(w.from);
+      document.getElementById('pg-vol-readout').innerHTML = `<b>Woche ab ${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.</b> · ${w.sets} Sätze · ${pgFmtMin(w.min)} · ${pgFmtKg(w.kg)}`;
+    };
+  });
+  root.querySelectorAll('[data-heat]').forEach((z) => {
+    z.onclick = () => {
+      const y = window.scrollY;
+      pgHeatSel = z.dataset.heat;
+      drawProgress();
+      window.scrollTo(0, y);
+    };
+  });
   wireCycleCard();
   root.querySelectorAll('[data-pg-source]').forEach((b) => {
     b.onclick = () => {
@@ -11844,7 +12699,17 @@ function renderKontoAnim() {
       <div class="chip-row">
         ${ANIM_LEVELS.map(([k, label]) => `<button type="button" class="chip ${k === lvl ? 'active' : ''}" data-anim-level="${k}">${label}</button>`).join('')}
       </div>
+      <p class="card-sub" style="margin:14px 0 10px;">Figur: die neue Zeichnung ist noch in der Testphase.</p>
+      <div class="chip-row">
+        ${[['', 'Klassisch'], ['v2', 'Neue Figur']].map(([k, label]) => `<button type="button" class="chip ${(slothV2On() ? 'v2' : '') === k ? 'active' : ''}" data-sloth-fig="${k}">${label}</button>`).join('')}
+      </div>
     </div>`;
+  holder.querySelectorAll('[data-sloth-fig]').forEach((b) => {
+    b.onclick = () => {
+      try { if (b.dataset.slothFig) localStorage.setItem(SLOTH_FIG_KEY, b.dataset.slothFig); else localStorage.removeItem(SLOTH_FIG_KEY); } catch (e) { /* ignorieren */ }
+      renderKontoAnim();
+    };
+  });
   holder.querySelectorAll('[data-anim-level]').forEach((b) => {
     b.onclick = () => {
       try { localStorage.setItem(ANIM_KEY, b.dataset.animLevel); } catch (e) { /* ignorieren */ }

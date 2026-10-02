@@ -1178,6 +1178,7 @@ function render() {
   if (!state.member) { boot(); return; }
   hideFabStart(); // jede Route entscheidet selbst, ob/wofür sie ihn zeigt
   hideFsDock();
+  document.getElementById('fb-dice-sheet')?.remove(); // Würfel-Fenster gehört zum Board-Tab
   switch (state.route) {
     case 'log': renderLog(); break;
     case 'fingerboard': renderFingerboard(); break;

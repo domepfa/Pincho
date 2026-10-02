@@ -245,6 +245,7 @@ const EXERCISE_LIBRARY = [
   { id: 'incline_bench_press', name: 'Schrägbankdrücken', category: 'push', howTo: 'Wie Bankdrücken, Bank auf ca. 30° geneigt, Stange Richtung obere Brust führen.', muscles: { primary: ['chest'], secondary: ['triceps', 'shoulders'] } },
   { id: 'ohp', name: 'Overhead Press', category: 'push', howTo: 'Stehend oder sitzend Stange bzw. Hanteln von Schulterhöhe gerade nach oben drücken.', muscles: { primary: ['shoulders'], secondary: ['triceps'] } },
   { id: 'dips', name: 'Dips', category: 'push', pauseFriendly: true, howTo: 'Am Barren/Kasten die Arme beugen, bis die Oberarme etwa parallel zum Boden sind, dann strecken — Ellbogen nah am Körper.', muscles: { primary: ['chest', 'triceps'], secondary: ['shoulders'] } },
+  { id: 'dip_machine', name: 'Dip-Maschine sitzend', category: 'push', howTo: 'Aufrecht sitzen, Griffe seitlich neben dem Körper, Arme nach unten durchstrecken, kontrolliert zurück bis die Ellbogen etwa 90° gebeugt sind — Schultern tief, Ellbogen nah am Körper.', muscles: { primary: ['triceps', 'chest'], secondary: ['shoulders'] } },
   { id: 'butterfly', name: 'Butterfly', category: 'push', howTo: 'An der Maschine sitzend die Arme vor der Brust zusammenführen, Bewegung kontrolliert zurückführen.', muscles: { primary: ['chest'], secondary: ['shoulders'] } },
   { id: 'triceps_extension', name: 'Trizepsstrecker', category: 'push', howTo: 'Kabel oder Seil von oben nach unten strecken, Ellbogen bleiben dabei am Körper fixiert.', muscles: { primary: ['triceps'], secondary: [] } },
   // Beine
