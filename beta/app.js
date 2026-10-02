@@ -2820,8 +2820,12 @@ function renderLogBuilderPanel() {
    Eine einzige, modul-globale Phase/Uhr reicht, da jeweils nur eine
    Übung gleichzeitig aktiv ist. */
 let fsPhase = 'idle';
-let fsWorkTimer = { seconds: 0, intervalId: null };
-let fsRestTimer = { seconds: 0, intervalId: null };
+// startedAt: Zeitstempel statt reinem Hochzählen — bei ausgeschaltetem
+// Display drosselt/stoppt das Handy setInterval, die Sekunden werden daher
+// bei jedem Tick aus der echten Uhr berechnet (sonst stand z. B. der
+// Cooldown-Timer still, solange der Bildschirm aus war).
+let fsWorkTimer = { seconds: 0, intervalId: null, startedAt: 0 };
+let fsRestTimer = { seconds: 0, intervalId: null, startedAt: 0 };
 let fsCapturedElapsed = 0;
 
 function updateFsWorkTimerUI() {
@@ -2832,9 +2836,10 @@ function startFsWorkTimer() {
   requestWakeLock(); // Bildschirm soll während einer laufenden Session nicht ausgehen (dieselbe Sperre wie im Fingerboard-Ablauf)
   clearInterval(fsWorkTimer.intervalId);
   fsWorkTimer.seconds = 0;
+  fsWorkTimer.startedAt = Date.now();
   updateFsWorkTimerUI();
   fsWorkTimer.intervalId = setInterval(() => {
-    fsWorkTimer.seconds++;
+    fsWorkTimer.seconds = Math.floor((Date.now() - fsWorkTimer.startedAt) / 1000);
     updateFsWorkTimerUI();
   }, 1000);
 }
@@ -2871,12 +2876,18 @@ function startFsRestTimer() {
   requestWakeLock();
   clearInterval(fsRestTimer.intervalId);
   fsRestTimer.seconds = 0;
+  fsRestTimer.startedAt = Date.now();
   updateFsRestTimerUI();
   fsRestTimer.intervalId = setInterval(() => {
-    fsRestTimer.seconds++;
+    const prev = fsRestTimer.seconds;
+    fsRestTimer.seconds = Math.floor((Date.now() - fsRestTimer.startedAt) / 1000);
+    if (fsRestTimer.seconds === prev) return;
     updateFsRestTimerUI();
     // Gong je 30s: 0:30 → 1×, 1:00 → 2×, 1:30 → 3×, ab 2:00 → 4× (Obergrenze).
-    if (fsRestTimer.seconds % 30 === 0) gongStrikes(Math.min(4, fsRestTimer.seconds / 30));
+    // Nur wenn die 30er-Marke in diesem Tick überschritten wurde und nicht
+    // nach langem Display-aus nachträglich (dann würde es verspätet gongen).
+    const mark = Math.floor(fsRestTimer.seconds / 30);
+    if (mark > Math.floor(prev / 30) && fsRestTimer.seconds - prev <= 2) gongStrikes(Math.min(4, mark));
   }, 1000);
 }
 // Ohne explizites Stoppen lief die Pausenuhr bisher im Hintergrund einfach
@@ -3189,8 +3200,8 @@ function renderFsPanel() {
         <button type="button" class="chip ${isHold ? 'active' : ''}" data-unit="time">Zeit</button>
       </div>
       <div class="field-row">
-        <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" enterkeyhint="next" id="fs-weight" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
-        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" value="${isHold ? fsCapturedElapsed : esc(prevReps)}"></div>
+        <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" enterkeyhint="next" id="fs-weight" data-entry-key="${builder.activeIndex}:${g.sets.length}" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
+        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" data-entry-key="${builder.activeIndex}:${g.sets.length}:${unit}" value="${isHold ? fsCapturedElapsed : esc(prevReps)}"></div>
       </div>
       <button type="button" class="btn small" id="fs-add-set" style="width:100%;">Satz speichern</button>
     `;
@@ -3211,6 +3222,14 @@ function renderFsPanel() {
     const linked = cur.superset && cur.superset === prev.superset;
     return `<button type="button" class="ss-link ${linked ? 'linked' : ''}" data-fs-ss="${gi}">${linked ? 'Supersatz lösen' : `＋ Mit ${esc(exerciseName(prev.exerciseId))} als Supersatz verbinden`}</button>`;
   };
+  // Schon eingetippte Werte (Gewicht/Wdh.) über das Neu-Zeichnen retten —
+  // z. B. ✎ Maschineneinstellungen zeichnet die Karte neu, und die Felder
+  // kämen sonst wieder mit dem Vorschlag vom letzten Mal zurück.
+  const prevWeightEl = document.getElementById('fs-weight');
+  const prevRepsEl = document.getElementById('fs-reps');
+  const typedEntry = prevWeightEl && prevRepsEl
+    ? { key: prevWeightEl.dataset.entryKey, unitKey: prevRepsEl.dataset.entryKey, weight: prevWeightEl.value, reps: prevRepsEl.value }
+    : null;
   holder.innerHTML = `${tabsHtml}
     ${orderedExercises.map(({ g, gi }) => {
       const isActive = gi === builder.activeIndex;
@@ -3437,6 +3456,11 @@ function renderFsPanel() {
   const weightEl = document.getElementById('fs-weight');
   const repsEl = document.getElementById('fs-reps');
   if (weightEl) {
+    if (typedEntry && typedEntry.key === weightEl.dataset.entryKey) {
+      weightEl.value = typedEntry.weight;
+      // Wdh. nur bei gleicher Einheit übernehmen (Umschalten auf Zeit setzt die gestoppte Dauer ein)
+      if (typedEntry.unitKey === repsEl.dataset.entryKey) repsEl.value = typedEntry.reps;
+    }
     // Beim Fokussieren den Wert markieren statt zu löschen — Tippen
     // ersetzt eine markierte Auswahl automatisch, aber man sieht den
     // vorgeschlagenen Wert noch kurz, bevor man drüberschreibt. Wichtig
@@ -10343,8 +10367,16 @@ function syncFbRingAnimation() {
 function tickBlock() {
   if (fbCheckinTyping) return; // Zeit angehalten, solange man im Check-in tippt
   audioKeepWarm();
-  fb.secondsLeft--;
   const step = fb.sequence[fb.stepIndex];
+  // Display war aus (Ticks gedrosselt/ausgefallen): verpasste Sekunden des
+  // laufenden Schritts aus der echten Uhr nachholen, statt dort
+  // weiterzuzählen, wo der Bildschirm ausging. Nur innerhalb des aktuellen
+  // Schritts — bei 0 geht es wie gewohnt einen Schritt weiter.
+  if (step && fb.stepStartedAt && !fb.pausedAt) {
+    const real = step.seconds - Math.floor((Date.now() - fb.stepStartedAt) / 1000);
+    if (fb.secondsLeft - real > 2) fb.secondsLeft = Math.max(1, real + 1);
+  }
+  fb.secondsLeft--;
   if (fb.secondsLeft <= 0) {
     if (advanceToNextStep()) return; // advanceBlock() hat schon (inkl. Ring) neu gerendert
     if (fbIsTrailingPause()) {
