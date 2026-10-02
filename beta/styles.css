@@ -514,7 +514,8 @@ button, input, select, textarea { font-family: inherit; }
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   font-size: 12.5px; color: var(--ink); font-weight: 600; margin-bottom: 8px;
 }
-#fs-dock .fs-dock-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#fs-dock .fs-dock-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+#fs-dock .fs-session-clock { flex-shrink: 0; color: var(--ink-faint); font-weight: 500; font-variant-numeric: tabular-nums; }
 #fs-dock .fs-dock-head .btn { flex-shrink: 0; padding: 6px 12px; font-size: 13px; }
 #fs-dock .fs-work-timer { font-size: 48px; margin-bottom: 8px; }
 #fs-dock .fs-rest-timer { font-size: 22px; padding: 8px; margin-bottom: 10px; }
@@ -1814,3 +1815,15 @@ body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }
 .fs-rest-actions { display: flex; gap: 10px; justify-content: center; }
 #fs-rest-timer { cursor: pointer; }
 .fs-dock-hint { font-size: 14px; color: var(--ink-dim); margin: -2px 0 8px; }
+
+/* Notiz zum Satz (Pausen-Screen) und Anzeige unter dem Satz */
+.fs-rest-note { width: 100%; box-sizing: border-box; margin: 4px 0 12px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); border-radius: var(--radius-sm); font-size: 16px; }
+.fs-set-note { font-size: 12px; color: var(--ink-faint); margin: -2px 0 6px 4px; }
+.fs-set-note::before { content: '✎ '; }
+
+/* Übung würfeln (Freestyle) */
+.ex-dice-row { display: flex; justify-content: flex-end; margin: -2px 0 8px; }
+.ex-dice-card { border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
+.ex-dice-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; }
+.ex-dice-name { font-size: 18px; color: var(--ink); }
+.ex-dice-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
