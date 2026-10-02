@@ -5141,12 +5141,311 @@ function openFbDiceSheet() {
   };
 }
 
+/* ---------- Würfelduell (zu zweit, ein Handy) ----------
+   Vollbild über der App, aus beta/entwurf-wuerfelspiel.html übernommen.
+   Ablauf je Runde: gemeinsamen Griff würfeln (wird jede Runde kleiner,
+   keine Monos/einarmigen Griffe), dann würfelt jeder dem anderen die
+   Hängezeit; gehalten = 1 Punkt, Gleichstand: mehr Sekunden gewinnt.
+   Zwischen den eigenen Hangs mindestens 90 s Pause. Wird nicht gespeichert. */
+function openDuel() {
+  if (document.getElementById('duel')) return;
+  const root = document.createElement('div');
+  root.id = 'duel';
+  root.innerHTML = '<div class="screen"></div>';
+  document.body.appendChild(root);
+  const app = root.firstChild;
+
+/* Schwierigkeit je Griff: 0 = Aufwärmen, 3 = klein. Monos und einarmige Griffe fehlen bewusst. */
+const TIER = {
+  jug: 0, edge_large: 0, sloper_easy: 0,
+  edge_medium: 1, sloper_medium: 1, pocket3: 1, pocket3_deep: 1, pocket2_deep: 1, edge3: 1,
+  edge_small: 2, pocket3_small: 2, pocket2: 2, pocket2_offset: 2, sloper_hard: 2,
+  edge_xsmall: 3, pocket2_small: 3,
+};
+const REST_SEC = 90;
+const g = {
+  names: ['Anna', 'Ben'], board: 'bm2000', rounds: 5, min: 6, max: 12,
+  round: 0, turn: 0, grip: null, rolled: null, score: [0, 0], held: [0, 0],
+  lastHangEnd: [0, 0], log: [], screen: 'setup', speed: 1,
+};
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const buzz = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { /* egal */ } };
+const now = () => Date.now();
+const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+let timer = null;
+const stop = () => { clearInterval(timer); timer = null; };
+
+function armNote(board, id) {
+  const ov = (typeof GRIP_ARM_OVERRIDE !== 'undefined' && GRIP_ARM_OVERRIDE[board]) || {};
+  return ov[id] || '';
+}
+function maxTier() { // Runde 1–2 nur grosse Griffe, dann immer kleiner
+  const r = g.round + 1;
+  return r <= 2 ? 1 : Math.min(3, 1 + Math.ceil((r - 2) / Math.max(1, (g.rounds - 2) / 2)));
+}
+function rollGrip() {
+  const mt = maxTier();
+  const pool = BOARDS[g.board].grips.filter((x) => TIER[x.id] != null && TIER[x.id] <= mt && armNote(g.board, x.id) !== 'einarmig' && (!g.grip || x.id !== g.grip.id));
+  // In späteren Runden die schwerste erlaubte Stufe bevorzugen
+  const weighted = pool.flatMap((x) => Array(g.round < 2 ? 1 : TIER[x.id] + 1).fill(x));
+  return weighted[Math.floor(Math.random() * weighted.length)];
+}
+function gripHtml(grip) {
+  const b = BOARDS[g.board];
+  const dots = b.hotspots.filter((h) => h.grip === grip.id).map((h) => `<span class="dot" style="left:${h.hx ?? h.x}%;top:${h.hy ?? h.y}%"></span>`).join('');
+  const t = TIER[grip.id];
+  return `
+    <div class="board"><div class="board-in"><img src="${b.image}" alt="${esc(b.label)}">${dots}</div></div>
+    <div class="grip-name"><b>${esc(grip.label)}</b><span>${esc(grip.note || ' ')}</span>
+      <div class="tier" aria-label="Schwierigkeit ${t + 1} von 4">${[0, 1, 2, 3].map((i) => `<i class="${i <= t ? 'on' : ''}"></i>`).join('')}</div></div>`;
+}
+function topBar(showRound = true) {
+  return `
+    <div class="top">
+      <button class="icon-btn" id="quit" aria-label="Beenden">✕</button>
+      <div class="score">
+        <span class="p"><i style="background:var(--pa)"></i>${esc(g.names[0])}</span>
+        <span class="pts">${g.score[0]}</span><span class="colon">:</span><span class="pts">${g.score[1]}</span>
+        <span class="p">${esc(g.names[1])}<i style="background:var(--pb)"></i></span>
+      </div>
+      <span style="width:40px;flex:none"></span>
+    </div>
+    ${showRound ? `<div class="round">Runde ${g.round + 1} von ${g.rounds}</div>` : ''}`;
+}
+const tag = (i) => `<span class="tag" style="background:var(--p${i ? 'b' : 'a'})">${esc(g.names[i])}</span>`;
+function wireTop() {
+  const q = document.getElementById('quit');
+  if (q) q.onclick = () => { if (g.screen === 'setup' || g.screen === 'end' || confirm('Würfelduell beenden?')) close(); };
+  const s = document.getElementById('speed');
+  if (s) s.onclick = () => { g.speed = g.speed > 1 ? 1 : 5; s.classList.toggle('on', g.speed > 1); };
+}
+
+/* Würfel: kurz durchrollen, dann stehen bleiben */
+function rollDie(el, values, final, done) {
+  el.classList.add('rolling');
+  let n = 0;
+  const id = setInterval(() => {
+    el.firstChild.textContent = values[Math.floor(Math.random() * values.length)];
+    if (++n > 10) {
+      clearInterval(id);
+      el.classList.remove('rolling');
+      el.firstChild.textContent = final;
+      el.classList.add('done');
+      buzz(60);
+      done();
+    }
+  }, 80);
+}
+
+function render() {
+  stop();
+  ({ setup, grip, rollTime, ready, countdown, hang, result, end }[g.screen])();
+  wireTop();
+}
+
+function setup() {
+  app.innerHTML = `
+    <div class="top"><button class="icon-btn" id="quit" aria-label="Schliessen">✕</button></div>
+    <h1>🎲 Würfelduell</h1>
+    <p class="intro">Zu zweit am Board, ein Handy. Ihr würfelt den Griff gemeinsam und dem anderen die Hängezeit.</p>
+    <div class="field"><label>Spieler</label><div class="names"><input id="n0" value="${esc(g.names[0])}" maxlength="12"><input id="n1" value="${esc(g.names[1])}" maxlength="12"></div></div>
+    <div class="field"><label>Board</label><div class="chips">${['bm1000', 'bm2000'].map((b) => `<button class="chip ${g.board === b ? 'on' : ''}" data-board="${b}">${b === 'bm1000' ? 'BM 1000' : 'BM 2000'}</button>`).join('')}</div></div>
+    <div class="field"><label>Runden</label><div class="chips">${[3, 5, 8].map((r) => `<button class="chip ${g.rounds === r ? 'on' : ''}" data-rounds="${r}">${r}</button>`).join('')}</div></div>
+    <div class="field"><label>Hängezeit</label><div class="chips">${[[5, 10], [6, 12], [8, 15]].map(([a, b]) => `<button class="chip ${g.min === a ? 'on' : ''}" data-range="${a}-${b}">${a}–${b} s</button>`).join('')}</div></div>
+    <ul class="rules">
+      <li>Am Anfang grosse Griffe, jede Runde wird es kleiner.</li>
+      <li>Gehalten = 1 Punkt. Gleichstand: mehr Sekunden gewinnt.</li>
+      <li>Zwischen deinen Hangs mindestens ${REST_SEC} s Pause.</li>
+    </ul>
+    <div class="actions"><button class="btn" id="go">Los geht's</button></div>`;
+  app.querySelectorAll('[data-board]').forEach((b) => { b.onclick = () => { g.board = b.dataset.board; setup(); }; });
+  app.querySelectorAll('[data-rounds]').forEach((b) => { b.onclick = () => { g.rounds = Number(b.dataset.rounds); setup(); }; });
+  app.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => { [g.min, g.max] = b.dataset.range.split('-').map(Number); setup(); }; });
+  ['n0', 'n1'].forEach((id, i) => { document.getElementById(id).oninput = (e) => { g.names[i] = e.target.value.trim() || (i ? 'B' : 'A'); }; });
+  document.getElementById('go').onclick = () => {
+    Object.assign(g, { round: 0, turn: 0, grip: null, score: [0, 0], held: [0, 0], lastHangEnd: [0, 0], log: [] });
+    g.screen = 'grip'; render();
+  };
+}
+
+function grip() {
+  const pick = rollGrip();
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <p class="who">Gemeinsamer Griff für diese Runde</p>
+      <div id="grip-box" style="opacity:.25">${gripHtml(pick)}</div>
+    </div>
+    <div class="actions" id="act"><button class="btn" id="roll">🎲 Griff würfeln</button></div>`;
+  document.getElementById('roll').onclick = () => {
+    const box = document.getElementById('grip-box');
+    const grips = BOARDS[g.board].grips.filter((x) => TIER[x.id] != null);
+    let n = 0;
+    document.getElementById('act').innerHTML = '';
+    const id = setInterval(() => {
+      box.innerHTML = gripHtml(grips[Math.floor(Math.random() * grips.length)]);
+      if (++n > 9) {
+        clearInterval(id);
+        g.grip = pick;
+        box.innerHTML = gripHtml(pick);
+        box.style.opacity = 1;
+        buzz(80);
+        document.getElementById('act').innerHTML = `<button class="btn" id="next">Weiter: ${esc(g.names[1 - g.turn])} würfelt</button>`;
+        document.getElementById('next').onclick = () => { g.screen = 'rollTime'; render(); };
+      }
+    }, 90);
+  };
+}
+
+function rollTime() {
+  const hanger = g.turn, roller = 1 - g.turn;
+  const values = []; for (let s = g.min; s <= g.max; s++) values.push(s);
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <p class="who">${tag(roller)} würfelt für ${tag(hanger)}</p>
+      <div class="die" id="die"><span>?</span><small>Sek.</small></div>
+      <p class="who" style="font-size:15px">${esc(g.grip.label)}</p>
+    </div>
+    <div class="actions" id="act"><button class="btn" id="roll">🎲 Zeit würfeln</button></div>`;
+  document.getElementById('roll').onclick = () => {
+    document.getElementById('act').innerHTML = '';
+    g.rolled = values[Math.floor(Math.random() * values.length)];
+    rollDie(document.getElementById('die'), values, g.rolled, () => {
+      document.getElementById('act').innerHTML = `<button class="btn" id="next">Handy an ${esc(g.names[hanger])} →</button>`;
+      document.getElementById('next').onclick = () => { g.screen = 'ready'; render(); };
+    });
+  };
+}
+
+function restLeft(i) {
+  if (!g.lastHangEnd[i]) return 0;
+  return Math.max(0, Math.ceil(REST_SEC - ((now() - g.lastHangEnd[i]) / 1000) * g.speed));
+}
+function ready() {
+  const i = g.turn;
+  const draw = () => {
+    const left = restLeft(i);
+    app.innerHTML = `${topBar()}
+      <div class="main">
+        <p class="who">${tag(i)} hängt <b>${g.rolled} s</b></p>
+        ${gripHtml(g.grip)}
+        ${left ? `<div class="rest"><b>${fmt(left)}</b><span>Pause für ${esc(g.names[i])}</span></div>` : ''}
+      </div>
+      <div class="actions">
+        ${left ? '<button class="link" id="skip">Jetzt schon hängen</button>' : '<button class="btn" id="start">▶ Start</button>'}
+      </div>`;
+    wireTop();
+    const st = document.getElementById('start');
+    if (st) st.onclick = () => { g.screen = 'countdown'; render(); };
+    const sk = document.getElementById('skip');
+    if (sk) sk.onclick = () => { g.lastHangEnd[i] = 0; draw(); };
+    return left;
+  };
+  if (draw()) timer = setInterval(() => { if (!draw()) { stop(); buzz([100, 60, 100]); } }, 1000);
+}
+
+function countdown() {
+  let n = 3;
+  app.innerHTML = `${topBar()}<div class="main"><p class="who">Hände an den Griff</p><div class="count cond" id="cnt">3</div></div>`;
+  buzz(60); beepTick();
+  timer = setInterval(() => {
+    n--;
+    if (n <= 0) { beepStart(); g.screen = 'hang'; render(); return; }
+    document.getElementById('cnt').textContent = n;
+    buzz(60); beepTick();
+  }, 1000 / Math.min(g.speed, 2));
+}
+
+function hang() {
+  const i = g.turn, target = g.rolled, L = 2 * Math.PI * 104;
+  const started = now();
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <p class="who">${tag(i)} · ${esc(g.grip.label)}</p>
+      <div class="timer"><svg viewBox="0 0 240 240"><circle class="track" cx="120" cy="120" r="104"/><circle class="ring" id="ring" cx="120" cy="120" r="104" stroke-dasharray="${L}" stroke-dashoffset="0"/></svg>
+        <div class="num"><span id="num">${target}</span><small>hängen</small></div></div>
+    </div>
+    <div class="actions"><button class="btn release" id="rel">Losgelassen</button></div>`;
+  const finish = (heldSec, ok) => {
+    stop();
+    g.lastHangEnd[i] = now();
+    g.held[i] += heldSec;
+    if (ok) g.score[i]++;
+    g.log.push({ round: g.round, who: i, grip: g.grip.label, target, held: heldSec, ok });
+    buzz(ok ? [80, 60, 200] : 300);
+    g.screen = 'result'; render();
+  };
+  timer = setInterval(() => {
+    const el = ((now() - started) / 1000) * g.speed;
+    const left = Math.max(0, target - el);
+    document.getElementById('num').textContent = Math.ceil(left);
+    document.getElementById('ring').style.strokeDashoffset = String(L * (el / target));
+    if (left <= 0) finish(target, true);
+  }, 100);
+  document.getElementById('rel').onclick = () => {
+    const el = Math.min(target, Math.floor(((now() - started) / 1000) * g.speed));
+    finish(el, el >= target);
+  };
+}
+
+function result() {
+  const last = g.log[g.log.length - 1];
+  const bothDone = g.log.filter((l) => l.round === g.round).length === 2;
+  const lastRound = g.round + 1 >= g.rounds;
+  app.innerHTML = `${topBar()}
+    <div class="main">
+      <div class="result ${last.ok ? 'ok' : 'fail'}">
+        <b>${last.ok ? 'Gehalten! +1' : 'Losgelassen'}</b>
+        <span>${esc(g.names[last.who])}: ${last.held} von ${last.target} s</span>
+      </div>
+    </div>
+    <div class="actions"><button class="btn" id="next">${!bothDone ? `Jetzt ${esc(g.names[1 - last.who])}` : lastRound ? 'Zum Ergebnis' : 'Nächste Runde'}</button></div>`;
+  document.getElementById('next').onclick = () => {
+    if (!bothDone) { g.turn = 1 - g.turn; g.screen = 'rollTime'; }
+    else if (lastRound) g.screen = 'end';
+    else { g.round++; g.turn = g.round % 2; g.screen = 'grip'; } // abwechselnd beginnen
+    render();
+  };
+}
+
+function end() {
+  const [a, b] = g.score;
+  const w = a !== b ? (a > b ? 0 : 1) : g.held[0] !== g.held[1] ? (g.held[0] > g.held[1] ? 0 : 1) : -1;
+  const rows = [];
+  for (let r = 0; r < g.rounds; r++) {
+    const l = g.log.filter((x) => x.round === r);
+    if (!l.length) continue;
+    const cell = (i) => { const x = l.find((y) => y.who === i); return x ? `${x.ok ? '✓' : '✗'} ${x.held}/${x.target}s` : '–'; };
+    rows.push(`<tr><td>${r + 1}</td><td>${esc(l[0].grip)}</td><td class="c">${cell(0)}</td><td class="c">${cell(1)}</td></tr>`);
+  }
+  app.innerHTML = `${topBar(false)}
+    <div class="main">
+      <div class="winner">${w < 0 ? '<b>Unentschieden</b>' : `<span>🏆 Sieg für</span><b style="color:var(--p${w ? 'b' : 'a'})">${esc(g.names[w])}</b>`}
+        <p class="who" style="font-size:14px;margin-top:6px">${a} : ${b} Punkte · ${g.held[0]} s : ${g.held[1]} s gehalten${a === b && w >= 0 ? ' (entscheidet)' : ''}</p></div>
+      <table><thead><tr><th>#</th><th>Griff</th><th class="c">${esc(g.names[0])}</th><th class="c">${esc(g.names[1])}</th></tr></thead><tbody>${rows.join('')}</tbody></table>
+    </div>
+    <div class="actions"><button class="btn" id="again">Revanche</button><button class="btn ghost" id="setup">Einstellungen</button></div>`;
+  document.getElementById('again').onclick = () => { Object.assign(g, { round: 0, turn: 0, grip: null, score: [0, 0], held: [0, 0], lastHangEnd: [0, 0], log: [] }); g.screen = 'grip'; render(); };
+  document.getElementById('setup').onclick = () => { g.screen = 'setup'; render(); };
+}
+
+
+  g.names = [(state.member && state.member.name) || 'Ich', 'Partner'];
+  g.board = fb.board || currentMemberBoard();
+  const onPop = () => { stop(); root.remove(); releaseWakeLock(); window.removeEventListener('popstate', onPop); };
+  const close = () => { onPop(); if (history.state && history.state.duel) history.back(); };
+  history.pushState({ duel: true }, '');
+  window.addEventListener('popstate', onPop);
+  requestWakeLock();
+  render();
+}
+
 async function renderFingerboard() {
   if (!fb.board) fb.board = currentMemberBoard();
 
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Fingerboard</h2><div class="sec-rule"></div></div>
     <div id="fb-start-card-holder">${fbStartCardHtml()}</div>
+    <button type="button" class="btn ghost fb-duel-open" id="fb-duel-open">🎲 Würfelduell zu zweit</button>
 
     <div class="sec-head" id="fb-quickstart-toggle" style="cursor:pointer;">
       <h2 class="sec-title" style="font-size:18px;">Schnelltraining</h2><div class="sec-rule"></div>
@@ -5235,6 +5534,7 @@ async function renderFingerboard() {
   });
   document.getElementById('fb-weight').oninput = (e) => { fb.weight = e.target.value; };
   document.getElementById('fb-dice-open').onclick = openFbDiceSheet;
+  document.getElementById('fb-duel-open').onclick = openDuel;
   document.getElementById('fb-new-ablauf').onclick = () => {
     if (fb.blocks.length && !confirm('Aktuellen Ablauf verwerfen und ganz neu (leer) beginnen?')) return;
     fb.blocks = [];
