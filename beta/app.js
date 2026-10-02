@@ -12699,9 +12699,9 @@ function renderKontoAnim() {
       <div class="chip-row">
         ${ANIM_LEVELS.map(([k, label]) => `<button type="button" class="chip ${k === lvl ? 'active' : ''}" data-anim-level="${k}">${label}</button>`).join('')}
       </div>
-      <p class="card-sub" style="margin:14px 0 10px;">Figur: die neue Zeichnung ist noch in der Testphase.</p>
+      <p class="card-sub" style="margin:14px 0 10px;">Figur</p>
       <div class="chip-row">
-        ${[['', 'Klassisch'], ['v2', 'Neue Figur']].map(([k, label]) => `<button type="button" class="chip ${(slothV2On() ? 'v2' : '') === k ? 'active' : ''}" data-sloth-fig="${k}">${label}</button>`).join('')}
+        ${[['', 'Neue Figur'], ['classic', 'Klassisch']].map(([k, label]) => `<button type="button" class="chip ${(slothV2On() ? '' : 'classic') === k ? 'active' : ''}" data-sloth-fig="${k}">${label}</button>`).join('')}
       </div>
     </div>`;
   holder.querySelectorAll('[data-sloth-fig]').forEach((b) => {
