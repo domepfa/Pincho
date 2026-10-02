@@ -468,6 +468,8 @@ def side_mesh(parts, cfg):
         p = np.array([x, y], float)
         d = [sd((x, y), a, b) for a, b in bones]
         bi = int(np.argmin(d[1:])) + 1  # Bein-Knochen (Rumpf nur über das Hüftgelenk)
+        if y > cfg['an'][1] - 6:  # Ferse und alles unter dem Knöchel gehört zum Fuss (sonst schwingt die Ferse mit dem Schienbein)
+            bi = 3
         # Seite eines Gelenks nach Lage entlang der Kette, nicht nach Abstand (Kniescheibe gehört unter das Knie)
         axes = []
         for j, (J0, R) in enumerate(joints):
