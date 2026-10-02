@@ -200,6 +200,7 @@ def cut_view(view, cfg, parts, joints, anchors):
             save('flat' + far, M['handR'], 'wrR', dark=dark)
         # Beine: stehend + gebeugte Oberschenkel aus der armlosen Serie, Beugewinkel der Zeichnungen merken
         legJ, fl0 = side_leg(parts, SIDE_STAND)  # ganzes Bein aus derselben Zeichnung wie der Rumpf
+        MESH['side'] = side_mesh(parts, SIDE_STAND)  # Bein als verformbares Gitter (neue Darstellung)
         jv['flex'] = {'thigh': round(fl0, 1)}
         # Kniebeugung der Zeichnung je Stellung (Unterschenkel- minus Oberschenkelwinkel)
         kb = lambda c: round(float(np.degrees(np.arctan2(c['an'][1] - c['kn'][1], c['an'][0] - c['kn'][0])
@@ -252,7 +253,7 @@ def cut_view(view, cfg, parts, joints, anchors):
 SQ = 1.82
 SQX = [(0, 340), (340, 680), (680, 1050), (1050, 1536)]
 SIDE_TORSO = dict(src='side_squats.png', xr=SQX[0], sx=SQ, sy=SQ, rot=0,
-    J=dict(neck=(205, 292), sh=(180, 360), hip=(175, 600), tail=(60, 650)),
+    J=dict(neck=(205, 292), sh=(180, 360), hip=(170, 612), tail=(60, 650)),  # Hüfte = Hüfte des Beins (SIDE_STAND)
     poly=[(85, 300), (150, 270), (250, 262), (282, 318), (300, 395), (294, 460), (265, 515), (250, 592), (100, 556), (80, 450), (70, 350)],
     bag=[(22, 512), (112, 512), (112, 648), (22, 648)])
 
@@ -307,7 +308,7 @@ SIDE_LEGS = {
 }
 
 
-def under_bag(mask, bag, fig, below, G, g, a0):
+def under_bag(mask, bag, fig, below, G, g, a0, ink=True):
     """Gesäss hinter dem Chalkbag ergänzen: Bag-Fläche innerhalb der konvexen Hülle des Beins mit Fell
     (an der nächsten Beinkante gespiegelt) füllen, damit beim Drehen keine gerade Schnittkante sichtbar wird."""
     from scipy.spatial import ConvexHull
@@ -326,8 +327,9 @@ def under_bag(mask, bag, fig, below, G, g, a0):
     ok = inner[my, mx]
     g[ry, rx] = np.where(ok, G[my, mx], G[qy, qx]); a0[ry, rx] = 1.0
     # Umrisslinie am neuen Rand (wie gezeichnet)
-    edge = fill & ~ndi.binary_erosion(fill | mask, iterations=3)
-    g[:] = g * (1 - 0.8 * ndi.gaussian_filter(edge.astype(float), 0.8))
+    if ink:
+        edge = fill & ~ndi.binary_erosion(fill | mask, iterations=3)
+        g[:] = g * (1 - 0.8 * ndi.gaussian_filter(edge.astype(float), 0.8))
     return mask | fill
 
 
@@ -405,13 +407,106 @@ def side_leg(parts, cfg, sfx=''):
     return out, flex_of(cfg['torso'], cfg['hip'], cfg['kn'])
 
 
+def side_mesh(parts, cfg):
+    """Bein seitlich als EIN Bild mit Dreiecksgitter (Mesh) und Knochengewichten (Rumpf, Oberschenkel,
+    Unterschenkel, Fuss). Die Puppe verformt das Gitter weich (WebGL) – keine Nahtstellen, keine Stellungswechsel."""
+    A, G, fig, alpha = figure(cfg['src'], cfg.get('xr'))
+    H, W = fig.shape
+    yy, xx = np.mgrid[0:H, 0:W]
+    (bx0, by0), (bx1, by1) = cfg['belt']
+    below = yy > by0 + (xx - bx0) * (by1 - by0) / (bx1 - bx0) + 10
+    im = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(im).polygon(cfg['bag'], fill=1)
+    bag = np.asarray(im).astype(bool)
+    # dunkle Kontur hinten am Gesäss (liegt stehend hinter dem Beutel) weg – beim Beugen käme sie als Streifen heraus
+    leg = ndi.binary_opening(fig & below & ~ndi.binary_dilation(bag, iterations=14), iterations=5)
+    lb, nn = ndi.label(leg)
+    if nn > 1:
+        leg = lb == (np.argmax(ndi.sum(leg, lb, range(1, nn + 1))) + 1)
+    g = G.copy(); a0 = alpha.copy()
+    # hinter dem Beutel nichts ergänzen: der Beutel hängt am Rumpf und deckt das Gesäss in jeder Stellung
+    leg = leg | (ndi.binary_dilation(leg, iterations=2) & ndi.binary_erosion(fig, iterations=3) & ~bag & below)
+    a = ndi.gaussian_filter(leg.astype(float), 0.8) * np.where(leg, a0, 0)
+    f = S * SQ
+    bb = None
+    for far, dark in (('', 1.0), ('_far', FAR_DARK)):
+        img = Image.fromarray(np.dstack([np.clip(g * dark, 0, 255), np.clip(a * 255, 0, 255)]).astype(np.uint8), 'LA')
+        bb = img.getchannel('A').getbbox()
+        img = img.crop(bb).resize((round((bb[2] - bb[0]) * f), round((bb[3] - bb[1]) * f)), Image.LANCZOS)
+        img.save(os.path.join(OUT, f'v2side_legmesh{far}.png'), optimize=True)
+        parts[f'v2side_legmesh{far}'] = [round(bb[0] * f), round(bb[1] * f), round(bb[0] * f) + img.width, round(bb[1] * f) + img.height]
+    # Gitter (Blatt-Pixel), nur wo Bein ist
+    step = 9
+    dil = ndi.binary_dilation(leg, iterations=step + 2)
+    gx = np.arange(bb[0] - step, bb[2] + 2 * step, step); gy = np.arange(bb[1] - step, bb[3] + 2 * step, step)
+    idx = -np.ones((len(gy), len(gx)), int); V = []
+    for j, y in enumerate(gy):
+        for i, x in enumerate(gx):
+            if 0 <= y < H and 0 <= x < W and dil[y, x]:
+                idx[j, i] = len(V); V.append((int(x), int(y)))
+    T = []
+    for j in range(len(gy) - 1):
+        for i in range(len(gx) - 1):
+            q00, q10, q01, q11 = idx[j, i], idx[j, i + 1], idx[j + 1, i], idx[j + 1, i + 1]
+            if min(q00, q10, q01) >= 0: T += [int(q00), int(q10), int(q01)]
+            if min(q10, q11, q01) >= 0: T += [int(q10), int(q11), int(q01)]
+    # Gewichte: nächster Knochen weich gemischt; an der Hüfte grosser, weicher Übergang Rumpf -> Oberschenkel (rundes Gesäss)
+    sh = cfg['torso'][1]
+    bones = [(cfg['hip'], sh), (cfg['hip'], cfg['kn']), (cfg['kn'], cfg['an']), (cfg['an'], cfg['to'])]
+
+    def sd(p, a, b):
+        p = np.array(p, float); a = np.array(a, float); b = np.array(b, float); d = b - a
+        t = np.clip(((p - a) @ d) / (d @ d), 0, 1); return float(np.linalg.norm(p - a - t * d))
+    # Gewichte: jeder Punkt hängt am nächsten Knochen und wird nur nahe einem Gelenk weich mit dem Nachbarknochen
+    # gemischt (Hüfte breit für ein rundes Gesäss, Knie/Knöchel schmal) – nie mehr als zwei Knochen.
+    joints = [(np.array(cfg['hip'], float), 70.0), (np.array(cfg['kn'], float), 40.0), (np.array(cfg['an'], float), 26.0)]
+    hip = joints[0][0]; Wt = []
+    for (x, y) in V:
+        w = [0.0, 0.0, 0.0, 0.0]
+        if bag[min(y, H - 1), min(x, W - 1)] or y < hip[1] - 90:
+            w[0] = 1.0; Wt += w; continue
+        p = np.array([x, y], float)
+        d = [sd((x, y), a, b) for a, b in bones]
+        bi = int(np.argmin(d[1:])) + 1  # Bein-Knochen (Rumpf nur über das Hüftgelenk)
+        # Seite eines Gelenks nach Lage entlang der Kette, nicht nach Abstand (Kniescheibe gehört unter das Knie)
+        axes = []
+        for j, (J0, R) in enumerate(joints):
+            ax = np.array(bones[j + 1][1], float) - J0; ax /= np.linalg.norm(ax)
+            axes.append(float((p - J0) @ ax))
+        for j in (1, 2):
+            if bi == j and axes[j] > 0: bi = j + 1
+            if bi == j + 1 and axes[j] < 0 and d[j] < d[j + 1] + 40: bi = j
+        w[bi] = 1.0
+        for j, (J0, R) in enumerate(joints):  # Gelenk j liegt zwischen Knochen j und j+1
+            if bi not in (j, j + 1):
+                continue
+            u = axes[j]  # >0: Seite des unteren Knochens
+            ax = np.array(bones[j + 1][1], float) - J0; ax /= np.linalg.norm(ax)
+            if j == 1 and (p - J0) @ np.array([ax[1], -ax[0]]) > 0:  # Kniekehle (Innenseite der Beugung): breiter Übergang
+                R = R * 1.9
+            if abs(u) < R and np.linalg.norm(p - J0) < R * 3.5:
+                t = (u + R) / (2 * R); t = t * t * (3 - 2 * t)
+                w = [0.0, 0.0, 0.0, 0.0]; w[j] = 1 - t; w[j + 1] = t
+                break
+        Wt += [round(v, 3) for v in w]
+    lt = np.hypot(cfg['kn'][0] - cfg['hip'][0], cfg['kn'][1] - cfg['hip'][1])
+    lc = np.hypot(cfg['an'][0] - cfg['kn'][0], cfg['an'][1] - cfg['kn'][1])
+    fT, fC = S * SQ * LEG_T / lt, S * SQ * LEG_C / lc
+    return {'img': 'v2side_legmesh', 'V': [c for v in V for c in v], 'T': T, 'W': Wt,
+            'J': [list(cfg['hip']), list(cfg['kn']), list(cfg['an'])],  # Gelenke Hüfte, Knie, Knöchel (Blatt-Pixel)
+            'f': [round(S * SQ, 5), round(fT, 5), round(fC, 5), round(fC, 5)], 'src': round(f, 5)}
+
+
+MESH = {}
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     parts, joints, anchors = {}, {}, {}
     for view, cfg in VIEWS.items():
         cut_view(view, cfg, parts, joints, anchors)
         print(view, 'ok')
-    block = 'const SLOTH_V2 = ' + json.dumps({'parts': parts, 'joints': joints, 'anchors': anchors}, separators=(',', ':')) + ';'
+    block = 'const SLOTH_V2 = ' + json.dumps({'parts': parts, 'joints': joints, 'anchors': anchors, 'mesh': MESH}, separators=(',', ':')) + ';'
     js = open(RIG_JS).read()
     if '/* V2:BEGIN */' in js:
         js = re.sub(r'/\* V2:BEGIN \*/.*?/\* V2:END \*/', '/* V2:BEGIN */\n' + block + '\n/* V2:END */', js, flags=re.S)
