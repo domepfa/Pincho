@@ -946,6 +946,9 @@ function slothRigBuild(pose, v2 = false) {
       // so bleibt der Fuss flach und die Bewegung sieht aus wie gezeichnet
       const planted = (x === '' && pose.pin === 'ankle') || (x === '_far' && pose.pin === 'fankle');
       if (planted && !pose.feet && pose.drawnKnee !== false && J.kneeBend) {
+        // Kniebeugung nach dem Oberschenkel gegenüber der Senkrechten (nicht gegenüber dem Rumpf): beim Kreuzheben
+        // kommt die Hüftbeugung vom vorgebeugten Rumpf, die Knie bleiben dort fast gestreckt
+        const f = Math.max(0, 90 - (((deg % 360) + 540) % 360 - 180));
         const kbv = ks.map((k) => J.kneeBend[k]), fv = ks.map((k) => F[k]);
         let rel = kbv[0];
         for (let i = 1; i < ks.length; i++) if (f >= fv[i - 1]) rel = kbv[i - 1] + (kbv[i] - kbv[i - 1]) * Math.min(1, (f - fv[i - 1]) / (fv[i] - fv[i - 1]));
