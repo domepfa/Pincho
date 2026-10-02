@@ -10,7 +10,8 @@ const SLOTH_RIG_BASE = './assets/sloth/rig/';
 const SLOTH_RIG2_BASE = SLOTH_RIG_BASE.replace('/rig/', '/rig2/');
 /* Neue Figur (v2, aus ganzen Zeichnungen geschnitten, siehe tools/sloth-rig/build_v2.py) – im Konto umschaltbar */
 const SLOTH_FIG_KEY = 'pincho_sloth_fig';
-function slothV2On() { try { return localStorage.getItem(SLOTH_FIG_KEY) === 'v2'; } catch (e) { return false; } }
+// Neue Figur ist Standard; nur wer im Konto "Klassisch" wählt, bekommt die alte ('classic')
+function slothV2On() { try { return localStorage.getItem(SLOTH_FIG_KEY) !== 'classic'; } catch (e) { return true; } }
 // Bein seitlich als verformbares Gitter (WebGL); ohne WebGL bleibt es bei den einzelnen Bildteilen
 const slothMeshOK = (() => { try { return !!document.createElement('canvas').getContext('webgl'); } catch (e) { return false; } })();
 const slothPartBox = (im) => (im && im.startsWith('v2') ? SLOTH_V2.parts[im] : SLOTH_PARTS[im]);
