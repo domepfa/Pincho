@@ -10567,7 +10567,27 @@ function beep(freq, duration) {
    genutzt: das BILD (Zahl/Ring/Übergang) wird um denselben Betrag NACH dem
    Ton gezeigt, statt gleichzeitig — im Ergebnis wirkt der Ton dann relativ
    zum Bild "vorgezogen". Bei Bedarf einfach diese eine Zahl anpassen. */
-const FB_AUDIO_LEAD_MS = 70;
+const FB_AUDIO_LEAD_BASE_MS = 70;
+/* Ton-Ausgleich für Bluetooth: Kopfhörer/Lautsprecher spielen jeden Ton
+   150–300 ms später ab. Die Anzeige wartet dann entsprechend länger, damit
+   Zahl und Ton wieder zusammenfallen (die Zeiten selbst bleiben exakt).
+   'auto' (Standard) nimmt die vom Browser gemeldete Ausgabe-Verzögerung
+   (Chrome/Android: outputLatency), sonst fester Wert aus dem Konto. */
+const AUDIO_COMP_KEY = 'pincho_audio_comp';
+function audioCompPref() { try { return localStorage.getItem(AUDIO_COMP_KEY) || 'auto'; } catch (e) { return 'auto'; } }
+function audioMeasuredLatencyMs() {
+  const ctx = beep.ctx;
+  if (!ctx) return null;
+  const lat = (Number(ctx.outputLatency) || 0) + (Number(ctx.baseLatency) || 0);
+  return lat > 0 ? Math.round(lat * 1000) : null;
+}
+function fbAudioLeadMs() {
+  const pref = audioCompPref();
+  if (pref !== 'auto') return FB_AUDIO_LEAD_BASE_MS + (Number(pref) || 0);
+  // Handylautsprecher meldet ~10–50 ms (deckt der Grundvorlauf ab); darüber die Differenz ausgleichen, höchstens 500 ms
+  const lat = audioMeasuredLatencyMs() || 0;
+  return FB_AUDIO_LEAD_BASE_MS + Math.min(500, Math.max(0, lat - 50));
+}
 
 /* Hält die Audio-Ausgabe während eines laufenden Ablaufs durchgehend wach
    (für Menschen unhörbar: 20Hz, praktisch Lautstärke 0), damit sie zwischen
@@ -10899,7 +10919,7 @@ function tickPreCountdown() {
       const stageEl = document.getElementById('fbx-stage');
       if (stageEl && fb.preCount === 3) stageEl.classList.add('fbx-flash');
     }
-  }, FB_AUDIO_LEAD_MS); // siehe FB_AUDIO_LEAD_MS — Ton vor Bild
+  }, fbAudioLeadMs()); // siehe fbAudioLeadMs — Ton vor Bild
 }
 
 function startSequence() {
@@ -11027,15 +11047,15 @@ function tickBlock() {
       // nicht, hier lohnt sich ein voller Re-Render (passiert nur einmal
       // pro Block, kein Performance-Problem); baut den Ring frisch, dessen
       // Animation läuft über syncFbRingAnimation() am Ende von
-      // renderFbOverlay() mit an. Verzögert (siehe FB_AUDIO_LEAD_MS), damit
+      // renderFbOverlay() mit an. Verzögert (siehe fbAudioLeadMs), damit
       // der eben ausgelöste Ton (advanceToNextStep) dem Bild vorausläuft.
-      setTimeout(renderFbOverlay, FB_AUDIO_LEAD_MS);
+      setTimeout(renderFbOverlay, fbAudioLeadMs());
       return;
     }
     // Gleicher Ring-Knoten bleibt bestehen (kein voller Re-Render nötig) —
     // Animation für die neue Phase explizit neu ansetzen, ebenfalls
     // verzögert (siehe oben).
-    setTimeout(syncFbRingAnimation, FB_AUDIO_LEAD_MS);
+    setTimeout(syncFbRingAnimation, fbAudioLeadMs());
   } else if (step && !isWorkPhase(step) && fb.secondsLeft <= 3) {
     // Letzte 3 Sekunden einer Pause: kurzer Tick pro Sekunde als
     // akustische Vorwarnung, dass der nächste Satz gleich losgeht.
@@ -11044,7 +11064,7 @@ function tickBlock() {
   } else if (step && !isWorkPhase(step) && fb.secondsLeft === 10 && fbNextWorkBlock()) {
     fbWarnSoon(); // Stufe 1: 10 s vor Ende der Pause
   }
-  setTimeout(updateTimerUI, FB_AUDIO_LEAD_MS);
+  setTimeout(updateTimerUI, fbAudioLeadMs());
 }
 
 /* "Wiederholungen geschafft — weiter" bei Fixübungen/Lifting-Pin-Reps:
@@ -12758,16 +12778,26 @@ function renderKontoAnim() {
   const lvl = animLevel();
   holder.innerHTML = `
     <div class="card">
-      <p class="card-title">Faultier-Animationen</p>
-      <p class="card-sub" style="margin-bottom:10px;">${esc(ANIM_LEVELS.find((l) => l[0] === lvl)[2])}.</p>
+      <p class="card-title">Anzeige & Ton</p>
+      <p class="card-sub" style="margin-bottom:10px;">Faultier-Animationen: ${esc(ANIM_LEVELS.find((l) => l[0] === lvl)[2])}.</p>
       <div class="chip-row">
         ${ANIM_LEVELS.map(([k, label]) => `<button type="button" class="chip ${k === lvl ? 'active' : ''}" data-anim-level="${k}">${label}</button>`).join('')}
+      </div>
+      <p class="card-sub" style="margin:14px 0 10px;">Ton-Ausgleich (Bluetooth): ${(() => { const m = audioMeasuredLatencyMs(); return audioCompPref() === 'auto' ? (m != null ? `gemessen ${m} ms` : 'wird beim nächsten Ablauf gemessen') : 'fest eingestellt'; })()}</p>
+      <div class="chip-row">
+        ${[['auto', 'Automatisch'], ['0', 'Aus'], ['150', '150 ms'], ['300', '300 ms']].map(([k, label]) => `<button type="button" class="chip ${audioCompPref() === k ? 'active' : ''}" data-audio-comp="${k}">${label}</button>`).join('')}
       </div>
       <p class="card-sub" style="margin:14px 0 10px;">Figur</p>
       <div class="chip-row">
         ${[['', 'Neue Figur'], ['classic', 'Klassisch']].map(([k, label]) => `<button type="button" class="chip ${(slothV2On() ? '' : 'classic') === k ? 'active' : ''}" data-sloth-fig="${k}">${label}</button>`).join('')}
       </div>
     </div>`;
+  holder.querySelectorAll('[data-audio-comp]').forEach((b) => {
+    b.onclick = () => {
+      try { if (b.dataset.audioComp === 'auto') localStorage.removeItem(AUDIO_COMP_KEY); else localStorage.setItem(AUDIO_COMP_KEY, b.dataset.audioComp); } catch (e) { /* ignorieren */ }
+      renderKontoAnim();
+    };
+  });
   holder.querySelectorAll('[data-sloth-fig]').forEach((b) => {
     b.onclick = () => {
       try { if (b.dataset.slothFig) localStorage.setItem(SLOTH_FIG_KEY, b.dataset.slothFig); else localStorage.removeItem(SLOTH_FIG_KEY); } catch (e) { /* ignorieren */ }
