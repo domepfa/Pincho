@@ -117,6 +117,10 @@ function recentExerciseIdsForSupergroup(sg, limit) {
   return ids;
 }
 
+/* Strichzeichnungen für Würfeln/Duell (statt Emoji), Farbe über currentColor */
+const ICON_DIE = '<svg class="line-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.1" fill="currentColor" stroke="none"/></svg>';
+const ICON_DICE2 = '<svg class="line-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="7" width="11" height="11" rx="3"/><path d="M10 7V5.5a3 3 0 0 1 3-3h5.5a3 3 0 0 1 3 3V11a3 3 0 0 1-3 3H13.5"/><circle cx="6" cy="10.5" r=".9" fill="currentColor" stroke="none"/><circle cx="10" cy="14.5" r=".9" fill="currentColor" stroke="none"/><circle cx="17.5" cy="6.5" r=".9" fill="currentColor" stroke="none"/></svg>';
+
 /* Welche Übungen zeigt die Auswahl gerade? Suche schlägt alles (über alle
    Regionen hinweg), sonst der angetippte Muskel (Hauptmuskel zuerst, dann
    Übungen, die ihn nur mittrainieren), sonst die Körperregion mit
@@ -221,7 +225,7 @@ function exercisePickerBodyHtml(list, selectedId, sg, muscle, query, useRecents,
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input type="search" class="ex-search-input" placeholder="Übung suchen …" aria-label="Übung suchen" value="${esc(query || '')}">
     </label>
-    ${dice ? '<div class="ex-dice-row"><button type="button" class="btn ghost small ex-dice-btn" id="ex-dice-btn" title="Zufällige Übung aus dem gewählten Bereich">🎲 Übung würfeln</button></div><div id="ex-dice-result"></div>' : ''}
+    ${dice ? `<div class="ex-dice-row"><button type="button" class="btn ghost small ex-dice-btn" id="ex-dice-btn" title="Zufällige Übung aus dem gewählten Bereich">${ICON_DIE} Übung würfeln</button></div><div id="ex-dice-result"></div>` : ''}
     <button type="button" class="ex-body-toggle" id="ex-body-toggle" aria-expanded="${mapOpen}">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 10l4 2 4-2M10 21l2-6 2 6"/></svg>
       ${mapOpen ? 'Körperkarte ausblenden' : 'Nach Muskel wählen'}
@@ -428,11 +432,11 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
         const where = muscle ? (MUSCLE_ZONE_LABEL[muscle] || muscle) : EX_SUPERGROUP_LABEL[exerciseSupergroup(ex)] || '';
         out.innerHTML = `
           <div class="ex-dice-card">
-            <span class="ex-dice-label">🎲 Vorschlag${where ? ' · ' + esc(where) : ''}</span>
+            <span class="ex-dice-label">Vorschlag${where ? ' · ' + esc(where) : ''}</span>
             <b class="ex-dice-name">${esc(ex.name)}</b>
             <div class="ex-dice-actions">
               <button type="button" class="btn small" id="ex-dice-take">Übernehmen</button>
-              <button type="button" class="btn ghost small" id="ex-dice-again">Nochmal 🎲</button>
+              <button type="button" class="btn ghost small" id="ex-dice-again">Nochmal würfeln</button>
             </div>
           </div>`;
         out.querySelector('#ex-dice-take').onclick = () => { selectedId = id; out.innerHTML = ''; onSelect(id); };
@@ -5099,7 +5103,7 @@ function openFbDiceSheet() {
   el.innerHTML = `
     <div class="info-sheet-card fb-dice-card">
       <div class="fs-rest-grip" aria-hidden="true"></div>
-      <h3 class="fb-dice-title">🎲 Würfeln</h3>
+      <h3 class="fb-dice-title">${ICON_DIE} Würfeln</h3>
       <div class="chip-row">${chip('dice-what', 'set', d.what, 'Ein Satz')}${chip('dice-what', 'ablauf', d.what, 'Ganzer Ablauf')}</div>
       <label class="fs-rest-label fb-dice-label">Art</label>
       <div class="chip-row">${chip('dice-kind', 'hang', d.kind, 'Board')}${chip('dice-kind', 'campus', d.kind, 'Campus')}${d.what === 'ablauf' ? chip('dice-kind', 'mix', d.kind, 'Mix') : ''}</div>
@@ -5113,8 +5117,8 @@ function openFbDiceSheet() {
         </div>
         <div class="fb-dice-actions">
           <button type="button" class="btn" id="fb-dice-take">Übernehmen</button>
-          <button type="button" class="btn ghost" id="fb-dice-roll">Nochmal 🎲</button>
-        </div>` : `<button type="button" class="btn fb-dice-go" id="fb-dice-roll">🎲 Würfeln</button>`}
+          <button type="button" class="btn ghost" id="fb-dice-roll">Nochmal</button>
+        </div>` : `<button type="button" class="btn fb-dice-go" id="fb-dice-roll">Würfeln</button>`}
       ${d.what === 'set' ? '<p class="login-hint">Der Satz landet im Formular — dort wie gewohnt hinzufügen.</p>' : ''}
     </div>`;
   el.querySelectorAll('[data-dice-what]').forEach((b) => { b.onclick = () => { d.what = b.dataset.diceWhat; if (d.what === 'set' && d.kind === 'mix') d.kind = 'hang'; d.preview = null; openFbDiceSheet(); }; });
@@ -5182,7 +5186,7 @@ async function importDuelInbox() {
     }
   }
   if (n) {
-    toast(n === 1 ? `🎲 Würfelduell${from ? ' mit ' + from : ''} übernommen` : `🎲 ${n} Würfelduelle übernommen`, 'ok');
+    toast(n === 1 ? `Würfelduell${from ? ' mit ' + from : ''} übernommen` : `${n} Würfelduelle übernommen`, 'ok');
     if (document.getElementById('fb-history-list')) renderFbHistory();
     if (state.route === 'progress') renderProgress();
   }
@@ -5295,7 +5299,7 @@ function render() {
 function setup() {
   app.innerHTML = `
     <div class="top"><button class="icon-btn" id="quit" aria-label="Schliessen">✕</button></div>
-    <h1>🎲 Würfelduell</h1>
+    <h1>${ICON_DICE2} Würfelduell</h1>
     <p class="intro">Zu zweit am Board, ein Handy. Ihr würfelt den Griff gemeinsam und dem anderen die Hängezeit.</p>
     <div class="field"><label>Du</label><div class="names one"><input id="n0" value="${esc(g.names[0])}" maxlength="12"></div></div>
     <div class="field"><label>Mitspieler</label>
@@ -5336,7 +5340,7 @@ function grip() {
       <p class="who">Gemeinsamer Griff für diese Runde</p>
       <div id="grip-box" style="opacity:.25">${gripHtml(pick)}</div>
     </div>
-    <div class="actions" id="act"><button class="btn" id="roll">🎲 Griff würfeln</button></div>`;
+    <div class="actions" id="act"><button class="btn" id="roll">Griff würfeln</button></div>`;
   document.getElementById('roll').onclick = () => {
     const box = document.getElementById('grip-box');
     const grips = BOARDS[g.board].grips.filter((x) => TIER[x.id] != null);
@@ -5366,7 +5370,7 @@ function rollTime() {
       <div class="die" id="die"><span>?</span><small>Sek.</small></div>
       <p class="who" style="font-size:15px">${esc(g.grip.label)}</p>
     </div>
-    <div class="actions" id="act"><button class="btn" id="roll">🎲 Zeit würfeln</button></div>`;
+    <div class="actions" id="act"><button class="btn" id="roll">Zeit würfeln</button></div>`;
   document.getElementById('roll').onclick = () => {
     document.getElementById('act').innerHTML = '';
     g.rolled = values[Math.floor(Math.random() * values.length)];
@@ -5527,7 +5531,6 @@ async function renderFingerboard() {
   renderShell(`
     <div class="sec-head"><h2 class="sec-title">Fingerboard</h2><div class="sec-rule"></div></div>
     <div id="fb-start-card-holder">${fbStartCardHtml()}</div>
-    <button type="button" class="btn ghost fb-duel-open" id="fb-duel-open">🎲 Würfelduell zu zweit</button>
 
     <div class="sec-head" id="fb-quickstart-toggle" style="cursor:pointer;">
       <h2 class="sec-title" style="font-size:18px;">Schnelltraining</h2><div class="sec-rule"></div>
@@ -5537,10 +5540,7 @@ async function renderFingerboard() {
 
     <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Eigenen Ablauf bauen</h2><div class="sec-rule"></div></div>
 
-    <div class="fb-new-row">
-      <button type="button" class="btn" id="fb-new-ablauf">＋ Neuer Ablauf</button>
-      <button type="button" class="btn ghost fb-dice-open" id="fb-dice-open" title="Satz oder Ablauf würfeln" aria-label="Würfeln">🎲</button>
-    </div>
+    <button type="button" class="btn" id="fb-new-ablauf" style="width:100%;margin-bottom:12px;">＋ Neuer Ablauf</button>
 
     <div class="chip-row fb-addtype-row">
       <button class="chip ${fb.addType === 'hang' ? 'active' : ''}" data-add-type="hang">Board</button>
@@ -5586,6 +5586,12 @@ async function renderFingerboard() {
     <div id="fb-blocks-list"></div>
 
     <div id="fb-runtime"></div>
+
+    <div class="sec-head"><h2 class="sec-title" style="font-size:18px;">Für Abwechslung</h2><div class="sec-rule"></div></div>
+    <div class="fb-fun">
+      <button type="button" class="fb-fun-row" id="fb-dice-open">${ICON_DIE}<span>Ablauf würfeln<small>Satz oder ganzer Ablauf, Board / Campus</small></span><i aria-hidden="true">›</i></button>
+      <button type="button" class="fb-fun-row" id="fb-duel-open">${ICON_DICE2}<span>Würfelduell<small>zu zweit, ein Handy</small></span><i aria-hidden="true">›</i></button>
+    </div>
 
     <div class="sec-head"><h2 class="sec-title">Verlauf</h2><div class="sec-rule"></div></div>
     <div class="list" id="fb-history-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
@@ -5684,7 +5690,7 @@ async function renderFbHistory() {
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
   list.innerHTML = entries.length ? entries.map(([id, s]) => `
     <div class="log-item">
-      <div class="top"><span>${esc(fmtDayKey(s.date))}</span><span class="type">${s.templateId === 'duel' ? '🎲 Würfelduell · ' : ''}${esc((BOARDS[s.board] && BOARDS[s.board].label) || s.board)}${s.partial ? ' · UNVOLLSTÄNDIG' : ''}</span></div>
+      <div class="top"><span>${esc(fmtDayKey(s.date))}</span><span class="type">${s.templateId === 'duel' ? 'Würfelduell · ' : ''}${esc((BOARDS[s.board] && BOARDS[s.board].label) || s.board)}${s.partial ? ' · UNVOLLSTÄNDIG' : ''}</span></div>
       <div class="ex-log-list">${fbResultsSummaryHtml(s.blocks || [], s.results || [])}</div>
       ${challengeDurationChipsHtml(`fb-history-share-${id}`, CHALLENGE_WINDOW_H)}
       <div class="field-row" style="margin-top:6px;">
