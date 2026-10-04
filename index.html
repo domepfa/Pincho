@@ -17,11 +17,36 @@
 <div id="app"></div>
 <div id="toast-root"></div>
 
-<script src="./config.js"></script>
-<script src="./data.js"></script>
-<script src="./firebase.js"></script>
-<script src="./sloth-rig.js"></script>
-<script src="./app.js"></script>
+<!-- Reihenfolge zählt: alle Skripte teilen einen globalen Namensraum; main.js zuletzt. -->
+<script src="./js/config.js"></script>
+<script src="./js/data.js"></script>
+<script src="./js/firebase.js"></script>
+<script src="./js/sloth-rig-data.js"></script>
+<script src="./js/sloth-rig.js"></script>
+<script src="./js/core.js"></script>
+<script src="./js/exercise-picker.js"></script>
+<script src="./js/login.js"></script>
+<script src="./js/shell.js"></script>
+<script src="./js/plan.js"></script>
+<script src="./js/log.js"></script>
+<script src="./js/ausdauer.js"></script>
+<script src="./js/flow.js"></script>
+<script src="./js/gym.js"></script>
+<script src="./js/fingerboard.js"></script>
+<script src="./js/fb-builder.js"></script>
+<script src="./js/fb-dice.js"></script>
+<script src="./js/exercise-figures.js"></script>
+<script src="./js/fb-blocks.js"></script>
+<script src="./js/audio.js"></script>
+<script src="./js/fb-runner.js"></script>
+<script src="./js/progress.js"></script>
+<script src="./js/cycle.js"></script>
+<script src="./js/challenges.js"></script>
+<script src="./js/privacy.js"></script>
+<script src="./js/help.js"></script>
+<script src="./js/custom-exercises.js"></script>
+<script src="./js/konto.js"></script>
+<script src="./js/main.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));

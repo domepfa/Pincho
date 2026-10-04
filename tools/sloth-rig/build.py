@@ -2,7 +2,7 @@
 
 Jede Vorlage: Teile durch weisse Lücken getrennt, weisser Hintergrund.
 Ausgabe: assets/sloth/rig/<ansicht>_<teil>.png in Schwarzweiss (Graustufe +
-Transparenz) und die Teil-Rechtecke im Block PARTS in beta/sloth-rig.js.
+Transparenz) und die Teil-Rechtecke im Block PARTS in beta/js/sloth-rig-data.js.
 
 Aufruf aus dem Repo-Stamm:  python3 tools/sloth-rig/build.py
 Braucht: pip install pillow numpy scipy
@@ -15,7 +15,7 @@ from scipy import ndimage as ndi
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 OUT = os.path.join(ROOT, 'assets', 'sloth', 'rig')
-RIG_JS = os.path.join(ROOT, 'beta', 'sloth-rig.js')
+RIG_JS = os.path.join(ROOT, 'beta', 'js', 'sloth-rig-data.js')
 
 # Teil-Nummern = Zusammenhangskomponenten der Vorlage (siehe --list)
 SHEETS = {

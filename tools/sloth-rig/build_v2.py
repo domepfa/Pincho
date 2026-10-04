@@ -10,7 +10,7 @@ Jede Figur steht in einer Pose, in der sich nichts überdeckt (A-Pose, Arm frei)
   seinem EIGENEN Fell (nächster eigener Pixel) – so wandert beim Drehen kein fremdes Stück mit.
 - Schwarzweiss mit derselben Kurve wie die bisherige Puppe, Bilder halb so gross gespeichert.
 
-Ausgabe: assets/sloth/rig2/<ansicht>_<teil>.png und der Block SLOTH_V2 in beta/sloth-rig.js
+Ausgabe: assets/sloth/rig2/<ansicht>_<teil>.png und der Block SLOTH_V2 in beta/js/sloth-rig-data.js
 (Teil-Rechtecke, Gelenke, Anschlusspunkte – im selben Format wie SLOTH_PARTS/JOINTS/ANCHORS).
 
 Aufruf aus dem Repo-Stamm:  python3 tools/sloth-rig/build_v2.py
@@ -24,7 +24,7 @@ from build import gray
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 OUT = os.path.join(ROOT, 'assets', 'sloth', 'rig2')
-RIG_JS = os.path.join(ROOT, 'beta', 'sloth-rig.js')
+RIG_JS = os.path.join(ROOT, 'beta', 'js', 'sloth-rig-data.js')
 S = 0.5  # Speichergrösse der Teile (halbe Auflösung reicht fürs Handy)
 FAR_DARK = 0.55
 

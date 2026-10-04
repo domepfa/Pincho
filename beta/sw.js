@@ -1,6 +1,8 @@
-const CACHE_NAME = 'pincho-beta-v94';
+const CACHE_NAME = 'pincho-beta-v95';
 const SHELL_ASSETS = [
-  './', './index.html', './styles.css', './config.js', './data.js', './firebase.js', './sloth-rig.js', './app.js',
+  './', './index.html', './styles.css',
+  // Reihenfolge wie in index.html
+  './js/config.js', './js/data.js', './js/firebase.js', './js/sloth-rig-data.js', './js/sloth-rig.js', './js/core.js', './js/exercise-picker.js', './js/login.js', './js/shell.js', './js/plan.js', './js/log.js', './js/ausdauer.js', './js/flow.js', './js/gym.js', './js/fingerboard.js', './js/fb-builder.js', './js/fb-dice.js', './js/exercise-figures.js', './js/fb-blocks.js', './js/audio.js', './js/fb-runner.js', './js/progress.js', './js/cycle.js', './js/challenges.js', './js/privacy.js', './js/help.js', './js/custom-exercises.js', './js/konto.js', './js/main.js',
   './manifest.json', '../assets/icon-512-any.png', '../assets/icon-192-any.png', '../assets/icon-512-transparent.png', '../assets/icon-512-maskable.png', '../assets/icon-beta-192-any.png', '../assets/icon-beta-512-maskable.png',
   '../assets/board-bm1000.png', '../assets/board-bm2000.png', '../assets/board-campus.jpg',
   '../assets/ki-anleitung-json.md',

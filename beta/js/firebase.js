@@ -100,7 +100,7 @@ async function sendPasswordReset(email) {
   return identityCall('sendOobCode', { requestType: 'PASSWORD_RESET', email });
 }
 
-/* Löscht das Login-Konto selbst (die Daten in der Datenbank löscht app.js
+/* Löscht das Login-Konto selbst (die Daten in der Datenbank löscht js/privacy.js
    vorher). Firebase verlangt dafür eine frische Anmeldung. */
 async function deleteAuthAccount() {
   if (!(await ensureValidAuthToken())) return { ok: false, code: 'NO_TOKEN' };
@@ -176,7 +176,7 @@ async function ensureValidAuthToken() {
 
 /* Ist dieses Gerät schon einmal angemeldet worden? Dann
    startet die App auch offline direkt — das Token wird im Hintergrund
-   erneuert, sobald wieder Netz da ist (siehe boot() in app.js). */
+   erneuert, sobald wieder Netz da ist (siehe boot() in js/core.js). */
 function hasStoredAuth() {
   return !!(authState.idToken || authState.refreshToken);
 }
