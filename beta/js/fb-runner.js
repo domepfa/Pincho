@@ -403,7 +403,7 @@ function fbGetReadyText(b) {
   if (b.type === 'campus') return 'Get ready — an die Startsprosse!';
   return 'Get ready — Position einnehmen!';
 }
-/* Kurzname fürs Schild "Als Nächstes" auf der Bühne (ohne Klammerzusatz). */
+/* Kurzname der nächsten Übung fürs Check-in-Kästchen (ohne Klammerzusatz). */
 function fbShortName(b) {
   const short = (t) => String(t || '').replace(/\s*\(.*?\)\s*/g, ' ').trim();
   if (b.type === 'pause') return 'Pause';
@@ -558,7 +558,7 @@ window.addEventListener('resize', () => { if (document.getElementById('fbx-board
 function fbStageInnerHtml(st) {
   const d = st.displayBlock;
   const onBoard = d.type === 'hang' && BOARDS[d.board];
-  const tag = st.mode === 'ready' ? (onBoard ? 'Hier hängen' : '') : st.trailing ? `Als Nächstes · ${fbShortName(d)}` : '';
+  const tag = st.mode === 'ready' ? (onBoard ? 'Hier hängen' : '') : st.trailing ? 'Danach' : '';
   if (onBoard) return fbBoardStageHtml(d, st.mode === 'work', tag, st.mode !== 'work' && fbSoonLevel() === 2);
   let fig;
   if (st.mode === 'work') {

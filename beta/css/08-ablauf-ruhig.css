@@ -12,8 +12,8 @@
 }
 .fbx-rest { --phase: var(--accent2); }
 /* Letzte 5 s vor einem Satz (Pause und Start-Countdown, siehe fbSoonLevel):
-   rot und pulsierend — Titel, Zahl, Balken und Griff-Rahmen gleichzeitig. */
-.fbx.fbx-soon { --phase: #ff3b30; }
+   Pausenfarbe Orange, die Zahl pulsiert. */
+.fbx.fbx-soon { --phase: var(--accent2); }
 .fbx-soon .fbx-num { animation: fbxSoonPulse 1s ease-in-out infinite; }
 @keyframes fbxSoonPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(1.06); } }
 .fbx-ready .fbx-num { color: var(--phase); }
