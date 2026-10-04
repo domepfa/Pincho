@@ -42,11 +42,11 @@ function esc(str) {
    localStorage gespiegelt und beim Start wiederhergestellt — bis der
    Nutzer aktiv speichert oder zurücksetzt. */
 function saveDraft(key, data) {
-  try { localStorage.setItem('pinchobeta_draft_' + key, JSON.stringify(data)); } catch (e) { /* ignorieren */ }
+  try { localStorage.setItem(STORAGE_PREFIX + 'draft_' + key, JSON.stringify(data)); } catch (e) { /* ignorieren */ }
 }
 function loadDraft(key) {
   try {
-    const raw = localStorage.getItem('pinchobeta_draft_' + key);
+    const raw = localStorage.getItem(STORAGE_PREFIX + 'draft_' + key);
     return raw ? JSON.parse(raw) : null;
   } catch (e) { return null; }
 }
@@ -212,7 +212,7 @@ function exercisePickerListHtml(list, selectedId, sg, muscle, query, useRecents,
 
 /* Körperkarte einklappbar: wer schon Übungen geloggt hat, sieht zuerst "Zuletzt gemacht" und die Suche,
    die Karte bleibt einen Tipp entfernt. Die Wahl merkt sich das Gerät. */
-let exBodyMapOpen = (() => { try { const v = localStorage.getItem('pinchobeta_bodymap'); return v == null ? null : v === '1'; } catch (e) { return null; } })();
+let exBodyMapOpen = (() => { try { const v = localStorage.getItem(STORAGE_PREFIX + 'bodymap'); return v == null ? null : v === '1'; } catch (e) { return null; } })();
 function exBodyMapIsOpen(useRecents) {
   return exBodyMapOpen ?? !(useRecents && recentExerciseIds(1).length);
 }
@@ -461,7 +461,7 @@ function wireExercisePickerGrid(containerId, list, initialSelectedId, onSelect, 
     if (mapToggle) mapToggle.onclick = () => {
       exBodyMapOpen = !exBodyMapIsOpen(useRecents);
       if (!exBodyMapOpen) muscle = '';
-      try { localStorage.setItem('pinchobeta_bodymap', exBodyMapOpen ? '1' : '0'); } catch (e) { /* ignorieren */ }
+      try { localStorage.setItem(STORAGE_PREFIX + 'bodymap', exBodyMapOpen ? '1' : '0'); } catch (e) { /* ignorieren */ }
       render();
     };
     const clearBtn = holder.querySelector('#ex-muscle-clear');
@@ -529,8 +529,8 @@ function todayKey() {
 function pad2(n) { return String(n).padStart(2, '0'); }
 
 /* ---------- State ---------- */
-const PROFILE_KEY = 'pinchobeta_profile';
-const ACTIVE_CREW_KEY = 'pinchobeta_active_crew';
+const PROFILE_KEY = STORAGE_PREFIX + 'profile';
+const ACTIVE_CREW_KEY = STORAGE_PREFIX + 'active_crew';
 function loadStoredProfile() {
   try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); } catch (e) { return null; }
 }
@@ -669,7 +669,7 @@ function authErrorText(code) {
 function loginShell(inner) {
   APP_ROOT.innerHTML = `
     <div class="login-shell">
-      <img class="login-logo" src="../assets/icon-512-any.png" alt="Pincho">
+      <img class="login-logo" src="${ASSET_BASE}icon-512-any.png" alt="Pincho">
       ${inner}
     </div>
   `;
@@ -985,7 +985,7 @@ function logout(skipConfirm) {
 let challengeUnseenCount = 0;
 
 function getChallengesSeenAt() {
-  return Number(localStorage.getItem('pinchobeta_challenges_seen_at') || 0);
+  return Number(localStorage.getItem(STORAGE_PREFIX + 'challenges_seen_at') || 0);
 }
 /* Zählt neue Challenges über alle eigenen Crews (nicht nur die aktive). */
 async function refreshChallengeUnseen() {
@@ -1013,7 +1013,7 @@ function setChallengeUnseenCount(n) {
   } catch (e) { /* Badging API evtl. nicht unterstützt */ }
 }
 function markChallengesSeenNow() {
-  try { localStorage.setItem('pinchobeta_challenges_seen_at', String(Date.now())); } catch (e) { /* ignorieren */ }
+  try { localStorage.setItem(STORAGE_PREFIX + 'challenges_seen_at', String(Date.now())); } catch (e) { /* ignorieren */ }
   setChallengeUnseenCount(0);
 }
 
@@ -1031,7 +1031,7 @@ const NAV_ITEMS = [
 /* Eigene Anordnung der unteren Navigation (Konto → Navigation): Reihenfolge
    und ausgeblendete Tabs. Gespeichert im Profil (members/{id}/nav), dazu
    lokal gespiegelt, damit der Start-Tab schon vor dem Laden stimmt. */
-const NAV_PREF_KEY = 'pinchobeta_nav';
+const NAV_PREF_KEY = STORAGE_PREFIX + 'nav';
 function navPrefs() {
   const fromDoc = state.memberDoc && state.memberDoc.nav;
   if (fromDoc) return fromDoc;
@@ -1061,7 +1061,6 @@ function navIconSvg(d) {
 }
 
 // Beta läuft unter /beta/ — dort das BETA-Schild zeigen, sonst nicht.
-const IS_BETA = location.pathname.includes('/beta/');
 function renderShell(contentHtml) {
   const memberName = state.member ? esc(state.member.name) : '';
   APP_ROOT.innerHTML = `
@@ -2202,7 +2201,7 @@ function renderFlowBuilderPanel(holder) {
     </div>
     <div id="flow-import-panel" ${flowImportOpen ? '' : 'hidden'} style="margin-bottom:16px;">
       <div class="field-row" style="margin-bottom:10px;">
-        <a href="../assets/ki-anleitung-flow-json.md" download class="btn ghost small" style="flex:1;text-decoration:none;box-sizing:border-box;">📄 Herunterladen</a>
+        <a href="${ASSET_BASE}ki-anleitung-flow-json.md" download class="btn ghost small" style="flex:1;text-decoration:none;box-sizing:border-box;">📄 Herunterladen</a>
         <button type="button" class="btn ghost small" id="flow-import-guide-copy" style="flex:1;">📋 Kopieren</button>
       </div>
       <div class="field">
@@ -2294,7 +2293,7 @@ function renderFlowBuilderPanel(holder) {
   };
   document.getElementById('flow-import-guide-copy').onclick = async () => {
     try {
-      const res = await fetch('../assets/ki-anleitung-flow-json.md');
+      const res = await fetch(ASSET_BASE + 'ki-anleitung-flow-json.md');
       const text = await res.text();
       await navigator.clipboard.writeText(text);
       toast('Anleitung kopiert.', 'ok');
@@ -3654,7 +3653,7 @@ let fbQuickstartOpen = false; // Schnelltraining-Karten sind standardmässig ein
 /* Schnelltraining: 'own' = eigene Vorlagen, 'crew' = von anderen geteilte.
    Tab-Wahl pro Gerät gemerkt; Ersteller-Filter/"Ausgeblendete zeigen" nur
    für die aktuelle Ansicht. */
-let fbQsTab = (() => { try { return localStorage.getItem('pinchobeta_fb_qs_tab') || 'pincho'; } catch (e) { return 'pincho'; } })();
+let fbQsTab = (() => { try { return localStorage.getItem(STORAGE_PREFIX + 'fb_qs_tab') || 'pincho'; } catch (e) { return 'pincho'; } })();
 let fbQsCreator = 'all';
 let fbQsShowHidden = false;
 /* Pro Mitglied ausgeblendete Crew-Vorlagen ({sharedTemplateId: true}) —
@@ -5572,7 +5571,7 @@ async function renderFingerboard() {
     </div>
     <div id="fb-import-panel" ${fbImportOpen ? '' : 'hidden'} style="margin-bottom:16px;">
       <div class="field-row" style="margin-bottom:10px;">
-        <a href="../assets/ki-anleitung-json.md" download class="btn ghost small" style="flex:1;text-decoration:none;box-sizing:border-box;">📄 Herunterladen</a>
+        <a href="${ASSET_BASE}ki-anleitung-json.md" download class="btn ghost small" style="flex:1;text-decoration:none;box-sizing:border-box;">📄 Herunterladen</a>
         <button type="button" class="btn ghost small" id="fb-import-guide-copy" style="flex:1;">📋 Kopieren</button>
       </div>
       <div class="field">
@@ -5638,7 +5637,7 @@ async function renderFingerboard() {
   };
   document.getElementById('fb-import-guide-copy').onclick = async () => {
     try {
-      const res = await fetch('../assets/ki-anleitung-json.md');
+      const res = await fetch(ASSET_BASE + 'ki-anleitung-json.md');
       const text = await res.text();
       await navigator.clipboard.writeText(text);
       toast('Anleitung kopiert.', 'ok');
@@ -5730,10 +5729,10 @@ function findFbTemplateById(id) {
 }
 /* Zuletzt per Schnelltraining gestartete Vorlage bzw. Programm (für die Startkarte oben) */
 function fbLastTemplate() {
-  try { const v = JSON.parse(localStorage.getItem('pinchobeta_fb_last_tpl') || 'null'); return v && findFbTemplateById(v.id) ? v : null; } catch (e) { return null; }
+  try { const v = JSON.parse(localStorage.getItem(STORAGE_PREFIX + 'fb_last_tpl') || 'null'); return v && findFbTemplateById(v.id) ? v : null; } catch (e) { return null; }
 }
 function fbRememberTemplate(id) {
-  try { localStorage.setItem('pinchobeta_fb_last_tpl', JSON.stringify({ id, at: Date.now() })); } catch (e) { /* ignorieren */ }
+  try { localStorage.setItem(STORAGE_PREFIX + 'fb_last_tpl', JSON.stringify({ id, at: Date.now() })); } catch (e) { /* ignorieren */ }
 }
 /* Startkarte: grosser "Weiter mit"-Knopf ganz oben; neue Nutzer bekommen das Einsteiger-Programm vorgeschlagen */
 function fbStartCardHtml() {
@@ -5954,7 +5953,7 @@ function renderFbQuickstart() {
   holder.querySelectorAll('[data-qs-tab]').forEach((btn) => {
     btn.onclick = () => {
       fbQsTab = btn.dataset.qsTab;
-      try { localStorage.setItem('pinchobeta_fb_qs_tab', fbQsTab); } catch (e) { /* ignorieren */ }
+      try { localStorage.setItem(STORAGE_PREFIX + 'fb_qs_tab', fbQsTab); } catch (e) { /* ignorieren */ }
       renderFbQuickstart();
     };
   });
@@ -10579,7 +10578,7 @@ const FB_AUDIO_LEAD_BASE_MS = 70;
    Zahl und Ton wieder zusammenfallen (die Zeiten selbst bleiben exakt).
    'auto' (Standard) nimmt die vom Browser gemeldete Ausgabe-Verzögerung
    (Chrome/Android: outputLatency), sonst fester Wert aus dem Konto. */
-const AUDIO_COMP_KEY = 'pinchobeta_audio_comp';
+const AUDIO_COMP_KEY = STORAGE_PREFIX + 'audio_comp';
 function audioCompPref() { try { return localStorage.getItem(AUDIO_COMP_KEY) || 'auto'; } catch (e) { return 'auto'; } }
 function audioMeasuredLatencyMs() {
   const ctx = beep.ctx;
@@ -10719,7 +10718,7 @@ function fbWarmupReminder() {
   const warm = !first || first.type !== 'hang' || ['jug', 'edge_large', 'sloper_easy', 'sloper_medium'].includes(first.grip || first.gripLeft);
   if (warm) return;
   const today = todayKey();
-  try { if (localStorage.getItem('pinchobeta_warmup_hint') === today) return; localStorage.setItem('pinchobeta_warmup_hint', today); } catch (e) { return; }
+  try { if (localStorage.getItem(STORAGE_PREFIX + 'warmup_hint') === today) return; localStorage.setItem(STORAGE_PREFIX + 'warmup_hint', today); } catch (e) { return; }
   toast('Aufgewärmt? Nie kalt an kleine Griffe: Programm „Aufwärmen“ unter Schnelltraining dauert 5 Minuten.');
 }
 
@@ -11257,7 +11256,7 @@ const PROGRESS_COLORS = { gym: '#2f95cf', board: '#c4851c', other: '#9b7be6' }; 
 const PROGRESS_RANGES = [['4w', '4W', 28], ['3m', '3M', 91], ['1y', '1J', 365], ['all', 'Alle', 100000]];
 let progressRange = '3m';
 let progressExerciseId = null;
-let progressSource = (() => { try { return localStorage.getItem('pinchobeta_pg_source') || 'gym'; } catch (e) { return 'gym'; } })(); // 'gym' | 'board'
+let progressSource = (() => { try { return localStorage.getItem(STORAGE_PREFIX + 'pg_source') || 'gym'; } catch (e) { return 'gym'; } })(); // 'gym' | 'board'
 let progressFbSessions = [];
 
 function dayKey(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
@@ -12118,7 +12117,7 @@ function drawProgress() {
   root.querySelectorAll('[data-pg-source]').forEach((b) => {
     b.onclick = () => {
       progressSource = b.dataset.pgSource;
-      try { localStorage.setItem('pinchobeta_pg_source', progressSource); } catch (e) { /* ignorieren */ }
+      try { localStorage.setItem(STORAGE_PREFIX + 'pg_source', progressSource); } catch (e) { /* ignorieren */ }
       progressExerciseId = null;
       drawProgress();
     };
@@ -12769,7 +12768,7 @@ function wishesCardHtml(list) {
 
 /* Faultier-Animationen: An / Ruhig (ohne Gesichter, Schwanzschwingen, Bahnlinie, Überblenden) / Aus (steht still).
    Gilt pro Gerät; die Klasse am <html> steuert das Stylesheet (siehe anim-calm / anim-off). */
-const ANIM_KEY = 'pinchobeta_anim';
+const ANIM_KEY = STORAGE_PREFIX + 'anim';
 const ANIM_LEVELS = [['on', 'An', 'Alles, auch Gesichter und Nachschwingen'], ['calm', 'Ruhig', 'Bewegung ja, ohne Gesichter und Effekte'], ['off', 'Aus', 'Faultier steht still, spart Akku']];
 function animLevel() { try { return localStorage.getItem(ANIM_KEY) || 'on'; } catch (e) { return 'on'; } }
 function applyAnimLevel() {
@@ -13082,7 +13081,7 @@ async function createCrew(name) {
    — sonst passen alte Seite und neues CSS nicht zusammen. */
 (() => {
   const bg = document.querySelector('.sloth-bg');
-  if (bg && !bg.querySelector('img')) bg.innerHTML = '<img src="../assets/sloth/sloth-bg.png" alt="">';
+  if (bg && !bg.querySelector('img')) bg.innerHTML = '<img src="' + ASSET_BASE + 'sloth/sloth-bg.png" alt="">';
 })();
 
 /* ---------- Start ---------- */

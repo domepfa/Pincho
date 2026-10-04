@@ -101,17 +101,18 @@ Unter `https://domepfa.github.io/Pincho/beta/` läuft parallel eine Beta
 wird erst nach dem Testen in die Haupt-App übernommen.
 
 - Eigene Kopie der Dateien in `beta/` (Bilder/Anleitungen aus `../assets/`).
+  Der Code ist in beiden Ordnern **identisch**; was sich unterscheidet
+  (Speicher-Keys, Pfad zu `assets/`, BETA-Schild), regelt `config.js` zur
+  Laufzeit anhand der Adresse.
 - Gleiche Firebase-Daten und gleiche Konten wie die Haupt-App (Anmeldung
   gilt aber pro App), eigener Offline-Speicher (`pinchobeta_…`-Keys, Cache `pincho-beta-…`) — beide
   Service Worker löschen nur ihre eigenen alten Caches.
-- Neuer Look als Überschreib-Schicht am Ende von `beta/styles.css`.
-- **Übernehmen in die Haupt-App:** `tools/promote-beta.sh` kopiert
-  `app.js`, `data.js`, `firebase.js`, `styles.css` und `index.html` aus
-  `beta/` in die Wurzel, stellt Pfade (`../assets/` → `./assets/`),
-  Speicher-Keys (`pinchobeta_` → `pincho_`), Titel und Icons zurück und
-  zählt die Cache-Version der Haupt-App hoch. `manifest.json`/`sw.js` der
-  Haupt-App bleiben eigenständig. Das BETA-Schild erscheint automatisch nur
-  unter `/beta/`.
+- **Übernehmen in die Haupt-App:** `tools/promote-beta.sh` kopiert den Code
+  unverändert aus `beta/` in die Wurzel, stellt in `index.html` Titel, Icons
+  und Pfade zurück und zählt die Cache-Version der Haupt-App hoch.
+  `manifest.json`/`sw.js` der Haupt-App bleiben eigenständig.
+- **Vor jedem Merge:** `node tools/smoke-test.mjs` (Playwright) öffnet
+  Haupt-App und Beta gegen eine nachgebaute Firebase und meldet JS-Fehler.
 
 ## Offene Punkte / bewusst nicht in v1
 

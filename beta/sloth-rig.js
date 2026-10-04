@@ -6,10 +6,10 @@
    einmalig CSS-Keyframes gerechnet; die Figur selbst ist ein statisches SVG,
    das sich per innerHTML einsetzen lässt und ohne JS-Schleife animiert. */
 
-const SLOTH_RIG_BASE = '../assets/sloth/rig/';
+const SLOTH_RIG_BASE = ASSET_BASE + 'sloth/rig/';
 const SLOTH_RIG2_BASE = SLOTH_RIG_BASE.replace('/rig/', '/rig2/');
 /* Neue Figur (v2, aus ganzen Zeichnungen geschnitten, siehe tools/sloth-rig/build_v2.py) – im Konto umschaltbar */
-const SLOTH_FIG_KEY = 'pinchobeta_sloth_fig';
+const SLOTH_FIG_KEY = STORAGE_PREFIX + 'sloth_fig';
 // Neue Figur ist Standard; nur wer im Konto "Klassisch" wählt, bekommt die alte ('classic')
 function slothV2On() { try { return localStorage.getItem(SLOTH_FIG_KEY) !== 'classic'; } catch (e) { return true; } }
 // Bein seitlich als verformbares Gitter (WebGL); ohne WebGL bleibt es bei den einzelnen Bildteilen

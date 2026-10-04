@@ -15,7 +15,7 @@
 const BOARDS = {
   bm1000: {
     label: 'Beastmaker 1000',
-    image: './assets/board-bm1000.png',
+    image: ASSET_BASE + 'board-bm1000.png',
     grips: [
       { id: 'jug', label: 'Jug', note: '2 Jugs oben' },
       { id: 'edge_large', label: 'Grosse Kante (4-Finger)', note: '50mm' },
@@ -65,7 +65,7 @@ const BOARDS = {
   },
   bm2000: {
     label: 'Beastmaker 2000',
-    image: './assets/board-bm2000.png',
+    image: ASSET_BASE + 'board-bm2000.png',
     grips: [
       { id: 'edge_large', label: 'Grosse Kante (4-Finger)', note: '50mm' },
       { id: 'edge_medium', label: 'Mittlere Kante (4-Finger)', note: '33mm' },
@@ -123,7 +123,7 @@ const BOARDS = {
    deshalb kein Foto-Hotspot-Picker wie bei BOARDS, sondern nur der
    Sprossen-TYP (unterschiedliche Leisten-/Sprossengrössen = unterschiedlich
    schwer) plus die Bewegung als Zahlen (siehe app.js, Satz-Typ 'campus'). */
-const CAMPUS_BOARD_IMAGE = './assets/board-campus.jpg';
+const CAMPUS_BOARD_IMAGE = ASSET_BASE + 'board-campus.jpg';
 /* lineX/lineX2 (% von Bildbreite, siehe assets/board-campus.jpg): markiert
    im Referenzbild per Strich, welche Spalte gemeint ist — bei den Kugeln
    zwei Striche, da deren Löcher im Zickzack (zwei versetzte Spalten) statt
