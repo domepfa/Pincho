@@ -75,7 +75,7 @@ mit Augenzwinkern (Faultier = Fingerkraft).
 | Navigation | unten, Symbol + Text, aktiver Tab als Pille |
 | Maskottchen | Faultier (Hintergrund-Strichzeichnung, Figur im Ablauf) |
 
-Die Werte stehen in `beta/styles.css` (Abschnitt „BETA — neuer Look“)
+Die Werte stehen in `css/04-look-basis.css` (Abschnitt „BETA — neuer Look“)
 als Überschreib-Schicht über dem alten Stil. Diese Aufteilung hat den Umbau
 Schritt für Schritt möglich gemacht.
 

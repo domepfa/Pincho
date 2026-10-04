@@ -1,0 +1,11 @@
+/* css/11-abwechslung.css — Strichzeichnungen und Abschnitt "Für Abwechslung" (Board). Reihenfolge der Dateien zählt (Kaskade). */
+/* Strichzeichnungen und Abschnitt "Für Abwechslung" (Board) */
+.line-icon { width: 1.2em; height: 1.2em; vertical-align: -0.22em; flex: none; }
+.ex-dice-btn .line-icon { margin-right: 4px; }
+.fb-dice-title .line-icon, #duel h1 .line-icon { color: var(--accent, #4fc3ff); }
+.fb-fun { margin-bottom: 18px; }
+.fb-fun-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 2px; border: 0; border-top: 1px solid var(--line-soft); background: none; color: var(--ink); font: 600 15px Barlow, system-ui, sans-serif; text-align: left; cursor: pointer; }
+.fb-fun-row:first-child { border-top: 0; }
+.fb-fun-row .line-icon { width: 24px; height: 24px; color: var(--accent); }
+.fb-fun-row small { display: block; font-weight: 500; font-size: 12px; color: var(--ink-faint); }
+.fb-fun-row i { margin-left: auto; font-style: normal; color: var(--ink-faint); font-size: 18px; }

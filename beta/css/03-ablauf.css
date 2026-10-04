@@ -1,0 +1,410 @@
+/* css/03-ablauf.css — Alter Look: Ablauf-Vollbild, Info-Sheet, Restprogramm, Ring/Countdown, Check-in, Fertig-Screen, Campus-Grafik, Muskelkarte, Strichmännchen. Reihenfolge der Dateien zählt (Kaskade). */
+/* ---------- Ablauf-Vollbild ----------
+   Eigenständiges, fixed-positioniertes Overlay (an document.body gehängt,
+   nicht Teil von #app) — deckt den ganzen Bildschirm ab, solange ein
+   Fingerboard-Ablauf läuft. */
+.fb-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 700px 500px at 15% 8%, rgba(255, 255, 255, 0.045), transparent 60%),
+    radial-gradient(ellipse 650px 700px at 90% 85%, rgba(120, 175, 220, 0.05), transparent 55%),
+    repeating-linear-gradient(123deg, rgba(255, 255, 255, 0.02) 0px, rgba(255, 255, 255, 0.02) 1px, transparent 2px, transparent 130px);
+  display: flex; flex-direction: column; align-items: stretch;
+  padding: calc(10px + var(--safe-top)) 18px calc(10px + var(--safe-bottom));
+  overflow-y: auto; overflow-x: hidden;
+  /* War overflow:hidden — das Ziel bleibt, dass alles ohne Scrollen passt
+     (siehe .fb-overlay-inner unten), aber bei sehr vollen Bildschirmen
+     (langer Griff-/Muster-Text + Referenzbild + Check-in-Panel zusammen)
+     reichte der verfügbare Platz trotzdem nicht und Inhalt wurde einfach
+     abgeschnitten. Jetzt als Absicherung scrollbar statt komplett
+     verloren, auch wenn es der Ausnahmefall bleiben soll. */
+}
+.fb-overlay.hidden { display: none; }
+
+/* ---------- Übungsinfo-Sheet (lang drücken auf eine Übung im Raster) ---------- */
+.info-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(0, 0, 0, .6);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.info-sheet-backdrop.hidden { display: none; }
+.info-sheet-card {
+  position: relative; width: 100%; max-width: 480px;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding: 20px 18px calc(20px + var(--safe-bottom));
+  max-height: 80vh; overflow-y: auto;
+  animation: riseIn .22s ease both;
+}
+.info-sheet-close {
+  position: absolute; top: 12px; right: 12px;
+  background: none; border: 1px solid var(--line); color: var(--ink-faint);
+  width: 30px; height: 30px; font-size: 14px; line-height: 1; cursor: pointer;
+}
+.info-sheet-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: .02em; margin-bottom: 10px; padding-right: 36px; }
+.info-sheet-figure { display: flex; flex-direction: column; align-items: center; margin-bottom: 12px; }
+.info-sheet-figure .ex-figure { width: 150px; height: auto; }
+.info-sheet-figure .ex-figure-emoji { font-size: 48px; }
+.ex-howto { font-size: 13px; color: var(--ink-dim); line-height: 1.5; margin-bottom: 12px; }
+.fb-overlay-close {
+  /* position:fixed statt :absolute — alle Overlays, in denen das benutzt
+     wird, sind selbst schon vollflächig (inset:0), optisch also identisch,
+     aber bleibt so oben stehen, auch wenn der Inhalt darunter mal scrollen
+     muss (siehe .fb-overlay overflow-y). */
+  position: fixed; top: calc(14px + var(--safe-top)); right: 16px; z-index: 2;
+  background: none; border: 1px solid var(--line); color: var(--ink-faint);
+  width: 34px; height: 34px; font-size: 15px; line-height: 1; cursor: pointer;
+}
+.fb-overlay-overview-btn {
+  position: fixed; top: calc(14px + var(--safe-top)); left: 16px; z-index: 2;
+  background: none; border: 1px solid var(--line); color: var(--ink-faint);
+  width: 34px; height: 34px; font-size: 16px; line-height: 1; cursor: pointer;
+}
+
+/* ---------- Restprogramm-Übersicht (Button oben links im Ablauf-Overlay):
+   Liste aller Sätze des laufenden Ablaufs, damit man nicht raten muss, was
+   noch kommt — legt sich als eigene Ebene über den laufenden Timer, der im
+   Hintergrund einfach weiterläuft (siehe toggleFbOverview in app.js). ---------- */
+.fb-overview {
+  position: fixed; inset: 0; z-index: 3;
+  background: var(--bg);
+  padding: calc(14px + var(--safe-top)) 18px calc(14px + var(--safe-bottom));
+  display: flex; flex-direction: column; gap: 12px;
+  animation: riseIn .18s ease both;
+}
+.fb-overview-header { display: flex; align-items: center; justify-content: center; padding: 0 40px; }
+.fb-overview-title-main { font-size: 12px; letter-spacing: .08em; color: var(--ink-dim); text-align: center; }
+.fb-overview-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; max-width: 420px; width: 100%; margin: 0 auto; }
+.fb-overview-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border: 1px solid var(--line); background: var(--surface-2);
+}
+.fb-overview-idx {
+  flex-shrink: 0; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); font-size: 12px; color: var(--ink-dim);
+}
+.fb-overview-title { font-size: 14px; font-weight: 700; }
+.fb-overview-sub { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+.fb-overview-done { opacity: .45; }
+.fb-overview-done .fb-overview-idx { border-color: var(--accent); color: var(--accent); }
+.fb-overview-current { border-color: var(--accent); background: rgba(var(--accent-rgb), .08); }
+.fb-overview-current .fb-overview-idx { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .15); }
+/* Alles muss ohne Scrollen aufs Display passen — statt einer festen
+   Blockgrösse mit "justify-content:center" (die auf kurzen Screens
+   überläuft) verteilt space-evenly den verfügbaren Platz auf alle Kinder,
+   und Figur/Ring/Countdown unten sind in vh geklammert statt fix in px,
+   damit sie sich automatisch verkleinern statt abzuschneiden. */
+.fb-overlay-inner {
+  display: flex; flex-direction: column; align-items: center; gap: clamp(3px, 1.1vh, 14px);
+  max-width: 420px; width: 100%; margin: 0 auto; flex: 1; min-height: 0;
+  justify-content: space-evenly; overflow: hidden;
+}
+
+.fb-progress-text { font-size: 11px; color: var(--ink-dim); text-align: center; }
+
+/* Hang/Pause-Visual: Ring füllt sich mit dem Fortschritt INNERHALB des
+   aktuellen Schritts, daneben ein Strichmännchen, das hängt (Hang) oder
+   sich lockert (Pause) — statt einer abstrakten Gesamt-Fortschrittsanzeige. */
+.fb-hang-visual { position: relative; display: flex; align-items: center; justify-content: center; gap: clamp(8px, 3vw, 18px); }
+.fb-phase-figure { width: clamp(56px, 13vh, 90px); flex-shrink: 0; }
+.fb-phase-figure .ex-figure { width: 100%; height: auto; display: block; }
+.fb-hang-figure { transform-origin: 50% 10%; animation: figSway 1.7s ease-in-out infinite; }
+.fb-arm-shake { transform-origin: 49.5% 32.5%; animation: figShake .9s ease-in-out infinite; }
+@keyframes figSway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes figShake { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+
+.fb-timer-ring { position: relative; width: clamp(80px, 17vh, 168px); height: clamp(80px, 17vh, 168px); flex-shrink: 0; }
+.fb-timer-ring svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--line); stroke-width: 7; }
+.ring-fg {
+  fill: none; stroke: var(--accent); stroke-width: 7; stroke-linecap: round;
+  stroke-dasharray: 326.7; transition: stroke-dashoffset .95s linear;
+}
+.ring-fg.rest { stroke: var(--ink-dim); }
+.fb-timer-ring .big {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: clamp(26px, 7vh, 52px); color: var(--accent); line-height: 1;
+}
+.fb-timer-ring .big.rest { color: var(--ink-dim); }
+.fb-timer-ring .big.rest-warn { color: var(--accent2); animation: bigWarnPulse .6s ease-in-out infinite; }
+.ring-fg.rest-warn { stroke: var(--accent2); animation: ringWarnPulse .6s ease-in-out infinite; }
+@keyframes bigWarnPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+@keyframes ringWarnPulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+/* Letzte 3 Sekunden einer PAUSE (synchron zu den beepTick()-Pieptönen,
+   siehe tickBlock in app.js): jede Ziffer fliegt einzeln aus dem Bild
+   (siehe fbFlyDigitsHtml in app.js — jede Ziffer ein eigenes <span>,
+   dadurch startet die Animation bei jedem Tick als frisches Element neu),
+   dazu Ring-Glow und ein Hintergrund-Blitz hinter der ganzen
+   Hang-Visual-Gruppe. .fb-overlay hat overflow:hidden und deckt den ganzen
+   Screen ab — die Ziffern verschwinden dadurch optisch wirklich "aus dem
+   Bildschirm", nicht nur aus dem Ring. */
+.fb-timer-ring .big.rest-tense { font-size: clamp(44px, 13vh, 96px); color: var(--danger); }
+.fb-fly-char {
+  display: inline-block; animation: flyOutUp .85s cubic-bezier(.3, 0, .7, 1) both;
+}
+.fb-fly-char:nth-child(1) { --fly-x: -70px; --fly-r: -50deg; }
+.fb-fly-char:nth-child(2) { --fly-x: 70px; --fly-r: 50deg; animation-delay: .06s; }
+@keyframes flyOutUp {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  15% { transform: translate(0, 0) rotate(0deg) scale(1.15); opacity: 1; }
+  100% { transform: translate(var(--fly-x, 0), -140vh) rotate(var(--fly-r, 40deg)) scale(1.3); opacity: 0; }
+}
+.ring-fg.rest-tense { stroke: var(--danger); animation: ringTensePulse 1s ease-in-out infinite; }
+.fb-hang-visual.rest-tense::before {
+  content: ''; position: absolute; inset: -14px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 107, 107, .45) 0%, rgba(255, 107, 107, 0) 70%);
+  animation: hangVisualFlash 1s ease-in-out infinite; pointer-events: none;
+}
+@keyframes ringTensePulse { 0%, 100% { opacity: 1; filter: drop-shadow(0 0 0 rgba(255, 107, 107, 0)); } 30% { opacity: .55; filter: drop-shadow(0 0 10px rgba(255, 107, 107, .9)); } }
+@keyframes hangVisualFlash { 0%, 100% { opacity: 0; } 30% { opacity: 1; } }
+
+/* Letzte 3 Sekunden eines ARBEITS-Satzes (Hang/Work/Halten): eigener,
+   schlichterer Effekt als bei der Pause — ein echtes Blinken (hart an/aus,
+   keine sanfte Überblendung) statt Rausfliegen, warnt, dass die
+   Arbeitsphase gleich endet. */
+.fb-timer-ring .big.work-tense, .ring-fg.work-tense { animation: blinkTense .5s steps(1) infinite; }
+@keyframes blinkTense { 0%, 49% { opacity: 1; } 50%, 100% { opacity: .2; } }
+
+/* "LOS!" blitzt kurz statt der Zahl auf (siehe advanceToNextStep/
+   fbBigContent in app.js) — füllt die Lücke, die sonst entsteht, sobald
+   die letzte Pausen-Ziffer weggeflogen ist, bis die neue Satz-Zeit zu
+   laufen beginnt. */
+.fb-timer-ring .big.los-flash {
+  font-size: clamp(30px, 8vh, 60px); letter-spacing: .02em;
+  animation: losPop .3s cubic-bezier(.25, 1.4, .4, 1) both;
+}
+@keyframes losPop { 0% { opacity: 0; transform: scale(1.7); } 60% { opacity: 1; transform: scale(.9); } 100% { transform: scale(1); } }
+/* Treibt #fb-ring-fg an (siehe syncFbRingAnimation in app.js): eine
+   lineare Animation über die exakte Phasendauer statt Offset per JS einmal
+   pro Sekunde zu setzen — läuft dadurch exakt in Echtzeit mit, unabhängig
+   von Tick-Timing/Frame-Drops. */
+@keyframes fbRingFill { from { stroke-dashoffset: 326.7; } to { stroke-dashoffset: 0; } }
+
+/* Vorbereitungs-Countdown (5..1) vor einem Hang-Satz: grosse Zahl, die bei
+   jedem Tick neu einschwingt (neues DOM-Element pro Sekunde durch den
+   vollen Re-Render triggert die Animation von selbst); in den letzten
+   3 Sekunden wechselt sie auf die "Achtung"-Farbe und schlägt stärker aus. */
+.fb-precount {
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: clamp(56px, 16vh, 108px); line-height: 1;
+  color: var(--accent); margin: 2px 0; animation: popIn .35s cubic-bezier(.25, 1.4, .4, 1) both;
+}
+.fb-precount-tense { color: var(--accent2); animation: precountTick .5s cubic-bezier(.25, 1.4, .4, 1) both; }
+.fb-precount-heading { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: .06em; color: #fff; }
+.fb-precount-subheading { font-size: 11px; letter-spacing: .1em; color: var(--ink-dim); margin-top: -4px; }
+@keyframes precountTick { 0% { opacity: 0; transform: scale(1.4); } 60% { opacity: 1; transform: scale(.95); } 100% { transform: scale(1); } }
+
+.fb-overlay-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.fb-stage-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+/* War fix 20px, unabhängig vom Text — bei langen Titeln (z. B. Campus mit
+   Muster-Angabe) wickelte das auf 3+ Zeilen und sprengte zusammen mit dem
+   Rest (Referenzbild, Check-in-Panel) die Bildschirmhöhe. Jetzt spürbar
+   kleiner als vorher, aber bewusst dieselbe Grösse wie
+   .fb-stage-label-readable (siehe unten) — vorher wirkte die Kopfzeile je
+   nach Pausen-Art mal gross, mal winzig, das war die eigentliche
+   Inkonsistenz. */
+.fb-stage-label.fb-stage-label-next { font-size: 14px; font-weight: 700; letter-spacing: .04em; color: #fff; line-height: 1.35; }
+/* Pausen MIT verbleibenden Wiederholungen (nicht die abschliessende, kurze
+   "NEXT: ..."-Pause) zeigen hier oft einen langen Griff-/Muster-Text (z. B.
+   Campus-Leiste + Start + Muster) — moderat statt massiv vergrössert, damit
+   lange Texte nicht den knappen Platz im Ablauf-Overlay sprengen. */
+.fb-stage-label.fb-stage-label-readable { font-size: 13px; letter-spacing: .05em; color: var(--ink); line-height: 1.4; }
+
+/* Regel-Kacheln unter der Kopfzeile (siehe fbFactChipsHtml in app.js) —
+   reiner Text statt Icons: in einer Vorschau haben Icons wie 🪵 für
+   "Rundleiste" zu Rätselraten geführt, Text ist eindeutig. Immer vier
+   gleich angeordnete Plätze (Griff/Was, Arme/Hände, Zeit, Wiederholungen),
+   damit man die Zeile einmal lernt und danach bei jedem Satztyp am
+   selben Platz nachschauen kann. */
+.fb-fact-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; margin-bottom: 4px; }
+.fb-fact-chip {
+  border: 1px solid var(--line); background: var(--surface-2);
+  padding: 7px 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
+}
+.fb-fact-label {
+  font-size: 8.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); order: -1;
+}
+.fb-fact-value { font-family: 'Barlow', sans-serif; font-weight: 700; font-size: 12px; line-height: 1.2; color: var(--ink); }
+@media (max-width: 360px) {
+  .fb-fact-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+.fb-stage-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; text-align: center; letter-spacing: .02em; }
+.fb-stage-sub { font-size: 12px; color: var(--ink-dim); text-align: center; }
+
+/* Check-in während der letzten Pause eines Satzes — läuft nebenher, ohne
+   den Ablauf zu unterbrechen (siehe openBlockCheckin in app.js). Bewusst
+   sehr kräftig/gross: das Handy liegt beim Training meist am Boden, aus
+   der Distanz oder im Vorbeigehen abgelesen — kein Platz für zurückhaltende
+   Feinschrift. */
+/* War deutlich zu hoch (grosszügiges Padding + lange zweizeilige
+   Erklärung + grosse Chips) und drängte den Rest des Bildschirms weg —
+   Label jetzt einzeilig ohne Zusatzsatz (siehe checkinPanelHtml), Padding
+   und Chip-Grösse spürbar kompakter. */
+.fb-checkin { width: 100%; max-width: 320px; border: 2px solid var(--accent); background: rgba(var(--accent-rgb), .1); padding: clamp(7px, 1.3vh, 12px); box-sizing: border-box; }
+.fb-checkin[hidden] { display: none; }
+.fb-checkin-label {
+  font-family: 'Barlow', system-ui, sans-serif; font-size: clamp(11px, 3vw, 14px); font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--ink); margin-bottom: 6px; text-align: center;
+}
+.fb-checkin-chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.fb-chip {
+  width: clamp(36px, 10vw, 48px); height: clamp(36px, 10vw, 48px); border: 2px solid var(--line); background: var(--surface-2); color: var(--ink);
+  font-family: 'Barlow', system-ui, sans-serif; font-weight: 700; font-size: clamp(15px, 4.2vw, 20px); cursor: pointer; transition: all .15s;
+}
+.fb-chip.ok { border-color: var(--accent); color: #04141c; background: var(--accent); box-shadow: 0 0 14px -2px rgba(var(--accent-rgb), .7); }
+.fb-chip.fail { border-color: var(--danger); color: #1a0606; background: var(--danger); text-decoration: line-through; box-shadow: 0 0 14px -2px rgba(255, 107, 107, .6); }
+.fb-checkin-row { display: flex; gap: 10px; }
+.fb-checkin-row input[type="text"] {
+  width: 88px; text-align: center; background: var(--surface-2); border: 3px solid var(--accent); color: var(--ink);
+  padding: clamp(9px, 2vh, 14px) 8px; font-size: clamp(20px, 6vw, 26px); font-weight: 700; box-sizing: border-box;
+}
+.fb-checkin-row .kg-field { flex: 1; }
+.fb-checkin-row .kg-field input { border: 3px solid var(--accent); font-size: clamp(20px, 6vw, 26px); font-weight: 700; padding: clamp(9px, 2vh, 14px) 44px clamp(9px, 2vh, 14px) 12px; }
+.fb-checkin-row .kg-field span { font-size: 14px; font-weight: 700; color: var(--ink); }
+
+/* Übersicht auf dem "Ablauf geschafft!"-Screen */
+.fb-summary-headline { font-size: 13px; color: var(--accent); margin-bottom: 2px; text-align: center; }
+.fb-summary-list { width: 100%; max-width: 280px; max-height: 22vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box; }
+.fb-summary-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--ink-dim); border-bottom: 1px solid var(--line); padding: 4px 2px; }
+.fb-stage-next { font-size: clamp(14px, 3.8vw, 18px); font-weight: 700; color: var(--ink); text-align: center; min-height: 16px; }
+.fb-stage-btn { width: 100%; max-width: 280px; margin-top: 0; padding: clamp(7px, 1.8vh, 13px); }
+
+.fb-transport { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 14px); margin-top: 0; }
+.fb-transport-btn {
+  background: none; border: 1px solid var(--line); color: var(--ink-dim);
+  width: clamp(48px, 10vh, 68px); height: clamp(42px, 9vh, 56px); font-size: 22px; cursor: pointer;
+  transition: border-color .13s, color .13s, transform .13s;
+}
+.fb-transport-btn:disabled { opacity: .3; cursor: not-allowed; }
+.fb-transport-btn:not(:disabled):active { border-color: var(--accent); color: var(--accent); transform: scale(.93); }
+.fb-transport-btn.fb-play {
+  width: clamp(58px, 12vh, 84px); height: clamp(50px, 11vh, 72px); font-size: 28px;
+  border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), .1);
+}
+.fb-transport-btn.fb-play:disabled { border-color: var(--line); color: var(--ink-dim); background: none; }
+
+.fb-hang-visual.fb-paused .fb-hang-figure,
+.fb-hang-visual.fb-paused .fb-arm-shake,
+.fb-hang-visual.fb-paused .fig-a,
+.fb-hang-visual.fb-paused .fig-b { animation-play-state: paused; }
+/* Höhe statt Breite begrenzen — bei voller Container-Breite (bis 420px)
+   würde die quadratische Figur sonst so hoch werden, dass Ring/Timer und
+   die Buttons darunter nicht mehr ohne Scrollen aufs Display passen. */
+.fb-stage-figure { width: 100%; display: flex; justify-content: center; }
+.fb-stage-figure .timeline-thumb { width: auto; max-width: 100%; height: auto; max-height: 19vh; }
+.fb-stage-figure .ex-figure { width: auto; max-width: 100%; height: auto; max-height: 19vh; display: block; }
+.fb-stage-figure .ex-figure-emoji { font-size: clamp(48px, 10vh, 96px); text-align: center; line-height: 1.2; }
+
+/* Campus-Arbeitssatz: statt einer generischen Deko-Figur zeigt dieser
+   Block gross, was gerade zählt — Bewegungsart/Starthand als Klartext,
+   plus welche Sprossen bzw. welches Muster dran ist. Muss auch aus
+   einiger Distanz (Handy liegt am Boden) sofort erkennbar sein. Wichtiger
+   als "mitten in der Bewegung ablesbar" ist aber: in den paar Sekunden
+   davor merkbar, denn während der Bewegung schaut niemand aufs Handy. */
+.campus-work-figure { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+.campus-armline { text-align: center; }
+.campus-armline-mode { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: clamp(19px, 4.5vh, 26px); letter-spacing: .02em; color: var(--ink); }
+.campus-armline-hand {
+  font-family: 'Barlow', system-ui, sans-serif; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); margin-left: 8px;
+}
+.campus-work-move {
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: clamp(40px, 9vh, 76px); line-height: 1;
+  color: var(--accent); display: flex; align-items: center; gap: 10px;
+}
+.campus-work-arrow { color: var(--ink-dim); font-size: .7em; }
+
+/* Leiter-Grafik für Muster-Sätze: bildet den Weg am Board ab (welche
+   Sprossen, in welcher Reihenfolge) statt abstrakter Vorzeichen-Kacheln —
+   leichter zu merken in dem einen Blick, bevor man zum Board läuft. */
+.campus-ladder-row { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 3vw, 20px); }
+.campus-ladder-svg { height: clamp(120px, 22vh, 190px); width: auto; overflow: visible; }
+.campus-route { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.campus-route-step { display: flex; align-items: center; gap: 8px; font-size: clamp(12px, 3vw, 14px); color: var(--ink-dim); }
+.campus-route-step b { color: var(--ink); font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1.3em; font-weight: normal; letter-spacing: .02em; }
+.campus-route-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.campus-route-dot.up { background: var(--accent); }
+.campus-route-dot.down { background: var(--accent2); }
+
+/* Von/Zu/Schrittweite-Baukasten (Campus-Add-Panel) */
+.campus-step-hint { font-size: 11.5px; color: var(--ink-faint); margin: 6px 0 10px; }
+.campus-step-preview {
+  border: 1px dashed var(--line); background: var(--surface-2); padding: 10px 12px; margin-bottom: 14px;
+  display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+}
+.campus-step-preview .label { font-family: 'Barlow', system-ui, sans-serif; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+.campus-step-preview .route { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; color: var(--accent); letter-spacing: .02em; }
+.campus-step-preview.error { color: var(--danger); font-size: 12.5px; justify-content: flex-start; text-align: left; }
+
+/* Zielmuskeln-Übersicht: ein Körper-Umriss (vorne links, hinten rechts),
+   Zonen werden je Übung ein-/ausgeblendet statt neu gezeichnet. */
+.fb-muscle-block { margin-top: 0; text-align: center; }
+.muscle-map { width: clamp(70px, 11vh, 150px); margin: 0 auto; display: block; }
+/* Im Ablauf klein halten: die allgemeine .muscle-map-Breite weiter unten (bis 260 px)
+   würde sonst gewinnen und Knöpfe unter den Bildschirmrand schieben. */
+.fb-muscle-block .muscle-map { width: clamp(70px, 11vh, 150px); }
+.muscle-head { fill: var(--ink-faint); opacity: .3; }
+.muscle-zone rect, .muscle-zone ellipse { fill: var(--ink-faint); opacity: .28; transition: fill .2s, opacity .2s; }
+.muscle-zone.secondary rect, .muscle-zone.secondary ellipse { fill: var(--accent); opacity: .5; }
+.muscle-zone.primary rect, .muscle-zone.primary ellipse { fill: var(--accent); opacity: .95; }
+.fb-muscle-label { font-size: 10.5px; color: var(--ink-dim); margin-top: 6px; max-width: 260px; margin-left: auto; margin-right: auto; }
+
+.fb-overlay-done { align-items: center; text-align: center; position: relative; overflow: hidden; }
+.fb-done-emoji { font-size: 64px; animation: popIn .5s cubic-bezier(.25, 1.4, .4, 1) both; }
+.fb-overlay-done .fb-stage-title { animation: riseIn .4s ease .1s both; }
+.fb-overlay-done .fb-stage-sub { animation: riseIn .4s ease .18s both; }
+.fb-overlay-done .fb-stage-btn { animation: riseIn .4s ease .26s both; }
+.confetti-piece {
+  position: absolute; top: -12px; width: 8px; height: 14px; opacity: .9;
+  animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+  to { transform: translateY(115vh) rotate(var(--spin)); opacity: .3; }
+}
+
+/* ---------- Übungs-Strichmännchen (fig-*) ----------
+   Farb-Code: gedämpft = bleibt fix, hell = bewegter Körperteil, Lime =
+   der eigentliche Arbeitspunkt. Gestrichelte Linie + Pfeil zeigt die
+   Bewegungsrichtung — verhindert z. B. Verwechslungen mit einer Drehung. */
+.fig-pose { fill: none; stroke: var(--ink); stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+.fig-pose circle { fill: var(--ink); stroke: none; }
+.fig-pose.fig-fixed { stroke: var(--ink-faint); }
+.fig-pose.fig-fixed circle { fill: var(--ink-faint); }
+.fig-joint { fill: var(--ink-faint); }
+.fig-joint.fig-mid { fill: var(--ink); }
+.fig-joint.fig-hi { fill: var(--accent); }
+.fig-motion { stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 5 6; fill: none; opacity: .55; }
+.fig-arrow { fill: var(--accent); opacity: .8; }
+.fig-rig { stroke: var(--ink-dim); stroke-width: 3.5; fill: none; stroke-dasharray: 1 7; stroke-linecap: round; }
+.fig-rig-dot { fill: var(--accent); stroke: none; }
+.ex-figure-caption {
+  font-size: 12.5px; color: var(--ink); text-align: center; max-width: 280px;
+  margin: 2px auto 0; line-height: 1.45;
+}
+.fig-a { animation-name: figPoseA; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+.fig-b { animation-name: figPoseB; animation-timing-function: ease-in-out; animation-iteration-count: infinite; opacity: 0; }
+@keyframes figPoseA { 0%, 15% { opacity: 1; } 40%, 60% { opacity: 0; } 85%, 100% { opacity: 1; } }
+@keyframes figPoseB { 0%, 15% { opacity: 0; } 40%, 60% { opacity: 1; } 85%, 100% { opacity: 0; } }
+.fig-static { animation: figPulse 2.4s ease-in-out infinite; }
+@keyframes figPulse { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fig-a { animation: none; opacity: 1; }
+  .fig-b { animation: none; opacity: 0; }
+  .fig-static { animation: none; }
+  .fb-hang-figure, .fb-arm-shake { animation: none; }
+  .ring-fg { transition: none; }
+  .ring-fg.rest-warn, .fb-timer-ring .big.rest-warn { animation: none; }
+  .ring-fg.rest-tense, .fb-timer-ring .big.rest-tense { animation: none; }
+  .fb-hang-visual.rest-tense::before { animation: none; opacity: 0; }
+  .fb-fly-char { animation: none; }
+  .ring-fg.work-tense, .fb-timer-ring .big.work-tense { animation: none; }
+  .fb-timer-ring .big.los-flash { animation: none; }
+  #fb-ring-fg { animation: none !important; }
+  .fb-precount, .fb-precount-tense { animation: none; }
+  .anim-in, .fb-done-emoji, .fb-overlay-done .fb-stage-title,
+  .fb-overlay-done .fb-stage-sub, .fb-overlay-done .fb-stage-btn { animation: none; opacity: 1; transform: none; }
+  .confetti-piece { display: none; }
+  .qs-card:hover { transform: none; }
+}

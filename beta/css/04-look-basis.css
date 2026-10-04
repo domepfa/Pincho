@@ -1,0 +1,147 @@
+/* css/04-look-basis.css — Neuer Look (überschreibt 01–03): Tokens, Kopf, Navigation, Karten, Knöpfe, Chips, Felder. Reihenfolge der Dateien zählt (Kaskade). */
+/* ================================================================
+   BETA — neuer Look (Schritt 1: Grundlagen)
+   Liegt bewusst als Überschreib-Schicht am Ende, damit die bisherigen
+   Regeln oben unverändert bleiben und sich die Beta leicht mit der
+   laufenden App vergleichen lässt. Schwarz / Blau / Weiss, runde
+   Karten und Knöpfe, Barlow als Schrift, Faultier im Hintergrund.
+   ================================================================= */
+:root {
+  --bg: #07090c;
+  --surface: #10151b;
+  --surface-2: #161d25;
+  --line: #2f3a47;
+  --line-soft: #1f2731;
+  --ink: #f4f6f8;
+  --ink-dim: #b3bdc8;
+  --ink-faint: #9aa6b4;
+  --accent: #4fc3ff;
+  --accent-rgb: 79, 195, 255;
+  --accent-ink: #04141f;
+  --accent-glow: #9fe4ff;
+  --radius: 16px;
+  --radius-sm: 12px;
+}
+
+html, body {
+  background-color: var(--bg);
+  background-image: none;
+  font-family: 'Barlow', system-ui, -apple-system, sans-serif;
+}
+.mono { font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+
+/* Faultier-Strichzeichnung, oben rechts hinter allem */
+.sloth-bg {
+  position: fixed; top: 58px; right: -26px; width: 230px; z-index: 0;
+  color: var(--accent); opacity: .16; pointer-events: none;
+}
+.sloth-bg svg { width: 100%; height: auto; display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .sloth-bg { animation: sloth-sway 7s ease-in-out infinite; transform-origin: 50% 0; }
+}
+@keyframes sloth-sway { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+#app { position: relative; z-index: 1; }
+
+/* Kopfzeile */
+.topbar {
+  background: rgba(7, 9, 12, .86);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line-soft);
+}
+.topbar .mark { font-size: 26px; letter-spacing: .03em; }
+.topbar .mark::before { background: var(--accent); border-radius: 2px; }
+.beta-badge {
+  display: inline-block; vertical-align: middle; margin-left: 6px; padding: 2px 7px 1px;
+  font-family: 'Barlow', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .12em;
+  color: var(--accent-ink); background: var(--accent); border-radius: 999px;
+}
+.app-tagline { font-size: 11px; }
+.topbar .who .name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.topbar .logout {
+  border-radius: 999px; border-color: var(--line); color: var(--ink);
+  font-size: 12px; font-weight: 600; padding: 7px 14px;
+}
+
+/* Navigation unten: Symbol + Text, aktiver Tab als Pille */
+.bottomnav {
+  background: rgba(11, 15, 20, .94);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line-soft);
+}
+.bottomnav a {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 4px 9px; font-family: 'Barlow', sans-serif; font-size: 11px; font-weight: 600;
+  letter-spacing: .06em; color: var(--ink-dim);
+}
+.bottomnav a.active { color: var(--accent); font-weight: 700; }
+.nav-pill { display: flex; padding: 3px 18px; border-radius: 999px; transition: background .25s ease; }
+.bottomnav a.active .nav-pill { background: rgba(var(--accent-rgb), .16); }
+.nav-icon { display: block; }
+.nav-indicator { display: none; }
+.nav-dot { top: 5px; right: calc(50% - 22px); }
+
+/* Überschriften */
+.sec-title { font-size: 24px; letter-spacing: .01em; padding-left: 0; }
+.sec-title::before { display: none; }
+.sec-rule { background: var(--line-soft); }
+
+/* Karten und Flächen: rund statt eckig */
+.card, .qs-card, .stat-tile, .timeline-card, .challenge-card, .board-visual, .campus-ref,
+.fs-group, .fs-inline-input, .fs-sticky-bar, .list-empty, .pattern-strip {
+  border-radius: var(--radius);
+}
+.card, .qs-card, .stat-tile, .timeline-card, .challenge-card, .fs-group {
+  background: var(--surface); border-color: var(--line-soft);
+}
+.timeline-thumb { border-radius: var(--radius-sm); }
+.card-title { font-size: 12px; font-weight: 700; letter-spacing: .1em; }
+.card-value { font-size: 30px; }
+
+/* Knöpfe: kräftig blau (Haupt) oder weiss mit sichtbarem Rand (Neben) */
+.btn {
+  border-radius: 14px; font-size: 19px; letter-spacing: .03em; padding: 14px;
+  background: var(--accent); color: var(--accent-ink);
+  box-shadow: 0 8px 22px -10px rgba(var(--accent-rgb), .75);
+}
+.btn.small { border-radius: 999px; font-size: 15px; padding: 9px 16px; }
+.btn.ghost {
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--ink);
+}
+.btn.ghost:not(:disabled):active { background: var(--surface); }
+.btn.ghost.accent-outline { background: transparent; border-color: var(--accent); color: var(--accent); }
+.btn.danger { border-radius: 14px; }
+.btn:disabled { opacity: .35; }
+
+/* Chips: Pillen, aktiv = weiss gefüllt */
+.chip {
+  border-radius: 999px; font-family: 'Barlow', sans-serif; font-size: 14px; font-weight: 600;
+  padding: 8px 16px; color: var(--ink); border-color: var(--line); background: var(--surface);
+}
+.chip.active { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.log-mode-row .chip { font-size: 14px; }
+.log-mode-row .chip.active { color: var(--bg); }
+
+/* Eingabefelder */
+.field label { font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--ink-dim); }
+.field input, .field select, .field textarea, .kg-field input, .ex-row-input, .day-row select {
+  border-radius: var(--radius-sm); background: var(--surface-2); border-color: var(--line);
+  font-size: 16px;
+}
+.stepper-btn, .pattern-btn { border-radius: 999px; }
+.stepper-num { border-radius: var(--radius-sm); }
+
+/* Trainings-Leiste unten: runder Knopf */
+#fs-dock { border-radius: 20px 20px 0 0; }
+#fs-dock .fs-dock-btn { border-radius: 16px; }
+#fs-dock .fs-rest-timer { border-radius: 12px; }
+
+/* Toasts */
+.toast { border-radius: 14px; }
+/* Aktiver Chip immer dunkle Schrift auf weiss — einige ältere, spezifischere
+   Regeln oben färben sie sonst blau (auf weiss schlecht lesbar). */
+.chip.active { color: var(--bg) !important; }
+/* Kleine Symbol-Knöpfe (Info, Entfernen, …) rund statt eckig */
+.ex-row-remove, .ex-pick-info, .ex-row-step { border-radius: 10px; }
+/* Navigation ist mit Symbolen höher geworden — Trainings-Leiste darüber */
+#fs-dock { bottom: calc(62px + var(--safe-bottom)); }
+body.has-fs-dock { padding-bottom: calc(62px + 210px + var(--safe-bottom)); }

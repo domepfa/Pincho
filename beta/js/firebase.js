@@ -16,7 +16,7 @@
 
 const FIREBASE_URL = 'https://pincho-crew-default-rtdb.europe-west1.firebasedatabase.app';
 const FIREBASE_API_KEY = 'AIzaSyDFwqI1f2o03DLM3I8oPXWFQw3nH9ZrQdA';
-const AUTH_STORAGE_KEY = 'pincho_uauth'; // bewusst nicht "…_auth": das war der alte Team-Login
+const AUTH_STORAGE_KEY = STORAGE_PREFIX + 'uauth'; // bewusst nicht "…_auth": das war der alte Team-Login
 
 let authState = { idToken: null, refreshToken: null, expiresAt: 0, uid: null, email: null };
 
@@ -100,7 +100,7 @@ async function sendPasswordReset(email) {
   return identityCall('sendOobCode', { requestType: 'PASSWORD_RESET', email });
 }
 
-/* Löscht das Login-Konto selbst (die Daten in der Datenbank löscht app.js
+/* Löscht das Login-Konto selbst (die Daten in der Datenbank löscht js/privacy.js
    vorher). Firebase verlangt dafür eine frische Anmeldung. */
 async function deleteAuthAccount() {
   if (!(await ensureValidAuthToken())) return { ok: false, code: 'NO_TOKEN' };
@@ -176,7 +176,7 @@ async function ensureValidAuthToken() {
 
 /* Ist dieses Gerät schon einmal angemeldet worden? Dann
    startet die App auch offline direkt — das Token wird im Hintergrund
-   erneuert, sobald wieder Netz da ist (siehe boot() in app.js). */
+   erneuert, sobald wieder Netz da ist (siehe boot() in js/core.js). */
 function hasStoredAuth() {
   return !!(authState.idToken || authState.refreshToken);
 }
@@ -193,8 +193,8 @@ function authQuery() {
    gespeichertes Training geht so nicht verloren. Solange etwas in der
    Warteschlange steckt, werden frisch geladene Daten damit überlagert,
    damit ein noch nicht hochgeladener Eintrag nicht kurz "verschwindet". */
-const CACHE_PREFIX = 'pincho_c:';
-const QUEUE_KEY = 'pincho_queue';
+const CACHE_PREFIX = STORAGE_PREFIX + 'c:';
+const QUEUE_KEY = STORAGE_PREFIX + 'queue';
 
 function pathSegs(path) { return String(path).split('/').filter(Boolean); }
 function startsWithSegs(a, b) { return b.length <= a.length && b.every((seg, i) => a[i] === seg); }

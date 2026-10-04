@@ -9,7 +9,17 @@
 <link rel="icon" href="./assets/icon-192-any.png" type="image/png">
 <link rel="apple-touch-icon" href="./assets/icon-512-maskable.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./css/01-basis.css">
+<link rel="stylesheet" href="./css/02-bereiche.css">
+<link rel="stylesheet" href="./css/03-ablauf.css">
+<link rel="stylesheet" href="./css/04-look-basis.css">
+<link rel="stylesheet" href="./css/05-look-board.css">
+<link rel="stylesheet" href="./css/06-look-seiten.css">
+<link rel="stylesheet" href="./css/07-faultier.css">
+<link rel="stylesheet" href="./css/08-ablauf-ruhig.css">
+<link rel="stylesheet" href="./css/09-ergaenzungen.css">
+<link rel="stylesheet" href="./css/10-duell.css">
+<link rel="stylesheet" href="./css/11-abwechslung.css">
 </head>
 <body>
 <!-- Muskelfaultier (assets/sloth) dezent und dunkel im Hintergrund, rein dekorativ. -->
@@ -17,10 +27,36 @@
 <div id="app"></div>
 <div id="toast-root"></div>
 
-<script src="./data.js"></script>
-<script src="./firebase.js"></script>
-<script src="./sloth-rig.js"></script>
-<script src="./app.js"></script>
+<!-- Reihenfolge zählt: alle Skripte teilen einen globalen Namensraum; main.js zuletzt. -->
+<script src="./js/config.js"></script>
+<script src="./js/data.js"></script>
+<script src="./js/firebase.js"></script>
+<script src="./js/sloth-rig-data.js"></script>
+<script src="./js/sloth-rig.js"></script>
+<script src="./js/core.js"></script>
+<script src="./js/exercise-picker.js"></script>
+<script src="./js/login.js"></script>
+<script src="./js/shell.js"></script>
+<script src="./js/plan.js"></script>
+<script src="./js/log.js"></script>
+<script src="./js/ausdauer.js"></script>
+<script src="./js/flow.js"></script>
+<script src="./js/gym.js"></script>
+<script src="./js/fingerboard.js"></script>
+<script src="./js/fb-builder.js"></script>
+<script src="./js/fb-dice.js"></script>
+<script src="./js/exercise-figures.js"></script>
+<script src="./js/fb-blocks.js"></script>
+<script src="./js/audio.js"></script>
+<script src="./js/fb-runner.js"></script>
+<script src="./js/progress.js"></script>
+<script src="./js/cycle.js"></script>
+<script src="./js/challenges.js"></script>
+<script src="./js/privacy.js"></script>
+<script src="./js/help.js"></script>
+<script src="./js/custom-exercises.js"></script>
+<script src="./js/konto.js"></script>
+<script src="./js/main.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));

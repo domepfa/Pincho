@@ -22,10 +22,10 @@ wie bei Firnspur/Fixseil), Speicherung über Firebase Realtime Database.
    Konsole, nicht im öffentlichen Repo. Siehe "Sicherheit" unten.
 4. Die Datenbank-URL oben in der Konsole kopieren (Format
    `https://<projekt>-default-rtdb.<region>.firebasedatabase.app`) und in
-   [`firebase.js`](./firebase.js) bei `FIREBASE_URL` eintragen.
+   [`js/firebase.js`](./js/firebase.js) bei `FIREBASE_URL` eintragen.
 5. Unter **Projekteinstellungen → Allgemein → Meine Apps** eine Web-App
    registrieren (Symbol `</>`, beliebiger Spitzname reicht). Den `apiKey` aus
-   dem angezeigten Code-Schnipsel in `firebase.js` bei `FIREBASE_API_KEY`
+   dem angezeigten Code-Schnipsel in `js/firebase.js` bei `FIREBASE_API_KEY`
    eintragen.
 6. Unter **Authentication → Sign-in method** die Methode **„E-Mail/Passwort"**
    aktivieren. Ohne diesen Schritt lehnt Firebase jeden Login ab.
@@ -72,7 +72,7 @@ Die Regeln in [`database.rules.json`](./database.rules.json) sorgen dafür, dass
   höchstens ein leeres Login-Konto anlegen, aber nichts lesen oder schreiben,
 - den Code (`crewSecrets`) nur sieht, wer die Crew gegründet hat.
 
-Der `apiKey` in `firebase.js` ist bei Firebase kein Geheimnis (siehe
+Der `apiKey` in `js/firebase.js` ist bei Firebase kein Geheimnis (siehe
 [Google-Doku](https://firebase.google.com/docs/projects/api-keys)) — die
 Sicherheit kommt von den Regeln.
 
@@ -87,7 +87,7 @@ Die App startet auch ohne bzw. mit sehr schlechtem Netz (z. B. im Gym):
   innert 2,5 s antwortet, sonst sofort aus der gespeicherten Kopie. Die
   Netz-Antwort aktualisiert die Kopie im Hintergrund (neue Version beim
   nächsten Öffnen). Bilder und Google Fonts: Cache zuerst.
-- **Daten** (`firebase.js`): Jeder gelesene Pfad wird in `localStorage`
+- **Daten** (`js/firebase.js`): Jeder gelesene Pfad wird in `localStorage`
   gespiegelt (`pincho_c:<pfad>`). Schreibzugriffe landen zuerst lokal und in
   einer Warteschlange (`pincho_queue`), die automatisch hochgeladen wird,
   sobald wieder Netz da ist. Push-IDs werden lokal erzeugt (Firebase-Format).
@@ -101,17 +101,18 @@ Unter `https://domepfa.github.io/Pincho/beta/` läuft parallel eine Beta
 wird erst nach dem Testen in die Haupt-App übernommen.
 
 - Eigene Kopie der Dateien in `beta/` (Bilder/Anleitungen aus `../assets/`).
+  Der Code ist in beiden Ordnern **identisch**; was sich unterscheidet
+  (Speicher-Keys, Pfad zu `assets/`, BETA-Schild), regelt `js/config.js` zur
+  Laufzeit anhand der Adresse.
 - Gleiche Firebase-Daten und gleiche Konten wie die Haupt-App (Anmeldung
   gilt aber pro App), eigener Offline-Speicher (`pinchobeta_…`-Keys, Cache `pincho-beta-…`) — beide
   Service Worker löschen nur ihre eigenen alten Caches.
-- Neuer Look als Überschreib-Schicht am Ende von `beta/styles.css`.
-- **Übernehmen in die Haupt-App:** `tools/promote-beta.sh` kopiert
-  `app.js`, `data.js`, `firebase.js`, `styles.css` und `index.html` aus
-  `beta/` in die Wurzel, stellt Pfade (`../assets/` → `./assets/`),
-  Speicher-Keys (`pinchobeta_` → `pincho_`), Titel und Icons zurück und
-  zählt die Cache-Version der Haupt-App hoch. `manifest.json`/`sw.js` der
-  Haupt-App bleiben eigenständig. Das BETA-Schild erscheint automatisch nur
-  unter `/beta/`.
+- **Übernehmen in die Haupt-App:** `tools/promote-beta.sh` kopiert den Code
+  unverändert aus `beta/` in die Wurzel, stellt in `index.html` Titel, Icons
+  und Pfade zurück und zählt die Cache-Version der Haupt-App hoch.
+  `manifest.json`/`sw.js` der Haupt-App bleiben eigenständig.
+- **Vor jedem Merge:** `node tools/smoke-test.mjs` (Playwright) öffnet
+  Haupt-App und Beta gegen eine nachgebaute Firebase und meldet JS-Fehler.
 
 ## Offene Punkte / bewusst nicht in v1
 
@@ -130,7 +131,7 @@ wird erst nach dem Testen in die Haupt-App übernommen.
   `tools/sloth-rig/`) und Faultier-Posen nicht wild mischen. Für die
   Gliederpuppe fehlen eine Seitenansicht-Vorlage und separate Oberarme.
 - **Hilfe** (`#hilfe`, unter KONTO → „So funktioniert Pincho"): ein
-  aufklappbarer Abschnitt pro Tab (`HELP_SECTIONS` in `app.js`) — bei neuen
+  aufklappbarer Abschnitt pro Tab (`HELP_SECTIONS` in `js/help.js`) — bei neuen
   Funktionen dort mitpflegen.
 - **Datenschutz** (`#datenschutz`, auch ohne Anmeldung): Betreiber „Dome";
   die Kontakt-Adresse steht nicht im Code, sondern in `config/contact`
@@ -155,7 +156,7 @@ wird erst nach dem Testen in die Haupt-App übernommen.
   Kopie) und **Crew** (Filter nach Ersteller, pro Person ausblendbar über
   `hiddenTemplates/{memberId}`). Ablauf-Zeit inkl. Übungspausen wird über
   `restSec` bei Exercise-Sätzen mitgerechnet (siehe `fbEstimateSeconds` in
-  `app.js`).
+  `js/fingerboard.js`).
 - **Ablauf-Vollbild**: Sobald ein Ablauf startet, übernimmt `#fb-overlay`
   (an `document.body` gehängt, nicht Teil von `#app`) den ganzen Bildschirm
   — inkl. Best-effort `requestFullscreen()` (fällt auf iOS o. Ä. einfach auf
@@ -167,19 +168,25 @@ wird erst nach dem Testen in die Haupt-App übernommen.
   dynamischen Bewegungen, ein sanftes Pulsieren bei Halteübungen (Plank
   etc.); ohne hinterlegte Animation fällt es auf ein 💪-Emoji zurück. Neue
   Übungen bekommen eine Animation, indem man `EXERCISE_FIGURES[exerciseId]`
-  in `app.js` ergänzt (Farbcode: gedämpft = fix, hell = bewegt, Lime = der
+  in `js/exercise-figures.js` ergänzt (Farbcode: gedämpft = fix, hell = bewegt, Lime = der
   Arbeitspunkt).
 
 ## Projektstruktur
 
 ```
-index.html      App-Shell, lädt Fonts + Scripts
-styles.css      Gesamtes Styling (ein dunkles Theme: Granit/Chalk/Flechte/Alpenglühen)
-data.js         Statische Konfiguration: Boards, Protokolle, Übungen, Standard-Wochenplan
-firebase.js     Dünne REST-Anbindung an Firebase Realtime Database + Auth
+index.html      App-Shell, lädt Fonts + Skripte (Reihenfolge zählt, main.js zuletzt)
+css/            Styling, in Ladereihenfolge aufgeteilt (01–03 alter Look, ab 04 neuer Look als Überschreib-Schicht)
+js/             Der ganze Code, klassische Skripte mit gemeinsamem globalem Namensraum
+                (eine Datei pro Bereich, Übersicht in CLAUDE.md)
+  config.js     Unterschiede Haupt-App/Beta (Speicher-Präfix, Asset-Pfad)
+  data.js       Statische Konfiguration: Boards, Übungen, Posen, Programme, Wochenplan
+  firebase.js   REST-Anbindung an Firebase Realtime Database + Auth, Offline-Kopie
+  sloth-rig*.js Faultier-Puppe (sloth-rig-data.js wird von tools/sloth-rig erzeugt)
+  core.js … main.js  App: Kern, Tabs, Timer (siehe CLAUDE.md)
+beta/           Beta-App: identischer Code, eigene index.html/manifest.json/sw.js
+tools/          promote-beta.sh, smoke-test.mjs, sloth-rig/ (Puppen-Teile erzeugen)
+calibrate.html  Hilfsseite: Griff-Hotspots am Board-Bild ausrichten
 database.rules.json  Datenbank-Regeln (in die Firebase-Konsole kopieren)
-app.js          Login, Routing, Views (Plan/Log/Fingerboard/Challenges), Timer-Logik
 manifest.json   PWA-Manifest
 sw.js           Service Worker (Netzwerk-zuerst, Offline-Fallback fürs App-Shell)
-icon.svg        App-Icon (Platzhalter)
 ```

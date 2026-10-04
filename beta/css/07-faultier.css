@@ -1,0 +1,41 @@
+/* css/07-faultier.css — Faultier-Puppe (sloth-rig.js) und Hintergrund-Faultier. Reihenfolge der Dateien zählt (Kaskade). */
+/* ---------- Faultier-Puppe (sloth-rig.js): SVG aus Einzelteilen ---------- */
+.sloth-rig { display: block; overflow: visible; }
+.sloth-rig-bar { fill: #3b4048; stroke: #0a0a0a; stroke-width: 5; }
+.sloth-rig-cable { fill: #6b7079; }
+.sloth-rig-rope { fill: none; stroke: #2b2f36; stroke-width: 7; stroke-linecap: round; }
+.sloth-rig-handle { fill: #2b2f36; }
+.sloth-rig .sp-far { filter: brightness(.6); }
+.sloth-rig-shadow { fill: #000; opacity: .45; }
+/* Bewegungsbahn der Hand: dezente gestrichelte Hilfslinie hinter der Figur */
+.sloth-rig-path { fill: none; stroke: var(--accent); stroke-width: 7; stroke-dasharray: 2 16; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+/* Übungswechsel: kurz einblenden */
+@keyframes slothEnter { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+.sloth-rig.sr-enter { animation: slothEnter .35s ease-out; transform-origin: 50% 100%; }
+/* 18vh statt 24vh: mit Geräten (Kabelturm) war die Figur so hoch, dass die Knöpfe unten aus dem Bild rutschten */
+.fb-stage-figure .sloth-img, .fb-phase-figure .sloth-img { max-height: 18vh; width: auto; }
+.timeline-thumb .sloth-img { width: 100%; height: 100%; }
+.fb-phase-figure .sloth-img { width: 100%; height: auto; max-height: none; }
+.fb-phase-figure:has(.sloth-img) { width: clamp(110px, 20vh, 170px); }
+.info-sheet-figure .sloth-img { width: auto; height: 220px; }
+.fb-done-sloth { width: min(46vw, 190px); height: auto; margin: 0 auto 6px; transform-origin: 50% 95%; animation: popIn .5s cubic-bezier(.25, 1.4, .4, 1) both; }
+.pg-pr-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.pg-pr-wrap .pg-pr { margin-bottom: 0; }
+.pg-pr-sloth { width: 64px; height: auto; flex-shrink: 0; transform-origin: 50% 90%; animation: popIn .5s cubic-bezier(.25, 1.4, .4, 1) both; }
+.fb-hang-visual.fb-paused .sloth-rig g, .fb-hang-visual.fb-paused .sloth-rig image { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .sloth-rig g, .sloth-rig image, .sloth-rig.sr-enter { animation: none !important; }
+  .sloth-rig .sw-1 { opacity: 0; }
+  .fb-done-sloth, .pg-pr-sloth { animation: none; }
+}
+
+/* Hintergrund-Faultier: Bild statt Strichzeichnung, dezent und dunkel */
+.sloth-bg { top: 100px; right: -44px; width: 250px; color: inherit; opacity: .24; }
+.sloth-bg img { width: 100%; height: auto; display: block; filter: brightness(.55) saturate(.5); }
+/* heller, ganz sichtbar (rechte Hand nicht mehr abgeschnitten), Ast links ausblenden */
+.sloth-bg { right: 6px; width: 250px; opacity: .34; }
+.sloth-bg img {
+  filter: brightness(.75) saturate(.6);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 38%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 38%);
+}

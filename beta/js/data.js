@@ -15,7 +15,7 @@
 const BOARDS = {
   bm1000: {
     label: 'Beastmaker 1000',
-    image: '../assets/board-bm1000.png',
+    image: ASSET_BASE + 'board-bm1000.png',
     grips: [
       { id: 'jug', label: 'Jug', note: '2 Jugs oben' },
       { id: 'edge_large', label: 'Grosse Kante (4-Finger)', note: '50mm' },
@@ -65,7 +65,7 @@ const BOARDS = {
   },
   bm2000: {
     label: 'Beastmaker 2000',
-    image: '../assets/board-bm2000.png',
+    image: ASSET_BASE + 'board-bm2000.png',
     grips: [
       { id: 'edge_large', label: 'Grosse Kante (4-Finger)', note: '50mm' },
       { id: 'edge_medium', label: 'Mittlere Kante (4-Finger)', note: '33mm' },
@@ -122,8 +122,8 @@ const BOARDS = {
    (die Sprossen sind ohnehin durchnummeriert und immer in einer Spalte) —
    deshalb kein Foto-Hotspot-Picker wie bei BOARDS, sondern nur der
    Sprossen-TYP (unterschiedliche Leisten-/Sprossengrössen = unterschiedlich
-   schwer) plus die Bewegung als Zahlen (siehe app.js, Satz-Typ 'campus'). */
-const CAMPUS_BOARD_IMAGE = '../assets/board-campus.jpg';
+   schwer) plus die Bewegung als Zahlen (siehe js/fb-builder.js, Satz-Typ 'campus'). */
+const CAMPUS_BOARD_IMAGE = ASSET_BASE + 'board-campus.jpg';
 /* lineX/lineX2 (% von Bildbreite, siehe assets/board-campus.jpg): markiert
    im Referenzbild per Strich, welche Spalte gemeint ist — bei den Kugeln
    zwei Striche, da deren Löcher im Zickzack (zwei versetzte Spalten) statt
@@ -208,7 +208,7 @@ function gripArmNote(boardId, gripId) {
 /* `muscles` (primary/secondary) sind allgemeines Trainingswissen, keine
    erfundenen Produktdaten — welche Muskelgruppe eine Standardübung wie
    Klimmzug oder Kniebeuge beansprucht, ist Lehrbuchstoff. Zone-Ids
-   beziehen sich auf MUSCLE_ZONES_SVG/MUSCLE_ZONE_LABEL in app.js. */
+   beziehen sich auf MUSCLE_ZONES_SVG/MUSCLE_ZONE_LABEL in js/exercise-picker.js. */
 const EXERCISE_LIBRARY = [
   // Zug
   { id: 'pullup', name: 'Klimmzug', category: 'zug', howTo: 'Obergriff an der Stange, Körper ruhig, bis das Kinn über die Stange ziehen, kontrolliert ablassen.', muscles: { primary: ['lats'], secondary: ['biceps', 'forearms_front'] } },
@@ -373,7 +373,7 @@ function exerciseHowTo(id) {
    Zahl in Wirklichkeit eine Haltedauer in Sekunden, deshalb bekommen sie
    im Log einen Timer statt eines reinen Zahlenfelds. */
 function exerciseIsHold(id) {
-  // Warm-up/Cooldown sind zeitbasierte Pseudo-Übungen (siehe app.js) statt
+  // Warm-up/Cooldown sind zeitbasierte Pseudo-Übungen (siehe js/fb-builder.js) statt
   // echte Bibliothekseinträge — daher der Sonderfall statt eines Lookups.
   if (id === 'warmup_general' || id === 'cooldown_general') return true;
   const ex = EXERCISE_LIBRARY.find((e) => e.id === id);
@@ -499,7 +499,7 @@ const PINCHO_PROGRAMS = [
 
 /* ---------- Standard-Wochenplan (Startvorlage) ----------
    Wird pro Mitglied einmalig nach Firebase kopiert und ist dort danach
-   frei editierbar (siehe app.js renderPlan). */
+   frei editierbar (siehe js/plan.js). */
 const DEFAULT_WEEK_PLAN = [
   { day: 'Mo', title: 'Bouldern Halle', tag: 'skill' },
   { day: 'Di', title: 'Gym — Zug & Rumpf', tag: 'gym' },
