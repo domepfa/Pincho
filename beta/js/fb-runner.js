@@ -403,6 +403,15 @@ function fbGetReadyText(b) {
   if (b.type === 'campus') return 'Get ready — an die Startsprosse!';
   return 'Get ready — Position einnehmen!';
 }
+/* Kurzname fürs Schild "Als Nächstes" auf der Bühne (ohne Klammerzusatz). */
+function fbShortName(b) {
+  const short = (t) => String(t || '').replace(/\s*\(.*?\)\s*/g, ' ').trim();
+  if (b.type === 'pause') return 'Pause';
+  if (b.type === 'hang') return hangIsAsymmetric(b) ? `${short(gripLabel(b.board, b.gripLeft))} / ${short(gripLabel(b.board, b.gripRight))}` : short(gripLabel(b.board, b.grip));
+  if (b.type === 'block') return short(blockGripLabel(b));
+  if (b.type === 'campus') return short(campusRungLabel(b.rungType));
+  return short(exerciseName(b.exerciseId));
+}
 function fbShortSub(b) {
   if (b.type === 'pause') return 'Pause';
   if (isHoldModeBlock(b)) return `${b.reps}× ${b.hangSec} s ${b.type === 'block' ? 'Halten' : 'Hang'}${b.reps > 1 && b.restSec > 0 ? ` · ${b.restSec} s Pause` : ''}`;
@@ -549,7 +558,7 @@ window.addEventListener('resize', () => { if (document.getElementById('fbx-board
 function fbStageInnerHtml(st) {
   const d = st.displayBlock;
   const onBoard = d.type === 'hang' && BOARDS[d.board];
-  const tag = st.mode === 'ready' ? (onBoard ? 'Hier hängen' : '') : st.trailing ? 'Als Nächstes' : '';
+  const tag = st.mode === 'ready' ? (onBoard ? 'Hier hängen' : '') : st.trailing ? `Als Nächstes · ${fbShortName(d)}` : '';
   if (onBoard) return fbBoardStageHtml(d, st.mode === 'work', tag, st.mode !== 'work' && fbSoonLevel() === 2);
   let fig;
   if (st.mode === 'work') {
@@ -672,7 +681,7 @@ function renderFbOverlay() {
         <div class="fbx-bar"><i id="fb-bar-fg"></i></div>
       </div>
       <div class="fbx-info">
-        <b id="fbx-info-main">${fbInfoMainHtml(st.displayBlock, st.activeRep)}</b>
+        <b id="fbx-info-main">${st.trailing ? '<span class="fbx-next-label">Danach:</span> ' : ''}${fbInfoMainHtml(st.displayBlock, st.activeRep)}</b>
         <span id="fb-upcoming">${esc(upcoming)}</span>
       </div>
       <div class="fbx-controls">
@@ -806,12 +815,20 @@ function initBlockResult(index) {
    Pause (tickBlock) als auch bei einem vollen Neurendern der Bühne
    (renderFbOverlay), z. B. nach Pause/Weiter, damit der Zwischenstand
    nicht verloren geht. */
+/* Beim Tippen verdeckt die Handy-Tastatur die Info-Zeile unten — darum steht
+   im Eingabe-Kästchen selbst noch einmal, was danach kommt. */
+function fbCheckinNextHtml() {
+  const st = fbRunState();
+  if (!st.trailing) return '';
+  return `<div class="fb-checkin-next">Danach: <b>${esc(fbShortName(st.displayBlock))}</b> · ${esc(fbShortSub(st.displayBlock))}</div>`;
+}
 function checkinPanelHtml(index) {
   const result = fb.runResults[index];
   if (!result || result.type === 'pause') return '';
   if (result.doneReps) {
     return `
       <div class="fb-checkin-label mono">GESCHAFFTE SÄTZE</div>
+      ${fbCheckinNextHtml()}
       <div class="fb-checkin-chips">
         ${result.doneReps.map((ok, i) => `<button type="button" class="fb-chip ${ok ? 'ok' : 'fail'}" data-satz="${i}">${i + 1}</button>`).join('')}
       </div>
@@ -819,6 +836,7 @@ function checkinPanelHtml(index) {
   }
   return `
     <div class="fb-checkin-label mono">GESCHAFFT</div>
+    ${fbCheckinNextHtml()}
     <form id="fb-checkin-form" class="fb-checkin-row">
       <input type="text" inputmode="numeric" enterkeyhint="done" id="fb-checkin-reps" value="${esc(String(result.reps))}" placeholder="Wdh.">
       <div class="kg-field"><input type="number" inputmode="decimal" enterkeyhint="done" id="fb-checkin-weight" value="${esc(String(result.weight))}" step="0.5" placeholder="0"><span class="mono">kg</span></div>
