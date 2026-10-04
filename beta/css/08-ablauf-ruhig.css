@@ -1,0 +1,152 @@
+/* css/08-ablauf-ruhig.css — Ablauf-Vollbild, ruhiges Layout (renderFbOverlay). Reihenfolge der Dateien zählt (Kaskade). */
+/* ---------- Ablauf-Vollbild, ruhiges Layout (siehe renderFbOverlay) ----------
+   Feste Zeilen, damit zwischen den Phasen nichts springt: Kopf · Phase ·
+   Bühne · Zahl · Info · Steuerung. Phasenfarbe: Hang/Arbeit blau, Pause
+   orange, Bereit weiss. Entwurf: beta/entwurf-timer.html */
+.fbx {
+  --phase: var(--accent);
+  position: absolute; inset: 0;
+  display: grid; grid-template-rows: 56px 60px minmax(0, 1fr) 124px 66px 104px;
+  max-width: 480px; margin: 0 auto;
+  padding: var(--safe-top) 16px var(--safe-bottom);
+}
+.fbx-rest { --phase: var(--accent2); }
+/* Ende der Pause (siehe fbSoonLevel): Phasenfarbe läuft in den letzten 5 s
+   von Orange zu Blau — Titel, Zahl, Balken und Griff-Rahmen gleichzeitig.
+   @property, damit die Farbe animierbar ist. */
+@property --phase { syntax: '<color>'; inherits: true; initial-value: #4fc3ff; }
+.fbx-soon { animation: fbxToWork 1.5s ease-out forwards; }
+@keyframes fbxToWork { from { --phase: var(--accent2); } to { --phase: var(--accent); } }
+.fbx-ready.fbx-soon { animation-name: fbxReadyToWork; }
+@keyframes fbxReadyToWork { from { --phase: var(--ink); } to { --phase: var(--accent); } }
+.fbx-ready .fbx-num { color: var(--phase); }
+.fbx-num.fbx-pop { animation: fbxPop .45s cubic-bezier(.25, 1.5, .4, 1); }
+@keyframes fbxPop { 0% { transform: scale(1.28); } 100% { transform: scale(1); } }
+.fbx-stage.fbx-flash::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 0 0 3px var(--accent), inset 0 0 60px rgba(var(--accent-rgb), .45);
+  animation: fbxFlash .9s ease-out forwards;
+}
+@keyframes fbxFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+.fbx-ready { --phase: var(--ink); }
+
+.fbx-top { display: flex; align-items: center; gap: 12px; }
+.fbx-icon {
+  width: 40px; height: 40px; flex: none; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  display: grid; place-items: center; cursor: pointer;
+}
+.fbx-icon svg { width: 18px; height: 18px; }
+.fbx-segs { flex: 1; display: flex; gap: 3px; height: 6px; }
+.fbx-seg { min-width: 4px; background: var(--line-soft); border-radius: 3px; overflow: hidden; }
+.fbx-seg i { display: block; height: 100%; background: var(--ink-dim); transform: scaleX(0); transform-origin: left; }
+.fbx-seg.current i { background: var(--phase); }
+
+.fbx-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; align-self: center; min-width: 0; }
+.fbx-phase {
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 40px; line-height: 1;
+  letter-spacing: .02em; text-transform: uppercase; color: var(--phase); white-space: nowrap;
+}
+.fbx-paused-tag { font-size: 16px; letter-spacing: .08em; color: var(--ink-dim); margin-left: 10px; vertical-align: middle; }
+.fbx-rep {
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 19px; color: var(--ink-dim);
+  white-space: nowrap; flex: none; /* Grösse passt fbFitOverlayText an, statt abzuschneiden */
+}
+
+.fbx-stage {
+  position: relative; overflow: hidden; border-radius: 20px;
+  background: radial-gradient(120% 80% at 50% 0%, #141b23 0%, var(--bg) 70%);
+}
+.fbx-board { position: absolute; left: 4%; width: 92%; top: 14px; }
+.fbx-board img { display: block; width: 100%; height: auto; }
+.fbx-board-dim { filter: brightness(.38) saturate(.6); }
+.fbx-board-lit { position: absolute; inset: 0; clip-path: url(#fbx-grip-clip); }
+.fbx-board-rings { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.fbx-clipdef { position: absolute; }
+.fbx-ring { fill: none; stroke: var(--phase); stroke-width: 2.5px; }
+.fbx-ring-l { stroke: var(--accent); }
+.fbx-ring-r { stroke: var(--accent2); }
+.fbx-rest .fbx-ring, .fbx-ready .fbx-ring { stroke-dasharray: 5 3; }
+.fbx-tag {
+  position: absolute; transform: translate(-50%, calc(-100% - 6px)); z-index: 1;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--bg); background: var(--ink); padding: 2px 9px; border-radius: 10px; white-space: nowrap;
+}
+.fbx-tag-top { left: 50%; top: 14px; transform: translateX(-50%); }
+.fbx-fig { position: absolute; transition: opacity .25s; }
+.fbx-fig svg { display: block; width: 100%; height: 100%; }
+.fbx-measuring .sloth-rig g, .fbx-measuring .sloth-rig image { animation: none !important; }
+.fbx.paused .sloth-rig g, .fbx.paused .sloth-rig image { animation-play-state: paused; }
+.fbx-center {
+  position: absolute; inset: 14px 12px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+}
+.fbx-center:has(~ .fbx-tag-top) { top: 44px; }
+.fbx-center > svg, .fbx-center .sloth-img, .fbx-center .ex-figure { flex: 1 1 auto; min-height: 0; max-height: 100%; max-width: 100%; width: auto; height: 100%; }
+.fbx-center .ex-figure-caption { flex: none; font-size: 13px; color: var(--ink-dim); text-align: center; }
+.fbx-center .campus-work-figure { max-width: 100%; }
+.fbx-muscles { position: absolute; top: 10px; right: 10px; width: 84px; opacity: .9; }
+.fbx-muscles svg { width: 100%; height: auto; display: block; }
+.fbx-checkin {
+  position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 2;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px;
+}
+.fbx-stage:has(.fbx-checkin:not(:empty)) .ex-figure-caption { visibility: hidden; }
+.fbx-checkin:empty { display: none; }
+
+.fbx-count { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.fbx-num {
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 108px; line-height: .9;
+  font-variant-numeric: tabular-nums; color: var(--ink); height: 98px; display: flex; align-items: center;
+}
+.fbx-rest .fbx-num { color: var(--phase); }
+.fbx-num.work-tense { animation: blinkTense .5s steps(1) infinite; }
+.fbx-num.los-flash { color: var(--accent); }
+.fbx-bar { width: 100%; height: 6px; border-radius: 3px; background: var(--line-soft); overflow: hidden; }
+.fbx-bar i { display: block; height: 100%; background: var(--phase); transform: scaleX(0); transform-origin: left; }
+@keyframes fbBarFill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.fbx-info { text-align: center; align-self: center; min-width: 0; }
+.fbx-info b {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  font-size: 17px; font-weight: 600; line-height: 1.15; max-height: 2.3em;
+}
+.fbx-info > span { display: block; font-size: 15px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; }
+
+.fbx-controls { display: flex; align-items: center; justify-content: center; gap: 28px; }
+.fbx-ctl {
+  width: 60px; height: 60px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink); display: grid; place-items: center; cursor: pointer;
+}
+.fbx-ctl svg { width: 24px; height: 24px; }
+.fbx-ctl:disabled { visibility: hidden; }
+.fbx-main {
+  width: 84px; height: 84px; border-radius: 42px; border: 0; cursor: pointer;
+  background: var(--accent); color: var(--accent-ink); display: grid; place-items: center;
+  box-shadow: 0 6px 24px rgba(var(--accent-rgb), .28);
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: .04em;
+}
+.fbx-main svg { width: 32px; height: 32px; }
+.fbx-main-wide { width: auto; min-width: 150px; padding: 0 28px; }
+
+.fbx-sheet-bg { position: fixed; inset: 0; z-index: 4; background: rgba(0, 0, 0, .55); display: flex; align-items: flex-end; justify-content: center; }
+.fbx-sheet {
+  width: 100%; max-width: 480px; display: grid; gap: 10px;
+  background: var(--surface); border-top: 1px solid var(--line); border-radius: 20px 20px 0 0;
+  padding: 22px 16px calc(22px + var(--safe-bottom)); animation: riseIn .18s ease both;
+}
+.fbx-sheet-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; }
+.fbx-sheet-text { color: var(--ink-dim); margin-bottom: 6px; }
+.fbx-danger { color: var(--accent2); }
+
+/* Kleine Handys: Zahl und Titel etwas kleiner, Bühne behält den Rest */
+@media (max-height: 700px) {
+  .fbx { grid-template-rows: 52px 50px minmax(0, 1fr) 100px 62px 92px; }
+  .fbx-phase { font-size: 32px; }
+  .fbx-num { font-size: 84px; height: 78px; }
+  .fbx-main { width: 72px; height: 72px; }
+  .fbx-ctl { width: 52px; height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fbx-num.work-tense, .fbx-num.fbx-pop, .fbx-stage.fbx-flash::after { animation: none; }
+  .fbx-soon { animation: none; --phase: var(--accent); }
+}

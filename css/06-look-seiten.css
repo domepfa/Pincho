@@ -1,0 +1,180 @@
+/* css/06-look-seiten.css — Neuer Look: Fortschritt, Login/Konto/Crews, Zyklus, Datenschutz, Campus Hand für Hand, Hilfe, eigene Übungen. Reihenfolge der Dateien zählt (Kaskade). */
+/* ---------- BETA Schritt 5: Fortschritt ---------- */
+.bottomnav a { font-size: 10px; letter-spacing: .03em; padding-left: 2px; padding-right: 2px; }
+.nav-pill { padding: 3px 14px; }
+
+.pg-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.pg-tile { display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line-soft); }
+.pg-tile b { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px; line-height: 1; color: var(--ink); }
+.pg-tile b.accent { color: var(--accent); }
+.pg-tile span { font-size: 12px; color: var(--ink-faint); }
+
+.pg-card { padding: 14px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line-soft); margin-bottom: 12px; }
+.pg-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.pg-card-head h3 { margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; }
+.pg-muted { font-size: 12px; color: var(--ink-faint); }
+.pg-ranges { margin: 0; flex-wrap: nowrap; gap: 4px; }
+.pg-ranges .chip.small { padding: 5px 10px; }
+.pg-select { width: 100%; margin-bottom: 10px; padding: 11px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); font-family: 'Barlow', sans-serif; font-size: 16px; }
+.pg-hero { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.pg-hero-num { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 44px; line-height: 1; }
+.pg-hero-num.up { color: var(--accent); }
+.pg-hero-num.down { color: #ffb49b; }
+.pg-hero-sub { font-size: 13px; color: var(--ink-faint); }
+.pg-pr { display: inline-block; margin-bottom: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(var(--accent-rgb), .14); color: var(--ink); font-size: 14px; }
+.pg-pr::before { content: '★ '; color: var(--accent); }
+
+.pg-chart { width: 100%; height: auto; display: block; overflow: visible; }
+.pg-grid { stroke: var(--line-soft); stroke-width: 1; }
+.pg-axis { fill: var(--ink-faint); font-family: 'Barlow', sans-serif; font-size: 11px; }
+.pg-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.pg-dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; pointer-events: none; }
+.pg-dot.pr { fill: var(--accent); stroke: var(--surface); }
+.pg-hit { fill: transparent; cursor: pointer; }
+.pg-readout { margin-top: 6px; font-size: 13px; color: var(--ink-dim); min-height: 18px; }
+
+.pg-weeks { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; }
+.pg-week { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pg-cell { width: 100%; max-width: 28px; height: 15px; border-radius: 4px; background: #1a212a; }
+.pg-cell.future { background: transparent; border: 1px dashed #1f2731; }
+.pg-cell.gym { background: #2f95cf; }
+.pg-cell.board { background: #c4851c; }
+.pg-cell.other { background: #9b7be6; }
+.pg-week-label { font-size: 10px; color: var(--ink-faint); margin-top: 2px; }
+.pg-legend { display: flex; gap: 14px; margin-top: 10px; font-size: 12px; color: var(--ink-dim); }
+.pg-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.pg-legend i.gym { background: #2f95cf; } .pg-legend i.board { background: #c4851c; } .pg-legend i.other { background: #9b7be6; }
+
+.pg-rec { margin-bottom: 10px; }
+.pg-rec-head { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+.pg-rec-head .ok { color: #a9dcf7; } .pg-rec-head .wait { color: #ffb49b; }
+.pg-rec-bar { height: 8px; border-radius: 4px; background: #1a212a; overflow: hidden; }
+.pg-rec-bar span { display: block; height: 100%; border-radius: 4px; }
+.pg-rec-bar span.ok { background: var(--accent); } .pg-rec-bar span.wait { background: #ff8a66; }
+
+/* ---------- Login mit eigenem Konto / Konto & Crews ---------- */
+.login-shell .field { text-align: left; }
+.login-shell .login-tag b { color: var(--ink); }
+.auth-tabs { justify-content: center; }
+.link-btn {
+  background: none; border: none; color: var(--ink-dim); font: inherit; font-size: 13px;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer; margin: 14px auto 0; padding: 6px;
+}
+.link-btn.inline { margin: 0; padding: 0 2px; font-size: 12px; }
+.onb-admin-card { margin-top: 22px; text-align: left; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.topbar a.who { text-decoration: none; color: inherit; }
+.topbar .logout.active { border-color: var(--accent); color: var(--accent); }
+.konto-logout { margin-top: 14px; }
+.crew-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.crew-head .card-value { font-size: 24px; overflow-wrap: anywhere; }
+.crew-members .chip { cursor: default; color: var(--ink); display: inline-flex; align-items: center; gap: 4px; }
+.crew-members .chip.legacy { color: var(--ink-faint); border-style: dashed; }
+.chip-x {
+  background: none; border: none; color: var(--ink-faint); font-size: 16px; line-height: 1;
+  padding: 0 0 0 6px; margin: -4px -4px -4px 0; cursor: pointer;
+}
+.chip-x:hover { color: var(--danger); }
+.invite-code { font-size: 28px; font-weight: 700; letter-spacing: .18em; margin: 0 0 12px; color: var(--ink); }
+.card .field-row { align-items: flex-start; }
+.card .field-row .field { margin-bottom: 0; }
+.card .field-row .btn.small { flex-shrink: 0; }
+
+/* ---------- Zyklus (Fortschritt) ---------- */
+.pg-cycle-band { opacity: .16; }
+.pg-cycle-legend { flex-wrap: wrap; row-gap: 6px; }
+.pg-cycle-more { margin-top: 12px; }
+.pg-cycle-more summary { cursor: pointer; font-size: 13px; color: var(--ink-dim); padding: 6px 0; }
+.pg-cycle-more[open] summary { margin-bottom: 10px; }
+.pg-cycle-add { align-items: flex-end; }
+.pg-cycle-add .field { margin-bottom: 0; }
+.pg-cycle-more .chip-row .chip { cursor: default; color: var(--ink); display: inline-flex; align-items: center; }
+.pg-cycle-tip { margin: 0 0 12px; padding: 8px 12px; border-left: 3px solid var(--accent); border-radius: 4px; background: var(--surface-2, rgba(255,255,255,.04)); font-size: 14px; color: var(--ink); }
+.pg-cycle-learn { font-size: 14px; color: var(--ink-dim); }
+.pg-cycle-phase { padding: 10px 0; border-top: 1px solid var(--line-soft); }
+.pg-cycle-phase p { margin: 4px 0; line-height: 1.45; }
+.pg-cycle-phase.current .pg-cycle-phase-title { color: var(--accent); }
+.pg-cycle-phase-title { font-weight: 700; color: var(--ink); margin: 6px 0 4px; }
+.pg-cycle-phase-title i, .pg-cmp-label i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.pg-cycle-sources { margin: 0; padding-left: 20px; font-size: 12px; }
+.pg-cycle-sources a { color: var(--ink-dim); overflow-wrap: anywhere; }
+.pg-cmp { margin: 14px 0 4px; }
+.pg-cmp-row { display: grid; grid-template-columns: 118px 1fr 52px; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+.pg-cmp-label { color: var(--ink-dim); white-space: nowrap; }
+.pg-cmp-bar { position: relative; height: 10px; border-radius: 5px; background: #1a212a; }
+.pg-cmp-bar::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ink-faint); }
+.pg-cmp-bar span { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+.pg-cmp-val { text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ---------- Datenschutz / Konto-Daten ---------- */
+.privacy-shell { max-width: 640px; margin: 0 auto; padding: 24px 16px 40px; }
+.privacy { font-size: 15px; line-height: 1.5; color: var(--ink-dim); margin-bottom: 18px; }
+.privacy h3 { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; color: var(--ink); margin: 18px 0 6px; }
+.privacy p { margin: 0 0 8px; }
+.privacy ul { margin: 0 0 8px; padding-left: 20px; }
+.privacy li { margin-bottom: 6px; }
+.privacy b { color: var(--ink); }
+.privacy a, .login-hint a { color: var(--accent); }
+.konto-data { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.konto-data #konto-delete-box { width: 100%; }
+
+/* ---------- Fortschritt: Gym/Board + Übungsübersicht ---------- */
+.pg-source { margin: 0 0 10px; }
+.pg-ex-current { margin: 0 0 6px; font-weight: 700; color: var(--ink); font-size: 16px; }
+.pg-ex-list { margin-top: 12px; border-top: 1px solid var(--line-soft); }
+.pg-ex-row {
+  display: grid; grid-template-columns: 1fr auto 56px; gap: 10px; align-items: center; width: 100%;
+  padding: 10px 4px; background: none; border: none; border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-dim); font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+}
+.pg-ex-row.active { color: var(--ink); background: rgba(var(--accent-rgb), .08); border-radius: 8px; }
+.pg-ex-row.active .pg-ex-name { color: var(--accent); font-weight: 700; }
+.pg-ex-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pg-ex-last { font-size: 13px; white-space: nowrap; }
+.pg-ex-chg { text-align: right; font-variant-numeric: tabular-nums; }
+.pg-ex-chg .up { color: var(--accent); }
+.pg-ex-chg .down { color: #ffb49b; }
+
+/* ---------- Campus "Hand für Hand" ---------- */
+.cr-move { stroke: var(--bg); stroke-width: 4; pointer-events: none; }
+.cr-move.l { fill: var(--accent); }
+.cr-move.r { fill: #ff6b47; }
+.cr-move-num { fill: #04141c; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; text-anchor: middle; pointer-events: none; }
+.cr-side { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 44px; text-anchor: middle; opacity: .8; pointer-events: none; }
+.cr-side.l { fill: var(--accent); }
+.cr-side.r { fill: #ff6b47; }
+.campus-route-dot.hand-r-dot { background: #ff6b47; }
+.cr-move-start { fill: none; stroke-width: 7; pointer-events: none; }
+.cr-move-start.l { stroke: var(--accent); }
+.cr-move-start.r { stroke: #ff6b47; }
+
+/* ---------- Hilfe ---------- */
+.konto-help { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--ink); }
+.konto-help .card-sub { margin: 0; }
+.konto-help-icon { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: rgba(var(--accent-rgb), .15); color: var(--accent); font-weight: 700; font-size: 20px; }
+.help-item { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 16px; margin-bottom: 10px; padding: 0 14px; }
+.help-item summary { display: flex; align-items: baseline; gap: 10px; padding: 14px 0; cursor: pointer; list-style: none; }
+.help-item summary::-webkit-details-marker { display: none; }
+.help-item summary::after { content: '+'; margin-left: auto; color: var(--ink-faint); font-size: 20px; }
+.help-item[open] summary::after { content: '−'; }
+.help-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; color: var(--ink); }
+.help-sub { font-size: 12px; color: var(--ink-faint); }
+.help-body { padding-bottom: 14px; font-size: 14px; line-height: 1.5; color: var(--ink-dim); }
+.help-body p { margin: 0 0 8px; }
+.help-body ul { margin: 0 0 8px; padding-left: 20px; }
+.help-body li { margin-bottom: 6px; }
+.help-body b { color: var(--ink); }
+
+/* ---------- Eigene Übungen / Wünsche ---------- */
+.ex-custom-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.ex-card-own { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); border: 1px solid rgba(var(--accent-rgb), .5); border-radius: 999px; padding: 1px 6px; vertical-align: 2px; }
+.custom-ex-sheet .field { text-align: left; }
+.cx-check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-dim); margin: 0 0 14px; }
+.cx-check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.topbar .logout { position: relative; }
+.konto-dot { position: absolute; top: -3px; right: -3px; }
+.wish-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
+.wish-row:last-child { border-bottom: none; }
+.wish-row.done { opacity: .55; }
+
+/* Suche aktiv: Körperkarte/Gruppen weg, Treffer direkt unter dem Feld */
+.ex-searching .ex-body-wrap, .ex-searching .ex-supergroup-row, .ex-searching .ex-muscle-row { display: none; }

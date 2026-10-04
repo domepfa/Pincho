@@ -1,0 +1,177 @@
+/* css/09-ergaenzungen.css — Konto-Navigation, Wochenplan, Leerzustände, Satz-Arten, Startkarte, Animationsstufen, Supersätze, Pausen-Bildschirm, Würfeln, Fortschritt-Woche. Reihenfolge der Dateien zählt (Kaskade). */
+/* ---------- Konto: Navigation unten anordnen ---------- */
+.nav-pref-list { display: flex; flex-direction: column; gap: 6px; }
+.nav-pref-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2);
+}
+.nav-pref-row.off { opacity: .5; }
+.nav-pref-icon { display: grid; place-items: center; color: var(--ink-dim); }
+.nav-pref-label { flex: 1; font-weight: 600; }
+.nav-pref-btn {
+  width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); font-size: 18px; cursor: pointer;
+}
+.nav-pref-btn:disabled { visibility: hidden; }
+
+/* Start-Knöpfe ohne Inhalt ausblenden statt ausgrauen (der Leer-Hinweis darüber erklärt, was fehlt) */
+#plan-start:disabled, #fb-start-ablauf:disabled { display: none; }
+
+/* Wochenplan: Tag (+ HEUTE) | Titel | Typ | Start */
+.day-row { display: grid; grid-template-columns: 52px 1fr 40px; grid-template-areas: 'd title go' 'd tag go'; align-items: center; column-gap: 10px; row-gap: 4px; border-radius: 16px; padding: 10px 12px; }
+.day-row .d { grid-area: d; }
+.day-row input { grid-area: title; }
+.day-row select { grid-area: tag; justify-self: start; }
+.day-row .day-go, .day-row .day-go-gap { grid-area: go; }
+.day-row .d { width: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; font-size: 13px; font-weight: 600; color: var(--ink-dim); }
+.day-row.today .d { color: var(--accent); }
+.day-row .tag-pill { border-radius: 999px; font-size: 9px; padding: 2px 6px; }
+.day-row input { min-width: 0; font-size: 15px; }
+.day-row select { width: auto; min-width: 104px; font-size: 12px; font-weight: 600; letter-spacing: .06em; padding: 5px 8px; color: var(--ink-dim); }
+.day-go, .day-go-gap { width: 40px; height: 40px; }
+.day-go { border-radius: 50%; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.day-go svg { width: 16px; height: 16px; fill: currentColor; }
+.day-row.today .day-go { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* Leere Zustände als Einladung: Faultier, ein Satz, ein klarer nächster Schritt */
+.empty-invite { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 22px 18px; }
+.empty-invite h3 { margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 24px; }
+.empty-invite p { margin: 0; max-width: 34ch; }
+.empty-invite .empty-invite-sloth { height: 150px; width: auto; }
+.empty-invite-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }
+.empty-invite-actions .btn { width: auto; min-width: 150px; text-decoration: none; text-align: center; }
+
+/* Körperkarte ein-/ausklappen */
+.ex-body-toggle { display: inline-flex; align-items: center; gap: 8px; margin: 10px 0 4px; padding: 8px 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: 600 14px 'Barlow', system-ui, sans-serif; cursor: pointer; }
+.ex-searching .ex-body-toggle { display: none; }
+
+/* Satz-Arten im Fingerboard: grosse Kacheln statt kleiner Pillen (auch mit Kreide an den Fingern gut zu treffen) */
+.fb-addtype-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fb-addtype-row .chip { min-height: 46px; font-size: 15px; justify-content: center; text-align: center; border-radius: 14px; margin: 0; }
+
+/* Fingerboard-Startkarte: nächster sinnvoller Schritt ganz oben */
+.fb-start-card { display: flex; align-items: center; gap: 14px; padding: 16px 16px 16px 18px; margin: 4px 0 18px; border-radius: 20px;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), .16), rgba(var(--accent-rgb), .04)); border: 1px solid rgba(var(--accent-rgb), .45); }
+.fb-start-text { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.fb-start-eyebrow { font: 600 11px 'Barlow', system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.fb-start-text b { font: 700 26px/1.05 'Barlow Condensed', sans-serif; color: var(--ink); }
+.fb-start-meta { font-size: 13px; color: var(--ink-dim); }
+.fb-start-card .fb-start-go { width: 60px; height: 60px; border-radius: 50%; flex: none; display: grid; place-items: center; padding: 0; }
+.fb-start-sug { font-size: 13px; color: var(--accent); font-weight: 600; }
+
+/* Übung antippen -> Hinzufügen-Knopf erscheint direkt in der Karte */
+.ex-card { flex-wrap: wrap; }
+.ex-quick-add { flex: 0 0 calc(100% - 16px); margin: 0 8px 8px; min-height: 44px; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
+  font: 700 16px 'Barlow', system-ui, sans-serif; cursor: pointer; animation: riseIn .18s ease both; }
+.ex-quick-add.done { background: var(--surface-2); color: var(--success); }
+
+/* Faultier-Animationen (Konto): Ruhig = ohne Gesichter, Bahnlinie, Überblenden; Aus = steht still */
+.anim-calm .sloth-rig .sf-blink, .anim-calm .sloth-rig .sf-yawn, .anim-calm .sloth-rig .sf-effort { animation: none !important; opacity: 0 !important; }
+.anim-calm .sloth-rig-path, .anim-off .sloth-rig-path { display: none; }
+.anim-calm .sloth-rig.sr-enter, .anim-off .sloth-rig.sr-enter { animation: none; }
+.anim-off .sloth-rig g, .anim-off .sloth-rig image { animation: none !important; }
+.anim-off .sloth-rig .sw-1 { opacity: 0; }
+.anim-off .fb-done-sloth, .anim-off .pg-pr-sloth { animation: none; }
+
+/* Supersätze */
+.ss-link { display: block; width: 100%; margin: -2px 0 8px; padding: 8px 12px; border-radius: 12px; border: 1px dashed var(--line);
+  background: none; color: var(--ink-dim); font: 600 14px 'Barlow', system-ui, sans-serif; cursor: pointer; text-align: center; }
+.ss-link.linked { border-style: solid; border-color: rgba(var(--accent-rgb), .5); color: var(--accent); }
+.ex-row.in-superset { border-left: 3px solid var(--accent); }
+.ss-badge { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(var(--accent-rgb), .15);
+  color: var(--accent); font: 700 11px 'Barlow', system-ui, sans-serif; letter-spacing: .04em; vertical-align: middle; }
+.fs-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 6px; scrollbar-width: none; }
+.fs-tabs .chip { flex: none; white-space: nowrap; }
+.ss-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: middle; }
+
+/* Pausen-Bildschirm (Gym): gross, lesbar aus einem Meter */
+#fs-rest-screen { z-index: 70; align-items: stretch; }
+.fs-rest-card { max-width: 480px; max-height: none; height: 100%; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: calc(14px + var(--safe-top)) 20px calc(20px + var(--safe-bottom)); background: var(--bg); border: 0; overflow-y: auto; }
+.fs-rest-grip { width: 44px; height: 5px; border-radius: 3px; background: var(--line); margin-bottom: 4px; }
+.fs-rest-dial { position: relative; width: min(72vw, 300px); aspect-ratio: 1; }
+.fs-rest-dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.fs-rest-track { fill: none; stroke: var(--surface-2); stroke-width: 12; }
+.fs-rest-ring { fill: none; stroke: #ff6b47; stroke-width: 12; stroke-linecap: round; transition: stroke-dashoffset .9s linear, stroke .3s; }
+#fs-rest-screen.ready .fs-rest-ring { stroke: var(--success); }
+.fs-rest-center { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 2px; }
+.fs-rest-big { font: 700 clamp(56px, 18vw, 84px)/1 'Barlow Condensed', sans-serif; color: var(--ink); }
+.fs-rest-label { font: 600 12px 'Barlow', system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); }
+.fs-rest-state { font: 600 16px 'Barlow', system-ui, sans-serif; color: #ff6b47; }
+#fs-rest-screen.ready .fs-rest-state { color: var(--success); }
+.fs-rest-target { display: flex; align-items: center; gap: 14px; color: var(--ink-dim); font: 600 15px 'Barlow', system-ui, sans-serif; }
+.fs-rest-adj { min-width: 64px; min-height: 40px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: 600 14px 'Barlow', system-ui, sans-serif; cursor: pointer; }
+.fs-rest-next { width: 100%; display: grid; gap: 8px; padding: 14px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line-soft); }
+.fs-rest-next-row { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: baseline; }
+.fs-rest-next-row b { font: 700 22px/1.15 'Barlow Condensed', sans-serif; color: var(--ink); grid-column: 2; }
+.fs-rest-next-row .ss-badge { grid-row: 1 / span 2; align-self: center; }
+.fs-rest-next-row span:last-child { grid-column: 2; font-size: 15px; color: var(--ink-dim); }
+.fs-rest-go { width: 100%; min-height: 76px; font-size: 26px; border-radius: 22px; margin-top: auto; }
+#fs-rest-screen.ready .fs-rest-go { box-shadow: 0 0 0 4px rgba(74, 222, 128, .35); }
+.fs-rest-actions { display: flex; gap: 10px; justify-content: center; }
+#fs-rest-timer { cursor: pointer; }
+.fs-dock-hint { font-size: 14px; color: var(--ink-dim); margin: -2px 0 8px; }
+
+/* Notiz zum Satz (Pausen-Screen) und Anzeige unter dem Satz */
+.fs-rest-note { width: 100%; box-sizing: border-box; margin: 4px 0 12px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); border-radius: var(--radius-sm); font-size: 16px; }
+.fs-set-note { font-size: 12px; color: var(--ink-faint); margin: -2px 0 6px 4px; }
+.fs-set-note::before { content: '✎ '; }
+
+/* Übung würfeln (Freestyle) */
+.ex-dice-row { display: flex; justify-content: flex-end; margin: -2px 0 8px; }
+.ex-dice-card { border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
+.ex-dice-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; }
+.ex-dice-name { font-size: 18px; color: var(--ink); }
+.ex-dice-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+
+/* Würfeln am Board */
+.fb-dice-card { text-align: left; }
+.fb-dice-title { margin: 0 0 12px; font-size: 20px; }
+.fb-dice-label { display: block; margin: 12px 0 6px; }
+.fb-dice-go { width: 100%; margin-top: 16px; }
+.fb-dice-preview { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; max-height: 40vh; overflow-y: auto; }
+.fb-dice-preview ol { margin: 6px 0 0; padding-left: 22px; font-size: 14px; color: var(--ink); }
+.fb-dice-preview li { margin: 3px 0; }
+.fb-dice-preview small { color: var(--ink-faint); }
+.fb-dice-actions { display: flex; gap: 8px; margin-top: 12px; }
+.fb-dice-actions .btn { flex: 1; }
+
+/* Fortschritt: Woche, Muskelgruppen, Heatmap, Volumen, Rekorde, Hinweise */
+.pg-weeknav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.pg-weeknav-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 20px; cursor: pointer; }
+.pg-weeknav-label { text-align: center; }
+.pg-weeknav-label b { display: block; font-size: 17px; }
+.pg-weeknav-label span { font-size: 12px; color: var(--ink-faint); }
+.pg-delta { display: block; font-size: 11.5px; font-weight: 700; margin-top: 3px; color: var(--ink-faint); }
+.pg-delta.up { color: var(--success); }
+.pg-delta.down { color: var(--accent2); }
+.pg-mg-row { display: grid; grid-template-columns: 96px 1fr 30px; align-items: center; gap: 8px; padding: 5px 0; }
+.pg-mg-name { font-size: 14px; font-weight: 600; }
+.pg-mg-flag { font-size: 11px; color: var(--accent2); font-weight: 700; }
+.pg-mg-track { position: relative; height: 16px; }
+.pg-mg-band { position: absolute; top: 0; bottom: 0; background: rgba(74, 222, 128, .12); border-left: 1px dashed rgba(74, 222, 128, .5); border-right: 1px dashed rgba(74, 222, 128, .5); }
+.pg-mg-bar { position: absolute; left: 0; top: 3px; height: 10px; background: var(--accent); border-radius: 0 4px 4px 0; }
+.pg-mg-num { font: 700 17px 'Barlow Condensed', sans-serif; text-align: right; }
+.pg-mg-scale { display: grid; grid-template-columns: 96px 1fr 30px; gap: 8px; font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
+.pg-mg-scale > div { position: relative; height: 14px; }
+.pg-mg-scale span { position: absolute; transform: translateX(-50%); }
+.pg-heat-wrap { max-width: 300px; margin: 0 auto; }
+.muscle-map.pg-heat-map { width: 100%; }
+.pg-heat-map .body-base { pointer-events: none; }
+.pg-heat-map .pg-heat-zone path { stroke: var(--surface); stroke-width: .8; cursor: pointer; opacity: 1; }
+.pg-heat-map .pg-heat-zone.sel path { stroke: var(--ink); stroke-width: 1.6; }
+.pg-heat-legend { display: flex; justify-content: center; gap: 2px; margin-top: 10px; font-size: 11px; color: var(--ink-faint); }
+.pg-heat-legend div { text-align: center; width: 54px; }
+.pg-heat-legend i { display: block; height: 10px; border-radius: 2px; margin-bottom: 3px; }
+.pg-readout { font-size: 13.5px; margin: 8px 0 0; min-height: 20px; }
+.pg-vol { display: block; width: 100%; }
+.pg-vol-axis { font-size: 10.5px; fill: var(--ink-faint); font-family: Barlow, sans-serif; }
+.pg-vol-hit { cursor: pointer; }
+.pg-record { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-soft); font-size: 14.5px; }
+.pg-record:first-of-type { border-top: 0; }
+.pg-record small { display: block; font-size: 12px; color: var(--ink-faint); }
+.pg-record b { white-space: nowrap; }
+.pg-hint { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-soft); font-size: 14px; }
+.pg-hint:first-of-type { border-top: 0; }
+.pg-hint-ico { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); font-size: 13px; }

@@ -15,7 +15,7 @@ const FB_RING_CIRCUMFERENCE = 326.7; // 2 * PI * r(52)
 /* Beta: Faultier statt Strichmännchen (Pincho = Fingerkraft wie ein
    Faultier). Beim Hängen hängt es mit den Krallen an der Leiste und
    schwingt leicht, in der Pause sitzt es mit hängenden Armen und atmet
-   durch (Animationen in styles.css, .sloth-*). */
+   durch (Animationen in css/, .sloth-*). */
 const SLOTH_FACE = `
   <circle class="sloth-head" cx="100" cy="64" r="19"/>
   <path class="sloth-mask" d="M86 62 q6 -7 12 1 q-6 7 -12 -1z M114 62 q-6 -7 -12 1 q6 7 12 -1z"/>
@@ -1019,7 +1019,7 @@ function advanceToNextStep() {
    der richtigen Stelle "einsteigt"), unabhängig vom 1x/Sekunde-Tick-Timing
    und ohne dass am Phasenende manuell auf "geschlossen" gesprungen werden
    müsste — die Animation erreicht das Ende von selbst exakt im
-   richtigen Moment. Bei "prefers-reduced-motion" (siehe auch styles.css)
+   richtigen Moment. Bei "prefers-reduced-motion" (siehe auch css/)
    stattdessen wie bisher ein statischer, aus fb.secondsLeft berechneter
    Wert ohne Animation. Muss bei jedem echten Schrittwechsel neu aufgerufen
    werden (frisches DOM-Element durch renderFbOverlay ODER derselbe Ring-

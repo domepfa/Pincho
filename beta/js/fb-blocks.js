@@ -513,7 +513,7 @@ function fbBlockTitle(b) {
 
 /* Letzte 3 Sekunden einer Pause (rest-tense, siehe renderFbOverlay/
    updateTimerUI): statt die Zahl nur zu vergrössern/pulsieren, fliegt jede
-   Ziffer einzeln aus dem Bild (siehe .fb-fly-char in styles.css) — jede
+   Ziffer einzeln aus dem Bild (siehe .fb-fly-char in css/) — jede
    Ziffer als eigenes <span>, damit die CSS-Animation bei jedem Tick (neues
    Element durch den Re-Render) von vorne losläuft, statt nur einmal zu
    laufen und dann stehen zu bleiben. */

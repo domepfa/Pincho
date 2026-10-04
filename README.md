@@ -175,7 +175,7 @@ wird erst nach dem Testen in die Haupt-App übernommen.
 
 ```
 index.html      App-Shell, lädt Fonts + Skripte (Reihenfolge zählt, main.js zuletzt)
-styles.css      Gesamtes Styling
+css/            Styling, in Ladereihenfolge aufgeteilt (01–03 alter Look, ab 04 neuer Look als Überschreib-Schicht)
 js/             Der ganze Code, klassische Skripte mit gemeinsamem globalem Namensraum
                 (eine Datei pro Bereich, Übersicht in CLAUDE.md)
   config.js     Unterschiede Haupt-App/Beta (Speicher-Präfix, Asset-Pfad)
