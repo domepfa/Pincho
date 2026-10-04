@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pincho-shell-v134';
+const CACHE_NAME = 'pincho-shell-v135';
 const SHELL_ASSETS = [
   './', './index.html',
   './css/01-basis.css', './css/02-bereiche.css', './css/03-ablauf.css', './css/04-look-basis.css', './css/05-look-board.css', './css/06-look-seiten.css', './css/07-faultier.css', './css/08-ablauf-ruhig.css', './css/09-ergaenzungen.css', './css/10-duell.css', './css/11-abwechslung.css',

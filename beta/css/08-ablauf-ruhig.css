@@ -11,14 +11,11 @@
   padding: var(--safe-top) 16px var(--safe-bottom);
 }
 .fbx-rest { --phase: var(--accent2); }
-/* Ende der Pause (siehe fbSoonLevel): Phasenfarbe läuft in den letzten 5 s
-   von Orange zu Blau — Titel, Zahl, Balken und Griff-Rahmen gleichzeitig.
-   @property, damit die Farbe animierbar ist. */
-@property --phase { syntax: '<color>'; inherits: true; initial-value: #4fc3ff; }
-.fbx-soon { animation: fbxToWork 1.5s ease-out forwards; }
-@keyframes fbxToWork { from { --phase: var(--accent2); } to { --phase: var(--accent); } }
-.fbx-ready.fbx-soon { animation-name: fbxReadyToWork; }
-@keyframes fbxReadyToWork { from { --phase: var(--ink); } to { --phase: var(--accent); } }
+/* Letzte 5 s vor einem Satz (Pause und Start-Countdown, siehe fbSoonLevel):
+   Pausenfarbe Orange, die Zahl pulsiert. */
+.fbx.fbx-soon { --phase: var(--accent2); }
+.fbx-soon .fbx-num { animation: fbxSoonPulse 1s ease-in-out infinite; }
+@keyframes fbxSoonPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(1.06); } }
 .fbx-ready .fbx-num { color: var(--phase); }
 .fbx-num.fbx-pop { animation: fbxPop .45s cubic-bezier(.25, 1.5, .4, 1); }
 @keyframes fbxPop { 0% { transform: scale(1.28); } 100% { transform: scale(1); } }
@@ -72,7 +69,11 @@
   font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
   color: var(--bg); background: var(--ink); padding: 2px 9px; border-radius: 10px; white-space: nowrap;
 }
+.fbx-tag { max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; }
 .fbx-tag-top { left: 50%; top: 14px; transform: translateX(-50%); }
+.fbx-next-label { color: var(--ink-faint); font-weight: 500; }
+.fb-checkin-next { text-align: center; font-size: 14px; color: var(--ink-faint); margin: -2px 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fb-checkin-next b { color: var(--ink); font-weight: 600; }
 .fbx-fig { position: absolute; transition: opacity .25s; }
 .fbx-fig svg { display: block; width: 100%; height: 100%; }
 .fbx-measuring .sloth-rig g, .fbx-measuring .sloth-rig image { animation: none !important; }
@@ -148,5 +149,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .fbx-num.work-tense, .fbx-num.fbx-pop, .fbx-stage.fbx-flash::after { animation: none; }
-  .fbx-soon { animation: none; --phase: var(--accent); }
+  .fbx-soon .fbx-num { animation: none; }
 }
