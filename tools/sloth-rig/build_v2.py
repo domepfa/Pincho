@@ -192,6 +192,7 @@ def cut_view(view, cfg, parts, joints, anchors):
         jv['torso'] = [TJ['hip'], TJ['sh']]
         jv['face'] = [sc(J['neck']), sc(J['top'])]
         anchors[view] = {'shoulder': TJ['sh'], 'hip': TJ['hip'], 'tail': TJ['tail'], 'face': TJ['neck']}  # Schwanz unter dem Chalkbag
+        MESH['sidearm'] = arm_mesh(parts, J, M['uarmR'] | M['farmR'] | M['handR'], G, alpha)  # Arm als Gitter
         for far, dark in (('', 1.0), ('_far', FAR_DARK)):
             save('uarm' + far, M['uarmR'], dark=dark)  # ohne Kappe: die Schulter ist schon ganz dabei
             save('farm' + far, M['farmR'], 'elR', dark=dark)
@@ -407,6 +408,73 @@ def side_leg(parts, cfg, sfx=''):
     return out, flex_of(cfg['torso'], cfg['hip'], cfg['kn'])
 
 
+def mesh_save(parts, key, mask, G, a0, f):
+    """Bild eines Mesh-Teils (vorne + abgedunkelt hinten) auf Massstab f speichern; liefert den Rahmen im Blatt."""
+    a = ndi.gaussian_filter(mask.astype(float), 0.8) * np.where(mask, a0, 0)
+    bb = None
+    for far, dark in (('', 1.0), ('_far', FAR_DARK)):
+        img = Image.fromarray(np.dstack([np.clip(G * dark, 0, 255), np.clip(a * 255, 0, 255)]).astype(np.uint8), 'LA')
+        bb = img.getchannel('A').getbbox()
+        img = img.crop(bb).resize((round((bb[2] - bb[0]) * f), round((bb[3] - bb[1]) * f)), Image.LANCZOS)
+        img.save(os.path.join(OUT, f'v2side_{key}{far}.png'), optimize=True)
+        parts[f'v2side_{key}{far}'] = [round(bb[0] * f), round(bb[1] * f), round(bb[0] * f) + img.width, round(bb[1] * f) + img.height]
+    return bb
+
+
+def mesh_grid(mask, bb, step):
+    """Regelmässiges Dreiecksgitter (Blatt-Pixel) über dem Teil, nur wo das Teil ist (plus Rand)."""
+    H, W = mask.shape
+    dil = ndi.binary_dilation(mask, iterations=step + 2)
+    gx = np.arange(bb[0] - step, bb[2] + 2 * step, step); gy = np.arange(bb[1] - step, bb[3] + 2 * step, step)
+    idx = -np.ones((len(gy), len(gx)), int); V = []
+    for j, y in enumerate(gy):
+        for i, x in enumerate(gx):
+            if 0 <= y < H and 0 <= x < W and dil[y, x]:
+                idx[j, i] = len(V); V.append((int(x), int(y)))
+    T = []
+    for j in range(len(gy) - 1):
+        for i in range(len(gx) - 1):
+            q00, q10, q01, q11 = idx[j, i], idx[j, i + 1], idx[j + 1, i], idx[j + 1, i + 1]
+            if min(q00, q10, q01) >= 0: T += [int(q00), int(q10), int(q01)]
+            if min(q10, q11, q01) >= 0: T += [int(q10), int(q11), int(q01)]
+    return V, T
+
+
+def chain_weights(p, bones, joints, first=0, fix=(), wide=None, outer=1.0, force=None):
+    """Gewichte eines Gitterpunkts an einer Knochenkette. Gelenk j liegt zwischen Knochen j und j+1.
+    Der Punkt hängt am nächsten Knochen (ab first) und wird nur nahe einem Gelenk weich mit dem Nachbarknochen
+    gemischt – nie mehr als zwei Knochen. fix: Gelenke, bei denen die Seite nach Lage entlang der Kette
+    bestimmt wird (Kniescheibe/Ellbogen gehören zum richtigen Glied); wide: Gelenk mit breitem Übergang auf der
+    Innenseite der Beugung (Kniekehle, Armbeuge), outer: Faktor für dessen Aussenseite (Ellbogenspitze bleibt
+    straffer, sonst verschmiert das Fell beim starken Beugen); force: fester Knochen für diesen Punkt (oder None)."""
+    def sd(a, b):
+        a = np.array(a, float); b = np.array(b, float); d = b - a
+        t = np.clip(((p - a) @ d) / (d @ d), 0, 1); return float(np.linalg.norm(p - a - t * d))
+    d = [sd(a, b) for a, b in bones]
+    bi = int(np.argmin(d[first:])) + first
+    if force is not None:
+        bi = force
+    axes, units = [], []
+    for j, (J0, R) in enumerate(joints):
+        ax = np.array(bones[j + 1][1], float) - J0; ax /= np.linalg.norm(ax)
+        axes.append(float((p - J0) @ ax)); units.append(ax)
+    for j in fix:
+        if bi == j and axes[j] > 0: bi = j + 1
+        if bi == j + 1 and axes[j] < 0 and d[j] < d[j + 1] + 40: bi = j
+    w = [0.0] * len(bones); w[bi] = 1.0
+    for j, (J0, R) in enumerate(joints):
+        if bi not in (j, j + 1):
+            continue
+        u, ax = axes[j], units[j]
+        if j == wide:
+            R = R * (1.9 if (p - J0) @ np.array([ax[1], -ax[0]]) > 0 else outer)
+        if abs(u) < R and np.linalg.norm(p - J0) < R * 3.5:
+            t = (u + R) / (2 * R); t = t * t * (3 - 2 * t)
+            w = [0.0] * len(bones); w[j] = 1 - t; w[j + 1] = t
+            break
+    return [round(v, 3) for v in w]
+
+
 def side_mesh(parts, cfg):
     """Bein seitlich als EIN Bild mit Dreiecksgitter (Mesh) und Knochengewichten (Rumpf, Oberschenkel,
     Unterschenkel, Fuss). Die Puppe verformt das Gitter weich (WebGL) – keine Nahtstellen, keine Stellungswechsel."""
@@ -423,80 +491,46 @@ def side_mesh(parts, cfg):
     lb, nn = ndi.label(leg)
     if nn > 1:
         leg = lb == (np.argmax(ndi.sum(leg, lb, range(1, nn + 1))) + 1)
-    g = G.copy(); a0 = alpha.copy()
     # hinter dem Beutel nichts ergänzen: der Beutel hängt am Rumpf und deckt das Gesäss in jeder Stellung
     leg = leg | (ndi.binary_dilation(leg, iterations=2) & ndi.binary_erosion(fig, iterations=3) & ~bag & below)
-    a = ndi.gaussian_filter(leg.astype(float), 0.8) * np.where(leg, a0, 0)
     f = S * SQ
-    bb = None
-    for far, dark in (('', 1.0), ('_far', FAR_DARK)):
-        img = Image.fromarray(np.dstack([np.clip(g * dark, 0, 255), np.clip(a * 255, 0, 255)]).astype(np.uint8), 'LA')
-        bb = img.getchannel('A').getbbox()
-        img = img.crop(bb).resize((round((bb[2] - bb[0]) * f), round((bb[3] - bb[1]) * f)), Image.LANCZOS)
-        img.save(os.path.join(OUT, f'v2side_legmesh{far}.png'), optimize=True)
-        parts[f'v2side_legmesh{far}'] = [round(bb[0] * f), round(bb[1] * f), round(bb[0] * f) + img.width, round(bb[1] * f) + img.height]
-    # Gitter (Blatt-Pixel), nur wo Bein ist
-    step = 9
-    dil = ndi.binary_dilation(leg, iterations=step + 2)
-    gx = np.arange(bb[0] - step, bb[2] + 2 * step, step); gy = np.arange(bb[1] - step, bb[3] + 2 * step, step)
-    idx = -np.ones((len(gy), len(gx)), int); V = []
-    for j, y in enumerate(gy):
-        for i, x in enumerate(gx):
-            if 0 <= y < H and 0 <= x < W and dil[y, x]:
-                idx[j, i] = len(V); V.append((int(x), int(y)))
-    T = []
-    for j in range(len(gy) - 1):
-        for i in range(len(gx) - 1):
-            q00, q10, q01, q11 = idx[j, i], idx[j, i + 1], idx[j + 1, i], idx[j + 1, i + 1]
-            if min(q00, q10, q01) >= 0: T += [int(q00), int(q10), int(q01)]
-            if min(q10, q11, q01) >= 0: T += [int(q10), int(q11), int(q01)]
-    # Gewichte: nächster Knochen weich gemischt; an der Hüfte grosser, weicher Übergang Rumpf -> Oberschenkel (rundes Gesäss)
+    bb = mesh_save(parts, 'legmesh', leg, G, alpha, f)
+    V, T = mesh_grid(leg, bb, 9)
+    # Gewichte: an der Hüfte grosser, weicher Übergang Rumpf -> Oberschenkel (rundes Gesäss), Knie/Knöchel schmal
     sh = cfg['torso'][1]
     bones = [(cfg['hip'], sh), (cfg['hip'], cfg['kn']), (cfg['kn'], cfg['an']), (cfg['an'], cfg['to'])]
-
-    def sd(p, a, b):
-        p = np.array(p, float); a = np.array(a, float); b = np.array(b, float); d = b - a
-        t = np.clip(((p - a) @ d) / (d @ d), 0, 1); return float(np.linalg.norm(p - a - t * d))
-    # Gewichte: jeder Punkt hängt am nächsten Knochen und wird nur nahe einem Gelenk weich mit dem Nachbarknochen
-    # gemischt (Hüfte breit für ein rundes Gesäss, Knie/Knöchel schmal) – nie mehr als zwei Knochen.
     joints = [(np.array(cfg['hip'], float), 70.0), (np.array(cfg['kn'], float), 40.0), (np.array(cfg['an'], float), 26.0)]
     hip = joints[0][0]; Wt = []
     for (x, y) in V:
-        w = [0.0, 0.0, 0.0, 0.0]
         if bag[min(y, H - 1), min(x, W - 1)] or y < hip[1] - 90:
-            w[0] = 1.0; Wt += w; continue
-        p = np.array([x, y], float)
-        d = [sd((x, y), a, b) for a, b in bones]
-        bi = int(np.argmin(d[1:])) + 1  # Bein-Knochen (Rumpf nur über das Hüftgelenk)
-        if y > cfg['an'][1] - 6:  # Ferse und alles unter dem Knöchel gehört zum Fuss (sonst schwingt die Ferse mit dem Schienbein)
-            bi = 3
-        # Seite eines Gelenks nach Lage entlang der Kette, nicht nach Abstand (Kniescheibe gehört unter das Knie)
-        axes = []
-        for j, (J0, R) in enumerate(joints):
-            ax = np.array(bones[j + 1][1], float) - J0; ax /= np.linalg.norm(ax)
-            axes.append(float((p - J0) @ ax))
-        for j in (1, 2):
-            if bi == j and axes[j] > 0: bi = j + 1
-            if bi == j + 1 and axes[j] < 0 and d[j] < d[j + 1] + 40: bi = j
-        w[bi] = 1.0
-        for j, (J0, R) in enumerate(joints):  # Gelenk j liegt zwischen Knochen j und j+1
-            if bi not in (j, j + 1):
-                continue
-            u = axes[j]  # >0: Seite des unteren Knochens
-            ax = np.array(bones[j + 1][1], float) - J0; ax /= np.linalg.norm(ax)
-            if j == 1 and (p - J0) @ np.array([ax[1], -ax[0]]) > 0:  # Kniekehle (Innenseite der Beugung): breiter Übergang
-                R = R * 1.9
-            if abs(u) < R and np.linalg.norm(p - J0) < R * 3.5:
-                t = (u + R) / (2 * R); t = t * t * (3 - 2 * t)
-                w = [0.0, 0.0, 0.0, 0.0]; w[j] = 1 - t; w[j + 1] = t
-                break
-        Wt += [round(v, 3) for v in w]
+            Wt += [1.0, 0.0, 0.0, 0.0]; continue
+        # Ferse und alles unter dem Knöchel gehört zum Fuss (sonst schwingt die Ferse mit dem Schienbein)
+        Wt += chain_weights(np.array([x, y], float), bones, joints, first=1, fix=(1, 2), wide=1, force=3 if y > cfg['an'][1] - 6 else None)
     lt = np.hypot(cfg['kn'][0] - cfg['hip'][0], cfg['kn'][1] - cfg['hip'][1])
     lc = np.hypot(cfg['an'][0] - cfg['kn'][0], cfg['an'][1] - cfg['kn'][1])
     fT, fC = S * SQ * LEG_T / lt, S * SQ * LEG_C / lc
-    return {'img': 'v2side_legmesh', 'V': [c for v in V for c in v], 'T': T, 'W': Wt,
-            'J': [list(cfg['hip']), list(cfg['kn']), list(cfg['an'])],  # Gelenke Hüfte, Knie, Knöchel (Blatt-Pixel)
-            'f': [round(S * SQ, 5), round(fT, 5), round(fC, 5), round(fC, 5)], 'src': round(f, 5)}
+    # f: Massstab Blatt -> Teil je Knochen; Z: Tiefe je Knochen (kleiner = vorne); c: gemeinsamer Bezugspunkt (Hüfte)
+    return {'img': 'v2side_legmesh', 'V': [c for v in V for c in v], 'T': T, 'W': Wt, 'c': list(cfg['hip']),
+            'f': [round(S * SQ, 5), round(fT, 5), round(fC, 5), round(fC, 5)], 'src': round(f, 5), 'Z': [0.6, -0.6, -0.3, -0.2]}
+
+
+def arm_mesh(parts, J, mask, G, alpha):
+    """Vorderer Arm seitlich (Schulter bis Krallen) als EIN Bild mit Gitter an Oberarm, Unterarm und Hand.
+    Ellbogen und Handgelenk biegen weich statt als zwei übereinandergelegte Teile."""
+    mask = ndi.binary_opening(mask, iterations=2)
+    lb, nn = ndi.label(mask)
+    if nn > 1:
+        mask = lb == (np.argmax(ndi.sum(mask, lb, range(1, nn + 1))) + 1)
+    bb = mesh_save(parts, 'armmesh', mask, G, alpha, S)
+    V, T = mesh_grid(mask, bb, 16)
+    bones = [(J['shR'], J['elR']), (J['elR'], J['wrR']), (J['wrR'], J['fiR'])]
+    # side.jpg ist grösser gezeichnet als side_squats.png: Übergänge entsprechend breiter als am Bein
+    joints = [(np.array(J['elR'], float), 70.0), (np.array(J['wrR'], float), 44.0)]
+    Wt = []
+    for (x, y) in V:
+        Wt += chain_weights(np.array([x, y], float), bones, joints, fix=(0, 1), wide=0, outer=0.5)
+    return {'img': 'v2side_armmesh', 'V': [c for v in V for c in v], 'T': T, 'W': Wt, 'c': list(J['shR']),
+            'f': [S, S, S], 'src': S, 'Z': [-0.6, -0.3, -0.2]}
 
 
 MESH = {}

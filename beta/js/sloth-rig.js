@@ -854,7 +854,7 @@ const SLOTH_MIN_H = 780;
 function slothRigBuild(pose, v2 = false) {
   const view = pose.view;
   const sit = v2 && view === 'front' && pose.legsFront;
-  const meshOn = v2 && view === 'side' && slothMeshOK && !!(SLOTH_V2.mesh && SLOTH_V2.mesh.side); // sitzend von vorne: eigene Zeichnung (Oberschenkel zum Betrachter)
+  const meshOn = v2 && view === 'side' && slothMeshOK && !!SLOTH_V2.mesh; // sitzend von vorne: eigene Zeichnung (Oberschenkel zum Betrachter)
   // v2: Rückansicht mit erhobenen Armen nutzt die Hänge-Zeichnung (keine verbogene Schulter)
   const armsUp = view === 'back' && ((pose.a.uarm_l ?? 90) < 0 || (pose.a.uarm_r ?? 90) < 0);
   const vk = v2 ? (armsUp ? 'hang' : sit ? 'sit' : view) : view;
@@ -991,17 +991,22 @@ function slothRigBuild(pose, v2 = false) {
         q['foot' + x] = place('foot', q['calf' + x].end, fDeg, 'side_foot' + x);
       }
     }
+    for (const k of pose.mirror || []) q[k].k = [q[k].k, -q[k].k]; // Teil an der Knochenachse spiegeln (vor den Meshes, die es übernehmen)
+    const bm = (e, d = [0, 0]) => ({ P: add(e.P, d), r: e.r, p: e.p, k: e.k, ba: e.ba });
     // Mesh: Bein (Gesäss bis Fuss) als EIN Bild, weich verformt durch Rumpf, Oberschenkel, Unterschenkel und Fuss.
-    // Die einzelnen Teile bleiben als Rückfall, bis das Gitter gezeichnet ist (dann ausgeblendet).
+    // Die einzelnen Teile (samt gebeugten Zeichnungen) bleiben als Rückfall, bis das Gitter gezeichnet ist (dann ausgeblendet).
     if (meshOn) for (const x of ['', '_far']) {
       const th = q['thigh' + x], ca = q['calf' + x];
       if (!th || th.skip || !ca || ca.skip) continue;
-      for (const k of Object.keys(q)) if (/^(thigh|calf)[ABC]/.test(k) && k.endsWith(x) && (x || !k.endsWith('_far'))) delete q[k];
       const fo = q['foot' + x] && !q['foot' + x].skip ? q['foot' + x] : ca, tor = q.torso;
-      const bm = (e, d = [0, 0]) => ({ P: add(e.P, d), r: e.r, p: e.p, k: e.k });
-      q['legmesh' + x] = { mesh: true, far: !!x, bones: [bm(tor, x ? D : [0, 0]), bm(th), bm(ca), bm(fo)] };
+      q['legmesh' + x] = { mesh: 'legmesh', far: !!x, bones: [bm(tor, x ? D : [0, 0]), bm(th), bm(ca), bm(fo)] };
     }
-    for (const k of pose.mirror || []) q[k].k = [q[k].k, -q[k].k]; // Teil an der Knochenachse spiegeln
+    // Mesh: Arm (Schulter bis Krallen) als EIN Bild an Oberarm, Unterarm und Hand. Faust: die Hand folgt dem Unterarm.
+    if (meshOn && SLOTH_V2.mesh.sidearm) for (const x of ['', '_far']) {
+      const ua = q['uarm' + x], fa = q['farm' + x], ha = q['hand' + x] && !q['hand' + x].skip ? q['hand' + x] : fa;
+      if (!ua || ua.skip || !fa || fa.skip) continue;
+      q['armmesh' + x] = { mesh: 'armmesh', far: !!x, bones: [bm(ua), bm(fa), bm(ha)] };
+    }
     return { q, pts: { wrist: q.farm.end, ankle: q.calf.end, grip: q.hand.end, knee: q.thigh.end, elbow: q.uarm.end,
       fwrist: q.farm_far.end, fankle: q.calf_far.end, fknee: q.thigh_far.end, fgrip: q.hand_far.end,
       shoulder: t.map(A.shoulder), hip: t.map(A.hip) } };
@@ -1085,7 +1090,7 @@ function slothRigBuild(pose, v2 = false) {
     const { q, pts } = pose1(pose.solve ? solve(s) : pose.lean ? lean(s) : s);
     // dx/dy: ganze Figur verschieben (Hüpfen, Fersen heben)
     const pin = sub(pts[pose.pin], [s.dx || 0, s.dy || 0]);
-    for (const k in q) q[k] = q[k].skip ? { skip: true } : q[k].mesh ? { mesh: true, far: q[k].far, bones: q[k].bones.map((m) => ({ ...m, P: sub(m.P, pin) })) }
+    for (const k in q) q[k] = q[k].skip ? { skip: true } : q[k].mesh ? { mesh: q[k].mesh, far: q[k].far, bones: q[k].bones.map((m) => ({ ...m, P: sub(m.P, pin) })) }
       : { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k, o: q[k].o, ba: q[k].ba };
     const pathPt = slothPathPoint(pose);
     if (pathPt && pts[pathPt]) Object.defineProperty(q, 'path', { value: sub(pts[pathPt], pin), enumerable: false });
@@ -1133,50 +1138,61 @@ const slothKeys = (name, pose) => pose.keys || (SLOTH_CALM.has(name) || SLOTH_NO
   : SLOTH_ECC_AB.has(name) ? SLOTH_KEYS_ECC : SLOTH_KEYS_CON);
 
 const slothRigCache = {};
-/* Mesh-Bein (neue Figur, Seitenansicht): ein Bild (Gesäss bis Fuss) auf einem Dreiecksgitter, jeder
-   Gitterpunkt gewichtet an Rumpf, Oberschenkel, Unterschenkel und Fuss gebunden (tools/sloth-rig/build_v2.py).
-   Pro Stellung werden die Punkte vorberechnet; gezeichnet wird live mit WebGL (siehe slothMeshTick). */
-function slothMeshPoints(bones) {
-  // Mischung der Knochen-Bewegungen als „dual quaternions“ (2D): Drehung und Verschiebung werden gemeinsam gemischt
-  // statt der fertigen Positionen – so behält das Bein an Hüfte und Knie seine Dicke (kein Einschnüren).
-  // Knochen: 0 Rumpf, 1 Oberschenkel, 2 Unterschenkel, 3 Fuss.
-  const M = SLOTH_V2.mesh.side, n = M.V.length / 2, out = new Float32Array(n * 3), Z = [0.6, -0.6, -0.3, -0.2];
-  const [hx, hy] = M.J[0]; // Bezugspunkt Hüfte (Blatt-Pixel)
+/* Meshes (neue Figur, Seitenansicht): Bein (Gesäss bis Fuss) und Arm (Schulter bis Krallen) je als EIN Bild auf
+   einem Dreiecksgitter; jeder Gitterpunkt hängt gewichtet an einer Knochenkette (tools/sloth-rig/build_v2.py).
+   Pro Stellung werden die Punkte vorberechnet; gezeichnet wird live mit WebGL (siehe slothMeshTick).
+   SLOTH_MESH_PARTS: Mesh -> Bildteile, die es ersetzt (bleiben als Rückfall, bis das Gitter gezeichnet ist). */
+const SLOTH_MESH_PARTS = { legmesh: ['thigh', 'calf', 'foot', 'knee', 'thighA', 'thighB', 'thighC', 'calfA', 'calfB', 'calfC'], armmesh: ['uarm', 'farm', 'hand', 'elbow'] };
+const SLOTH_MESH_SRC = { legmesh: 'side', armmesh: 'sidearm' }; // Schlüssel in SLOTH_V2.mesh
+function slothMeshPoints(M, bones) {
+  // Skinning wie in Spiele-Engines: Streckung (Massstab, len_/near_, Spiegeln) wird im Ruhezustand linear gemischt,
+  // Drehung und Verschiebung als „dual quaternions“ (2D) – so behält das Glied an den Gelenken seine Dicke.
+  // Knochen b bildet Blatt-Punkt v ab auf  P + R(r)·L·(v − j)  (j = sein Gelenk im Blatt, L = Streckung entlang des
+  // Knochens). Zerlegt in Streckung um den GEMEINSAMEN Bezugspunkt c des Meshes und einen starren Teil – nur so treffen
+  // sich die starren Teile benachbarter Knochen am Gelenk, und die Mischung bleibt dort ohne Beule.
+  const n = M.V.length / 2, nb = M.f.length, out = new Float32Array(n * 3), [cx, cy] = M.c;
   const B = bones.map((m, b) => {
-    const [kx, ky] = Array.isArray(m.k) ? m.k : [m.k, m.k], a = m.r * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
-    const dx = (hx * M.f[b] - m.p[0]) * kx, dy = (hy * M.f[b] - m.p[1]) * ky;
-    const tx = m.P[0] + dx * c - dy * s, ty = m.P[1] + dx * s + dy * c; // Bild der Hüfte unter diesem Knochen
+    const [kx, ky] = Array.isArray(m.k) ? m.k : [m.k, m.k], f = M.f[b], a = m.r * Math.PI / 180, ba = (m.ba || 0) * Math.PI / 180;
+    const cb = Math.cos(ba), sb = Math.sin(ba), X = kx * f, Y = ky * f;
+    // L = R(ba)·diag(X, Y)·R(−ba)
+    const L = [X * cb * cb + Y * sb * sb, (X - Y) * cb * sb, (X - Y) * cb * sb, X * sb * sb + Y * cb * cb];
+    const jx = cx - m.p[0] / f, jy = cy - m.p[1] / f, lx = L[0] * jx + L[1] * jy, ly = L[2] * jx + L[3] * jy; // L·(c − j)
+    const c = Math.cos(a), s = Math.sin(a);
+    // starrer Teil: y -> R·y + t  mit  t = P − R·c + R·L·(c − j)
+    const tx = m.P[0] + (lx - cx) * c - (ly - cy) * s, ty = m.P[1] + (lx - cx) * s + (ly - cy) * c;
     const rr = Math.cos(a / 2), ri = Math.sin(a / 2);
-    return { rr, ri, dr: (tx * rr + ty * ri) / 2, di: (ty * rr - tx * ri) / 2, sc: (kx + ky) / 2 * M.f[b] }; // d = t·conj(r)/2
+    return { L, rr, ri, dr: (tx * rr + ty * ri) / 2, di: (ty * rr - tx * ri) / 2 }; // d = t·conj(r)/2
   });
   for (let i = 0; i < n; i++) {
-    let rr = 0, ri = 0, dr = 0, di = 0, sc = 0, z = 0;
-    for (let b = 0; b < 4; b++) {
-      let w = M.W[4 * i + b];
+    const ux = M.V[2 * i] - cx, uy = M.V[2 * i + 1] - cy;
+    let rr = 0, ri = 0, dr = 0, di = 0, z = 0, yx = cx, yy = cy, piv = -1;
+    for (let b = 0; b < nb; b++) {
+      let w = M.W[nb * i + b];
       if (!w) continue;
       const q = B[b];
-      sc += w * q.sc; z += w * Z[b];
-      if (q.rr * B[0].rr + q.ri * B[0].ri < 0) w = -w; // gleiche Hemisphäre
+      yx += w * (q.L[0] * ux + q.L[1] * uy); yy += w * (q.L[2] * ux + q.L[3] * uy); z += w * M.Z[b]; // y = c + Σ w·L·(v − c)
+      if (piv < 0) piv = b; else if (q.rr * B[piv].rr + q.ri * B[piv].ri < 0) w = -w; // gleiche Hemisphäre
       rr += w * q.rr; ri += w * q.ri; dr += w * q.dr; di += w * q.di;
     }
-    const L = Math.hypot(rr, ri); rr /= L; ri /= L; dr /= L; di /= L;
+    const Ln = Math.hypot(rr, ri); rr /= Ln; ri /= Ln; dr /= Ln; di /= Ln;
     const tx = 2 * (dr * rr - di * ri), ty = 2 * (dr * ri + di * rr); // t = 2·d·r
-    const c = rr * rr - ri * ri, s = 2 * rr * ri, vx = (M.V[2 * i] - hx) * sc, vy = (M.V[2 * i + 1] - hy) * sc;
-    out[3 * i] = tx + vx * c - vy * s; out[3 * i + 1] = ty + vx * s + vy * c; out[3 * i + 2] = z;
+    const c = rr * rr - ri * ri, s = 2 * rr * ri;
+    out[3 * i] = tx + yx * c - yy * s; out[3 * i + 1] = ty + yx * s + yy * c; out[3 * i + 2] = z;
   }
   return out;
 }
-// Pro Figur ein kleines <canvas> im SVG (foreignObject). Ein gemeinsamer WebGL-Kontext zeichnet in jedem
-// Bildschirmbild das Bein genau zur Phase der CSS-Animation des Rumpfs (zwischen zwei Stellungen interpoliert)
+// Pro Figur und Mesh ein kleines <canvas> im SVG (foreignObject). Ein gemeinsamer WebGL-Kontext zeichnet in jedem
+// Bildschirmbild das Glied genau zur Phase der CSS-Animation des Rumpfs (zwischen zwei Stellungen interpoliert)
 // und kopiert es ins Canvas der Figur. Bis das erste Bild steht, bleiben die einzelnen Bildteile sichtbar.
 const slothMeshData = {}, slothMeshLive = new Set();
 let slothMeshGL = null, slothMeshRAF = 0;
 function slothMeshMarkup(name, key, list) {
-  const pts = list.map((e) => slothMeshPoints(e.bones));
+  const mk = list[0].mesh, M = SLOTH_V2.mesh[SLOTH_MESH_SRC[mk]];
+  const pts = list.map((e) => slothMeshPoints(M, e.bones));
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const P of pts) for (let i = 0; i < P.length; i += 3) { x0 = Math.min(x0, P[i]); x1 = Math.max(x1, P[i]); y0 = Math.min(y0, P[i + 1]); y1 = Math.max(y1, P[i + 1]); }
   x0 -= 4; y0 -= 4; x1 += 4; y1 += 4;
-  slothMeshData[name + '|' + key] = { pts, far: list[0].far, box: [x0, y0, x1 - x0, y1 - y0] };
+  slothMeshData[name + '|' + key] = { mk, key, pts, far: list[0].far, box: [x0, y0, x1 - x0, y1 - y0] };
   const f = (v) => +v.toFixed(1);
   return `<foreignObject class="sm-fo" data-smk="${name}|${key}" x="${f(x0)}" y="${f(y0)}" width="${f(x1 - x0)}" height="${f(y1 - y0)}"><canvas style="width:100%;height:100%;display:block"></canvas></foreignObject>`;
 }
@@ -1197,22 +1213,28 @@ function slothMeshInitGL() {
   gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec3 p;attribute vec2 u;varying vec2 v;uniform vec4 b;void main(){v=u;gl_Position=vec4((p.x-b.x)/b.z*2.0-1.0,1.0-(p.y-b.y)/b.w*2.0,p.z,1.0);}'));
   gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, 'precision mediump float;varying vec2 v;uniform sampler2D t;void main(){vec4 c=texture2D(t,v);if(c.a<0.03)discard;gl_FragColor=vec4(c.rgb*c.a,c.a);}'));
   gl.linkProgram(pr); gl.useProgram(pr);
-  const M = SLOTH_V2.mesh.side, n = M.V.length / 2, pb = SLOTH_V2.parts[M.img], uv = new Float32Array(n * 2);
-  for (let i = 0; i < n; i++) { uv[2 * i] = (M.V[2 * i] * M.src - pb[0]) / (pb[2] - pb[0]); uv[2 * i + 1] = (M.V[2 * i + 1] * M.src - pb[1]) / (pb[3] - pb[1]); }
-  const ub = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ub); gl.bufferData(gl.ARRAY_BUFFER, uv, gl.STATIC_DRAW);
-  const lu = gl.getAttribLocation(pr, 'u'); gl.enableVertexAttribArray(lu); gl.vertexAttribPointer(lu, 2, gl.FLOAT, false, 0, 0);
-  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(M.T), gl.STATIC_DRAW);
   gl.enable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.clearColor(0, 0, 0, 0);
-  const G = { cv, gl, pr, pbuf: gl.createBuffer(), lp: gl.getAttribLocation(pr, 'p'), ub: gl.getUniformLocation(pr, 'b'), tex: {}, buf: new Float32Array(n * 3) };
-  for (const far of [false, true]) {
-    const img = new Image();
-    img.onload = () => {
-      const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
-      G.tex[far] = t;
-    };
-    img.src = slothPartHref(M.img + (far ? '_far' : ''));
+  const G = { cv, gl, pr, pbuf: gl.createBuffer(), lp: gl.getAttribLocation(pr, 'p'), lu: gl.getAttribLocation(pr, 'u'), ub: gl.getUniformLocation(pr, 'b'), mesh: {} };
+  gl.enableVertexAttribArray(G.lp); gl.enableVertexAttribArray(G.lu);
+  // je Mesh: Texturkoordinaten, Dreiecke, Bild vorne/hinten
+  for (const mk of Object.keys(SLOTH_MESH_SRC)) {
+    const M = SLOTH_V2.mesh[SLOTH_MESH_SRC[mk]];
+    if (!M) continue;
+    const n = M.V.length / 2, pb = SLOTH_V2.parts[M.img], uv = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) { uv[2 * i] = (M.V[2 * i] * M.src - pb[0]) / (pb[2] - pb[0]); uv[2 * i + 1] = (M.V[2 * i + 1] * M.src - pb[1]) / (pb[3] - pb[1]); }
+    const E = G.mesh[mk] = { ub: gl.createBuffer(), ib: gl.createBuffer(), count: M.T.length, tex: {}, buf: new Float32Array(n * 3) };
+    gl.bindBuffer(gl.ARRAY_BUFFER, E.ub); gl.bufferData(gl.ARRAY_BUFFER, uv, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, E.ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(M.T), gl.STATIC_DRAW);
+    for (const far of [false, true]) {
+      const img = new Image();
+      img.onload = () => {
+        const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+        E.tex[far] = t;
+      };
+      img.src = slothPartHref(M.img + (far ? '_far' : ''));
+    }
   }
   return G;
 }
@@ -1224,33 +1246,34 @@ function slothMeshTick() {
   const { gl } = G, vh = window.innerHeight || 800;
   for (const L of slothMeshLive) {
     if (!L.fo.isConnected) { slothMeshLive.delete(L); continue; }
-    const tex = G.tex[L.d.far];
+    const E = G.mesh[L.d.mk], tex = E && E.tex[L.d.far];
     if (!tex) continue;
     const r = L.fo.getBoundingClientRect();
     if (r.bottom < 0 || r.top > vh || r.width < 2) continue;
     // Phase aus der CSS-Animation des Rumpfs derselben Figur (exakt im Takt, auch pausiert/verzögert)
     if (!L.anim || L.anim.playState === 'idle') { const svg = L.fo.closest('svg'), el = svg && svg.querySelector('.sp-torso'); L.anim = el && el.getAnimations ? el.getAnimations()[0] : null; }
     const pr = L.anim ? L.anim.effect.getComputedTiming().progress : 0;
-    const P = L.d.pts, N = P.length - 1, x = (pr == null ? 0 : pr) * N, i = Math.min(N - 1, Math.floor(x)), t = x - i, A = P[i], B = P[i + 1], buf = G.buf;
+    const P = L.d.pts, N = P.length - 1, x = (pr == null ? 0 : pr) * N, i = Math.min(N - 1, Math.floor(x)), t = x - i, A = P[i], B = P[i + 1], buf = E.buf;
     for (let k = 0; k < buf.length; k++) buf[k] = A[k] + (B[k] - A[k]) * t;
     const dpr = Math.min(2, window.devicePixelRatio || 1), w = Math.max(2, Math.round(r.width * dpr)), h = Math.max(2, Math.round(r.height * dpr));
     if (L.cv.width !== w || L.cv.height !== h) { L.cv.width = w; L.cv.height = h; L.ctx = null; }
     if (G.cv.width < w || G.cv.height < h) { G.cv.width = Math.max(G.cv.width, w); G.cv.height = Math.max(G.cv.height, h); }
     gl.viewport(0, G.cv.height - h, w, h); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.bindBuffer(gl.ARRAY_BUFFER, G.pbuf); gl.bufferData(gl.ARRAY_BUFFER, buf, gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(G.lp); gl.vertexAttribPointer(G.lp, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, E.ub); gl.vertexAttribPointer(G.lu, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, G.pbuf); gl.bufferData(gl.ARRAY_BUFFER, buf, gl.DYNAMIC_DRAW); gl.vertexAttribPointer(G.lp, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, E.ib);
     gl.uniform4f(G.ub, ...L.d.box);
-    gl.drawElements(gl.TRIANGLES, SLOTH_V2.mesh.side.T.length, gl.UNSIGNED_SHORT, 0);
+    gl.drawElements(gl.TRIANGLES, E.count, gl.UNSIGNED_SHORT, 0);
     const ctx = L.ctx || (L.ctx = L.cv.getContext('2d'));
     ctx.clearRect(0, 0, w, h); ctx.drawImage(G.cv, 0, 0, w, h, 0, 0, w, h);
-    if (!L.drawn) { L.drawn = true; const svg = L.fo.closest('svg'); if (svg) svg.classList.add(L.d.far ? 'sm-live-far' : 'sm-live'); }
+    if (!L.drawn) { L.drawn = true; const svg = L.fo.closest('svg'); if (svg) svg.classList.add('sm-' + L.d.key.replace('_', '-')); }
   }
   if (slothMeshLive.size) slothMeshRAF = requestAnimationFrame(slothMeshTick);
 }
-// Sobald das Mesh-Bein gezeichnet ist, die einzelnen Bildteile des Beins ausblenden
+// Sobald ein Mesh gezeichnet ist, die einzelnen Bildteile, die es ersetzt, ausblenden (z. B. .sm-armmesh-far .sp-uarm_far)
 (() => { const st = document.createElement('style');
-  st.textContent = ['', '_far'].map((x) => ['thigh', 'calf', 'foot', 'knee'].map((k) => `.sm-live${x.replace('_', '-')} .sp-${k}${x}`).join(',')).join(',') + '{visibility:hidden}';
+  st.textContent = Object.entries(SLOTH_MESH_PARTS).flatMap(([mk, ks]) => ['', '_far'].flatMap((x) => ks.map((k) => `.sm-${mk}${x.replace('_', '-')} .sp-${k}${x}`))).join(',') + '{visibility:hidden}';
   document.head.appendChild(st); })();
 // neue Figuren im DOM finden (Figuren entstehen als HTML-Text)
 if (typeof MutationObserver !== 'undefined' && slothMeshOK) new MutationObserver(() => slothMeshScan()).observe(document.documentElement, { childList: true, subtree: true });
@@ -1272,7 +1295,7 @@ function slothRigPrepare(poseName) {
     }
     return keys[keys.length - 1][1];
   };
-  const meshPose = v2 && pose.view === 'side' && slothMeshOK && !!(SLOTH_V2.mesh && SLOTH_V2.mesh.side);
+  const meshPose = v2 && pose.view === 'side' && slothMeshOK && !!SLOTH_V2.mesh;
   const N = meshPose ? 48 : 24, frames = [], calmTail = []; // Mesh-Bein: Einzelbilder, daher mehr Stellungen
   for (let i = 0; i <= N; i++) {
     const m = amount(i / N), s = {};
@@ -1313,7 +1336,8 @@ function slothRigPrepare(poseName) {
   // gebeugte Oberschenkel-Zeichnungen direkt über dem stehenden Oberschenkel
   const flexKeys = Object.keys(SLOTH_V2.joints.side.flex || {}).filter((k) => k !== 'thigh').sort((m, n) => SLOTH_V2.joints.side.flex[m] - SLOTH_V2.joints.side.flex[n]);
   base = base.flatMap((k) => { const m = /^(thigh|calf)(_far)?$/.exec(k); return m && pose.view === 'side' ? [k, ...flexKeys.map((f) => m[1] + f.slice(5) + (m[2] || ''))] : [k]; });
-  if (meshPose) base = base.flatMap((k) => (k === 'thigh' ? [k, 'legmesh'] : k === 'thigh_far' ? [k, 'legmesh_far'] : [k]));
+  // Meshes an der Stelle des Teils, das zuletzt von ihnen gezeichnet wird (Oberschenkel bzw. Oberarm)
+  if (meshPose) base = base.flatMap((k) => { const m = /^(thigh|uarm)(_far)?$/.exec(k); return m ? [k, (m[1] === 'thigh' ? 'legmesh' : 'armmesh') + (m[2] || '')] : [k]; });
   if (pose.armsFront) { const arms = base.filter((k) => /arm/.test(k)); base = base.filter((k) => !/arm/.test(k)); base.splice(base.indexOf('torso') + 1, 0, ...arms); }
   // drawLast: Teile ganz nach vorne holen (z. B. gefalteter Unterschenkel vor dem eigenen Oberschenkel)
   if (pose.drawLast) { base = base.filter((k) => !pose.drawLast.includes(k)); base.push(...pose.drawLast); }
