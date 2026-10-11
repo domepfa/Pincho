@@ -600,7 +600,8 @@ def side_mesh(parts, cfg):
     # hinter dem Beutel nichts ergänzen: der Beutel hängt am Rumpf und deckt das Gesäss in jeder Stellung
     leg = leg | (ndi.binary_dilation(leg, iterations=2) & ndi.binary_erosion(fig, iterations=3) & ~bag & below)
     f = S * SQ
-    bb = mesh_save(parts, 'legmesh', leg, G, alpha, f)
+    # eigener Name (mit Rand): v2side_legmesh.png bleibt unverändert für die Haupt-App, bis promote-beta.sh die Beta übernimmt
+    bb = mesh_save(parts, 'legmesh2', leg, G, alpha, f)
     V, T, grid = mesh_grid(leg, bb, 9)
     # Gewichte: an der Hüfte grosser, weicher Übergang Rumpf -> Oberschenkel (rundes Gesäss), Knie/Knöchel schmal
     sh = cfg['torso'][1]
@@ -616,7 +617,7 @@ def side_mesh(parts, cfg):
     lc = np.hypot(cfg['an'][0] - cfg['kn'][0], cfg['an'][1] - cfg['kn'][1])
     fT, fC = S * SQ * LEG_T / lt, S * SQ * LEG_C / lc
     # f: Massstab Blatt -> Teil je Knochen; Z: Tiefe je Knochen (kleiner = vorne)
-    return {'img': 'v2side_legmesh', 'grid': grid, 'W': [round(w * 100) for w in Wt], 
+    return {'img': 'v2side_legmesh2', 'grid': grid, 'W': [round(w * 100) for w in Wt], 
             'f': [round(S * SQ, 5), round(fT, 5), round(fC, 5), round(fC, 5)], 'src': round(f, 5), 'Z': [0.6, -0.6, -0.3, -0.2]}
 
 
