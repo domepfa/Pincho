@@ -156,18 +156,18 @@ const SLOTH_POSES = {
   },
   crunch: {
     view: 'side', pin: 'hip', dur: 2.2, floor: 60, relArms: true, label: 'Crunch',
-    a: { torso: 186, uarm: 145, farm: -15, thigh: -52, calf: 58 },
-    b: { torso: 214, uarm: 145, farm: -15, thigh: -52, calf: 58 },
+    a: { torso: 186, spine: 0, nod: 0, uarm: 145, farm: -15, thigh: -52, calf: 58 },
+    b: { torso: 206, spine: 40, nod: 12, uarm: 145, farm: -15, thigh: -52, calf: 58 },
   },
   superman: {
     view: 'side', pin: 'hip', dur: 3, floor: 58, grip: 'flat', label: 'Superman',
-    a: { torso: -2, uarm: -4, farm: -4, hand: -4, thigh: 180, calf: 180, fthigh: 182, fcalf: 182 },
-    b: { torso: -14, uarm: -22, farm: -22, hand: -22, thigh: 192, calf: 194, fthigh: 194, fcalf: 196 },
+    a: { torso: -2, spine: 0, nod: 0, uarm: -4, farm: -4, hand: -4, thigh: 180, calf: 180, fthigh: 182, fcalf: 182 },
+    b: { torso: -12, spine: -18, nod: -10, uarm: -22, farm: -22, hand: -22, thigh: 192, calf: 194, fthigh: 194, fcalf: 196 },
   },
   hollow: {
     view: 'side', pin: 'hip', dur: 3.2, floor: 60, label: 'Hollow Hold',
-    a: { torso: 196, uarm: 200, farm: 198, hand: 198, thigh: -16, calf: -14 },
-    b: { torso: 194, uarm: 198, farm: 196, hand: 196, thigh: -14, calf: -12 },
+    a: { torso: 196, spine: 16, nod: 10, uarm: 200, farm: 198, hand: 198, thigh: -16, calf: -14 },
+    b: { torso: 194, spine: 18, nod: 10, uarm: 198, farm: 196, hand: 196, thigh: -14, calf: -12 },
   },
   deadbug: {
     view: 'side', pin: 'hip', dur: 3, floor: 60, label: 'Dead Bug',
@@ -252,8 +252,8 @@ const SLOTH_POSES = {
   },
   catcow: {
     view: 'side', pin: 'knee', dur: 3.4, floor: 34, grip: 'flat', label: 'Katze-Kuh',
-    a: { torso: -10, uarm: 90, farm: 90, hand: 0, thigh: 90, calf: 178 },
-    b: { torso: 8, uarm: 90, farm: 90, hand: 0, thigh: 90, calf: 178 },
+    a: { torso: -6, spine: 28, nod: 22, uarm: 90, farm: 90, hand: 0, thigh: 90, calf: 178 },
+    b: { torso: 4, spine: -24, nod: -24, uarm: 90, farm: 90, hand: 0, thigh: 90, calf: 178 },
   },
   wgs: {
     view: 'side', pin: 'ankle', dur: 3.2, floor: 46, grip: 'flat', label: 'Grösste Dehnung der Welt',
@@ -285,8 +285,8 @@ const SLOTH_POSES = {
     // auf einer Box stehend, damit Kopf und Hände unter die Standfläche dürfen (echte Ausführung)
     view: 'side', pin: 'ankle', dur: 4, floor: 366, label: 'Jefferson Curl',
     props: [{ img: 'stepbox', at: [40, 42], a: [1006, 358], k: [1.1, 1.8], layer: 'back' }],
-    a: { torso: -96, uarm: 92, farm: 90, thigh: 86, calf: 92 },
-    b: { torso: 70, uarm: 92, farm: 90, thigh: 94, calf: 94 },
+    a: { torso: -96, spine: 0, nod: 0, uarm: 92, farm: 90, thigh: 86, calf: 92 },
+    b: { torso: 56, spine: 60, nod: 24, uarm: 92, farm: 90, thigh: 94, calf: 94 },
   },
   standwaage: {
     view: 'side', pin: 'fankle', dur: 3.6, floor: 46, label: 'Standwaage',
@@ -572,8 +572,8 @@ const SLOTH_POSES = {
   cablecrunch: {
     view: 'side', pin: 'knee', dur: 2.6, floor: 30, grip: 'fist', relArms: true, label: 'Crunch am Kabel',
     props: [cableTower(470), cableLine('top')],
-    a: { torso: -86, uarm: 170, farm: -10, thigh: 90, calf: 180, fthigh: 90, fcalf: 180 },
-    b: { torso: -10, uarm: 170, farm: -10, thigh: 110, calf: 180, fthigh: 110, fcalf: 180 },
+    a: { torso: -86, spine: 0, nod: 0, uarm: 170, farm: -10, thigh: 90, calf: 180, fthigh: 90, fcalf: 180 },
+    b: { torso: -18, spine: 44, nod: 14, uarm: 170, farm: -10, thigh: 110, calf: 180, fthigh: 110, fcalf: 180 },
   },
   pallof: {
     // Pallof Press (Vorderansicht): Kabelturm seitlich, beide Hände am Griff vor der Brust; die Arme strecken nach vorne
@@ -698,8 +698,8 @@ const SLOTH_POSES = {
   backext: {
     view: 'side', pin: 'hip', dur: 2.8, floor: 332, relArms: true, label: 'Rückenstrecker',
     props: [{ img: 'hyperext', at: [20, 40], a: [215, 668], k: 1.8, layer: 'back' }],
-    a: { torso: 34, uarm: 150, farm: -20, thigh: 128, calf: 128 },
-    b: { torso: -34, uarm: 150, farm: -20, thigh: 128, calf: 128 },
+    a: { torso: 34, spine: 22, nod: 10, uarm: 150, farm: -20, thigh: 128, calf: 128 },
+    b: { torso: -30, spine: -12, nod: -8, uarm: 150, farm: -20, thigh: 128, calf: 128 },
   },
   pullovermachine: {
     view: 'side', pin: 'hip', dur: 2.8, floor: 230, grip: 'fist', label: 'Pullover-Maschine',
@@ -900,19 +900,24 @@ function slothRigBuild(pose, v2 = false) {
 
   function side(s) {
     const q = {}, hk = pose.grip || 'hand', D = pose.depth || [-14, -8];
-    const t = q.torso = place('torso', [0, 0], s.torso, 'side_body');
-    q.head = place('face', t.map(A.face), s.torso + (s.nod || 0), 'side_face_neutral');
+    // spine (neue Figur): Rücken rundet sich um den Lendenwirbel (A.waist), + = Brustkorb nach vorne (Crunch).
+    // Becken und Brustkorb kippen je um die Hälfte, die Richtung Hüfte -> Schulter (s.torso) bleibt etwa gleich.
+    const sp = v2 && A.waist ? s.spine || 0 : 0, pelA = s.torso - sp / 2, chA = s.torso + sp / 2;
+    const t = q.torso = place('torso', [0, 0], s.torso, 'side_body'); // Bildteil (Rückfall): ganzer Rumpf
+    const pel = sp ? place('torso', [0, 0], pelA, 'side_body') : t;
+    const chest = sp ? (() => { const c0 = place('torso', [0, 0], chA, 'side_body'); return place('torso', sub(pel.map(A.waist), c0.map(A.waist)), chA, 'side_body'); })() : t;
+    q.head = place('face', chest.map(A.face), chA + (s.nod || 0), 'side_face_neutral');
     // Schwanz-Winkel relativ zum Rumpf wie in der bisherigen Zeichnung
     const oa = (n) => { const [p, d] = SLOTH_JOINTS.side[n]; return Math.atan2(d[1] - p[1], d[0] - p[0]) * 180 / Math.PI; };
-    q.tail = place('tail', t.map(A.tail), s.torso + oa('tail') - oa('torso') + (s.tail || 0));
+    q.tail = place('tail', pel.map(A.tail), pelA + oa('tail') - oa('torso') + (s.tail || 0));
     // v2: das hintere Bein liegt in der Zeichnung genau hinter dem vorderen. Bewegen sich beide Beine gleich,
     // zeigt eine versetzte zweite Kopie nur doppelte Umrisse -> dann hinteres Bein weglassen.
     const sameLegs = v2 && !pose.farFoot && ![pose.a, pose.b].some((k) => ['fthigh', 'fcalf', 'ffoot', 'legBend', 'kneeThigh', 'kneeCalf'].some((n) => k[n] != null));
     for (const far of [false, true]) {
       const x = far ? '_far' : '', raw = (k) => (far ? s['f' + k] ?? s[k] : s[k]);
       // relArms: Armwinkel relativ zum Rumpf (Arme drehen beim Aufrichten mit)
-      const v = (k) => (raw(k) != null && ((pose.relArms && /arm|hand/.test(k)) || (pose.relLegs && /thigh|calf/.test(k))) ? raw(k) + s.torso : raw(k));
-      const sh = add(t.map(A.shoulder), far ? D : [0, 0]), hip = add(t.map(A.hip), far ? D : [0, 0]);
+      const v = (k) => (raw(k) == null ? raw(k) : pose.relArms && /arm|hand/.test(k) ? raw(k) + chA : pose.relLegs && /thigh|calf/.test(k) ? raw(k) + pelA : raw(k));
+      const sh = add(chest.map(A.shoulder), far ? D : [0, 0]), hip = add(pel.map(A.hip), far ? D : [0, 0]);
       // len_/near_: Arm zeigt zum Betrachter bzw. von ihm weg (verkürzt, näher = grösser); hinten: flen_/fnear_
       const fore = (e, k) => { const L = raw('len_' + k) ?? 1, N = raw('near_' + k) ?? 1; if (L === 1 && N === 1) return e;
         const kk = Array.isArray(e.k) ? e.k : [e.k, e.k], d = sub(e.end, e.P);
@@ -960,7 +965,7 @@ function slothRigBuild(pose, v2 = false) {
       const th = q['thigh' + x];
       if (!th || th.skip) continue;
       const [b0, b1] = J.thigh, deg = th.r + Math.atan2(b1[1] - b0[1], b1[0] - b0[0]) * 180 / Math.PI;
-      const f = ((s.torso + 180 - deg) % 360 + 540) % 360 - 180, F = J.flex;
+      const f = ((pelA + 180 - deg) % 360 + 540) % 360 - 180, F = J.flex;
       const ks = Object.keys(F).sort((m, n) => F[m] - F[n]);
       // weicher Übergang (±6°) in der Mitte zwischen zwei Zeichnungen; die untere wird erst ausgeblendet,
       // wenn die obere ganz deckt (kein Durchscheinen nach hinten)
@@ -1000,7 +1005,7 @@ function slothRigBuild(pose, v2 = false) {
     if (meshOn) for (const x of ['', '_far']) {
       const th = q['thigh' + x], ca = q['calf' + x];
       if (!th || th.skip || !ca || ca.skip) continue;
-      const fo = q['foot' + x] && !q['foot' + x].skip ? q['foot' + x] : ca, tor = q.torso;
+      const fo = q['foot' + x] && !q['foot' + x].skip ? q['foot' + x] : ca, tor = pel;
       q['legmesh' + x] = { mesh: 'legmesh', far: !!x, bones: [bm(tor, x ? D : [0, 0]), bm(th), bm(ca), bm(fo)] };
     }
     // Mesh: Arm (Schulter bis Krallen) als EIN Bild an Oberarm, Unterarm und Hand. Faust: die Hand folgt dem Unterarm.
@@ -1009,9 +1014,14 @@ function slothRigBuild(pose, v2 = false) {
       if (!ua || ua.skip || !fa || fa.skip) continue;
       q['armmesh' + x] = { mesh: 'armmesh', far: !!x, bones: [bm(ua), bm(fa), bm(ha)] };
     }
+    // Mesh: Rumpf und Kopf als EIN Bild an Becken, Brustkorb und Kopf (Kopf nickt um den Hals, im Rumpf-Bild verankert)
+    if (meshOn && SLOTH_V2.mesh.sidetorso) {
+      const head = { P: chest.map(A.face), r: chest.r + (s.nod || 0), p: A.face, k: chest.k, ba: chest.ba };
+      q.torsomesh = { mesh: 'torsomesh', far: false, bones: [bm(pel), bm(chest), bm(head)] };
+    }
     return { q, pts: { wrist: q.farm.end, ankle: q.calf.end, grip: q.hand.end, knee: q.thigh.end, elbow: q.uarm.end,
       fwrist: q.farm_far.end, fankle: q.calf_far.end, fknee: q.thigh_far.end, fgrip: q.hand_far.end,
-      shoulder: t.map(A.shoulder), hip: t.map(A.hip) } };
+      shoulder: chest.map(A.shoulder), hip: pel.map(A.hip) } };
   }
 
   function frontBack(s) {
@@ -1144,8 +1154,8 @@ const slothRigCache = {};
    einem Dreiecksgitter; jeder Gitterpunkt hängt gewichtet an einer Knochenkette (tools/sloth-rig/build_v2.py).
    Pro Stellung werden die Punkte vorberechnet; gezeichnet wird live mit WebGL (siehe slothMeshTick).
    SLOTH_MESH_PARTS: Mesh -> Bildteile, die es ersetzt (bleiben als Rückfall, bis das Gitter gezeichnet ist). */
-const SLOTH_MESH_PARTS = { legmesh: ['thigh', 'calf', 'foot', 'knee', 'thighA', 'thighB', 'thighC', 'calfA', 'calfB', 'calfC'], armmesh: ['uarm', 'farm', 'hand', 'elbow'] };
-const SLOTH_MESH_SRC = { legmesh: 'side', armmesh: 'sidearm' }; // Schlüssel in SLOTH_V2.mesh
+const SLOTH_MESH_PARTS = { legmesh: ['thigh', 'calf', 'foot', 'knee', 'thighA', 'thighB', 'thighC', 'calfA', 'calfB', 'calfC'], armmesh: ['uarm', 'farm', 'hand', 'elbow'], torsomesh: ['torso', 'head'] };
+const SLOTH_MESH_SRC = { legmesh: 'side', armmesh: 'sidearm', torsomesh: 'sidetorso' }; // Schlüssel in SLOTH_V2.mesh
 function slothMeshPoints(M, bones) {
   // Skinning wie in Spiele-Engines: Streckung (Massstab, len_/near_, Spiegeln) wird im Ruhezustand linear gemischt,
   // Drehung und Verschiebung als „dual quaternions“ (2D) – so behält das Glied an den Gelenken seine Dicke.
@@ -1227,7 +1237,7 @@ function slothMeshInitGL() {
     const E = G.mesh[mk] = { ub: gl.createBuffer(), ib: gl.createBuffer(), count: M.T.length, tex: {}, buf: new Float32Array(n * 3) };
     gl.bindBuffer(gl.ARRAY_BUFFER, E.ub); gl.bufferData(gl.ARRAY_BUFFER, uv, gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, E.ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(M.T), gl.STATIC_DRAW);
-    for (const far of [false, true]) {
+    for (const far of SLOTH_V2.parts[M.img + '_far'] ? [false, true] : [false]) {
       const img = new Image();
       img.onload = () => {
         const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -1339,7 +1349,7 @@ function slothRigPrepare(poseName) {
   const flexKeys = Object.keys(SLOTH_V2.joints.side.flex || {}).filter((k) => k !== 'thigh').sort((m, n) => SLOTH_V2.joints.side.flex[m] - SLOTH_V2.joints.side.flex[n]);
   base = base.flatMap((k) => { const m = /^(thigh|calf)(_far)?$/.exec(k); return m && pose.view === 'side' ? [k, ...flexKeys.map((f) => m[1] + f.slice(5) + (m[2] || ''))] : [k]; });
   // Meshes an der Stelle des Teils, das zuletzt von ihnen gezeichnet wird (Oberschenkel bzw. Oberarm)
-  if (meshPose) base = base.flatMap((k) => { const m = /^(thigh|uarm)(_far)?$/.exec(k); return m ? [k, (m[1] === 'thigh' ? 'legmesh' : 'armmesh') + (m[2] || '')] : [k]; });
+  if (meshPose) base = base.flatMap((k) => { const m = /^(thigh|uarm|torso)(_far)?$/.exec(k); return m ? [k, { thigh: 'legmesh', uarm: 'armmesh', torso: 'torsomesh' }[m[1]] + (m[2] || '')] : [k]; });
   if (pose.armsFront) { const arms = base.filter((k) => /arm/.test(k)); base = base.filter((k) => !/arm/.test(k)); base.splice(base.indexOf('torso') + 1, 0, ...arms); }
   // drawLast: Teile ganz nach vorne holen (z. B. gefalteter Unterschenkel vor dem eigenen Oberschenkel)
   if (pose.drawLast) { base = base.filter((k) => !pose.drawLast.includes(k)); base.push(...pose.drawLast); }

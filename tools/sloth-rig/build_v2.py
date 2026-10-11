@@ -191,7 +191,8 @@ def cut_view(view, cfg, parts, joints, anchors):
         save('face', M['head'], fade=torsoCut)
         jv['torso'] = [TJ['hip'], TJ['sh']]
         jv['face'] = [sc(J['neck']), sc(J['top'])]
-        anchors[view] = {'shoulder': TJ['sh'], 'hip': TJ['hip'], 'tail': TJ['tail'], 'face': TJ['neck']}  # Schwanz unter dem Chalkbag
+        MESH['sidetorso'] = torso_mesh(parts, TJ, jv['face'])  # Becken, Brustkorb und Kopf als ein Gitter
+        anchors[view] = {'shoulder': TJ['sh'], 'hip': TJ['hip'], 'tail': TJ['tail'], 'face': TJ['neck'], 'waist': waist_of(TJ)}  # Schwanz unter dem Chalkbag
         MESH['sidearm'] = arm_mesh(parts, J, M['uarmR'] | M['farmR'] | M['handR'], G, alpha)  # Arm als Gitter
         for far, dark in (('', 1.0), ('_far', FAR_DARK)):
             save('uarm' + far, M['uarmR'], dark=dark)  # ohne Kappe: die Schulter ist schon ganz dabei
@@ -531,6 +532,59 @@ def arm_mesh(parts, J, mask, G, alpha):
         Wt += chain_weights(np.array([x, y], float), bones, joints, fix=(0, 1), wide=0, outer=0.5)
     return {'img': 'v2side_armmesh', 'V': [c for v in V for c in v], 'T': T, 'W': Wt, 'c': list(J['shR']),
             'f': [S, S, S], 'src': S, 'Z': [-0.6, -0.3, -0.2]}
+
+
+WAIST = 0.38  # Lendenwirbel: Anteil des Wegs Hüfte -> Schulter (knapp über dem Gürtel)
+
+
+def waist_of(TJ):
+    h, sh = np.array(TJ['hip']), np.array(TJ['sh'])
+    return [round(float(v), 1) for v in h + WAIST * (sh - h)]
+
+
+def torso_mesh(parts, TJ, faceJ):
+    """Rumpf (mit Gürtel und Chalkbag) und Kopf seitlich als EIN Bild in Rumpf-Koordinaten, Gitter an Becken,
+    Brustkorb und Kopf: der Rücken rundet sich weich (Crunch, Katze-Kuh), der Kopf nickt ohne Kante am Hals.
+    Der Kopf wird so eingesetzt, wie ihn die Puppe bisher über den Rumpf legt (gleiche Lage, gleicher Massstab)."""
+    tor = Image.open(os.path.join(OUT, 'v2side_torso.png')).convert('LA'); tb = parts['v2side_torso']
+    face = Image.open(os.path.join(OUT, 'v2side_face.png')).convert('LA'); fb = parts['v2side_face']
+    ang = lambda a, b: np.arctan2(b[1] - a[1], b[0] - a[0])
+    rel = ang(TJ['hip'], TJ['sh']) - ang(*faceJ)  # Drehung des Kopfes gegenüber seiner Zeichnung
+    anc = np.array(TJ['neck'], float); pf = np.array(faceJ[0], float)
+    # Kopfecken in Rumpf-Koordinaten -> gemeinsamer Rahmen
+    R = np.array([[np.cos(rel), -np.sin(rel)], [np.sin(rel), np.cos(rel)]])
+    fc = [anc + R @ (np.array(c, float) - pf) for c in [(fb[0], fb[1]), (fb[2], fb[1]), (fb[0], fb[3]), (fb[2], fb[3])]]
+    x0 = int(np.floor(min(tb[0], *[c[0] for c in fc]))) - 2; y0 = int(np.floor(min(tb[1], *[c[1] for c in fc]))) - 2
+    x1 = int(np.ceil(max(tb[2], *[c[0] for c in fc]))) + 2; y1 = int(np.ceil(max(tb[3], *[c[1] for c in fc]))) + 2
+    W, H = x1 - x0, y1 - y0
+    def lay(img, box, inv):
+        """img (Rahmen box) in den gemeinsamen Rahmen; inv: Rahmen-Punkt -> Bild-Punkt als (a, b, c, d, e, f)."""
+        rgba = Image.merge('RGBA', (img.getchannel(0),) * 3 + (img.getchannel(1),))
+        return rgba.transform((W, H), Image.AFFINE, inv, resample=Image.BICUBIC)
+    base = lay(tor, tb, (1, 0, x0 - tb[0], 0, 1, y0 - tb[1]))
+    Ri = R.T  # Rahmen -> Kopfbild: pf + Ri (x - anc), dann minus Bildursprung
+    off = pf - Ri @ anc
+    head = lay(face, fb, (Ri[0, 0], Ri[0, 1], Ri[0, 0] * x0 + Ri[0, 1] * y0 + off[0] - fb[0],
+                          Ri[1, 0], Ri[1, 1], Ri[1, 0] * x0 + Ri[1, 1] * y0 + off[1] - fb[1]))
+    comp = Image.alpha_composite(base, head)  # Kopf liegt über dem Rumpf (weicher Hals aus der Zeichnung)
+    a = np.asarray(comp)[..., 3].astype(float) / 255
+    for far, dark in (('', 1.0),):
+        g = np.asarray(comp)[..., 0].astype(float) * dark
+        Image.fromarray(np.dstack([g, a * 255]).astype(np.uint8), 'LA').save(os.path.join(OUT, f'v2side_torsomesh{far}.png'), optimize=True)
+    parts['v2side_torsomesh'] = [x0, y0, x1, y1]
+    # Gitter in Rumpf-Koordinaten (Teil-Pixel): Maske = sichtbarer Teil, Punkte relativ zum Rahmen verschoben
+    mask = a > 0.02
+    Vl, T = mesh_grid(mask, (0, 0, W, H), 7)
+    V = [(x + x0, y + y0) for x, y in Vl]
+    hip, sh = np.array(TJ['hip'], float), np.array(TJ['sh'], float)
+    wa = np.array(waist_of(TJ), float); top = anc + R @ (np.array(faceJ[1], float) - pf)
+    bones = [(hip, wa), (wa, anc), (anc, top)]
+    joints = [(wa, 34.0), (anc, 16.0)]
+    Wt = []
+    for (x, y) in V:
+        Wt += chain_weights(np.array([x, y], float), bones, joints, fix=(0, 1))
+    return {'img': 'v2side_torsomesh', 'V': [c for v in V for c in v], 'T': T, 'W': Wt, 'c': [float(hip[0]), float(hip[1])],
+            'f': [1, 1, 1], 'src': 1, 'Z': [0.0, -0.1, -0.2]}
 
 
 MESH = {}
