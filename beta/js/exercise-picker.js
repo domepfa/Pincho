@@ -269,7 +269,7 @@ function showExerciseInfoSheet(exerciseId, onChange) {
   // Zielmuskeln, nicht die Bewegung selbst. Nur bei Übungen mit einer
   // echten Animation zeigen (EXERCISE_FIGURES), sonst bliebe nur der
   // generische 💪-Platzhalter übrig, der hier nichts beiträgt.
-  const hasFigure = !!EXERCISE_FIGURES[exerciseId];
+  const hasFigure = !!EXERCISE_FIGURES[exerciseId] || !!SLOTH_EXERCISE_POSES[exerciseId]; // Strichfigur oder Faultier-Pose
   el.innerHTML = `
     <div class="info-sheet-card">
       <button type="button" class="info-sheet-close" id="info-sheet-close">✕</button>

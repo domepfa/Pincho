@@ -97,6 +97,11 @@ const CABLE_PULLEY = { top: [213, 538], mid: [222, 643], low: [213, 810] };
 const cableTower = (x) => ({ img: 'cable', at: [x, 46], a: [171, 838], k: 2.7, flip: true, layer: 'back' });
 const cableLine = (pulley, to = 'grip', prop = 0) => ({ line: { prop, pt: CABLE_PULLEY[pulley] }, to });
 
+// Kettlebell an der Faust (at: 'grip' vorne, 'fgrip' hinten), hängt am Griff nach unten
+const KB = (at, layer) => ({ img: 'kettlebell', at, a: [916, 64], k: 1.3, ...(layer ? { layer } : {}) });
+// TRX-Gurte: von einem festen Punkt (relativ zum festen Punkt der Pose, meist oberhalb des Bildes) zu beiden Händen
+// bzw. Füssen ('ankle'); dunkel und breiter als ein Kabel
+const TRX = (from, to = 'grip') => [{ line: from, to: 'f' + to, thick: 8, layer: 'mid', box: true }, { line: from, to, thick: 8, anchor: true, box: true }];
 const HANG_ARMS = { uarm_l: -110, farm_l: -98, grip_l: -94, uarm_r: -70, farm_r: -82, grip_r: -86 };
 const STAND_LEGS = { thigh_l: 100, calf_l: 91, thigh_r: 80, calf_r: 89 };
 
@@ -753,6 +758,124 @@ const SLOTH_POSES = {
     view: 'side', pin: 'ankle', dur: 3.6, floor: 46, wall: { x: -170 }, label: 'Brustdehnung im Türrahmen',
     a: { torso: -94, uarm: 184, farm: -90, hand: -90, thigh: 80, calf: 96, fthigh: 110, fcalf: 120 },
     b: { torso: -82, uarm: 190, farm: -86, hand: -86, thigh: 64, calf: 104, fthigh: 118, fcalf: 124 },
+  },
+  // ---- Kettlebell (Oktober 2026): Kugel hängt an der Faust wie beim Goblet Squat ----
+  kbswing: {
+    view: 'side', pin: 'ankle', dur: 1.6, floor: 46, grip: 'fist', label: 'Kettlebell Swing', props: [KB('grip')],
+    a: { torso: -40, uarm: 118, farm: 118, hand: 118, thigh: 58, calf: 100 },
+    b: { torso: -96, uarm: 2, farm: 0, hand: 0, thigh: 86, calf: 92 },
+  },
+  kbclean: {
+    view: 'side', pin: 'ankle', dur: 1.8, floor: 46, grip: 'fist', label: 'Kettlebell Clean', props: [KB('grip')],
+    keys: [[0, 0], [0.45, 1], [0.6, 1], [1, 0]],
+    a: { torso: -40, uarm: 118, farm: 118, hand: 118, thigh: 58, calf: 100, fuarm: 100, ffarm: 96 },
+    b: { torso: -96, uarm: 72, farm: -78, hand: -60, thigh: 86, calf: 92, fuarm: 96, ffarm: 92 },
+  },
+  kbpress: {
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'Kettlebell Press', props: [KB('grip')],
+    a: { torso: -96, uarm: 72, farm: -78, hand: -60, thigh: 86, calf: 92, fuarm: 96, ffarm: 92 },
+    b: { torso: -96, uarm: -92, farm: -92, hand: -92, thigh: 86, calf: 92, fuarm: 96, ffarm: 92 },
+  },
+  kbsnatch: {
+    view: 'side', pin: 'ankle', dur: 2, floor: 46, grip: 'fist', label: 'Kettlebell Snatch', props: [KB('grip')],
+    keys: [[0, 0], [0.45, 1], [0.6, 1], [1, 0]],
+    a: { torso: -40, uarm: 118, farm: 118, hand: 118, thigh: 58, calf: 100, fuarm: 100, ffarm: 96 },
+    b: { torso: -96, uarm: -94, farm: -94, hand: -94, thigh: 86, calf: 92, fuarm: 96, ffarm: 92 },
+  },
+  kbslrdl: {
+    view: 'side', pin: 'fankle', dur: 3.6, floor: 46, grip: 'fist', label: 'Einbeiniges Kreuzheben', props: [KB('grip')],
+    a: { torso: -96, uarm: 94, farm: 92, hand: 92, thigh: 90, calf: 92, fthigh: 88, fcalf: 92, fuarm: 96, ffarm: 92 },
+    b: { torso: -10, uarm: 92, farm: 90, hand: 90, thigh: 172, calf: 174, fthigh: 94, fcalf: 94, fuarm: 70, ffarm: 70 },
+  },
+  kbrow: {
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Kettlebell Rudern', props: [KB('grip')],
+    a: { torso: -36, uarm: 92, farm: 90, thigh: 70, calf: 102, fuarm: 70, ffarm: 70 },
+    b: { torso: -36, uarm: 170, farm: 70, thigh: 70, calf: 102, fuarm: 70, ffarm: 70 },
+  },
+  kbcarry: {
+    view: 'side', pin: 'hip', dur: 1.2, floor: 330, grip: 'fist', label: 'Farmer Carry', props: [KB('fgrip', 'mid'), KB('grip')],
+    a: { torso: -94, uarm: 92, farm: 90, fuarm: 92, ffarm: 90, thigh: 72, calf: 96, fthigh: 108, fcalf: 116 },
+    b: { torso: -94, uarm: 92, farm: 90, fuarm: 92, ffarm: 90, thigh: 108, calf: 116, fthigh: 72, fcalf: 96 },
+  },
+  kbracklunge: {
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'Ausfallschritt Front Rack', props: [KB('fgrip', 'mid'), KB('grip')],
+    a: { torso: -96, uarm: 72, farm: -78, hand: -60, thigh: 72, calf: 100, fthigh: 112, fcalf: 140 },
+    b: { torso: -94, uarm: 72, farm: -78, hand: -60, thigh: 8, calf: 96, fthigh: 98, fcalf: 172 },
+  },
+  // ---- TRX: Gurte als dunkle Bänder vom Aufhängepunkt (oberhalb des Bildes) zu Händen oder Füssen ----
+  trxrow: {
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'TRX Rudern', props: TRX([430, -960]),
+    a: { torso: -128, uarm: -46, farm: -46, hand: -46, thigh: 52, calf: 52 },
+    b: { torso: -112, uarm: 128, farm: -38, hand: -38, thigh: 68, calf: 68 },
+  },
+  trxyraise: {
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'TRX Y-Raise', props: TRX([430, -960]),
+    a: { torso: -128, uarm: -46, farm: -46, hand: -46, thigh: 52, calf: 52 },
+    b: { torso: -110, uarm: -104, farm: -104, hand: -104, thigh: 70, calf: 70 },
+  },
+  trxfacepull: {
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'TRX Face Pull', props: TRX([430, -960]),
+    a: { torso: -128, uarm: -46, farm: -46, hand: -46, thigh: 52, calf: 52 },
+    b: { torso: -112, uarm: -176, len_uarm: 0.55, farm: -34, hand: -34, thigh: 68, calf: 68 },
+  },
+  trxcurl: {
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'TRX Bizepscurl', props: TRX([430, -960]),
+    a: { torso: -128, uarm: -46, farm: -46, hand: -46, thigh: 52, calf: 52 },
+    b: { torso: -116, uarm: -50, farm: -160, hand: -160, thigh: 64, calf: 64 },
+  },
+  trxchestpress: {
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'TRX Brustpresse', props: TRX([-420, -960]),
+    a: { torso: -64, uarm: 24, farm: 24, hand: 24, thigh: 116, calf: 116 },
+    b: { torso: -52, uarm: 150, farm: 30, hand: 30, thigh: 128, calf: 128 },
+  },
+  trxtriceps: {
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'TRX Trizepsstrecken', props: TRX([-420, -960]),
+    a: { torso: -62, uarm: -48, farm: -48, hand: -48, thigh: 118, calf: 118 },
+    b: { torso: -54, uarm: -42, farm: 128, hand: 128, thigh: 126, calf: 126 },
+  },
+  trxfallout: {
+    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'TRX Fallout', props: TRX([-420, -960]),
+    a: { torso: -76, uarm: 36, farm: 36, hand: 36, thigh: 104, calf: 104 },
+    b: { torso: -42, uarm: -46, farm: -46, hand: -46, thigh: 138, calf: 138 },
+  },
+  trxpistol: {
+    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'TRX Pistol Squat', props: TRX([430, -960]),
+    a: { torso: -96, uarm: -34, farm: -34, hand: -34, thigh: 86, calf: 92, fthigh: 4, fcalf: 4 },
+    b: { torso: -62, uarm: -22, farm: -22, hand: -22, thigh: 8, calf: 112, fthigh: -14, fcalf: -14 },
+  },
+  trxpushup: {
+    view: 'side', pin: 'wrist', dur: 2.6, floor: 34, solve: { toe: 190 }, grip: 'flat', label: 'TRX Liegestütz', props: TRX([-560, -620], 'ankle'),
+    a: { uarm: 92, farm: 90, hand: 0 },
+    b: { uarm: 146, farm: 52, hand: 0 },
+  },
+  trxpike: {
+    view: 'side', pin: 'wrist', dur: 2.8, floor: 34, grip: 'flat', label: 'TRX Pike', props: TRX([-560, -620], 'ankle'),
+    a: { torso: -6, uarm: 92, farm: 90, hand: 0, thigh: 174, calf: 174 },
+    b: { torso: 44, uarm: 112, farm: 112, hand: 0, thigh: 140, calf: 140 },
+  },
+  trxtuck: {
+    view: 'side', pin: 'wrist', dur: 2.2, floor: 34, grip: 'flat', label: 'TRX Knee Tuck', props: TRX([-560, -620], 'ankle'),
+    a: { torso: -6, uarm: 92, farm: 90, hand: 0, thigh: 174, calf: 174 },
+    b: { torso: 6, uarm: 92, farm: 90, hand: 0, thigh: 58, calf: 170 },
+  },
+  trxhamcurl: {
+    // Schultern am Boden (fester Punkt), Fersen oben in den Gurten, Hüfte gehoben
+    view: 'side', pin: 'shoulder', dur: 2.8, floor: 40, grip: 'flat', label: 'TRX Hamstring Curl',
+    props: TRX([520, -560], 'ankle'),
+    a: { torso: 170, uarm: 4, farm: 2, hand: 0, thigh: -14, calf: -12 },
+    b: { torso: 160, uarm: 4, farm: 2, hand: 0, thigh: -62, calf: 62 },
+  },
+  // ---- Weitere ----
+  dipleg: {
+    view: 'side', pin: 'grip', dur: 2.6, floor: 330, grip: 'fist', label: 'Dipstütz Leg Raise',
+    props: [{ img: 'dipstation', at: [0, 10], a: [540, 637], k: 1.63, layer: 'back' }],
+    a: { torso: -92, uarm: 94, farm: 90, hand: 0, thigh: 96, calf: 150, fthigh: 98, fcalf: 152 },
+    b: { torso: -100, uarm: 94, farm: 90, hand: 0, thigh: -4, calf: -2, fthigh: -2, fcalf: 0 },
+  },
+  shouldercircle: {
+    view: 'front', pin: 'feet', dur: 3, floor: 26, label: 'Schulterkreisen',
+    a: { torso: -90, head: -90, uarm_l: 130, farm_l: 120, uarm_r: 50, farm_r: 60, ...STAND_LEGS, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: 240, farm_l: 250, uarm_r: -60, farm_r: -70, ...STAND_LEGS, tail: 0 },
   },
   hang: {
     view: 'back', pin: 'hands', dur: 3.6, bar: true, label: 'Faultier hängt an der Stange',
@@ -1437,7 +1560,13 @@ function slothRigPrepare(poseName) {
   // Umriss über alle Stellungen -> viewBox
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const f of frames) for (const key of order) {
-    if (!f[key] || f[key].line || f[key].skip || f[key].mesh || f[key].o === 0) continue;
+    if (f[key] && f[key].line) { // Seil: nur mit box (TRX-Gurt) beide Enden im Bild, sonst zählt es nicht
+      if (!/^prop\d+$/.test(key) || !(pose.props[+key.slice(4)] || {}).box) continue;
+      const { P, r, k } = f[key], e = [P[0] + k[0] * Math.cos(r * Math.PI / 180), P[1] + k[0] * Math.sin(r * Math.PI / 180)];
+      for (const [x, y] of [P, e]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      continue;
+    }
+    if (!f[key] || f[key].skip || f[key].mesh || f[key].o === 0) continue;
     const { img, P, r, p, k, ba = 0 } = f[key], b = slothPartBox(img), [kx, ky] = Array.isArray(k) ? k : [k, k];
     const c = Math.cos((r + ba) * Math.PI / 180), s = Math.sin((r + ba) * Math.PI / 180), cb = Math.cos(ba * Math.PI / 180), sb = Math.sin(ba * Math.PI / 180);
     for (const [x, y] of [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]]) {
@@ -1515,6 +1644,8 @@ function slothRigPrepare(poseName) {
     style.textContent += `\n@keyframes srr-${name}{to{stroke-dashoffset:-100}}.sr-${name} .sloth-rig-rope{animation:srr-${name} ${pose.dur}s linear infinite;animation-delay:var(--srd,0s)}`;
     extra += `<ellipse class="sloth-rig-rope" pathLength="100" stroke-dasharray="46 54" cx="${n(cx)}" cy="${n(cy)}" rx="${n(rx)}" ry="${n(ry)}"/>`;
   }
+  // anchor: Karabiner am festen Anfang eines Gurts (TRX)
+  (pose.props || []).forEach((pr, i) => { if (pr.anchor && frames[0]['prop' + i]) { const [x, y] = frames[0]['prop' + i].P; extra += `<circle class="sloth-rig-bar" cx="${n(x)}" cy="${n(y)}" r="16"/>`; } });
   if (pose.floor != null) extra += `<ellipse class="sloth-rig-shadow" cx="${n(box[0] + box[2] / 2)}" cy="${pose.floor}" rx="${n(box[2] * (pose.view === 'side' ? 0.46 : 0.34))}" ry="${n(Math.max(10, box[2] * 0.035))}"/>`;
   if (pose.bar) {
     const w = box[2] * 0.96;

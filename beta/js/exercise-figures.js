@@ -2680,6 +2680,12 @@ const SLOTH_EXERCISE_POSES = {
   russian_twist: 'russian', hip_9090: 'ninety', frog_stretch: 'frog', ext_rotation: 'extrot',
   tibialis_raise: 'tibialis', wrist_curl: 'wristcurl', wrist_ext: 'wristcurl', wrist_mobility: 'wristmob',
   doorway_pec_stretch: 'doorway',
+  kb_swing: 'kbswing', kb_swing_single: 'kbswing', kb_clean: 'kbclean', kb_press: 'kbpress', kb_snatch: 'kbsnatch',
+  kb_single_leg_rdl: 'kbslrdl', kb_row: 'kbrow', kb_farmer_carry: 'kbcarry', kb_front_rack_lunge: 'kbracklunge',
+  trx_row: 'trxrow', trx_y_raise: 'trxyraise', trx_face_pull: 'trxfacepull', trx_biceps_curl: 'trxcurl',
+  trx_chest_press: 'trxchestpress', trx_triceps_ext: 'trxtriceps', trx_fallout: 'trxfallout', trx_pistol_squat: 'trxpistol',
+  trx_push_up: 'trxpushup', trx_pike: 'trxpike', trx_knee_tuck: 'trxtuck', trx_hamstring_curl: 'trxhamcurl',
+  dip_leg_raise: 'dipleg', shoulder_circles: 'shouldercircle',
 };
 const SLOTH_VIEW_WORD = { side: 'Seitenansicht', back: 'Rückansicht', front: 'Vorderansicht' };
 function exerciseFigureSvg(exerciseId) {
