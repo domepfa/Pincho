@@ -1669,6 +1669,10 @@ const SLOTH_SWAPS = {
   russian: { imgs: [['pose_russian_a', [355, 220]], ['pose_russian_b', [824, 220]]], dur: 2.4, label: 'Russian Twist' },
   ninety: { imgs: [['pose_ninety', [418, 434]]], dur: 4, label: '90/90-Dehnung' },
   frog: { imgs: [['pose_frog_a', [397, 619]], ['pose_frog_b', [858, 614]]], dur: 3.6, label: 'Frog Stretch' },
+  // Kettlebell (sheets/poses_kb.png): Get-up am aufgestellten Fuss ausgerichtet, sonst Mitte zwischen den Füssen
+  tgu: { imgs: [['pose_tgu_a', [480, 554]], ['pose_tgu_b', [800, 531]]], dur: 6, sx: -170, label: 'Turkish Get-up' }, // sx: Schatten unter die Körpermitte
+  windmill: { imgs: [['pose_windmill_a', [1012, 559]], ['pose_windmill_b', [1322, 562]]], dur: 4.4, label: 'Kettlebell Windmill' },
+  halo: { imgs: [['pose_halo_a', [606, 1006]], ['pose_halo_b', [915, 1006]]], dur: 3, label: 'Kettlebell Halo' },
 };
 function slothSwapFigure(name, cls) {
   const sw = SLOTH_SWAPS[name];
@@ -1688,7 +1692,7 @@ function slothSwapFigure(name, cls) {
     slothRigCache['swap:' + name] = true;
   }
   const pad = 20, w = x1 - x0 + 2 * pad, h = y1 - y0 + 2 * pad;
-  const shadow = `<ellipse class="sloth-rig-shadow" cx="0" cy="-4" rx="${Math.round((x1 - x0) * 0.4)}" ry="10"/>`;
+  const shadow = `<ellipse class="sloth-rig-shadow" cx="${sw.sx || 0}" cy="-4" rx="${Math.round((x1 - x0) * 0.4)}" ry="10"/>`;
   return `<svg class="sloth-rig sr-${name} ${cls}" data-dur="${sw.dur}" viewBox="${x0 - pad} ${y0 - pad} ${w} ${h}" width="${Math.round(w / 1.5)}" height="${Math.round(h / 1.5)}" role="img" aria-label="${sw.label}">${shadow}${imgs.join('')}</svg>`;
 }
 

@@ -44,6 +44,9 @@ SIDE_SOCKETS = [((544, 295), 40), ((586, 513), 40)]
 POSES = ('poses_extra.jpg', {'russian_a': [2], 'russian_b': [1], 'ninety': [5], 'frog_a': [8], 'frog_b': [9],
                              'extrot_a': [15], 'extrot_b': [14]})
 
+# Kettlebell-Übungen als ganze Posen (GPT-Blatt, Oktober 2026): Turkish Get-up, Windmill, Halo – je Anfang und Ende
+POSES_KB = ('poses_kb.png', {'tgu_a': [4], 'tgu_b': [3], 'windmill_a': [2], 'windmill_b': [1], 'halo_a': [5], 'halo_b': [6]})
+
 # Geräte (Requisiten), Teil-Nummern je Blatt in sheets/equipment/
 EQUIP = {
     'geraete.jpg': {'plate': [1], 'kettlebell': [2], 'dumbbell': [3], 'dhandle': [54], 'rope': [53], 'ring': [52],
@@ -156,6 +159,10 @@ def main():
     rgb, lab = label(os.path.join(HERE, 'sheets', POSES[0]))
     g = gray(rgb)
     for name, ids in POSES[1].items():
+        parts[f'pose_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'pose_{name}.png'))
+    rgb, lab = label(os.path.join(HERE, 'sheets', POSES_KB[0]))
+    g = gray(rgb)
+    for name, ids in POSES_KB[1].items():
         parts[f'pose_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'pose_{name}.png'))
     for fname, comps in EQUIP.items():
         rgb, lab = label(os.path.join(HERE, 'sheets', 'equipment', fname))
