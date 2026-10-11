@@ -884,14 +884,16 @@ function slothRigBuild(pose, v2 = false) {
     const JJ = alt ? SLOTH_V2.joints[alt] : oldTail ? SLOTH_JOINTS[view] : J;
     if (!JJ[name]) return { skip: true, P, r: 0, p: [0, 0], k: 1, map: () => P, end: P };
     const [p, d, k0 = 1] = JJ[name], [q0, q1] = JJ[name], r = deg - Math.atan2(q1[1] - q0[1], q1[0] - q0[0]) * 180 / Math.PI;
-    const k = k0 * km * (v2 && !oldTail ? KV : (SLOTH_SCALE[view][name] ?? 1));
+    // km: Massstab, oder [entlang, quer] zum Knochen (nur neue Figur: kürzen, ohne das Glied dünner zu machen)
+    const kb = k0 * (v2 && !oldTail ? KV : (SLOTH_SCALE[view][name] ?? 1)), k = Array.isArray(km) && v2 ? [kb * km[0], kb * km[1]] : kb * (Array.isArray(km) ? km[0] : km);
     // sitzend von vorne verschwindet der Schwanz unter dem Gesäss
     let im = oldTail ? (vk !== 'sit' && SLOTH_PARTS[view + '_tail'] ? view + '_tail' : null) : img2(img || view + '_' + name);
     if (alt && im) im = SLOTH_V2.parts[im.replace('v2' + vk + '_', 'v2' + alt + '_')] ? im.replace('v2' + vk + '_', 'v2' + alt + '_') : im;
     // ba (neue Figur): Winkel des Knochens im Bild. Ungleiches Strecken (len_/near_, Spiegeln) wirkt dann entlang
     // des Knochens statt entlang der Bild-x-Achse (die Zeichnungen haben schräge Glieder)
     const ba = v2 ? Math.atan2(q1[1] - q0[1], q1[0] - q0[0]) * 180 / Math.PI : undefined;
-    return { img: im, skip: !im || undefined, P, r, p, k, ba, map: (q) => add(P, mul(rot(sub(q, p), r), k)), end: add(P, mul(rot(sub(d, p), r), k)) };
+    const kv = (v) => (Array.isArray(k) ? rot((([x, y]) => [x * k[0], y * k[1]])(rot(v, -ba)), ba) : mul(v, k)); // Streckung im Bild
+    return { img: im, skip: !im || undefined, P, r, p, k, ba, map: (q) => add(P, rot(kv(sub(q, p)), r)), end: add(P, rot(kv(sub(d, p)), r)) };
   };
   const ball = (img, P) => { const im = img2(img), b = slothPartBox(im); if (!b) return { skip: true, P, end: P };
     return { img: im, P, r: 0, p: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k: SLOTH_SCALE[view].ball ?? 1 }; };
@@ -924,7 +926,7 @@ function slothRigBuild(pose, v2 = false) {
         // Offene Hand: Unterarm und Krallenhand aus der Vorlage sind zusammen gut
         // doppelt so lang wie der Oberarm; auf menschliche Proportionen kürzen.
         const open = hk === 'hand';
-        q['farm' + x] = place('farm', q['uarm' + x].end, v('farm'), 'side_farm' + x, open ? 0.82 : 1);
+        q['farm' + x] = place('farm', q['uarm' + x].end, v('farm'), 'side_farm' + x, open ? [0.82, 1] : 1);
         q['hand' + x] = place(hk, q['farm' + x].end, v('hand') ?? v('farm'), 'side_' + hk + x, open ? 0.66 : 1);
       }
       q['thigh' + x] = place('thigh', hip, v('thigh'), 'side_thigh' + x);
