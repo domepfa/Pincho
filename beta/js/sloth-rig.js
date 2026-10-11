@@ -884,11 +884,13 @@ function slothRigBuild(pose, v2 = false) {
     const JJ = alt ? SLOTH_V2.joints[alt] : oldTail ? SLOTH_JOINTS[view] : J;
     if (!JJ[name]) return { skip: true, P, r: 0, p: [0, 0], k: 1, map: () => P, end: P };
     const [p, d, k0 = 1] = JJ[name], [q0, q1] = JJ[name], r = deg - Math.atan2(q1[1] - q0[1], q1[0] - q0[0]) * 180 / Math.PI;
-    // km: Massstab, oder [entlang, quer] zum Knochen (nur neue Figur: kürzen, ohne das Glied dünner zu machen)
-    const kb = k0 * (v2 && !oldTail ? KV : (SLOTH_SCALE[view][name] ?? 1)), k = Array.isArray(km) && v2 ? [kb * km[0], kb * km[1]] : kb * (Array.isArray(km) ? km[0] : km);
+    // km und k0 (Gelenkdaten): Massstab, oder [entlang, quer] zum Knochen (nur neue Figur: kürzen, ohne das Glied dünner
+    // zu machen; Arme aus einer anderen Zeichnung auf Länge und Dicke der Ansicht bringen)
+    const kb = v2 && !oldTail ? KV : (SLOTH_SCALE[view][name] ?? 1), [ka, kq] = Array.isArray(k0) ? k0 : [k0, k0], [ma, mq] = Array.isArray(km) ? km : [km, km];
+    const k = v2 && (ka !== kq || ma !== mq) ? [kb * ka * ma, kb * kq * mq] : kb * ka * ma;
     // sitzend von vorne verschwindet der Schwanz unter dem Gesäss
     let im = oldTail ? (vk !== 'sit' && SLOTH_PARTS[view + '_tail'] ? view + '_tail' : null) : img2(img || view + '_' + name);
-    if (alt && im) im = SLOTH_V2.parts[im.replace('v2' + vk + '_', 'v2' + alt + '_')] ? im.replace('v2' + vk + '_', 'v2' + alt + '_') : im;
+    if (alt && im && SLOTH_V2.parts['v2' + alt + '_' + name]) im = 'v2' + alt + '_' + name; // Teil aus der anderen Zeichnung
     // ba (neue Figur): Winkel des Knochens im Bild. Ungleiches Strecken (len_/near_, Spiegeln) wirkt dann entlang
     // des Knochens statt entlang der Bild-x-Achse (die Zeichnungen haben schräge Glieder)
     const ba = v2 ? Math.atan2(q1[1] - q0[1], q1[0] - q0[0]) * 180 / Math.PI : undefined;
@@ -1036,7 +1038,10 @@ function slothRigBuild(pose, v2 = false) {
     // near_<teil>: Glied kommt zum Betrachter -> insgesamt etwas grösser (Perspektive)
     // v2: len_farm ~0 war nur ein Behelf der alten Greifhand (brachte Unterarm mit); die neue hat einen echten Unterarm
     const shorten = (e, key) => { const L0 = s['len_' + key] ?? 1, L = v2 && L0 > 0 && L0 < 0.05 && /^farm_/.test(key) ? 1 : L0, N = s['near_' + key] ?? 1; if (L === 1 && N === 1) return e;
-      const d = sub(e.end, e.P); return { ...e, k: [e.k * L * N, e.k * N], end: add(e.P, mul(d, L * N)) }; };
+      const d = sub(e.end, e.P), [kx, ky] = Array.isArray(e.k) ? e.k : [e.k, e.k]; return { ...e, k: [kx * L * N, ky * N], end: add(e.P, mul(d, L * N)) }; };
+    // Arme, deren Unterarm in der Übung irgendwann über die Waagrechte geht (vorne, neue Figur, ohne Zweihand-Griff)
+    const upArms = {};
+    if (v2 && vk === 'front' && !pose.join && SLOTH_V2.joints.up) for (const x of ['l', 'r']) upArms[x] = [pose.a, pose.b].some((k) => -Math.sin(((k['farm_' + x] ?? 90) + (pose.relArms ? (k.torso ?? -90) + 90 : 0)) * Math.PI / 180) > 0.17);
     for (const x of ['l', 'r']) {
       const sh = A['sh_' + x];
       // armLift hob bei der alten Figur das Schultergelenk an (hängende Arme); die neue hat echte Schultern
@@ -1047,6 +1052,16 @@ function slothRigBuild(pose, v2 = false) {
       if (J['grip_' + x]) {
         const gk = s['grip_' + x] != null ? 'grip_' + x : 'farm_' + x; // ohne eigenen Winkel: Hand in Verlängerung des Unterarms
         q['grip_' + x] = shorten(place('grip_' + x, q['farm_' + x].end, arm(gk), undefined, 1, alt), s['len_grip_' + x] != null ? 'grip_' + x : 'farm_' + x);
+      }
+      // vorne, Unterarm über der Waagrechten: weich zur Zeichnung mit erhobenen Armen überblenden (uarmU/farmU) –
+      // Handflächen zueinander, Daumen nach hinten wie beim echten Arm (die hängende Zeichnung gedreht hätte ihn vorne).
+      // Die normale Zeichnung bleibt ganz sichtbar, bis die erhobene ganz deckt (kein Durchscheinen).
+      if (upArms[x]) {
+        const au = holds ? 'upfist' : 'up', uu = shorten(place('uarm_' + x, q['uarm_' + x].P, arm('uarm_' + x), undefined, 1, au), 'uarm_' + x);
+        const fu = shorten(place('farm_' + x, uu.end, arm('farm_' + x), undefined, 1, au), 'farm_' + x);
+        const e = -Math.sin(arm('farm_' + x) * Math.PI / 180), m = Math.min(1, Math.max(0, (e - 0.17) / 0.17)), o = m * m * (3 - 2 * m);
+        q['uarmU_' + x] = { ...uu, o }; q['farmU_' + x] = { ...fu, o };
+        q['uarm_' + x].o = q['farm_' + x].o = o >= 1 ? 0 : 1;
       }
       q['thigh_' + x] = shorten(place('thigh_' + x, t.map(A['hip_' + x]), leg('thigh_' + x)), 'thigh_' + x);
       q['calf_' + x] = shorten(place('calf_' + x, q['thigh_' + x].end, leg('calf_' + x)), 'calf_' + x);
@@ -1072,7 +1087,9 @@ function slothRigBuild(pose, v2 = false) {
       const from = (e) => (e && !e.skip && e.img ? /^v2([a-z]+)_/.exec(e.img)[1] : null);
       const ua = q['uarm_' + x], fa = q['farm_' + x], th = q['thigh_' + x], ca = q['calf_' + x];
       const av = from(fa), am = av && `${av}_${/farmfist/.test(fa.img) ? 'armfistmesh' : 'armmesh'}_${x}`;
-      if (am && from(ua) === av && SLOTH_V2.mesh[am]) q['armmesh_' + x] = { mesh: true, src: am, far: false, bones: [bm(ua), bm(fa)] };
+      if (am && from(ua) === av && SLOTH_V2.mesh[am]) q['armmesh_' + x] = { mesh: true, src: am, far: false, o: fa.o, bones: [bm(ua), bm(fa)] };
+      const uu = q['uarmU_' + x], fu = q['farmU_' + x], um = fu && `${from(fu)}_armmesh_${x}`;
+      if (um && SLOTH_V2.mesh[um]) q['armmeshU_' + x] = { mesh: true, src: um, far: false, o: fu.o, bones: [bm(uu), bm(fu)] };
       const lv = from(th), lm = lv && `${lv}_legmesh_${x}`;
       if (lm && from(ca) === lv && SLOTH_V2.mesh[lm]) q['legmesh_' + x] = { mesh: true, src: lm, far: false, bones: [bm(th), bm(ca)] };
     }
@@ -1114,7 +1131,7 @@ function slothRigBuild(pose, v2 = false) {
     const { q, pts } = pose1(pose.solve ? solve(s) : pose.lean ? lean(s) : s);
     // dx/dy: ganze Figur verschieben (Hüpfen, Fersen heben)
     const pin = sub(pts[pose.pin], [s.dx || 0, s.dy || 0]);
-    for (const k in q) q[k] = q[k].skip ? { skip: true } : q[k].mesh ? { mesh: true, src: q[k].src, far: q[k].far, bones: q[k].bones.map((m) => ({ ...m, P: sub(m.P, pin) })) }
+    for (const k in q) q[k] = q[k].skip ? { skip: true } : q[k].mesh ? { mesh: true, src: q[k].src, far: q[k].far, o: q[k].o, bones: q[k].bones.map((m) => ({ ...m, P: sub(m.P, pin) })) }
       : { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k, o: q[k].o, ba: q[k].ba };
     const pathPt = slothPathPoint(pose);
     if (pathPt && pts[pathPt]) Object.defineProperty(q, 'path', { value: sub(pts[pathPt], pin), enumerable: false });
@@ -1171,7 +1188,10 @@ const SLOTH_MESH_HIDE = (() => {
   const o = { torsomesh: ['torso', 'head'] };
   const side = { legmesh: ['thigh', 'calf', 'foot', 'knee', 'thighA', 'thighB', 'thighC', 'calfA', 'calfB', 'calfC'], armmesh: ['uarm', 'farm', 'hand', 'elbow'] };
   for (const [k, ps] of Object.entries(side)) { o[k] = ps; o[k + '_far'] = ps.map((n) => n + '_far'); }
-  for (const x of ['l', 'r']) { o['armmesh_' + x] = ['uarm_', 'farm_', 'elbow_'].map((n) => n + x); o['legmesh_' + x] = ['thigh_', 'calf_'].map((n) => n + x); }
+  for (const x of ['l', 'r']) {
+    o['armmesh_' + x] = ['uarm_', 'farm_', 'elbow_'].map((n) => n + x); o['legmesh_' + x] = ['thigh_', 'calf_'].map((n) => n + x);
+    o['armmeshU_' + x] = ['uarmU_', 'farmU_'].map((n) => n + x);
+  }
   return o;
 })();
 // Gitter aus der kompakten Form (build_v2.py, mesh_grid): Punkte zeilenweise, je Zelle zwei Dreiecke, Gewichte in Prozent
@@ -1241,7 +1261,8 @@ function slothMeshMarkup(name, key, list) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const P of pts) for (let i = 0; i < P.length; i += 3) { x0 = Math.min(x0, P[i]); x1 = Math.max(x1, P[i]); y0 = Math.min(y0, P[i + 1]); y1 = Math.max(y1, P[i + 1]); }
   x0 -= 4; y0 -= 4; x1 += 4; y1 += 4;
-  slothMeshData[name + '|' + key] = { mk, key, pts, far: list[0].far, box: [x0, y0, x1 - x0, y1 - y0] };
+  const op = list.some((e) => e.o != null) ? list.map((e) => e.o ?? 1) : null; // Deckkraft je Stellung (Überblenden)
+  slothMeshData[name + '|' + key] = { mk, key, pts, op, far: list[0].far, box: [x0, y0, x1 - x0, y1 - y0] };
   const f = (v) => +v.toFixed(1);
   return `<foreignObject class="sm-fo" data-smk="${name}|${key}" x="${f(x0)}" y="${f(y0)}" width="${f(x1 - x0)}" height="${f(y1 - y0)}"><canvas style="width:100%;height:100%;display:block"></canvas></foreignObject>`;
 }
@@ -1306,6 +1327,7 @@ function slothMeshTick() {
     L.pr = pr; L.w = Math.round(r.width);
     const P = L.d.pts, N = P.length - 1, x = (pr == null ? 0 : pr) * N, i = Math.min(N - 1, Math.floor(x)), t = x - i, A = P[i], B = P[i + 1], buf = E.buf;
     for (let k = 0; k < buf.length; k++) buf[k] = A[k] + (B[k] - A[k]) * t;
+    if (L.d.op) { const o = (L.d.op[i] + (L.d.op[i + 1] - L.d.op[i]) * t).toFixed(3); if (L.fo.style.opacity !== o) L.fo.style.opacity = o; }
     const dpr = Math.min(2, window.devicePixelRatio || 1), w = Math.max(2, Math.round(r.width * dpr)), h = Math.max(2, Math.round(r.height * dpr));
     if (L.cv.width !== w || L.cv.height !== h) { L.cv.width = w; L.cv.height = h; L.ctx = null; }
     if (G.cv.width < w || G.cv.height < h) { G.cv.width = Math.max(G.cv.width, w); G.cv.height = Math.max(G.cv.height, h); }
@@ -1387,6 +1409,8 @@ function slothRigPrepare(poseName) {
   // gebeugte Oberschenkel-Zeichnungen direkt über dem stehenden Oberschenkel
   const flexKeys = Object.keys(SLOTH_V2.joints.side.flex || {}).filter((k) => k !== 'thigh').sort((m, n) => SLOTH_V2.joints.side.flex[m] - SLOTH_V2.joints.side.flex[n]);
   base = base.flatMap((k) => { const m = /^(thigh|calf)(_far)?$/.exec(k); return m && pose.view === 'side' ? [k, ...flexKeys.map((f) => m[1] + f.slice(5) + (m[2] || ''))] : [k]; });
+  // erhobene Arme (vorne) direkt über den normalen
+  base = base.flatMap((k) => { const m = /^uarm_([lr])$/.exec(k); return m && frames[0]['uarmU_' + m[1]] ? [k, 'farmU_' + m[1], 'uarmU_' + m[1]] : [k]; });
   if (pose.armsFront) { const arms = base.filter((k) => /arm/.test(k)); base = base.filter((k) => !/arm/.test(k)); base.splice(base.indexOf('torso') + 1, 0, ...arms); }
   // drawLast: Teile ganz nach vorne holen (z. B. gefalteter Unterschenkel vor dem eigenen Oberschenkel)
   if (pose.drawLast) { base = base.filter((k) => !pose.drawLast.includes(k)); base.push(...pose.drawLast); }

@@ -57,6 +57,21 @@ VIEWS = {
         hipL=(380, 830), knL=(385, 965), anL=(338, 1320), toL=(285, 1440), hipR=(640, 830), knR=(640, 965), anR=(680, 1320), toR=(735, 1440)),
         torso=[(382, 375), (645, 375), (705, 435), (720, 510), (693, 600), (682, 705), (660, 802), (368, 802), (338, 705), (330, 600), (308, 510), (322, 435)],
         head=[(345, 45), (675, 45), (675, 360), (600, 390), (420, 390), (345, 360)]),
+    # Vorne mit erhobenen Armen (front_up.png, zwei Figuren: offen | Faust): nur die Arme, für Übungen mit Armen über der
+    # Schulter – Handflächen zueinander, Daumen nach hinten (die hängende Zeichnung gedreht hätte den Daumen vorne).
+    # Rumpf/Kopf/Beine nur zum Ausschneiden; Arme auf die Länge der Vorderansicht gebracht (arms_to='front').
+    'up': dict(src='front_up.png', xr=(0, 724), arms_only=True, arms_to='front', J=FB(
+        top=(352, 120), neck=(352, 330), hip=(352, 640),
+        shL=(262, 365), elL=(170, 240), wrL=(184, 120), fiL=(225, 32), shR=(445, 365), elR=(555, 250), wrR=(545, 122), fiR=(500, 35),
+        hipL=(310, 640), knL=(255, 810), anL=(215, 960), toL=(165, 1030), hipR=(395, 640), knR=(450, 810), anR=(490, 960), toR=(545, 1030)),
+        torso=[(275, 330), (430, 330), (470, 400), (480, 480), (460, 560), (460, 640), (245, 640), (245, 560), (225, 480), (235, 400)],
+        head=[(250, 120), (455, 120), (455, 320), (400, 340), (305, 340), (250, 320)]),
+    'upfist': dict(src='front_up.png', xr=(724, 1448), arms_only=True, arms_to='front', J=FB(
+        top=(1076, 120), neck=(1076, 330), hip=(1076, 640),
+        shL=(986, 365), elL=(880, 255), wrL=(885, 125), fiL=(905, 55), shR=(1166, 365), elR=(1270, 255), wrR=(1265, 125), fiR=(1250, 55),
+        hipL=(1034, 640), knL=(979, 810), anL=(939, 960), toL=(889, 1030), hipR=(1119, 640), knR=(1174, 810), anR=(1214, 960), toR=(1269, 1030)),
+        torso=[(999, 330), (1154, 330), (1194, 400), (1204, 480), (1184, 560), (1184, 640), (969, 640), (969, 560), (949, 480), (959, 400)],
+        head=[(974, 120), (1179, 120), (1179, 320), (1124, 340), (1029, 340), (974, 320)]),
     # Seite (Blick nach rechts): nur der vordere Arm/das vordere Bein, hinten = abgedunkelte Kopie
     'side': dict(src='side.jpg', J=FB(
         top=(330, 60), neck=(400, 340), hip=(390, 895), shR=(400, 445), elR=(640, 450), wrR=(880, 425), fiR=(985, 430),
@@ -82,9 +97,27 @@ def figure(path, xr=None):
     return A, gray(A), fig, alpha
 
 
+def arm_width(fig, J, s):
+    """Mittlere Armdicke (Silhouette quer zum Knochen, nahe Ellbogen und am Unterarm) je Armlänge Schulter -> Krallen."""
+    def w(a, b, frac):
+        P = np.array(J[a + s], float); d = np.array(J[b + s], float) - P; u = d / np.linalg.norm(d); n = np.array([-u[1], u[0]])
+        c = P + frac * d; tot = 0
+        for sgn in (1, -1):
+            t = 0
+            while True:
+                x, y = (c + sgn * (t + 1) * n).round().astype(int)
+                if not (0 <= y < fig.shape[0] and 0 <= x < fig.shape[1]) or not fig[y, x]:
+                    break
+                t += 1
+            tot += t
+        return tot
+    L = np.hypot(*np.subtract(J['el' + s], J['sh' + s])) + np.hypot(*np.subtract(J['fi' + s], J['el' + s]))
+    return float(np.mean([w('sh', 'el', 0.75), w('sh', 'el', 0.85), w('el', 'wr', 0.3), w('el', 'wr', 0.5), w('el', 'wr', 0.7)]) / L)
+
+
 def cut_view(view, cfg, parts, joints, anchors):
     J = cfg['J']
-    A, G, fig, alpha = figure(cfg['src'])
+    A, G, fig, alpha = figure(cfg['src'], cfg.get('xr'))
     H, W = fig.shape
     yy, xx = np.mgrid[0:H, 0:W]
 
@@ -154,14 +187,14 @@ def cut_view(view, cfg, parts, joints, anchors):
         g[ry, rx] = 0.5 * g[ry, rx] + 0.5 * soft[ry, rx]
         return True
 
-    def prep(name, mask, joint=None, src=None, fade=None, ink=False, src_alpha=None):
+    def prep(name, mask, joint=None, src=None, fade=None, ink=False, src_alpha=None, capk=1.0):
         """Bild (Grau) und Deckkraft eines Teils im Blatt: Maske säubern, Gelenk-Kappe, weiche Kante."""
         Gs = G if src is None else src
         # lose Fellsträhnen weg (Oberarm: Achselhaar hängt sonst als Strich herunter)
         mask = biggest(ndi.binary_opening(mask, iterations=6 if name.startswith('uarm') else 2))
         g = Gs.copy(); a0 = (alpha if src_alpha is None else src_alpha).copy()
         if joint:  # Gelenk-Überlappung mit eigenem Fell
-            r = CAP[re.sub('[LR]$', '', joint)]
+            r = CAP[re.sub('[LR]$', '', joint)] * capk  # capk: Zeichnung in anderem Massstab
             cap = (np.hypot(xx - J[joint][0], yy - J[joint][1]) < r) & ~mask
             if texfill(g, Gs, cap, mask):
                 a0[cap] = 1.0
@@ -242,6 +275,23 @@ def cut_view(view, cfg, parts, joints, anchors):
         jv.update(uarm=[sc(J['shR']), sc(J['elR'])], farm=[sc(J['elR']), sc(J['wrR'])], fist=[sc(J['elR']), sc(J['wrR'])],
                   hand=[sc(J['wrR']), sc(J['fiR'])], flat=[sc(J['wrR']), sc(J['fiR'])],
                   **legJ)
+        return
+    if cfg.get('arms_only'):
+        # nur Arme: Massstab je Arm so, dass Schulter -> Krallen so lang ist wie in der Zielansicht (dritter Gelenkwert)
+        # und Dicke je Armlänge wie dort (vierter Wert: Massstab quer zum Knochen) – sonst schwillt der Arm beim Überblenden an
+        tc = VIEWS[cfg['arms_to']]; T = tc['J']; L = lambda P, a, b: np.hypot(P[b][0] - P[a][0], P[b][1] - P[a][1])
+        tfig = figure(tc['src'], tc.get('xr'))[2]
+        for s in 'LR':
+            x = s.lower(); k = round(float((L(T, 'sh' + s, 'el' + s) + L(T, 'el' + s, 'fi' + s)) / (L(J, 'sh' + s, 'el' + s) + L(J, 'el' + s, 'fi' + s))), 4)
+            kq = round(k * arm_width(tfig, T, s) / arm_width(fig, J, s), 4)
+            print(f'  {view} Arm {x}: Länge x{k}, Dicke x{kq} ({kq / k:.3f})')
+            ua = prep('uarm_' + x, M['uarm' + s], 'sh' + s, capk=1 / k)
+            write('uarm_' + x, *ua)
+            fa = prep('farm_' + x, M['farm' + s] | M['hand' + s], 'el' + s, capk=1 / k)
+            write('farm_' + x, *fa)
+            limb_mesh('armmesh_' + x, ua, fa, ('sh' + s, 'el' + s, 'fi' + s), CAP['el'] / k)
+            jv['uarm_' + x] = [sc(J['sh' + s]), sc(J['el' + s]), [k, kq]]
+            jv['farm_' + x] = [sc(J['el' + s]), sc(J['fi' + s]), [k, kq]]
         return
     save('torso', M['torso'])
     save('head', M['head'], fade=torsoCut)
