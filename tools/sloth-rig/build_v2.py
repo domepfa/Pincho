@@ -154,7 +154,8 @@ def cut_view(view, cfg, parts, joints, anchors):
         g[ry, rx] = 0.5 * g[ry, rx] + 0.5 * soft[ry, rx]
         return True
 
-    def save(name, mask, joint=None, src=None, dark=1.0, fade=None, ink=False, src_alpha=None):
+    def prep(name, mask, joint=None, src=None, fade=None, ink=False, src_alpha=None):
+        """Bild (Grau) und Deckkraft eines Teils im Blatt: Maske säubern, Gelenk-Kappe, weiche Kante."""
         Gs = G if src is None else src
         # lose Fellsträhnen weg (Oberarm: Achselhaar hängt sonst als Strich herunter)
         mask = biggest(ndi.binary_opening(mask, iterations=6 if name.startswith('uarm') else 2))
@@ -175,13 +176,39 @@ def cut_view(view, cfg, parts, joints, anchors):
         if fade is not None:  # Schnittkante weich in das darunterliegende Teil auslaufen lassen (Hals)
             d = ndi.distance_transform_edt(~fade)
             a = a * np.clip(d / 16, 0.0, 1.0) ** 0.7
+        return g, a
+
+    def write(name, g, a, dark=1.0):
         im = Image.fromarray(np.dstack([np.clip(g * dark, 0, 255), np.clip(a * 255, 0, 255)]).astype(np.uint8), 'LA')
         bb = im.getchannel('A').getbbox()
         im = im.crop(bb)
         im = im.resize((max(1, round(im.width * S)), max(1, round(im.height * S))), Image.LANCZOS)
         key = f'v2{view}_{name}'
+        box = [round(bb[0] * S), round(bb[1] * S), round(bb[0] * S) + im.width, round(bb[1] * S) + im.height]
+        if 'mesh' in name:
+            im, box = padded(im, box)
         im.save(os.path.join(OUT, key + '.png'), optimize=True)
-        parts[key] = [round(bb[0] * S), round(bb[1] * S), round(bb[0] * S) + im.width, round(bb[1] * S) + im.height]
+        parts[key] = box
+        return bb
+
+    def save(name, mask, joint=None, src=None, dark=1.0, fade=None, ink=False, src_alpha=None):
+        write(name, *prep(name, mask, joint, src, fade, ink, src_alpha), dark)
+
+    def limb_mesh(name, up, lo, chain, R):
+        """Glied (Arm oder Bein) einer Ansicht als EIN Bild mit Gitter an zwei Knochen: oberes Teil liegt wie bisher über
+        dem unteren (beide mit ihren Gelenk-Kappen), das Gitter biegt am mittleren Gelenk weich (Radius R, Blatt-Pixel)."""
+        (gu, au), (gl, al) = up, lo
+        a = au + al * (1 - au)
+        g = np.where(a > 0, (gu * au + gl * al * (1 - au)) / np.maximum(a, 1e-6), gu)
+        bb = write(name, g, a)
+        V, T, grid = mesh_grid(a > 0.02, bb, 14)
+        root, mid, end = (np.array(J[k], float) for k in chain)
+        bones = [(root, mid), (mid, end)]
+        Wt = []
+        for (x, y) in V:
+            Wt += chain_weights(np.array([x, y], float), bones, [(mid, R)], fix=(0,))
+        MESH[f'{view}_{name}'] = {'img': f'v2{view}_{name}', 'grid': grid, 'W': [round(w * 100) for w in Wt],
+                                  'f': [S, S], 'src': S, 'Z': [-0.6, -0.3]}
 
     sc = lambda p: [round(p[0] * S, 1), round(p[1] * S, 1)]
     jv = joints[view] = {}
@@ -229,19 +256,29 @@ def cut_view(view, cfg, parts, joints, anchors):
     grip = view not in ('front', 'sit')  # Rückansicht/Hängen: eigene Greifhand (wie bisher grip_l/grip_r)
     for s in 'LR':
         x = s.lower()
-        save('uarm_' + x, M['uarm' + s], 'sh' + s)
+        ua = prep('uarm_' + x, M['uarm' + s], 'sh' + s)
+        write('uarm_' + x, *ua)
         if grip:
-            save('farm_' + x, M['farm' + s], 'el' + s)
+            fa = prep('farm_' + x, M['farm' + s], 'el' + s)
+            write('farm_' + x, *fa)
             save('grip_' + x, M['hand' + s], 'wr' + s)
             jv['grip_' + x] = [sc(J['wr' + s]), sc(J['fi' + s])]
             jv['farm_' + x] = [sc(J['el' + s]), sc(J['wr' + s])]
+            limb_mesh('armmesh_' + x, ua, fa, ('sh' + s, 'el' + s, 'wr' + s), CAP['el'])  # Greifhand bleibt eigenes Teil (liegt oben)
         else:  # vorne: Unterarm mit Hand (offen) und als Faust-Variante aus front_fist.jpg
-            save('farm_' + x, M['farm' + s] | M['hand' + s], 'el' + s)
+            fa = prep('farm_' + x, M['farm' + s] | M['hand' + s], 'el' + s)
+            write('farm_' + x, *fa)
+            limb_mesh('armmesh_' + x, ua, fa, ('sh' + s, 'el' + s, 'fi' + s), CAP['el'])
             if fistG is not None:
-                save('farmfist_' + x, fistM & ((own == names.index('farm' + s)) | (own == names.index('hand' + s))), 'el' + s, src=fistG, src_alpha=fistA)
+                ff = prep('farmfist_' + x, fistM & ((own == names.index('farm' + s)) | (own == names.index('hand' + s))), 'el' + s, src=fistG, src_alpha=fistA)
+                write('farmfist_' + x, *ff)
+                limb_mesh('armfistmesh_' + x, ua, ff, ('sh' + s, 'el' + s, 'fi' + s), CAP['el'])
             jv['farm_' + x] = [sc(J['el' + s]), sc(J['fi' + s])]
-        save('thigh_' + x, M['thigh' + s], 'hip' + s)
-        save('calf_' + x, M['calf' + s] | M['foot' + s], 'kn' + s)
+        th = prep('thigh_' + x, M['thigh' + s], 'hip' + s)
+        write('thigh_' + x, *th)
+        ca = prep('calf_' + x, M['calf' + s] | M['foot' + s], 'kn' + s)
+        write('calf_' + x, *ca)
+        limb_mesh('legmesh_' + x, th, ca, ('hip' + s, 'kn' + s, 'an' + s), CAP['kn'])
         jv['uarm_' + x] = [sc(J['sh' + s]), sc(J['el' + s])]
         jv['thigh_' + x] = [sc(J['hip' + s]), sc(J['kn' + s])]
         jv['calf_' + x] = [sc(J['kn' + s]), sc(J['an' + s])]
@@ -409,6 +446,16 @@ def side_leg(parts, cfg, sfx=''):
     return out, flex_of(cfg['torso'], cfg['hip'], cfg['kn'])
 
 
+MESH_PAD = 2  # durchsichtiger Rand um Mesh-Bilder: WebGL zieht sonst Randpixel (Fellspitzen) über Dreiecke ausserhalb
+
+
+def padded(img, box):
+    """Bild mit durchsichtigem Rand MESH_PAD und erweitertem Rahmen (Teil-Koordinaten)."""
+    out = Image.new(img.mode, (img.width + 2 * MESH_PAD, img.height + 2 * MESH_PAD), 0)
+    out.paste(img, (MESH_PAD, MESH_PAD))
+    return out, [box[0] - MESH_PAD, box[1] - MESH_PAD, box[2] + MESH_PAD, box[3] + MESH_PAD]
+
+
 def mesh_save(parts, key, mask, G, a0, f):
     """Bild eines Mesh-Teils (vorne + abgedunkelt hinten) auf Massstab f speichern; liefert den Rahmen im Blatt."""
     a = ndi.gaussian_filter(mask.astype(float), 0.8) * np.where(mask, a0, 0)
@@ -417,13 +464,16 @@ def mesh_save(parts, key, mask, G, a0, f):
         img = Image.fromarray(np.dstack([np.clip(G * dark, 0, 255), np.clip(a * 255, 0, 255)]).astype(np.uint8), 'LA')
         bb = img.getchannel('A').getbbox()
         img = img.crop(bb).resize((round((bb[2] - bb[0]) * f), round((bb[3] - bb[1]) * f)), Image.LANCZOS)
+        img, box = padded(img, [round(bb[0] * f), round(bb[1] * f), round(bb[0] * f) + img.width, round(bb[1] * f) + img.height])
         img.save(os.path.join(OUT, f'v2side_{key}{far}.png'), optimize=True)
-        parts[f'v2side_{key}{far}'] = [round(bb[0] * f), round(bb[1] * f), round(bb[0] * f) + img.width, round(bb[1] * f) + img.height]
+        parts[f'v2side_{key}{far}'] = box
     return bb
 
 
 def mesh_grid(mask, bb, step):
-    """Regelmässiges Dreiecksgitter (Blatt-Pixel) über dem Teil, nur wo das Teil ist (plus Rand)."""
+    """Regelmässiges Dreiecksgitter (Blatt-Pixel) über dem Teil, nur wo das Teil ist (plus Rand).
+    Liefert Punkte, Dreiecke und die kompakte Form für die App: [x0, y0, Abstand, Spalten, Zeilen, Lauflängen
+    (abwechselnd aus/an, zeilenweise)] – die App baut Punkte und Dreiecke daraus selbst (sloth-rig.js, slothMeshDecode)."""
     H, W = mask.shape
     dil = ndi.binary_dilation(mask, iterations=step + 2)
     gx = np.arange(bb[0] - step, bb[2] + 2 * step, step); gy = np.arange(bb[1] - step, bb[3] + 2 * step, step)
@@ -438,7 +488,12 @@ def mesh_grid(mask, bb, step):
             q00, q10, q01, q11 = idx[j, i], idx[j, i + 1], idx[j + 1, i], idx[j + 1, i + 1]
             if min(q00, q10, q01) >= 0: T += [int(q00), int(q10), int(q01)]
             if min(q10, q11, q01) >= 0: T += [int(q10), int(q11), int(q01)]
-    return V, T
+    on = (idx >= 0).ravel(); rle, cur, n = [], False, 0
+    for v in on:
+        if v == cur: n += 1
+        else: rle.append(n); cur, n = v, 1
+    rle.append(n)
+    return V, T, [int(gx[0]), int(gy[0]), int(step), len(gx), len(gy), rle]
 
 
 def chain_weights(p, bones, joints, first=0, fix=(), wide=None, outer=1.0, force=None):
@@ -496,7 +551,7 @@ def side_mesh(parts, cfg):
     leg = leg | (ndi.binary_dilation(leg, iterations=2) & ndi.binary_erosion(fig, iterations=3) & ~bag & below)
     f = S * SQ
     bb = mesh_save(parts, 'legmesh', leg, G, alpha, f)
-    V, T = mesh_grid(leg, bb, 9)
+    V, T, grid = mesh_grid(leg, bb, 9)
     # Gewichte: an der Hüfte grosser, weicher Übergang Rumpf -> Oberschenkel (rundes Gesäss), Knie/Knöchel schmal
     sh = cfg['torso'][1]
     bones = [(cfg['hip'], sh), (cfg['hip'], cfg['kn']), (cfg['kn'], cfg['an']), (cfg['an'], cfg['to'])]
@@ -510,8 +565,8 @@ def side_mesh(parts, cfg):
     lt = np.hypot(cfg['kn'][0] - cfg['hip'][0], cfg['kn'][1] - cfg['hip'][1])
     lc = np.hypot(cfg['an'][0] - cfg['kn'][0], cfg['an'][1] - cfg['kn'][1])
     fT, fC = S * SQ * LEG_T / lt, S * SQ * LEG_C / lc
-    # f: Massstab Blatt -> Teil je Knochen; Z: Tiefe je Knochen (kleiner = vorne); c: gemeinsamer Bezugspunkt (Hüfte)
-    return {'img': 'v2side_legmesh', 'V': [c for v in V for c in v], 'T': T, 'W': Wt, 'c': list(cfg['hip']),
+    # f: Massstab Blatt -> Teil je Knochen; Z: Tiefe je Knochen (kleiner = vorne)
+    return {'img': 'v2side_legmesh', 'grid': grid, 'W': [round(w * 100) for w in Wt], 
             'f': [round(S * SQ, 5), round(fT, 5), round(fC, 5), round(fC, 5)], 'src': round(f, 5), 'Z': [0.6, -0.6, -0.3, -0.2]}
 
 
@@ -523,14 +578,14 @@ def arm_mesh(parts, J, mask, G, alpha):
     if nn > 1:
         mask = lb == (np.argmax(ndi.sum(mask, lb, range(1, nn + 1))) + 1)
     bb = mesh_save(parts, 'armmesh', mask, G, alpha, S)
-    V, T = mesh_grid(mask, bb, 16)
+    V, T, grid = mesh_grid(mask, bb, 16)
     bones = [(J['shR'], J['elR']), (J['elR'], J['wrR']), (J['wrR'], J['fiR'])]
     # side.jpg ist grösser gezeichnet als side_squats.png: Übergänge entsprechend breiter als am Bein
     joints = [(np.array(J['elR'], float), 70.0), (np.array(J['wrR'], float), 44.0)]
     Wt = []
     for (x, y) in V:
         Wt += chain_weights(np.array([x, y], float), bones, joints, fix=(0, 1), wide=0, outer=0.5)
-    return {'img': 'v2side_armmesh', 'V': [c for v in V for c in v], 'T': T, 'W': Wt, 'c': list(J['shR']),
+    return {'img': 'v2side_armmesh', 'grid': grid, 'W': [round(w * 100) for w in Wt], 
             'f': [S, S, S], 'src': S, 'Z': [-0.6, -0.3, -0.2]}
 
 
@@ -574,8 +629,9 @@ def torso_mesh(parts, TJ, faceJ):
     parts['v2side_torsomesh'] = [x0, y0, x1, y1]
     # Gitter in Rumpf-Koordinaten (Teil-Pixel): Maske = sichtbarer Teil, Punkte relativ zum Rahmen verschoben
     mask = a > 0.02
-    Vl, T = mesh_grid(mask, (0, 0, W, H), 7)
+    Vl, T, grid = mesh_grid(mask, (0, 0, W, H), 7)
     V = [(x + x0, y + y0) for x, y in Vl]
+    grid[0] += x0; grid[1] += y0
     hip, sh = np.array(TJ['hip'], float), np.array(TJ['sh'], float)
     wa = np.array(waist_of(TJ), float); top = anc + R @ (np.array(faceJ[1], float) - pf)
     bones = [(hip, wa), (wa, anc), (anc, top)]
@@ -583,7 +639,7 @@ def torso_mesh(parts, TJ, faceJ):
     Wt = []
     for (x, y) in V:
         Wt += chain_weights(np.array([x, y], float), bones, joints, fix=(0, 1))
-    return {'img': 'v2side_torsomesh', 'V': [c for v in V for c in v], 'T': T, 'W': Wt, 'c': [float(hip[0]), float(hip[1])],
+    return {'img': 'v2side_torsomesh', 'grid': grid, 'W': [round(w * 100) for w in Wt], 
             'f': [1, 1, 1], 'src': 1, 'Z': [0.0, -0.1, -0.2]}
 
 
