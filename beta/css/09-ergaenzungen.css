@@ -106,7 +106,9 @@
 .fs-rest-next-row { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: baseline; }
 .fs-rest-next-row b { font: 700 22px/1.15 'Barlow Condensed', sans-serif; color: var(--ink); grid-column: 2; }
 .fs-rest-next-row .ss-badge { grid-row: 1 / span 2; align-self: center; }
-.fs-rest-next-row span:last-child { grid-column: 2; font-size: 15px; color: var(--ink-dim); }
+.fs-rest-next-row .fs-rest-next-sub { grid-column: 2; font-size: 15px; color: var(--ink-dim); }
+.fs-rest-hist { grid-column: 2; list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; font-size: 13px; color: var(--ink-dim); }
+.fs-rest-hist li span { display: inline-block; min-width: 46px; color: var(--ink); }
 .fs-rest-go { width: 100%; min-height: 76px; font-size: 26px; border-radius: 22px; margin-top: auto; }
 #fs-rest-screen.ready .fs-rest-go { box-shadow: 0 0 0 4px rgba(74, 222, 128, .35); }
 .fs-rest-actions { display: flex; gap: 10px; justify-content: center; }
