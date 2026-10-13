@@ -2685,7 +2685,7 @@ const SLOTH_EXERCISE_POSES = {
   trx_row: 'trxrow', trx_y_raise: 'trxyraise', trx_face_pull: 'trxfacepull', trx_biceps_curl: 'trxcurl',
   trx_chest_press: 'trxchestpress', trx_triceps_ext: 'trxtriceps', trx_fallout: 'trxfallout', trx_pistol_squat: 'trxpistol',
   trx_push_up: 'trxpushup', trx_pike: 'trxpike', trx_knee_tuck: 'trxtuck', trx_hamstring_curl: 'trxhamcurl',
-  dip_leg_raise: 'dipleg', shoulder_circles: 'shouldercircle',
+  sun_salutation: 'sunsal', dip_leg_raise: 'dipleg', shoulder_circles: 'shouldercircle',
 };
 const SLOTH_VIEW_WORD = { side: 'Seitenansicht', back: 'Rückansicht', front: 'Vorderansicht' };
 function exerciseFigureSvg(exerciseId) {

@@ -415,6 +415,7 @@ function exerciseIsHold(id) {
    Abfolge gedacht, nicht als gezieltes Muskeltraining. */
 const POSE_LIBRARY = [
   // Yoga
+  { id: 'sun_salutation', name: 'Sonnengruss', category: 'yoga', howTo: 'Fliessender Ablauf: Arme nach oben, Vorbeuge, Ausfallschritt zurück, Plank, Chaturanga, heraufschauender und herabschauender Hund, Ausfallschritt vor, Vorbeuge, aufrichten. Mit dem Atem bewegen.' },
   { id: 'mountain_pose', name: 'Berghaltung (Tadasana)', category: 'yoga', howTo: 'Aufrechter Stand, Füsse hüftbreit, Gewicht gleichmässig verteilt, lang durch den Scheitel wachsen.' },
   { id: 'downward_dog', name: 'Herabschauender Hund', category: 'yoga', howTo: 'Hände und Füsse am Boden, Hüfte nach oben schieben, Rücken lang, Fersen Richtung Boden.' },
   { id: 'childs_pose', name: 'Kindshaltung', category: 'yoga', howTo: 'Fersensitz, Oberkörper nach vorne über die Knie ablegen, Arme nach vorne oder neben dem Körper.' },
