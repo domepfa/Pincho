@@ -471,6 +471,17 @@ function fsSetSuggestion(g) {
   const note = last.note ? ` · „${last.note}“` : '';
   return `${g.sets.length ? 'eben' : 'letztes Mal'} ${w}${last.reps}${unit}${note}`;
 }
+/* Die letzten 3 Trainings dieser Übung im Pausen-Bildschirm, je Zeile alle Sätze. */
+function fsRestHistoryHtml(exerciseId) {
+  const sessions = historyForExercise(exerciseId, 3);
+  if (!sessions.length) return '';
+  const setTxt = (s) => {
+    const w = s.weight !== '' && s.weight != null ? `${String(s.weight).replace('.', ',')} kg × ` : '';
+    return `${w}${s.reps}${setUnitSuffix(exerciseId, s) ? ' s' : ''}`;
+  };
+  return `<ul class="fs-rest-hist">${sessions.map((sess) =>
+    `<li><span class="mono">${esc(fmtShortDate(sess.date))}</span>${esc(sess.sets.map(setTxt).join(' · '))}</li>`).join('')}</ul>`;
+}
 function hideFsRestScreen() {
   const el = document.getElementById('fs-rest-screen');
   if (el) el.remove();
@@ -492,10 +503,14 @@ function renderFsRestScreen(builder) {
   const group = supersetMembers(builder.exercises, nextIdx);
   const lines = group.map((j) => {
     const g = builder.exercises[j];
-    const sug = fsSetSuggestion(g);
+    const hist = fsRestHistoryHtml(g.exerciseId);
+    // "letztes Mal" steht schon in der Verlaufsliste darunter
+    const sug = g.sets.length || !hist ? fsSetSuggestion(g) : '';
     const letter = group.length > 1 ? `<span class="ss-badge">${String.fromCharCode(65 + group.indexOf(j))}</span>` : '';
-    return `<div class="fs-rest-next-row">${letter}<b>${esc(exerciseName(g.exerciseId))}</b><span>Satz ${g.sets.length + 1}${sug ? ' · ' + esc(sug) : ''}</span></div>`;
+    return `<div class="fs-rest-next-row">${letter}<b>${esc(exerciseName(g.exerciseId))}</b><span class="fs-rest-next-sub">Satz ${g.sets.length + 1}${sug ? ' · ' + esc(sug) : ''}</span>${hist}</div>`;
   }).join('');
+  // Nach dem letzten Satz einer Übung (Plan): klar machen, dass die Werte zur NÄCHSTEN Übung gehören
+  const isNextExercise = primary.id === 'fs-next-exercise';
   const target = fsRestTargetSec();
   const extra = dock.querySelector('#fs-next-set') && primary.id === 'fs-next-exercise';
   const noteSet = fsNoteTarget && builder.exercises[fsNoteTarget.gi] ? builder.exercises[fsNoteTarget.gi].sets[fsNoteTarget.si] : null;
@@ -528,7 +543,7 @@ function renderFsRestScreen(builder) {
       ${noteSet ? `<label class="fs-rest-label fs-rest-note-label" for="fs-rest-note">Notiz zu ${esc(exerciseName(builder.exercises[fsNoteTarget.gi].exerciseId))} · Satz ${fsNoteTarget.si + 1}</label>` : ''}
       ${noteSet ? `<input type="text" class="fs-rest-note" id="fs-rest-note" enterkeyhint="done" maxlength="80" placeholder="Notiz zum Satz, z. B. Untergriff, Sitz 4" value="${esc(noteSet.note || '')}">` : ''}
       <div class="fs-rest-next">
-        <span class="fs-rest-label">${group.length > 1 ? `Runde ${builder.exercises[group[0]].sets.length + 1}` : 'Als Nächstes'}</span>
+        <span class="fs-rest-label">${isNextExercise ? 'Nächste Übung' : group.length > 1 ? `Runde ${builder.exercises[group[0]].sets.length + 1}` : 'Als Nächstes'}</span>
         ${lines}
       </div>
       <button type="button" class="btn fs-rest-go" id="fs-rest-go">${primary.innerHTML}</button>
@@ -552,9 +567,19 @@ function renderFsRestScreen(builder) {
   if (ex) ex.onclick = () => dock.querySelector('#fs-next-set')?.click();
   document.getElementById('fs-rest-switch').onclick = () => {
     fsRestHidden = true;
-    hideFsRestScreen();
-    document.getElementById('fs-dock-add')?.click();
-    if (logMode === 'execute') document.getElementById('fs-panel')?.scrollIntoView({ behavior: 'smooth' });
+    const goToPicker = () => {
+      document.getElementById('fs-dock-add')?.click();
+      if (logMode === 'execute') document.getElementById('fs-panel')?.scrollIntoView({ behavior: 'smooth' });
+    };
+    // hideFsRestScreen geht im Verlauf zurück, und der Browser stellt dabei die alte
+    // Scrollposition wieder her: erst danach hochscrollen, sonst wird es überschrieben.
+    if (history.state && history.state.fsRest) {
+      window.addEventListener('popstate', () => setTimeout(goToPicker, 0), { once: true });
+      hideFsRestScreen();
+    } else {
+      hideFsRestScreen();
+      goToPicker();
+    }
   };
   el.querySelectorAll('[data-rest-adj]').forEach((b) => {
     b.onclick = () => {
