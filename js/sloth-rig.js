@@ -97,6 +97,11 @@ const CABLE_PULLEY = { top: [213, 538], mid: [222, 643], low: [213, 810] };
 const cableTower = (x) => ({ img: 'cable', at: [x, 46], a: [171, 838], k: 2.7, flip: true, layer: 'back' });
 const cableLine = (pulley, to = 'grip', prop = 0) => ({ line: { prop, pt: CABLE_PULLEY[pulley] }, to });
 
+// Kettlebell an der Faust (at: 'grip' vorne, 'fgrip' hinten), hängt am Griff nach unten
+const KB = (at, layer) => ({ img: 'kettlebell', at, a: [916, 64], k: 1.3, ...(layer ? { layer } : {}) });
+// TRX-Gurte: von einem festen Punkt (relativ zum festen Punkt der Pose, meist oberhalb des Bildes) zu beiden Händen
+// bzw. Füssen ('ankle'); dunkel und breiter als ein Kabel
+const TRX = (from, to = 'grip') => [{ line: from, to: 'f' + to, thick: 8, layer: 'mid', box: true }, { line: from, to, thick: 8, anchor: true, box: true }];
 const HANG_ARMS = { uarm_l: -110, farm_l: -98, grip_l: -94, uarm_r: -70, farm_r: -82, grip_r: -86 };
 const STAND_LEGS = { thigh_l: 100, calf_l: 91, thigh_r: 80, calf_r: 89 };
 
@@ -156,18 +161,18 @@ const SLOTH_POSES = {
   },
   crunch: {
     view: 'side', pin: 'hip', dur: 2.2, floor: 60, relArms: true, label: 'Crunch',
-    a: { torso: 186, uarm: 145, farm: -15, thigh: -52, calf: 58 },
-    b: { torso: 214, uarm: 145, farm: -15, thigh: -52, calf: 58 },
+    a: { torso: 186, spine: 0, nod: 0, uarm: 145, farm: -15, thigh: -52, calf: 58 },
+    b: { torso: 206, spine: 40, nod: 12, uarm: 145, farm: -15, thigh: -52, calf: 58 },
   },
   superman: {
     view: 'side', pin: 'hip', dur: 3, floor: 58, grip: 'flat', label: 'Superman',
-    a: { torso: -2, uarm: -4, farm: -4, hand: -4, thigh: 180, calf: 180, fthigh: 182, fcalf: 182 },
-    b: { torso: -14, uarm: -22, farm: -22, hand: -22, thigh: 192, calf: 194, fthigh: 194, fcalf: 196 },
+    a: { torso: -2, spine: 0, nod: 0, uarm: -4, farm: -4, hand: -4, thigh: 180, calf: 180, fthigh: 182, fcalf: 182 },
+    b: { torso: -12, spine: -18, nod: -10, uarm: -22, farm: -22, hand: -22, thigh: 192, calf: 194, fthigh: 194, fcalf: 196 },
   },
   hollow: {
     view: 'side', pin: 'hip', dur: 3.2, floor: 60, label: 'Hollow Hold',
-    a: { torso: 196, uarm: 200, farm: 198, hand: 198, thigh: -16, calf: -14 },
-    b: { torso: 194, uarm: 198, farm: 196, hand: 196, thigh: -14, calf: -12 },
+    a: { torso: 196, spine: 16, nod: 10, uarm: 200, farm: 198, hand: 198, thigh: -16, calf: -14 },
+    b: { torso: 194, spine: 18, nod: 10, uarm: 198, farm: 196, hand: 196, thigh: -14, calf: -12 },
   },
   deadbug: {
     view: 'side', pin: 'hip', dur: 3, floor: 60, label: 'Dead Bug',
@@ -252,8 +257,8 @@ const SLOTH_POSES = {
   },
   catcow: {
     view: 'side', pin: 'knee', dur: 3.4, floor: 34, grip: 'flat', label: 'Katze-Kuh',
-    a: { torso: -10, uarm: 90, farm: 90, hand: 0, thigh: 90, calf: 178 },
-    b: { torso: 8, uarm: 90, farm: 90, hand: 0, thigh: 90, calf: 178 },
+    a: { torso: -6, spine: 28, nod: 22, uarm: 90, farm: 90, hand: 0, thigh: 90, calf: 178 },
+    b: { torso: 4, spine: -24, nod: -24, uarm: 90, farm: 90, hand: 0, thigh: 90, calf: 178 },
   },
   wgs: {
     view: 'side', pin: 'ankle', dur: 3.2, floor: 46, grip: 'flat', label: 'Grösste Dehnung der Welt',
@@ -285,8 +290,8 @@ const SLOTH_POSES = {
     // auf einer Box stehend, damit Kopf und Hände unter die Standfläche dürfen (echte Ausführung)
     view: 'side', pin: 'ankle', dur: 4, floor: 366, label: 'Jefferson Curl',
     props: [{ img: 'stepbox', at: [40, 42], a: [1006, 358], k: [1.1, 1.8], layer: 'back' }],
-    a: { torso: -96, uarm: 92, farm: 90, thigh: 86, calf: 92 },
-    b: { torso: 70, uarm: 92, farm: 90, thigh: 94, calf: 94 },
+    a: { torso: -96, spine: 0, nod: 0, uarm: 92, farm: 90, thigh: 86, calf: 92 },
+    b: { torso: 56, spine: 60, nod: 24, uarm: 92, farm: 90, thigh: 94, calf: 94 },
   },
   standwaage: {
     view: 'side', pin: 'fankle', dur: 3.6, floor: 46, label: 'Standwaage',
@@ -572,8 +577,8 @@ const SLOTH_POSES = {
   cablecrunch: {
     view: 'side', pin: 'knee', dur: 2.6, floor: 30, grip: 'fist', relArms: true, label: 'Crunch am Kabel',
     props: [cableTower(470), cableLine('top')],
-    a: { torso: -86, uarm: 170, farm: -10, thigh: 90, calf: 180, fthigh: 90, fcalf: 180 },
-    b: { torso: -10, uarm: 170, farm: -10, thigh: 110, calf: 180, fthigh: 110, fcalf: 180 },
+    a: { torso: -86, spine: 0, nod: 0, uarm: 170, farm: -10, thigh: 90, calf: 180, fthigh: 90, fcalf: 180 },
+    b: { torso: -18, spine: 44, nod: 14, uarm: 170, farm: -10, thigh: 110, calf: 180, fthigh: 110, fcalf: 180 },
   },
   pallof: {
     // Pallof Press (Vorderansicht): Kabelturm seitlich, beide Hände am Griff vor der Brust; die Arme strecken nach vorne
@@ -698,8 +703,8 @@ const SLOTH_POSES = {
   backext: {
     view: 'side', pin: 'hip', dur: 2.8, floor: 332, relArms: true, label: 'Rückenstrecker',
     props: [{ img: 'hyperext', at: [20, 40], a: [215, 668], k: 1.8, layer: 'back' }],
-    a: { torso: 34, uarm: 150, farm: -20, thigh: 128, calf: 128 },
-    b: { torso: -34, uarm: 150, farm: -20, thigh: 128, calf: 128 },
+    a: { torso: 34, spine: 22, nod: 10, uarm: 150, farm: -20, thigh: 128, calf: 128 },
+    b: { torso: -30, spine: -12, nod: -8, uarm: 150, farm: -20, thigh: 128, calf: 128 },
   },
   pullovermachine: {
     view: 'side', pin: 'hip', dur: 2.8, floor: 230, grip: 'fist', label: 'Pullover-Maschine',
@@ -753,6 +758,125 @@ const SLOTH_POSES = {
     view: 'side', pin: 'ankle', dur: 3.6, floor: 46, wall: { x: -170 }, label: 'Brustdehnung im Türrahmen',
     a: { torso: -94, uarm: 184, farm: -90, hand: -90, thigh: 80, calf: 96, fthigh: 110, fcalf: 120 },
     b: { torso: -82, uarm: 190, farm: -86, hand: -86, thigh: 64, calf: 104, fthigh: 118, fcalf: 124 },
+  },
+  // ---- Kettlebell (Oktober 2026): Kugel hängt an der Faust wie beim Goblet Squat ----
+  kbswing: {
+    view: 'side', pin: 'ankle', dur: 1.6, floor: 46, grip: 'fist', label: 'Kettlebell Swing', props: [KB('grip')],
+    a: { torso: -40, uarm: 118, farm: 118, hand: 118, thigh: 58, calf: 100 },
+    b: { torso: -96, uarm: 2, farm: 0, hand: 0, thigh: 86, calf: 92 },
+  },
+  kbclean: {
+    view: 'side', pin: 'ankle', dur: 1.8, floor: 46, grip: 'fist', label: 'Kettlebell Clean', props: [KB('grip')],
+    keys: [[0, 0], [0.45, 1], [0.6, 1], [1, 0]],
+    a: { torso: -40, uarm: 118, farm: 118, hand: 118, thigh: 58, calf: 100, fuarm: 100, ffarm: 96 },
+    b: { torso: -96, uarm: 72, farm: -78, hand: -60, thigh: 86, calf: 92, fuarm: 96, ffarm: 92 },
+  },
+  kbpress: {
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'Kettlebell Press', props: [KB('grip')],
+    a: { torso: -96, uarm: 72, farm: -78, hand: -60, thigh: 86, calf: 92, fuarm: 96, ffarm: 92 },
+    b: { torso: -96, uarm: -92, farm: -92, hand: -92, thigh: 86, calf: 92, fuarm: 96, ffarm: 92 },
+  },
+  kbsnatch: {
+    view: 'side', pin: 'ankle', dur: 2, floor: 46, grip: 'fist', label: 'Kettlebell Snatch', props: [KB('grip')],
+    keys: [[0, 0], [0.45, 1], [0.6, 1], [1, 0]],
+    a: { torso: -40, uarm: 118, farm: 118, hand: 118, thigh: 58, calf: 100, fuarm: 100, ffarm: 96 },
+    b: { torso: -96, uarm: -94, farm: -94, hand: -94, thigh: 86, calf: 92, fuarm: 96, ffarm: 92 },
+  },
+  kbslrdl: {
+    view: 'side', pin: 'fankle', dur: 3.6, floor: 46, grip: 'fist', label: 'Einbeiniges Kreuzheben', props: [KB('grip')],
+    a: { torso: -96, uarm: 94, farm: 92, hand: 92, thigh: 90, calf: 92, fthigh: 88, fcalf: 92, fuarm: 96, ffarm: 92 },
+    b: { torso: -10, uarm: 92, farm: 90, hand: 90, thigh: 172, calf: 174, fthigh: 94, fcalf: 94, fuarm: 70, ffarm: 70 },
+  },
+  kbrow: {
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Kettlebell Rudern', props: [KB('grip')],
+    a: { torso: -36, uarm: 92, farm: 90, thigh: 70, calf: 102, fuarm: 70, ffarm: 70 },
+    b: { torso: -36, uarm: 170, farm: 70, thigh: 70, calf: 102, fuarm: 70, ffarm: 70 },
+  },
+  kbcarry: {
+    view: 'side', pin: 'hip', dur: 1.2, floor: 330, grip: 'fist', label: 'Farmer Carry', props: [KB('fgrip', 'mid'), KB('grip')],
+    a: { torso: -94, uarm: 92, farm: 90, fuarm: 92, ffarm: 90, thigh: 72, calf: 96, fthigh: 108, fcalf: 116 },
+    b: { torso: -94, uarm: 92, farm: 90, fuarm: 92, ffarm: 90, thigh: 108, calf: 116, fthigh: 72, fcalf: 96 },
+  },
+  kbracklunge: {
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'Ausfallschritt Front Rack', props: [KB('fgrip', 'mid'), KB('grip')],
+    a: { torso: -96, uarm: 72, farm: -78, hand: -60, thigh: 72, calf: 100, fthigh: 112, fcalf: 140 },
+    b: { torso: -94, uarm: 72, farm: -78, hand: -60, thigh: 8, calf: 96, fthigh: 98, fcalf: 172 },
+  },
+  // ---- TRX: Gurte als dunkle Bänder vom Aufhängepunkt (oberhalb des Bildes) zu Händen oder Füssen ----
+  trxrow: {
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'TRX Rudern', props: TRX([430, -960]),
+    a: { torso: -128, uarm: -46, farm: -46, hand: -46, thigh: 52, calf: 52 },
+    b: { torso: -112, uarm: 128, farm: -38, hand: -38, thigh: 68, calf: 68 },
+  },
+  trxyraise: {
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'TRX Y-Raise', props: TRX([430, -960]),
+    a: { torso: -128, uarm: -46, farm: -46, hand: -46, thigh: 52, calf: 52 },
+    b: { torso: -110, uarm: -104, farm: -104, hand: -104, thigh: 70, calf: 70 },
+  },
+  trxfacepull: {
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'TRX Face Pull', props: TRX([430, -960]),
+    a: { torso: -128, uarm: -46, farm: -46, hand: -46, thigh: 52, calf: 52 },
+    b: { torso: -112, uarm: -176, len_uarm: 0.55, farm: -34, hand: -34, thigh: 68, calf: 68 },
+  },
+  trxcurl: {
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'TRX Bizepscurl', props: TRX([430, -960]),
+    a: { torso: -128, uarm: -46, farm: -46, hand: -46, thigh: 52, calf: 52 },
+    b: { torso: -116, uarm: -50, farm: -160, hand: -160, thigh: 64, calf: 64 },
+  },
+  trxchestpress: {
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'TRX Brustpresse', props: TRX([-420, -960]),
+    a: { torso: -64, uarm: 24, farm: 24, hand: 24, thigh: 116, calf: 116 },
+    b: { torso: -52, uarm: 150, farm: 30, hand: 30, thigh: 128, calf: 128 },
+  },
+  trxtriceps: {
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'TRX Trizepsstrecken', props: TRX([-420, -960]),
+    // Oberarm schräg über dem Kopf (bleibt fast still), Ellbogen beugt ~130°: Hände zur Stirn; Körper neigt sich nur leicht mit
+    a: { torso: -60, uarm: -44, farm: -44, hand: -44, thigh: 120, calf: 120 },
+    b: { torso: -54, uarm: -40, farm: 92, hand: 92, thigh: 126, calf: 126 },
+  },
+  trxfallout: {
+    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'TRX Fallout', props: TRX([-420, -960]),
+    a: { torso: -76, uarm: 36, farm: 36, hand: 36, thigh: 104, calf: 104 },
+    b: { torso: -42, uarm: -46, farm: -46, hand: -46, thigh: 138, calf: 138 },
+  },
+  trxpistol: {
+    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'TRX Pistol Squat', props: TRX([430, -960]),
+    a: { torso: -96, uarm: -34, farm: -34, hand: -34, thigh: 86, calf: 92, fthigh: 4, fcalf: 4 },
+    b: { torso: -62, uarm: -22, farm: -22, hand: -22, thigh: 8, calf: 112, fthigh: -14, fcalf: -14 },
+  },
+  trxpushup: {
+    view: 'side', pin: 'wrist', dur: 2.6, floor: 34, solve: { toe: 190 }, grip: 'flat', label: 'TRX Liegestütz', props: TRX([-560, -620], 'ankle'),
+    a: { uarm: 92, farm: 90, hand: 0 },
+    b: { uarm: 146, farm: 52, hand: 0 },
+  },
+  trxpike: {
+    view: 'side', pin: 'wrist', dur: 2.8, floor: 34, grip: 'flat', label: 'TRX Pike', props: TRX([-560, -620], 'ankle'),
+    a: { torso: -6, uarm: 92, farm: 90, hand: 0, thigh: 174, calf: 174 },
+    b: { torso: 44, uarm: 112, farm: 112, hand: 0, thigh: 140, calf: 140 },
+  },
+  trxtuck: {
+    view: 'side', pin: 'wrist', dur: 2.2, floor: 34, grip: 'flat', label: 'TRX Knee Tuck', props: TRX([-560, -620], 'ankle'),
+    a: { torso: -6, uarm: 92, farm: 90, hand: 0, thigh: 174, calf: 174 },
+    b: { torso: 6, uarm: 92, farm: 90, hand: 0, thigh: 58, calf: 170 },
+  },
+  trxhamcurl: {
+    // Schultern am Boden (fester Punkt), Fersen oben in den Gurten, Hüfte gehoben
+    view: 'side', pin: 'shoulder', dur: 2.8, floor: 40, grip: 'flat', label: 'TRX Hamstring Curl',
+    props: TRX([520, -560], 'ankle'),
+    a: { torso: 170, uarm: 4, farm: 2, hand: 0, thigh: -14, calf: -12 },
+    b: { torso: 160, uarm: 4, farm: 2, hand: 0, thigh: -62, calf: 62 },
+  },
+  // ---- Weitere ----
+  dipleg: {
+    view: 'side', pin: 'grip', dur: 2.6, floor: 330, grip: 'fist', label: 'Dipstütz Leg Raise',
+    props: [{ img: 'dipstation', at: [0, 10], a: [540, 637], k: 1.63, layer: 'back' }],
+    a: { torso: -92, uarm: 94, farm: 90, hand: 0, thigh: 96, calf: 150, fthigh: 98, fcalf: 152 },
+    b: { torso: -100, uarm: 94, farm: 90, hand: 0, thigh: -4, calf: -2, fthigh: -2, fcalf: 0 },
+  },
+  shouldercircle: {
+    view: 'front', pin: 'feet', dur: 3, floor: 26, label: 'Schulterkreisen',
+    a: { torso: -90, head: -90, uarm_l: 130, farm_l: 120, uarm_r: 50, farm_r: 60, ...STAND_LEGS, tail: 0 },
+    b: { torso: -90, head: -90, uarm_l: 240, farm_l: 250, uarm_r: -60, farm_r: -70, ...STAND_LEGS, tail: 0 },
   },
   hang: {
     view: 'back', pin: 'hands', dur: 3.6, bar: true, label: 'Faultier hängt an der Stange',
@@ -854,7 +978,7 @@ const SLOTH_MIN_H = 780;
 function slothRigBuild(pose, v2 = false) {
   const view = pose.view;
   const sit = v2 && view === 'front' && pose.legsFront;
-  const meshOn = v2 && view === 'side' && slothMeshOK && !!(SLOTH_V2.mesh && SLOTH_V2.mesh.side); // sitzend von vorne: eigene Zeichnung (Oberschenkel zum Betrachter)
+  const meshOn = v2 && slothMeshOK && !!SLOTH_V2.mesh; // sitzend von vorne: eigene Zeichnung (Oberschenkel zum Betrachter)
   // v2: Rückansicht mit erhobenen Armen nutzt die Hänge-Zeichnung (keine verbogene Schulter)
   const armsUp = view === 'back' && ((pose.a.uarm_l ?? 90) < 0 || (pose.a.uarm_r ?? 90) < 0);
   const vk = v2 ? (armsUp ? 'hang' : sit ? 'sit' : view) : view;
@@ -884,33 +1008,45 @@ function slothRigBuild(pose, v2 = false) {
     const JJ = alt ? SLOTH_V2.joints[alt] : oldTail ? SLOTH_JOINTS[view] : J;
     if (!JJ[name]) return { skip: true, P, r: 0, p: [0, 0], k: 1, map: () => P, end: P };
     const [p, d, k0 = 1] = JJ[name], [q0, q1] = JJ[name], r = deg - Math.atan2(q1[1] - q0[1], q1[0] - q0[0]) * 180 / Math.PI;
-    const k = k0 * km * (v2 && !oldTail ? KV : (SLOTH_SCALE[view][name] ?? 1));
+    // km und k0 (Gelenkdaten): Massstab, oder [entlang, quer] zum Knochen (nur neue Figur: kürzen, ohne das Glied dünner
+    // zu machen; Arme aus einer anderen Zeichnung auf Länge und Dicke der Ansicht bringen)
+    const kb = v2 && !oldTail ? KV : (SLOTH_SCALE[view][name] ?? 1), [ka, kq] = Array.isArray(k0) ? k0 : [k0, k0], [ma, mq] = Array.isArray(km) ? km : [km, km];
+    const k = v2 && (ka !== kq || ma !== mq) ? [kb * ka * ma, kb * kq * mq] : kb * ka * ma;
     // sitzend von vorne verschwindet der Schwanz unter dem Gesäss
     let im = oldTail ? (vk !== 'sit' && SLOTH_PARTS[view + '_tail'] ? view + '_tail' : null) : img2(img || view + '_' + name);
-    if (alt && im) im = SLOTH_V2.parts[im.replace('v2' + vk + '_', 'v2' + alt + '_')] ? im.replace('v2' + vk + '_', 'v2' + alt + '_') : im;
+    if (alt && im && SLOTH_V2.parts['v2' + alt + '_' + name]) im = 'v2' + alt + '_' + name; // Teil aus der anderen Zeichnung
     // ba (neue Figur): Winkel des Knochens im Bild. Ungleiches Strecken (len_/near_, Spiegeln) wirkt dann entlang
     // des Knochens statt entlang der Bild-x-Achse (die Zeichnungen haben schräge Glieder)
     const ba = v2 ? Math.atan2(q1[1] - q0[1], q1[0] - q0[0]) * 180 / Math.PI : undefined;
-    return { img: im, skip: !im || undefined, P, r, p, k, ba, map: (q) => add(P, mul(rot(sub(q, p), r), k)), end: add(P, mul(rot(sub(d, p), r), k)) };
+    const kv = (v) => (Array.isArray(k) ? rot((([x, y]) => [x * k[0], y * k[1]])(rot(v, -ba)), ba) : mul(v, k)); // Streckung im Bild
+    return { img: im, skip: !im || undefined, P, r, p, k, ba, map: (q) => add(P, rot(kv(sub(q, p)), r)), end: add(P, rot(kv(sub(d, p)), r)) };
   };
   const ball = (img, P) => { const im = img2(img), b = slothPartBox(im); if (!b) return { skip: true, P, end: P };
     return { img: im, P, r: 0, p: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], k: SLOTH_SCALE[view].ball ?? 1 }; };
 
+  // Knochen eines Meshes aus einem gestellten Teil (d: Versatz, z. B. hintere Seite)
+  const bm = (e, d = [0, 0]) => ({ P: add(e.P, d), r: e.r, p: e.p, k: e.k, ba: e.ba });
+
   function side(s) {
     const q = {}, hk = pose.grip || 'hand', D = pose.depth || [-14, -8];
-    const t = q.torso = place('torso', [0, 0], s.torso, 'side_body');
-    q.head = place('face', t.map(A.face), s.torso + (s.nod || 0), 'side_face_neutral');
+    // spine (neue Figur): Rücken rundet sich um den Lendenwirbel (A.waist), + = Brustkorb nach vorne (Crunch).
+    // Becken und Brustkorb kippen je um die Hälfte, die Richtung Hüfte -> Schulter (s.torso) bleibt etwa gleich.
+    const sp = v2 && A.waist ? s.spine || 0 : 0, pelA = s.torso - sp / 2, chA = s.torso + sp / 2;
+    const t = q.torso = place('torso', [0, 0], s.torso, 'side_body'); // Bildteil (Rückfall): ganzer Rumpf
+    const pel = sp ? place('torso', [0, 0], pelA, 'side_body') : t;
+    const chest = sp ? (() => { const c0 = place('torso', [0, 0], chA, 'side_body'); return place('torso', sub(pel.map(A.waist), c0.map(A.waist)), chA, 'side_body'); })() : t;
+    q.head = place('face', chest.map(A.face), chA + (s.nod || 0), 'side_face_neutral');
     // Schwanz-Winkel relativ zum Rumpf wie in der bisherigen Zeichnung
     const oa = (n) => { const [p, d] = SLOTH_JOINTS.side[n]; return Math.atan2(d[1] - p[1], d[0] - p[0]) * 180 / Math.PI; };
-    q.tail = place('tail', t.map(A.tail), s.torso + oa('tail') - oa('torso') + (s.tail || 0));
+    q.tail = place('tail', pel.map(A.tail), pelA + oa('tail') - oa('torso') + (s.tail || 0));
     // v2: das hintere Bein liegt in der Zeichnung genau hinter dem vorderen. Bewegen sich beide Beine gleich,
     // zeigt eine versetzte zweite Kopie nur doppelte Umrisse -> dann hinteres Bein weglassen.
     const sameLegs = v2 && !pose.farFoot && ![pose.a, pose.b].some((k) => ['fthigh', 'fcalf', 'ffoot', 'legBend', 'kneeThigh', 'kneeCalf'].some((n) => k[n] != null));
     for (const far of [false, true]) {
       const x = far ? '_far' : '', raw = (k) => (far ? s['f' + k] ?? s[k] : s[k]);
       // relArms: Armwinkel relativ zum Rumpf (Arme drehen beim Aufrichten mit)
-      const v = (k) => (raw(k) != null && ((pose.relArms && /arm|hand/.test(k)) || (pose.relLegs && /thigh|calf/.test(k))) ? raw(k) + s.torso : raw(k));
-      const sh = add(t.map(A.shoulder), far ? D : [0, 0]), hip = add(t.map(A.hip), far ? D : [0, 0]);
+      const v = (k) => (raw(k) == null ? raw(k) : pose.relArms && /arm|hand/.test(k) ? raw(k) + chA : pose.relLegs && /thigh|calf/.test(k) ? raw(k) + pelA : raw(k));
+      const sh = add(chest.map(A.shoulder), far ? D : [0, 0]), hip = add(pel.map(A.hip), far ? D : [0, 0]);
       // len_/near_: Arm zeigt zum Betrachter bzw. von ihm weg (verkürzt, näher = grösser); hinten: flen_/fnear_
       const fore = (e, k) => { const L = raw('len_' + k) ?? 1, N = raw('near_' + k) ?? 1; if (L === 1 && N === 1) return e;
         const kk = Array.isArray(e.k) ? e.k : [e.k, e.k], d = sub(e.end, e.P);
@@ -924,7 +1060,7 @@ function slothRigBuild(pose, v2 = false) {
         // Offene Hand: Unterarm und Krallenhand aus der Vorlage sind zusammen gut
         // doppelt so lang wie der Oberarm; auf menschliche Proportionen kürzen.
         const open = hk === 'hand';
-        q['farm' + x] = place('farm', q['uarm' + x].end, v('farm'), 'side_farm' + x, open ? 0.82 : 1);
+        q['farm' + x] = place('farm', q['uarm' + x].end, v('farm'), 'side_farm' + x, open ? [0.82, 1] : 1);
         q['hand' + x] = place(hk, q['farm' + x].end, v('hand') ?? v('farm'), 'side_' + hk + x, open ? 0.66 : 1);
       }
       q['thigh' + x] = place('thigh', hip, v('thigh'), 'side_thigh' + x);
@@ -958,7 +1094,7 @@ function slothRigBuild(pose, v2 = false) {
       const th = q['thigh' + x];
       if (!th || th.skip) continue;
       const [b0, b1] = J.thigh, deg = th.r + Math.atan2(b1[1] - b0[1], b1[0] - b0[0]) * 180 / Math.PI;
-      const f = ((s.torso + 180 - deg) % 360 + 540) % 360 - 180, F = J.flex;
+      const f = ((pelA + 180 - deg) % 360 + 540) % 360 - 180, F = J.flex;
       const ks = Object.keys(F).sort((m, n) => F[m] - F[n]);
       // weicher Übergang (±6°) in der Mitte zwischen zwei Zeichnungen; die untere wird erst ausgeblendet,
       // wenn die obere ganz deckt (kein Durchscheinen nach hinten)
@@ -991,20 +1127,29 @@ function slothRigBuild(pose, v2 = false) {
         q['foot' + x] = place('foot', q['calf' + x].end, fDeg, 'side_foot' + x);
       }
     }
+    for (const k of pose.mirror || []) q[k].k = [q[k].k, -q[k].k]; // Teil an der Knochenachse spiegeln (vor den Meshes, die es übernehmen)
     // Mesh: Bein (Gesäss bis Fuss) als EIN Bild, weich verformt durch Rumpf, Oberschenkel, Unterschenkel und Fuss.
-    // Die einzelnen Teile bleiben als Rückfall, bis das Gitter gezeichnet ist (dann ausgeblendet).
+    // Die einzelnen Teile (samt gebeugten Zeichnungen) bleiben als Rückfall, bis das Gitter gezeichnet ist (dann ausgeblendet).
     if (meshOn) for (const x of ['', '_far']) {
       const th = q['thigh' + x], ca = q['calf' + x];
       if (!th || th.skip || !ca || ca.skip) continue;
-      for (const k of Object.keys(q)) if (/^(thigh|calf)[ABC]/.test(k) && k.endsWith(x) && (x || !k.endsWith('_far'))) delete q[k];
-      const fo = q['foot' + x] && !q['foot' + x].skip ? q['foot' + x] : ca, tor = q.torso;
-      const bm = (e, d = [0, 0]) => ({ P: add(e.P, d), r: e.r, p: e.p, k: e.k });
-      q['legmesh' + x] = { mesh: true, far: !!x, bones: [bm(tor, x ? D : [0, 0]), bm(th), bm(ca), bm(fo)] };
+      const fo = q['foot' + x] && !q['foot' + x].skip ? q['foot' + x] : ca, tor = pel;
+      q['legmesh' + x] = { mesh: true, src: 'side', far: !!x, bones: [bm(tor, x ? D : [0, 0]), bm(th), bm(ca), bm(fo)] };
     }
-    for (const k of pose.mirror || []) q[k].k = [q[k].k, -q[k].k]; // Teil an der Knochenachse spiegeln
+    // Mesh: Arm (Schulter bis Krallen) als EIN Bild an Oberarm, Unterarm und Hand. Faust: die Hand folgt dem Unterarm.
+    if (meshOn && SLOTH_V2.mesh.sidearm) for (const x of ['', '_far']) {
+      const ua = q['uarm' + x], fa = q['farm' + x], ha = q['hand' + x] && !q['hand' + x].skip ? q['hand' + x] : fa;
+      if (!ua || ua.skip || !fa || fa.skip) continue;
+      q['armmesh' + x] = { mesh: true, src: 'sidearm', far: !!x, bones: [bm(ua), bm(fa), bm(ha)] };
+    }
+    // Mesh: Rumpf und Kopf als EIN Bild an Becken, Brustkorb und Kopf (Kopf nickt um den Hals, im Rumpf-Bild verankert)
+    if (meshOn && SLOTH_V2.mesh.sidetorso) {
+      const head = { P: chest.map(A.face), r: chest.r + (s.nod || 0), p: A.face, k: chest.k, ba: chest.ba };
+      q.torsomesh = { mesh: true, src: 'sidetorso', far: false, bones: [bm(pel), bm(chest), bm(head)] };
+    }
     return { q, pts: { wrist: q.farm.end, ankle: q.calf.end, grip: q.hand.end, knee: q.thigh.end, elbow: q.uarm.end,
       fwrist: q.farm_far.end, fankle: q.calf_far.end, fknee: q.thigh_far.end, fgrip: q.hand_far.end,
-      shoulder: t.map(A.shoulder), hip: t.map(A.hip) } };
+      shoulder: chest.map(A.shoulder), hip: pel.map(A.hip) } };
   }
 
   function frontBack(s) {
@@ -1017,7 +1162,10 @@ function slothRigBuild(pose, v2 = false) {
     // near_<teil>: Glied kommt zum Betrachter -> insgesamt etwas grösser (Perspektive)
     // v2: len_farm ~0 war nur ein Behelf der alten Greifhand (brachte Unterarm mit); die neue hat einen echten Unterarm
     const shorten = (e, key) => { const L0 = s['len_' + key] ?? 1, L = v2 && L0 > 0 && L0 < 0.05 && /^farm_/.test(key) ? 1 : L0, N = s['near_' + key] ?? 1; if (L === 1 && N === 1) return e;
-      const d = sub(e.end, e.P); return { ...e, k: [e.k * L * N, e.k * N], end: add(e.P, mul(d, L * N)) }; };
+      const d = sub(e.end, e.P), [kx, ky] = Array.isArray(e.k) ? e.k : [e.k, e.k]; return { ...e, k: [kx * L * N, ky * N], end: add(e.P, mul(d, L * N)) }; };
+    // Arme, deren Unterarm in der Übung irgendwann über die Waagrechte geht (vorne, neue Figur, ohne Zweihand-Griff)
+    const upArms = {};
+    if (v2 && vk === 'front' && !pose.join && SLOTH_V2.joints.up) for (const x of ['l', 'r']) upArms[x] = [pose.a, pose.b].some((k) => -Math.sin(((k['farm_' + x] ?? 90) + (pose.relArms ? (k.torso ?? -90) + 90 : 0)) * Math.PI / 180) > 0.17);
     for (const x of ['l', 'r']) {
       const sh = A['sh_' + x];
       // armLift hob bei der alten Figur das Schultergelenk an (hängende Arme); die neue hat echte Schultern
@@ -1028,6 +1176,16 @@ function slothRigBuild(pose, v2 = false) {
       if (J['grip_' + x]) {
         const gk = s['grip_' + x] != null ? 'grip_' + x : 'farm_' + x; // ohne eigenen Winkel: Hand in Verlängerung des Unterarms
         q['grip_' + x] = shorten(place('grip_' + x, q['farm_' + x].end, arm(gk), undefined, 1, alt), s['len_grip_' + x] != null ? 'grip_' + x : 'farm_' + x);
+      }
+      // vorne, Unterarm über der Waagrechten: weich zur Zeichnung mit erhobenen Armen überblenden (uarmU/farmU) –
+      // Handflächen zueinander, Daumen nach hinten wie beim echten Arm (die hängende Zeichnung gedreht hätte ihn vorne).
+      // Die normale Zeichnung bleibt ganz sichtbar, bis die erhobene ganz deckt (kein Durchscheinen).
+      if (upArms[x]) {
+        const au = holds ? 'upfist' : 'up', uu = shorten(place('uarm_' + x, q['uarm_' + x].P, arm('uarm_' + x), undefined, 1, au), 'uarm_' + x);
+        const fu = shorten(place('farm_' + x, uu.end, arm('farm_' + x), undefined, 1, au), 'farm_' + x);
+        const e = -Math.sin(arm('farm_' + x) * Math.PI / 180), m = Math.min(1, Math.max(0, (e - 0.17) / 0.17)), o = m * m * (3 - 2 * m);
+        q['uarmU_' + x] = { ...uu, o }; q['farmU_' + x] = { ...fu, o };
+        q['uarm_' + x].o = q['farm_' + x].o = o >= 1 ? 0 : 1;
       }
       q['thigh_' + x] = shorten(place('thigh_' + x, t.map(A['hip_' + x]), leg('thigh_' + x)), 'thigh_' + x);
       q['calf_' + x] = shorten(place('calf_' + x, q['thigh_' + x].end, leg('calf_' + x)), 'calf_' + x);
@@ -1047,6 +1205,18 @@ function slothRigBuild(pose, v2 = false) {
     }
     // mirror: Teile an ihrer Knochenachse spiegeln (z. B. Hand beim Winken mit Krallen nach innen)
     for (const k of pose.mirror || []) { const kk = Array.isArray(q[k].k) ? q[k].k[0] : q[k].k; q[k].k = [kk, -kk]; }
+    // Meshes: Arm (Oberarm + Unterarm, vorne mit Hand) und Bein (Oberschenkel + Unterschenkel mit Fuss) je Seite, aus der
+    // Zeichnung, aus der auch die Teile stammen (Hänge-Ansicht mit hängendem Arm: Arm aus der Rückansicht, Faust vorne)
+    if (meshOn) for (const x of ['l', 'r']) {
+      const from = (e) => (e && !e.skip && e.img ? /^v2([a-z]+)_/.exec(e.img)[1] : null);
+      const ua = q['uarm_' + x], fa = q['farm_' + x], th = q['thigh_' + x], ca = q['calf_' + x];
+      const av = from(fa), am = av && `${av}_${/farmfist/.test(fa.img) ? 'armfistmesh' : 'armmesh'}_${x}`;
+      if (am && from(ua) === av && SLOTH_V2.mesh[am]) q['armmesh_' + x] = { mesh: true, src: am, far: false, o: fa.o, bones: [bm(ua), bm(fa)] };
+      const uu = q['uarmU_' + x], fu = q['farmU_' + x], um = fu && `${from(fu)}_armmesh_${x}`;
+      if (um && SLOTH_V2.mesh[um]) q['armmeshU_' + x] = { mesh: true, src: um, far: false, o: fu.o, bones: [bm(uu), bm(fu)] };
+      const lv = from(th), lm = lv && `${lv}_legmesh_${x}`;
+      if (lm && from(ca) === lv && SLOTH_V2.mesh[lm]) q['legmesh_' + x] = { mesh: true, src: lm, far: false, bones: [bm(th), bm(ca)] };
+    }
     const hand = (x) => (q['grip_' + x] || q['farm_' + x]).end;
     return { q, pts: {
       hand_l: hand('l'), hand_r: hand('r'), foot_l: q.calf_l.end, foot_r: q.calf_r.end, elbow_l: q.uarm_l.end, elbow_r: q.uarm_r.end,
@@ -1085,7 +1255,7 @@ function slothRigBuild(pose, v2 = false) {
     const { q, pts } = pose1(pose.solve ? solve(s) : pose.lean ? lean(s) : s);
     // dx/dy: ganze Figur verschieben (Hüpfen, Fersen heben)
     const pin = sub(pts[pose.pin], [s.dx || 0, s.dy || 0]);
-    for (const k in q) q[k] = q[k].skip ? { skip: true } : q[k].mesh ? { mesh: true, far: q[k].far, bones: q[k].bones.map((m) => ({ ...m, P: sub(m.P, pin) })) }
+    for (const k in q) q[k] = q[k].skip ? { skip: true } : q[k].mesh ? { mesh: true, src: q[k].src, far: q[k].far, o: q[k].o, bones: q[k].bones.map((m) => ({ ...m, P: sub(m.P, pin) })) }
       : { img: q[k].img, P: sub(q[k].P, pin), r: q[k].r, p: q[k].p, k: q[k].k, o: q[k].o, ba: q[k].ba };
     const pathPt = slothPathPoint(pose);
     if (pathPt && pts[pathPt]) Object.defineProperty(q, 'path', { value: sub(pts[pathPt], pin), enumerable: false });
@@ -1133,50 +1303,90 @@ const slothKeys = (name, pose) => pose.keys || (SLOTH_CALM.has(name) || SLOTH_NO
   : SLOTH_ECC_AB.has(name) ? SLOTH_KEYS_ECC : SLOTH_KEYS_CON);
 
 const slothRigCache = {};
-/* Mesh-Bein (neue Figur, Seitenansicht): ein Bild (Gesäss bis Fuss) auf einem Dreiecksgitter, jeder
-   Gitterpunkt gewichtet an Rumpf, Oberschenkel, Unterschenkel und Fuss gebunden (tools/sloth-rig/build_v2.py).
-   Pro Stellung werden die Punkte vorberechnet; gezeichnet wird live mit WebGL (siehe slothMeshTick). */
-function slothMeshPoints(bones) {
-  // Mischung der Knochen-Bewegungen als „dual quaternions“ (2D): Drehung und Verschiebung werden gemeinsam gemischt
-  // statt der fertigen Positionen – so behält das Bein an Hüfte und Knie seine Dicke (kein Einschnüren).
-  // Knochen: 0 Rumpf, 1 Oberschenkel, 2 Unterschenkel, 3 Fuss.
-  const M = SLOTH_V2.mesh.side, n = M.V.length / 2, out = new Float32Array(n * 3), Z = [0.6, -0.6, -0.3, -0.2];
-  const [hx, hy] = M.J[0]; // Bezugspunkt Hüfte (Blatt-Pixel)
+/* Meshes (neue Figur, Seitenansicht): Bein (Gesäss bis Fuss) und Arm (Schulter bis Krallen) je als EIN Bild auf
+   einem Dreiecksgitter; jeder Gitterpunkt hängt gewichtet an einer Knochenkette (tools/sloth-rig/build_v2.py).
+   Pro Stellung werden die Punkte vorberechnet; gezeichnet wird live mit WebGL (siehe slothMeshTick).
+   SLOTH_MESH_HIDE: Mesh-Teil der Figur -> Bildteile, die es ersetzt (bleiben als Rückfall, bis das Gitter gezeichnet ist).
+   Seitenansicht: Bein, Arm (je vorne und hinten), Rumpf mit Kopf; vorne/hinten: Arm und Bein je links/rechts. */
+const SLOTH_MESH_HIDE = (() => {
+  const o = { torsomesh: ['torso', 'head'] };
+  const side = { legmesh: ['thigh', 'calf', 'foot', 'knee', 'thighA', 'thighB', 'thighC', 'calfA', 'calfB', 'calfC'], armmesh: ['uarm', 'farm', 'hand', 'elbow'] };
+  for (const [k, ps] of Object.entries(side)) { o[k] = ps; o[k + '_far'] = ps.map((n) => n + '_far'); }
+  for (const x of ['l', 'r']) {
+    o['armmesh_' + x] = ['uarm_', 'farm_', 'elbow_'].map((n) => n + x); o['legmesh_' + x] = ['thigh_', 'calf_'].map((n) => n + x);
+    o['armmeshU_' + x] = ['uarmU_', 'farmU_'].map((n) => n + x);
+  }
+  return o;
+})();
+// Gitter aus der kompakten Form (build_v2.py, mesh_grid): Punkte zeilenweise, je Zelle zwei Dreiecke, Gewichte in Prozent
+function slothMeshDecode(M) {
+  if (M.V) return M;
+  const [x0, y0, st, nx, ny, rle] = M.grid, idx = new Int32Array(nx * ny).fill(-1), V = [], T = [];
+  let p = 0, on = false;
+  for (const n of rle) { if (on) for (let k = p; k < p + n; k++) { idx[k] = V.length / 2; V.push(x0 + (k % nx) * st, y0 + Math.floor(k / nx) * st); } p += n; on = !on; }
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    const a = idx[j * nx + i], b = idx[j * nx + i + 1], c = idx[(j + 1) * nx + i], d = idx[(j + 1) * nx + i + 1];
+    if (a >= 0 && b >= 0 && c >= 0) T.push(a, b, c);
+    if (b >= 0 && d >= 0 && c >= 0) T.push(b, d, c);
+  }
+  M.V = V; M.T = T; M.W = M.W.map((w) => w / 100);
+  return M;
+}
+function slothMeshPoints(M, bones) {
+  // Skinning wie in Spiele-Engines: Streckung (Massstab, len_/near_) wird im Ruhezustand linear gemischt, Drehung und
+  // Verschiebung als „dual quaternions“ (2D) – so behält das Glied an den Gelenken seine Dicke (kein Gummi-Effekt).
+  // Knochen b bildet Blatt-Punkt v ab auf  P + R(r)·L·(v − j)  (j = sein Gelenk im Blatt, L = Streckung entlang des
+  // Knochens). Für die Mischung zerlegt in Streckung um einen Drehpunkt c und einen starren Teil; c ist das Gelenk
+  // zwischen den beiden gemischten Knochen – dort treffen sich die starren Teile immer, die Mischung bleibt ohne Beule.
+  const n = M.V.length / 2, nb = M.f.length, out = new Float32Array(n * 3);
   const B = bones.map((m, b) => {
-    const [kx, ky] = Array.isArray(m.k) ? m.k : [m.k, m.k], a = m.r * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
-    const dx = (hx * M.f[b] - m.p[0]) * kx, dy = (hy * M.f[b] - m.p[1]) * ky;
-    const tx = m.P[0] + dx * c - dy * s, ty = m.P[1] + dx * s + dy * c; // Bild der Hüfte unter diesem Knochen
-    const rr = Math.cos(a / 2), ri = Math.sin(a / 2);
-    return { rr, ri, dr: (tx * rr + ty * ri) / 2, di: (ty * rr - tx * ri) / 2, sc: (kx + ky) / 2 * M.f[b] }; // d = t·conj(r)/2
+    const [kx, ky] = Array.isArray(m.k) ? m.k : [m.k, m.k], f = M.f[b], a = m.r * Math.PI / 180, ba = (m.ba || 0) * Math.PI / 180;
+    const cb = Math.cos(ba), sb = Math.sin(ba), X = kx * f, Y = ky * f;
+    // L = R(ba)·diag(X, Y)·R(−ba)
+    const L = [X * cb * cb + Y * sb * sb, (X - Y) * cb * sb, (X - Y) * cb * sb, X * sb * sb + Y * cb * cb];
+    return { L, P: m.P, jx: m.p[0] / f, jy: m.p[1] / f, c: Math.cos(a), s: Math.sin(a), rr: Math.cos(a / 2), ri: Math.sin(a / 2) };
   });
+  // starrer Teil von Knochen q zum Drehpunkt (cx, cy) als Dual Quaternion: y -> R·y + t,  t = P − R·c + R·L·(c − j)
+  const dq = (q, cx, cy) => {
+    const ux = cx - q.jx, uy = cy - q.jy, lx = q.L[0] * ux + q.L[1] * uy - cx, ly = q.L[2] * ux + q.L[3] * uy - cy;
+    const tx = q.P[0] + lx * q.c - ly * q.s, ty = q.P[1] + lx * q.s + ly * q.c;
+    return [(tx * q.rr + ty * q.ri) / 2, (ty * q.rr - tx * q.ri) / 2]; // d = t·conj(r)/2
+  };
   for (let i = 0; i < n; i++) {
-    let rr = 0, ri = 0, dr = 0, di = 0, sc = 0, z = 0;
-    for (let b = 0; b < 4; b++) {
-      let w = M.W[4 * i + b];
+    const vx = M.V[2 * i], vy = M.V[2 * i + 1];
+    // Drehpunkt: Gelenk des höheren der (höchstens zwei, benachbarten) gemischten Knochen
+    let hi = 0;
+    for (let b = 0; b < nb; b++) if (M.W[nb * i + b]) hi = b;
+    const cx = B[hi].jx, cy = B[hi].jy, ux = vx - cx, uy = vy - cy;
+    let rr = 0, ri = 0, dr = 0, di = 0, z = 0, yx = cx, yy = cy, piv = -1;
+    for (let b = 0; b < nb; b++) {
+      let w = M.W[nb * i + b];
       if (!w) continue;
-      const q = B[b];
-      sc += w * q.sc; z += w * Z[b];
-      if (q.rr * B[0].rr + q.ri * B[0].ri < 0) w = -w; // gleiche Hemisphäre
-      rr += w * q.rr; ri += w * q.ri; dr += w * q.dr; di += w * q.di;
+      const q = B[b], [qdr, qdi] = dq(q, cx, cy);
+      yx += w * (q.L[0] * ux + q.L[1] * uy); yy += w * (q.L[2] * ux + q.L[3] * uy); z += w * M.Z[b]; // y = c + Σ w·L·(v − c)
+      if (piv < 0) piv = b; else if (q.rr * B[piv].rr + q.ri * B[piv].ri < 0) w = -w; // gleiche Hemisphäre
+      rr += w * q.rr; ri += w * q.ri; dr += w * qdr; di += w * qdi;
     }
-    const L = Math.hypot(rr, ri); rr /= L; ri /= L; dr /= L; di /= L;
+    const Ln = Math.hypot(rr, ri); rr /= Ln; ri /= Ln; dr /= Ln; di /= Ln;
     const tx = 2 * (dr * rr - di * ri), ty = 2 * (dr * ri + di * rr); // t = 2·d·r
-    const c = rr * rr - ri * ri, s = 2 * rr * ri, vx = (M.V[2 * i] - hx) * sc, vy = (M.V[2 * i + 1] - hy) * sc;
-    out[3 * i] = tx + vx * c - vy * s; out[3 * i + 1] = ty + vx * s + vy * c; out[3 * i + 2] = z;
+    const c = rr * rr - ri * ri, s = 2 * rr * ri;
+    out[3 * i] = tx + yx * c - yy * s; out[3 * i + 1] = ty + yx * s + yy * c; out[3 * i + 2] = z;
   }
   return out;
 }
-// Pro Figur ein kleines <canvas> im SVG (foreignObject). Ein gemeinsamer WebGL-Kontext zeichnet in jedem
-// Bildschirmbild das Bein genau zur Phase der CSS-Animation des Rumpfs (zwischen zwei Stellungen interpoliert)
+// Pro Figur und Mesh ein kleines <canvas> im SVG (foreignObject). Ein gemeinsamer WebGL-Kontext zeichnet in jedem
+// Bildschirmbild das Glied genau zur Phase der CSS-Animation des Rumpfs (zwischen zwei Stellungen interpoliert)
 // und kopiert es ins Canvas der Figur. Bis das erste Bild steht, bleiben die einzelnen Bildteile sichtbar.
 const slothMeshData = {}, slothMeshLive = new Set();
 let slothMeshGL = null, slothMeshRAF = 0;
 function slothMeshMarkup(name, key, list) {
-  const pts = list.map((e) => slothMeshPoints(e.bones));
+  const mk = list[0].src, M = slothMeshDecode(SLOTH_V2.mesh[mk]);
+  const pts = list.map((e) => slothMeshPoints(M, e.bones));
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const P of pts) for (let i = 0; i < P.length; i += 3) { x0 = Math.min(x0, P[i]); x1 = Math.max(x1, P[i]); y0 = Math.min(y0, P[i + 1]); y1 = Math.max(y1, P[i + 1]); }
   x0 -= 4; y0 -= 4; x1 += 4; y1 += 4;
-  slothMeshData[name + '|' + key] = { pts, far: list[0].far, box: [x0, y0, x1 - x0, y1 - y0] };
+  const op = list.some((e) => e.o != null) ? list.map((e) => e.o ?? 1) : null; // Deckkraft je Stellung (Überblenden)
+  slothMeshData[name + '|' + key] = { mk, key, pts, op, far: list[0].far, box: [x0, y0, x1 - x0, y1 - y0] };
   const f = (v) => +v.toFixed(1);
   return `<foreignObject class="sm-fo" data-smk="${name}|${key}" x="${f(x0)}" y="${f(y0)}" width="${f(x1 - x0)}" height="${f(y1 - y0)}"><canvas style="width:100%;height:100%;display:block"></canvas></foreignObject>`;
 }
@@ -1197,23 +1407,29 @@ function slothMeshInitGL() {
   gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec3 p;attribute vec2 u;varying vec2 v;uniform vec4 b;void main(){v=u;gl_Position=vec4((p.x-b.x)/b.z*2.0-1.0,1.0-(p.y-b.y)/b.w*2.0,p.z,1.0);}'));
   gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, 'precision mediump float;varying vec2 v;uniform sampler2D t;void main(){vec4 c=texture2D(t,v);if(c.a<0.03)discard;gl_FragColor=vec4(c.rgb*c.a,c.a);}'));
   gl.linkProgram(pr); gl.useProgram(pr);
-  const M = SLOTH_V2.mesh.side, n = M.V.length / 2, pb = SLOTH_V2.parts[M.img], uv = new Float32Array(n * 2);
-  for (let i = 0; i < n; i++) { uv[2 * i] = (M.V[2 * i] * M.src - pb[0]) / (pb[2] - pb[0]); uv[2 * i + 1] = (M.V[2 * i + 1] * M.src - pb[1]) / (pb[3] - pb[1]); }
-  const ub = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ub); gl.bufferData(gl.ARRAY_BUFFER, uv, gl.STATIC_DRAW);
-  const lu = gl.getAttribLocation(pr, 'u'); gl.enableVertexAttribArray(lu); gl.vertexAttribPointer(lu, 2, gl.FLOAT, false, 0, 0);
-  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(M.T), gl.STATIC_DRAW);
   gl.enable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.clearColor(0, 0, 0, 0);
-  const G = { cv, gl, pr, pbuf: gl.createBuffer(), lp: gl.getAttribLocation(pr, 'p'), ub: gl.getUniformLocation(pr, 'b'), tex: {}, buf: new Float32Array(n * 3) };
-  for (const far of [false, true]) {
-    const img = new Image();
-    img.onload = () => {
-      const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
-      G.tex[far] = t;
-    };
-    img.src = slothPartHref(M.img + (far ? '_far' : ''));
-  }
+  const G = { cv, gl, pr, pbuf: gl.createBuffer(), lp: gl.getAttribLocation(pr, 'p'), lu: gl.getAttribLocation(pr, 'u'), ub: gl.getUniformLocation(pr, 'b'), mesh: {} };
+  gl.enableVertexAttribArray(G.lp); gl.enableVertexAttribArray(G.lu);
+  // je Mesh beim ersten Gebrauch: Texturkoordinaten, Dreiecke, Bild vorne (und abgedunkelt hinten, falls vorhanden)
+  G.get = (mk) => {
+    if (G.mesh[mk]) return G.mesh[mk];
+    const M = slothMeshDecode(SLOTH_V2.mesh[mk]), n = M.V.length / 2, pb = SLOTH_V2.parts[M.img], uv = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) { uv[2 * i] = (M.V[2 * i] * M.src - pb[0]) / (pb[2] - pb[0]); uv[2 * i + 1] = (M.V[2 * i + 1] * M.src - pb[1]) / (pb[3] - pb[1]); }
+    const E = G.mesh[mk] = { ub: gl.createBuffer(), ib: gl.createBuffer(), count: M.T.length, tex: {}, buf: new Float32Array(n * 3) };
+    gl.bindBuffer(gl.ARRAY_BUFFER, E.ub); gl.bufferData(gl.ARRAY_BUFFER, uv, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, E.ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(M.T), gl.STATIC_DRAW);
+    for (const far of SLOTH_V2.parts[M.img + '_far'] ? [false, true] : [false]) {
+      const img = new Image();
+      img.onload = () => {
+        const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+        E.tex[far] = t;
+      };
+      img.src = slothPartHref(M.img + (far ? '_far' : ''));
+    }
+    return E;
+  };
   return G;
 }
 function slothMeshTick() {
@@ -1224,33 +1440,37 @@ function slothMeshTick() {
   const { gl } = G, vh = window.innerHeight || 800;
   for (const L of slothMeshLive) {
     if (!L.fo.isConnected) { slothMeshLive.delete(L); continue; }
-    const tex = G.tex[L.d.far];
+    const E = G.get(L.d.mk), tex = E.tex[L.d.far];
     if (!tex) continue;
     const r = L.fo.getBoundingClientRect();
     if (r.bottom < 0 || r.top > vh || r.width < 2) continue;
     // Phase aus der CSS-Animation des Rumpfs derselben Figur (exakt im Takt, auch pausiert/verzögert)
     if (!L.anim || L.anim.playState === 'idle') { const svg = L.fo.closest('svg'), el = svg && svg.querySelector('.sp-torso'); L.anim = el && el.getAnimations ? el.getAnimations()[0] : null; }
     const pr = L.anim ? L.anim.effect.getComputedTiming().progress : 0;
-    const P = L.d.pts, N = P.length - 1, x = (pr == null ? 0 : pr) * N, i = Math.min(N - 1, Math.floor(x)), t = x - i, A = P[i], B = P[i + 1], buf = G.buf;
+    if (L.drawn && pr === L.pr && Math.round(r.width) === L.w) continue; // Stellung unverändert (z. B. angehalten): nichts zu tun
+    L.pr = pr; L.w = Math.round(r.width);
+    const P = L.d.pts, N = P.length - 1, x = (pr == null ? 0 : pr) * N, i = Math.min(N - 1, Math.floor(x)), t = x - i, A = P[i], B = P[i + 1], buf = E.buf;
     for (let k = 0; k < buf.length; k++) buf[k] = A[k] + (B[k] - A[k]) * t;
+    if (L.d.op) { const o = (L.d.op[i] + (L.d.op[i + 1] - L.d.op[i]) * t).toFixed(3); if (L.fo.style.opacity !== o) L.fo.style.opacity = o; }
     const dpr = Math.min(2, window.devicePixelRatio || 1), w = Math.max(2, Math.round(r.width * dpr)), h = Math.max(2, Math.round(r.height * dpr));
     if (L.cv.width !== w || L.cv.height !== h) { L.cv.width = w; L.cv.height = h; L.ctx = null; }
     if (G.cv.width < w || G.cv.height < h) { G.cv.width = Math.max(G.cv.width, w); G.cv.height = Math.max(G.cv.height, h); }
     gl.viewport(0, G.cv.height - h, w, h); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.bindBuffer(gl.ARRAY_BUFFER, G.pbuf); gl.bufferData(gl.ARRAY_BUFFER, buf, gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(G.lp); gl.vertexAttribPointer(G.lp, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, E.ub); gl.vertexAttribPointer(G.lu, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, G.pbuf); gl.bufferData(gl.ARRAY_BUFFER, buf, gl.DYNAMIC_DRAW); gl.vertexAttribPointer(G.lp, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, E.ib);
     gl.uniform4f(G.ub, ...L.d.box);
-    gl.drawElements(gl.TRIANGLES, SLOTH_V2.mesh.side.T.length, gl.UNSIGNED_SHORT, 0);
+    gl.drawElements(gl.TRIANGLES, E.count, gl.UNSIGNED_SHORT, 0);
     const ctx = L.ctx || (L.ctx = L.cv.getContext('2d'));
     ctx.clearRect(0, 0, w, h); ctx.drawImage(G.cv, 0, 0, w, h, 0, 0, w, h);
-    if (!L.drawn) { L.drawn = true; const svg = L.fo.closest('svg'); if (svg) svg.classList.add(L.d.far ? 'sm-live-far' : 'sm-live'); }
+    if (!L.drawn) { L.drawn = true; const svg = L.fo.closest('svg'); if (svg) svg.classList.add('sm-' + L.d.key.replace(/_/g, '-')); }
   }
   if (slothMeshLive.size) slothMeshRAF = requestAnimationFrame(slothMeshTick);
 }
-// Sobald das Mesh-Bein gezeichnet ist, die einzelnen Bildteile des Beins ausblenden
+// Sobald ein Mesh gezeichnet ist, die einzelnen Bildteile, die es ersetzt, ausblenden (z. B. .sm-armmesh-l .sp-uarm_l)
 (() => { const st = document.createElement('style');
-  st.textContent = ['', '_far'].map((x) => ['thigh', 'calf', 'foot', 'knee'].map((k) => `.sm-live${x.replace('_', '-')} .sp-${k}${x}`).join(',')).join(',') + '{visibility:hidden}';
+  st.textContent = Object.entries(SLOTH_MESH_HIDE).flatMap(([mk, ks]) => ks.map((k) => `.sm-${mk.replace(/_/g, '-')} .sp-${k}`)).join(',') + '{visibility:hidden}';
   document.head.appendChild(st); })();
 // neue Figuren im DOM finden (Figuren entstehen als HTML-Text)
 if (typeof MutationObserver !== 'undefined' && slothMeshOK) new MutationObserver(() => slothMeshScan()).observe(document.documentElement, { childList: true, subtree: true });
@@ -1272,7 +1492,7 @@ function slothRigPrepare(poseName) {
     }
     return keys[keys.length - 1][1];
   };
-  const meshPose = v2 && pose.view === 'side' && slothMeshOK && !!(SLOTH_V2.mesh && SLOTH_V2.mesh.side);
+  const meshPose = v2 && slothMeshOK && !!SLOTH_V2.mesh;
   const N = meshPose ? 48 : 24, frames = [], calmTail = []; // Mesh-Bein: Einzelbilder, daher mehr Stellungen
   for (let i = 0; i <= N; i++) {
     const m = amount(i / N), s = {};
@@ -1313,12 +1533,24 @@ function slothRigPrepare(poseName) {
   // gebeugte Oberschenkel-Zeichnungen direkt über dem stehenden Oberschenkel
   const flexKeys = Object.keys(SLOTH_V2.joints.side.flex || {}).filter((k) => k !== 'thigh').sort((m, n) => SLOTH_V2.joints.side.flex[m] - SLOTH_V2.joints.side.flex[n]);
   base = base.flatMap((k) => { const m = /^(thigh|calf)(_far)?$/.exec(k); return m && pose.view === 'side' ? [k, ...flexKeys.map((f) => m[1] + f.slice(5) + (m[2] || ''))] : [k]; });
-  if (meshPose) base = base.flatMap((k) => (k === 'thigh' ? [k, 'legmesh'] : k === 'thigh_far' ? [k, 'legmesh_far'] : [k]));
+  // erhobene Arme (vorne) direkt über den normalen
+  base = base.flatMap((k) => { const m = /^uarm_([lr])$/.exec(k); return m && frames[0]['uarmU_' + m[1]] ? [k, 'farmU_' + m[1], 'uarmU_' + m[1]] : [k]; });
   if (pose.armsFront) { const arms = base.filter((k) => /arm/.test(k)); base = base.filter((k) => !/arm/.test(k)); base.splice(base.indexOf('torso') + 1, 0, ...arms); }
   // drawLast: Teile ganz nach vorne holen (z. B. gefalteter Unterschenkel vor dem eigenen Oberschenkel)
   if (pose.drawLast) { base = base.filter((k) => !pose.drawLast.includes(k)); base.push(...pose.drawLast); }
   // legsFront: Beine vor dem Rumpf (sitzend von vorne, Oberschenkel kommen zum Betrachter)
   if (pose.legsFront) { const legs = base.filter((k) => /thigh|calf/.test(k)); base = base.filter((k) => !/thigh|calf/.test(k)); base.splice(base.indexOf('head') + 1, 0, ...legs.filter((k) => /calf/.test(k)), ...legs.filter((k) => /thigh/.test(k))); }
+  // Gespiegelter Knochen neben einem ungespiegelten (z. B. Winken: Krallen nach innen) lässt sich nicht weich mischen:
+  // dann bleibt dieses Glied für die ganze Übung bei den einzelnen Bildteilen
+  const flips = (e) => e.bones.map((m) => (Array.isArray(m.k) ? Math.sign(m.k[0] * m.k[1]) : 1));
+  for (const mk of Object.keys(frames[0]).filter((k) => frames[0][k].mesh)) {
+    if (frames.some((f) => new Set(flips(f[mk])).size > 1)) frames.forEach((f) => { f[mk] = { skip: true }; });
+  }
+  // Meshes direkt nach dem zuletzt gezeichneten Teil, das sie ersetzen (nach allen Umsortierungen)
+  if (meshPose) for (const mk of Object.keys(frames[0]).filter((k) => frames[0][k].mesh)) {
+    base = base.filter((k) => k !== mk);
+    base.splice(Math.max(...SLOTH_MESH_HIDE[mk].map((k) => base.indexOf(k))) + 1, 0, mk);
+  }
   const props = (pose.props || []).map((pr, i) => [pr.layer || 'front', 'prop' + i]);
   const mid = base.indexOf(pose.view === 'side' ? 'tail' : 'torso');
   const order = [...props.filter((x) => x[0] === 'back').map((x) => x[1]), ...base.slice(0, mid),
@@ -1329,7 +1561,13 @@ function slothRigPrepare(poseName) {
   // Umriss über alle Stellungen -> viewBox
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const f of frames) for (const key of order) {
-    if (!f[key] || f[key].line || f[key].skip || f[key].mesh || f[key].o === 0) continue;
+    if (f[key] && f[key].line) { // Seil: nur mit box (TRX-Gurt) beide Enden im Bild, sonst zählt es nicht
+      if (!/^prop\d+$/.test(key) || !(pose.props[+key.slice(4)] || {}).box) continue;
+      const { P, r, k } = f[key], e = [P[0] + k[0] * Math.cos(r * Math.PI / 180), P[1] + k[0] * Math.sin(r * Math.PI / 180)];
+      for (const [x, y] of [P, e]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      continue;
+    }
+    if (!f[key] || f[key].skip || f[key].mesh || f[key].o === 0) continue;
     const { img, P, r, p, k, ba = 0 } = f[key], b = slothPartBox(img), [kx, ky] = Array.isArray(k) ? k : [k, k];
     const c = Math.cos((r + ba) * Math.PI / 180), s = Math.sin((r + ba) * Math.PI / 180), cb = Math.cos(ba * Math.PI / 180), sb = Math.sin(ba * Math.PI / 180);
     for (const [x, y] of [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]]) {
@@ -1407,6 +1645,8 @@ function slothRigPrepare(poseName) {
     style.textContent += `\n@keyframes srr-${name}{to{stroke-dashoffset:-100}}.sr-${name} .sloth-rig-rope{animation:srr-${name} ${pose.dur}s linear infinite;animation-delay:var(--srd,0s)}`;
     extra += `<ellipse class="sloth-rig-rope" pathLength="100" stroke-dasharray="46 54" cx="${n(cx)}" cy="${n(cy)}" rx="${n(rx)}" ry="${n(ry)}"/>`;
   }
+  // anchor: Karabiner am festen Anfang eines Gurts (TRX)
+  (pose.props || []).forEach((pr, i) => { if (pr.anchor && frames[0]['prop' + i]) { const [x, y] = frames[0]['prop' + i].P; extra += `<circle class="sloth-rig-bar" cx="${n(x)}" cy="${n(y)}" r="16"/>`; } });
   if (pose.floor != null) extra += `<ellipse class="sloth-rig-shadow" cx="${n(box[0] + box[2] / 2)}" cy="${pose.floor}" rx="${n(box[2] * (pose.view === 'side' ? 0.46 : 0.34))}" ry="${n(Math.max(10, box[2] * 0.035))}"/>`;
   if (pose.bar) {
     const w = box[2] * 0.96;
@@ -1430,6 +1670,10 @@ const SLOTH_SWAPS = {
   russian: { imgs: [['pose_russian_a', [355, 220]], ['pose_russian_b', [824, 220]]], dur: 2.4, label: 'Russian Twist' },
   ninety: { imgs: [['pose_ninety', [418, 434]]], dur: 4, label: '90/90-Dehnung' },
   frog: { imgs: [['pose_frog_a', [397, 619]], ['pose_frog_b', [858, 614]]], dur: 3.6, label: 'Frog Stretch' },
+  // Kettlebell (sheets/poses_kb.png): Get-up am aufgestellten Fuss ausgerichtet, sonst Mitte zwischen den Füssen
+  tgu: { imgs: [['pose_tgu_a', [480, 554]], ['pose_tgu_b', [800, 531]]], dur: 6, sx: -170, label: 'Turkish Get-up' }, // sx: Schatten unter die Körpermitte
+  windmill: { imgs: [['pose_windmill_a', [1012, 559]], ['pose_windmill_b', [1322, 562]]], dur: 4.4, label: 'Kettlebell Windmill' },
+  halo: { imgs: [['pose_halo_a', [606, 1006]], ['pose_halo_b', [915, 1006]]], dur: 3, label: 'Kettlebell Halo' },
 };
 function slothSwapFigure(name, cls) {
   const sw = SLOTH_SWAPS[name];
@@ -1449,7 +1693,7 @@ function slothSwapFigure(name, cls) {
     slothRigCache['swap:' + name] = true;
   }
   const pad = 20, w = x1 - x0 + 2 * pad, h = y1 - y0 + 2 * pad;
-  const shadow = `<ellipse class="sloth-rig-shadow" cx="0" cy="-4" rx="${Math.round((x1 - x0) * 0.4)}" ry="10"/>`;
+  const shadow = `<ellipse class="sloth-rig-shadow" cx="${sw.sx || 0}" cy="-4" rx="${Math.round((x1 - x0) * 0.4)}" ry="10"/>`;
   return `<svg class="sloth-rig sr-${name} ${cls}" data-dur="${sw.dur}" viewBox="${x0 - pad} ${y0 - pad} ${w} ${h}" width="${Math.round(w / 1.5)}" height="${Math.round(h / 1.5)}" role="img" aria-label="${sw.label}">${shadow}${imgs.join('')}</svg>`;
 }
 

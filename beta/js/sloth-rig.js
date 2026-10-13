@@ -830,8 +830,9 @@ const SLOTH_POSES = {
   },
   trxtriceps: {
     view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'TRX Trizepsstrecken', props: TRX([-420, -960]),
-    a: { torso: -62, uarm: -48, farm: -48, hand: -48, thigh: 118, calf: 118 },
-    b: { torso: -54, uarm: -42, farm: 128, hand: 128, thigh: 126, calf: 126 },
+    // Oberarm schräg über dem Kopf (bleibt fast still), Ellbogen beugt ~130°: Hände zur Stirn; Körper neigt sich nur leicht mit
+    a: { torso: -60, uarm: -44, farm: -44, hand: -44, thigh: 120, calf: 120 },
+    b: { torso: -54, uarm: -40, farm: 92, hand: 92, thigh: 126, calf: 126 },
   },
   trxfallout: {
     view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'TRX Fallout', props: TRX([-420, -960]),
