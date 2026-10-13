@@ -2685,7 +2685,13 @@ const SLOTH_EXERCISE_POSES = {
   trx_row: 'trxrow', trx_y_raise: 'trxyraise', trx_face_pull: 'trxfacepull', trx_biceps_curl: 'trxcurl',
   trx_chest_press: 'trxchestpress', trx_triceps_ext: 'trxtriceps', trx_fallout: 'trxfallout', trx_pistol_squat: 'trxpistol',
   trx_push_up: 'trxpushup', trx_pike: 'trxpike', trx_knee_tuck: 'trxtuck', trx_hamstring_curl: 'trxhamcurl',
-  sun_salutation: 'sunsal', dip_leg_raise: 'dipleg', shoulder_circles: 'shouldercircle',
+  sun_salutation: 'sunsal',
+  // Yoga/Pilates (POSE_LIBRARY, Flow-Modus): Haltungen mit Atmen bzw. Pilates-Bewegungen
+  mountain_pose: 'ymountain', downward_dog: 'ydog', childs_pose: 'ychild', cat_cow_flow: 'catcow', cobra_pose: 'ycobra',
+  triangle_pose: 'ytriangle', extended_side_angle: 'ysideangle', chair_pose: 'ychair', tree_pose: 'ytree', low_lunge: 'ylowlunge',
+  bridge_pose: 'ybridge', camel_pose: 'ycamel', seated_forward_fold_flow: 'yseatedfold', corpse_pose: 'ycorpse',
+  pilates_hundred: 'phundred', roll_up: 'prollup', spine_stretch_pilates: 'pspine', swan_pilates: 'pswan', plank_pilates: 'plank',
+  side_plank_pilates: 'sideplank', shoulder_bridge_pilates: 'bridge', teaser_prep: 'pteaser', dip_leg_raise: 'dipleg', shoulder_circles: 'shouldercircle',
 };
 const SLOTH_VIEW_WORD = { side: 'Seitenansicht', back: 'Rückansicht', front: 'Vorderansicht' };
 function exerciseFigureSvg(exerciseId) {
