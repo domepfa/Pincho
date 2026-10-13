@@ -762,6 +762,103 @@ const SLOTH_POSES = {
     a: { torso: -94, uarm: 184, farm: -90, hand: -90, thigh: 80, calf: 96, fthigh: 110, fcalf: 120 },
     b: { torso: -82, uarm: 190, farm: -86, hand: -86, thigh: 64, calf: 104, fthigh: 118, fcalf: 124 },
   },
+  // ---- Yoga (Haltungen mit ruhigem Atmen: a = ausgeatmet, b = eingeatmet, 5 s je Atemzug) ----
+  ymountain: {
+    view: 'side', pin: 'ankle', dur: 5, floor: 46, grip: 'flat', feet: true, effort: false, label: 'Berghaltung',
+    a: { torso: -90, spine: 0, nod: 0, uarm: 92, farm: 90, hand: 90, thigh: 90, calf: 90, foot: 0 },
+    b: { torso: -91, spine: -4, nod: -3, uarm: 92, farm: 90, hand: 90, thigh: 90, calf: 90, foot: 0 },
+  },
+  ydog: {
+    view: 'side', pin: 'ankle', dur: 5, floor: 46, grip: 'flat', feet: true, effort: false, label: 'Herabschauender Hund',
+    a: { torso: 40, spine: 0, nod: 10, handX: 446, handY: 26, thigh: 108, calf: 108, foot: 20 },
+    b: { torso: 38, spine: -4, nod: 8, handX: 446, handY: 26, thigh: 108, calf: 108, foot: 20 },
+  },
+  ychild: {
+    view: 'side', pin: 'knee', dur: 5, floor: 34, grip: 'flat', effort: false, label: 'Kindshaltung',
+    a: { torso: -6, spine: 18, nod: 30, handX: 360, handY: 30, thigh: 8, calf: 182 },
+    b: { torso: -9, spine: 15, nod: 28, handX: 360, handY: 30, thigh: 8, calf: 182 },
+  },
+  ycobra: {
+    view: 'side', pin: 'hip', dur: 5, floor: 30, grip: 'flat', effort: false, label: 'Kobra',
+    a: { torso: -26, spine: -22, nod: -14, handX: 150, handY: 26, thigh: 182, calf: 182 },
+    b: { torso: -30, spine: -28, nod: -18, handX: 150, handY: 26, thigh: 182, calf: 182 },
+  },
+  ychair: {
+    view: 'side', pin: 'ankle', dur: 5, floor: 46, feet: true, effort: false, label: 'Stuhl',
+    a: { torso: -60, spine: -6, nod: -4, uarm: -70, farm: -70, hand: -70, thigh: 30, calf: 108, foot: 0 },
+    b: { torso: -62, spine: -10, nod: -6, uarm: -72, farm: -72, hand: -72, thigh: 30, calf: 108, foot: 0 },
+  },
+  ylowlunge: {
+    view: 'side', pin: 'ankle', dur: 5, floor: 46, feet: true, effort: false, label: 'Tiefer Ausfallschritt',
+    a: { torso: -88, spine: -6, nod: -6, uarm: -94, farm: -94, hand: -94, thigh: 6, calf: 96, foot: 0, fthigh: 128, fcalf: 182, ffoot: 182 },
+    b: { torso: -90, spine: -12, nod: -10, uarm: -96, farm: -96, hand: -96, thigh: 6, calf: 96, foot: 0, fthigh: 128, fcalf: 182, ffoot: 182 },
+  },
+  ybridge: {
+    view: 'side', pin: 'ankle', dur: 5, floor: 46, lean: { pt: 'shoulder', y: 12, from: 150, to: 240 }, grip: 'flat', effort: false, label: 'Brücke',
+    a: { torso: 180, uarm: 8, farm: 4, hand: 0, thigh: 0, calf: 80 },
+    b: { torso: 180, uarm: 8, farm: 4, hand: 0, thigh: -3, calf: 82 },
+  },
+  ycamel: {
+    view: 'side', pin: 'knee', dur: 5, floor: 34, grip: 'flat', effort: false, label: 'Kamel',
+    a: { torso: -112, spine: -40, nod: -30, handX: -150, handY: -60, thigh: 82, calf: 182 },
+    b: { torso: -114, spine: -46, nod: -34, handX: -150, handY: -60, thigh: 82, calf: 182 },
+  },
+  yseatedfold: {
+    view: 'side', pin: 'hip', dur: 5, floor: 40, grip: 'flat', effort: false, label: 'Sitzende Vorbeuge',
+    a: { torso: -36, spine: 34, nod: 22, handX: 236, handY: 30, thigh: 2, calf: 2 },
+    b: { torso: -42, spine: 28, nod: 18, handX: 236, handY: 30, thigh: 2, calf: 2 },
+  },
+  ycorpse: {
+    view: 'side', pin: 'hip', dur: 6, floor: 60, grip: 'flat', effort: false, label: 'Totenhaltung',
+    a: { torso: 180, spine: 0, nod: 0, uarm: 4, farm: 2, hand: 2, thigh: 0, calf: 0 },
+    b: { torso: 180, spine: -3, nod: 0, uarm: 4, farm: 2, hand: 2, thigh: 0, calf: 0 },
+  },
+  // Vorderansicht (Körperebene): Baum, Dreieck, Seitwinkel
+  ytree: {
+    view: 'front', pin: 'foot_l', dur: 5, floor: 26, effort: false, label: 'Baum',
+    a: { torso: -90, head: -90, uarm_l: -100, farm_l: -84, uarm_r: -80, farm_r: -96, thigh_l: 92, calf_l: 91, thigh_r: 30, calf_r: 160, tail: 0 },
+    b: { torso: -91, head: -91, uarm_l: -102, farm_l: -86, uarm_r: -82, farm_r: -98, thigh_l: 92, calf_l: 91, thigh_r: 30, calf_r: 160, tail: 0 },
+  },
+  ytriangle: {
+    view: 'front', pin: 'foot_r', dur: 5, floor: 26, effort: false, label: 'Dreieck',
+    // Rumpf kippt nach links (Bildseite), linke Hand zum linken Schienbein, rechter Arm senkrecht nach oben
+    a: { torso: -164, head: -172, uarm_l: 96, farm_l: 96, uarm_r: -88, farm_r: -88, thigh_l: 126, calf_l: 126, thigh_r: 54, calf_r: 54, tail: 0 },
+    b: { torso: -166, head: -174, uarm_l: 96, farm_l: 96, uarm_r: -90, farm_r: -90, thigh_l: 126, calf_l: 126, thigh_r: 54, calf_r: 54, tail: 0 },
+  },
+  ysideangle: {
+    view: 'front', pin: 'foot_r', dur: 5, floor: 26, effort: false, label: 'Ausgestreckter Seitwinkel',
+    // linkes Knie gebeugt (Rumpf kippt dorthin), linke Hand neben dem Fuss am Boden, rechter Arm schräg über den Kopf
+    a: { torso: -158, head: -166, uarm_l: 100, farm_l: 96, uarm_r: -150, farm_r: -152, thigh_l: 150, calf_l: 92, thigh_r: 50, calf_r: 50, tail: 0 },
+    b: { torso: -160, head: -168, uarm_l: 100, farm_l: 96, uarm_r: -152, farm_r: -154, thigh_l: 150, calf_l: 92, thigh_r: 50, calf_r: 50, tail: 0 },
+  },
+  // ---- Pilates (Bewegungen) ----
+  phundred: {
+    view: 'side', pin: 'hip', dur: 1, floor: 60, effort: false, label: 'The Hundred',
+    a: { torso: 198, spine: 22, nod: 16, uarm: 10, farm: 10, hand: 10, thigh: -40, calf: -40 },
+    b: { torso: 198, spine: 22, nod: 16, uarm: -2, farm: -2, hand: -2, thigh: -40, calf: -40 },
+  },
+  prollup: {
+    view: 'side', pin: 'hip', dur: 5, floor: 40, effort: false, label: 'Roll-Up',
+    keys: [[0, 0], [0.45, 1], [0.6, 1], [1, 0]],
+    a: { torso: 178, spine: 0, nod: 0, uarm: 178, farm: 178, hand: 178, thigh: 2, calf: 2 },
+    b: { torso: -40, spine: 40, nod: 26, uarm: 0, farm: 0, hand: 0, thigh: 2, calf: 2 },
+  },
+  pspine: {
+    view: 'side', pin: 'hip', dur: 5, floor: 40, effort: false, label: 'Wirbelsäulen-Dehnung',
+    a: { torso: -92, spine: 0, nod: 0, uarm: -2, farm: -2, hand: -2, thigh: 2, calf: 2 },
+    b: { torso: -60, spine: 40, nod: 26, uarm: 10, farm: 10, hand: 10, thigh: 2, calf: 2 },
+  },
+  pswan: {
+    view: 'side', pin: 'hip', dur: 4, floor: 30, grip: 'flat', effort: false, label: 'Schwan',
+    a: { torso: -4, spine: 0, nod: 0, handX: 150, handY: 26, thigh: 182, calf: 182 },
+    b: { torso: -30, spine: -26, nod: -16, handX: 150, handY: 26, thigh: 182, calf: 182 },
+  },
+  pteaser: {
+    view: 'side', pin: 'hip', dur: 4.4, floor: 28, effort: false, label: 'Teaser-Vorbereitung',
+    keys: [[0, 0], [0.45, 1], [0.6, 1], [1, 0]],
+    a: { torso: 180, spine: 0, nod: 0, uarm: 4, farm: 4, hand: 4, thigh: -60, calf: 40 },
+    b: { torso: -130, spine: 14, nod: 10, uarm: -36, farm: -36, hand: -36, thigh: -40, calf: -40 },
+  },
   // ---- Abläufe ----
   // Sonnengruss (Seitenansicht): Schlüsselposen per Geometrie (Bein 276, Rumpf 222, Arm 232 Einheiten). Füsse fest am Ursprung,
   // beim Zurücktreten per dx versetzt; Hände per IK fest auf der Matte (handX/handY = Handgelenk), Ellbogen zeigen nach hinten.
@@ -1327,7 +1424,7 @@ function slothRigBuild(pose, v2 = false) {
 
 /* Gesicht: blinzelt immer mal, schreit am härtesten Punkt ('b' = Stellung b, 'a' = Stellung a),
    gähnt in der Pause (yawn). Ruhige Übungen (Dehnen, Mobilität, Laufen, Pausen) ohne Schrei. */
-const SLOTH_CALM = new Set(['plank', 'hollow', 'squathold', 'wallsit', 'catcow', 'wgs', 'thoracic', 'legswing', 'anklerock',
+const SLOTH_CALM = new Set(['ymountain', 'ydog', 'ychild', 'ycobra', 'ychair', 'ylowlunge', 'ybridge', 'ycamel', 'yseatedfold', 'ycorpse', 'ytree', 'ytriangle', 'ysideangle', 'pspine', 'pswan', 'plank', 'hollow', 'squathold', 'wallsit', 'catcow', 'wgs', 'thoracic', 'legswing', 'anklerock',
   'neck', 'jefferson', 'standwaage', 'shuffle', 'quickfeet', 'hops', 'bounds', 'sprint', 'couch', 'figurefour', 'hipcircle',
   'lateralLunge', 'quadstretch', 'calfstretch', 'adductor', 'highknees', 'mountain', 'jumprope', 'ladder', 'wristmob', 'doorway',
   'birddog', 'deadbug', 'swimmer', 'ytw', 'heeltouch', 'pinlift', 'rest', 'reach', 'wave', 'scapula']);
