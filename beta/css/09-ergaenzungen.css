@@ -179,3 +179,17 @@
 .pg-hint { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-soft); font-size: 14px; }
 .pg-hint:first-of-type { border-top: 0; }
 .pg-hint-ico { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); font-size: 13px; }
+
+/* Training beenden (Freestyle) */
+#fs-finish-screen { z-index: 75; }
+.fs-finish-card { display: grid; gap: 14px; }
+.fs-finish-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.fs-finish-head h3 { margin: 0; font: 700 26px/1.1 'Barlow Condensed', sans-serif; color: var(--ink); }
+.fs-finish-head .info-sheet-close { position: static; }
+.fs-finish-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fs-finish-sum div { display: grid; gap: 2px; padding: 12px; border-radius: 14px; background: var(--surface-2); text-align: center; }
+.fs-finish-sum b { font: 700 24px/1 'Barlow Condensed', sans-serif; color: var(--ink); }
+.fs-finish-sum span { font-size: 12px; color: var(--ink-dim); }
+#fs-finish-slot #log-save { width: 100%; min-height: 56px; font-size: 20px; }
+.fs-finish-discard { justify-self: center; margin-top: 4px; color: var(--ink-dim); }
+.fs-dock-head #fs-dock-finish { margin-left: 6px; }

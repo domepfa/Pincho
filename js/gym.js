@@ -446,7 +446,8 @@ function activateFsGroup(builder, idx) {
 function renderFsDiscardButton() {
   const holder = document.getElementById('fs-discard-holder');
   if (!holder) return;
-  if (logMode !== 'freestyle' || !freestyleBuilder.exercises.length) { holder.innerHTML = ''; return; }
+  // Freestyle: Verwerfen steckt im Abschluss-Bildschirm (Leiste unten > Beenden)
+  if (logMode !== 'freestyle' || !freestyleBuilder.exercises.length || document.getElementById('log-finish-block')) { holder.innerHTML = ''; return; }
   holder.innerHTML = `<button type="button" class="btn ghost small" id="fs-discard" style="width:100%;margin-top:10px;">🗑 Freestyle verwerfen</button>`;
   document.getElementById('fs-discard').onclick = () => {
     if (!confirm('Freestyle-Session verwerfen? Alle noch nicht gespeicherten Sätze gehen verloren.')) return;
@@ -455,6 +456,54 @@ function renderFsDiscardButton() {
     saveDraft('freestyle', freestyleBuilder);
     renderLog();
   };
+}
+
+/* ---------- Training beenden (nur Freestyle) ----------
+   Immer erreichbar über "Beenden" in der Leiste unten: Zusammenfassung, Notiz, RPE, Speichern und – klein und
+   abgesetzt – Verwerfen. Notiz/RPE/Speichern sind die Felder aus dem Formular (log.js, #log-finish-block): sie
+   werden nur hierher verschoben und beim Schliessen zurückgelegt, so bleibt die Speicher-Logik an einer Stelle. */
+function openFsFinishScreen() {
+  const block = document.getElementById('log-finish-block');
+  if (!block || document.getElementById('fs-finish-screen')) return;
+  const b = freestyleBuilder, done = b.exercises.filter((g) => g.sets.length);
+  const sets = done.reduce((n, g) => n + g.sets.length, 0);
+  const el = document.createElement('div');
+  el.id = 'fs-finish-screen';
+  el.className = 'info-sheet-backdrop';
+  el.innerHTML = `
+    <div class="info-sheet-card fs-finish-card">
+      <div class="fs-rest-grip" aria-hidden="true"></div>
+      <div class="fs-finish-head"><h3>Training beenden</h3><button type="button" class="info-sheet-close" id="fs-finish-close" aria-label="Schliessen">✕</button></div>
+      <div class="fs-finish-sum mono">
+        <div><b>${b.sessionStartedAt ? fmtSessionClock(b.sessionStartedAt) : '–'}</b><span>Trainingszeit</span></div>
+        <div><b>${done.length}</b><span>${done.length === 1 ? 'Übung' : 'Übungen'}</span></div>
+        <div><b>${sets}</b><span>${sets === 1 ? 'Satz' : 'Sätze'}</span></div>
+      </div>
+      <div id="fs-finish-slot"></div>
+      <button type="button" class="btn ghost small fs-finish-discard" id="fs-finish-discard">Training verwerfen</button>
+    </div>`;
+  document.body.appendChild(el);
+  document.getElementById('fs-finish-slot').appendChild(block);
+  block.hidden = false;
+  wireSheetSwipeDown(el, () => closeFsFinishScreen());
+  el.addEventListener('click', (e) => { if (e.target === el) closeFsFinishScreen(); });
+  document.getElementById('fs-finish-close').onclick = () => closeFsFinishScreen();
+  document.getElementById('fs-finish-discard').onclick = () => {
+    if (!confirm('Training verwerfen? Alle noch nicht gespeicherten Sätze gehen verloren.')) return;
+    closeFsFinishScreen(true);
+    stopAllFsTimers();
+    freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id, sessionStartedAt: null };
+    saveDraft('freestyle', freestyleBuilder);
+    renderLog();
+  };
+}
+// gone: Formular wird ohnehin neu aufgebaut (nach Speichern/Verwerfen) – Felder nicht zurücklegen
+function closeFsFinishScreen(gone) {
+  const el = document.getElementById('fs-finish-screen');
+  if (!el) return;
+  const block = document.getElementById('log-finish-block'), home = document.getElementById('log-builder-panel');
+  if (!gone && block && home) { block.hidden = true; home.after(block); }
+  el.remove();
 }
 
 /* ---------- Pausen-Bildschirm (Gym) ----------
@@ -616,7 +665,7 @@ function renderFsPanel() {
       <div class="fs-dock-head mono">
         <span class="fs-dock-name">▸ ${esc(exerciseName(g.exerciseId))}</span>
         ${builder.sessionStartedAt ? `<span class="fs-session-clock" id="fs-session-clock" title="Trainingszeit gesamt">⏱ ${fmtSessionClock(builder.sessionStartedAt)}</span>` : ''}
-        ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-dock-add">+ Übung</button>` : ''}
+        ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-dock-add">+ Übung</button><button type="button" class="btn ghost small" id="fs-dock-finish">Beenden</button>` : ''}
       </div>`;
     if (fsPhase === 'idle') {
       const sug = fsSetSuggestion(g);
@@ -788,6 +837,8 @@ function renderFsPanel() {
   updateFsWorkTimerUI();
   updateFsRestTimerUI();
 
+  const dockFinish = document.getElementById('fs-dock-finish');
+  if (dockFinish) dockFinish.onclick = openFsFinishScreen;
   const dockAdd = document.getElementById('fs-dock-add');
   if (dockAdd) {
     dockAdd.onclick = () => {

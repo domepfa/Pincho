@@ -287,9 +287,11 @@ async function renderLog() {
       <div id="log-builder-panel"></div>
 
       ${hideSessionFields || showingRecap ? '' : `
+      <div id="log-finish-block" ${logMode === 'freestyle' ? 'hidden' : ''}>
       <div class="field"><label>Notiz (optional)</label><textarea id="log-note" placeholder="Befinden, Bedingungen, Sonstiges…"></textarea></div>
       <div class="field"><label>RPE (1–10, optional)</label><input type="number" id="log-rpe" min="1" max="10"></div>
-      <button class="btn" id="log-save">FERTIG &amp; SPEICHERN</button>`}
+      <button class="btn" id="log-save">${logMode === 'freestyle' ? 'Speichern' : 'FERTIG &amp; SPEICHERN'}</button>
+      </div>`}
     </div>
 
     <div class="sec-head"><h2 class="sec-title">Verlauf</h2><div class="sec-rule"></div></div>
@@ -338,6 +340,7 @@ async function renderLog() {
     };
     const id = await fbPush(`logs/${state.member.id}`, entry);
     if (id) {
+      closeFsFinishScreen(true);
       stopAllFsTimers();
       toast('Session gespeichert.', 'ok');
       // Trend JE Übung (↑/↓/→) gegenüber der letzten Session damit — Basis
