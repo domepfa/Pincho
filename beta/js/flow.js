@@ -31,6 +31,7 @@ function showPoseInfoSheet(poseId) {
     <div class="info-sheet-card">
       <button type="button" class="info-sheet-close" id="info-sheet-close">✕</button>
       <div class="info-sheet-title">${esc(poseName(poseId))}</div>
+      ${SLOTH_EXERCISE_POSES[poseId] ? `<div class="info-sheet-figure">${exerciseFigureSvg(poseId)}</div>` : ''}
       <div class="ex-howto">${esc(poseHowTo(poseId))}</div>
     </div>
   `;
@@ -404,6 +405,19 @@ function finishFlowEarly() {
   finishFlowSession(flowBlocks.slice(0, flow.blockIndex));
 }
 
+// Figur im Flow: Faultier-Pose der Übung, wenn es eine gibt (z. B. Sonnengruss), sonst 🧘; in der Wechselpause das ruhende Faultier
+function flowFigureHtml(block, working) {
+  if (!working) return fbRestFigureSvg();
+  return SLOTH_EXERCISE_POSES[block.poseId] ? slothFigure(SLOTH_EXERCISE_POSES[block.poseId], 'ex-figure sloth-img') : '<div class="ex-figure-emoji">🧘</div>';
+}
+// nur bei Wechsel Halten/Pause oder neuer Pose neu einsetzen (sonst begänne die Animation jede Sekunde von vorne)
+function setFlowFigure(holder, block, working) {
+  const key = block.poseId + '|' + working;
+  if (holder.dataset.fig === key) return;
+  holder.dataset.fig = key;
+  holder.innerHTML = flowFigureHtml(block, working);
+}
+
 function renderFlowOverlay() {
   const el = ensureFlowOverlay();
   const block = flowBlocks[flow.blockIndex];
@@ -420,7 +434,7 @@ function renderFlowOverlay() {
     <button type="button" class="fb-overlay-close" id="flow-close" title="Abbrechen">✕</button>
     <div class="fb-overlay-inner">
       <div class="fb-stage-label mono">POSE ${flow.blockIndex + 1}/${flowBlocks.length} · ${esc(poseName(block.poseId))}</div>
-      <div class="fb-stage-figure" id="flow-figure">${working ? '<div class="ex-figure-emoji">🧘</div>' : fbRestFigureSvg()}</div>
+      <div class="fb-stage-figure" id="flow-figure" data-fig="${esc(block.poseId + '|' + working)}">${flowFigureHtml(block, working)}</div>
       <div class="fb-hang-visual ${isPausedNow ? 'fb-paused' : ''}">
         <div class="fb-timer-ring">
           <svg viewBox="0 0 120 120">
@@ -460,7 +474,7 @@ function updateFlowUI() {
   const phaseEl = document.getElementById('flow-phase');
   if (phaseEl) phaseEl.textContent = working ? 'Halten' : 'Wechsel';
   const figureHolder = document.getElementById('flow-figure');
-  if (figureHolder) figureHolder.innerHTML = working ? '<div class="ex-figure-emoji">🧘</div>' : fbRestFigureSvg();
+  if (figureHolder) setFlowFigure(figureHolder, flowBlocks[flow.blockIndex], working);
 }
 
 /* Läuft die ganze Liste durch ODER wird vorzeitig beendet — landet wie

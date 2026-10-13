@@ -102,6 +102,9 @@ const KB = (at, layer) => ({ img: 'kettlebell', at, a: [916, 64], k: 1.3, ...(la
 // TRX-Gurte: von einem festen Punkt (relativ zum festen Punkt der Pose, meist oberhalb des Bildes) zu beiden Händen
 // bzw. Füssen ('ankle'); dunkel und breiter als ein Kabel
 const TRX = (from, to = 'grip') => [{ line: from, to: 'f' + to, thick: 8, layer: 'mid', box: true }, { line: from, to, thick: 8, anchor: true, box: true }];
+// Ausfallschritt im Sonnengruss (Hüfte ~138 über dem vorderen Knöchel, hinteres Bein 30° unter der Waagrechten)
+// Hüfte hoch genug, dass das kurze Faultier-Bein unter dem Bauch sichtbar bleibt
+const LUNGE = { name: 'Ausfallschritt', t: 1.4, h: 0.5, k: { torso: 4, spine: 10, nod: -8, handX: 180, handY: 30, thigh: 40, calf: 103, foot: 0, fthigh: 134, fcalf: 134, ffoot: 100, dx: 0, dy: 0 } };
 const HANG_ARMS = { uarm_l: -110, farm_l: -98, grip_l: -94, uarm_r: -70, farm_r: -82, grip_r: -86 };
 const STAND_LEGS = { thigh_l: 100, calf_l: 91, thigh_r: 80, calf_r: 89 };
 
@@ -759,6 +762,26 @@ const SLOTH_POSES = {
     a: { torso: -94, uarm: 184, farm: -90, hand: -90, thigh: 80, calf: 96, fthigh: 110, fcalf: 120 },
     b: { torso: -82, uarm: 190, farm: -86, hand: -86, thigh: 64, calf: 104, fthigh: 118, fcalf: 124 },
   },
+  // ---- Abläufe ----
+  // Sonnengruss (Seitenansicht): Schlüsselposen per Geometrie (Bein 276, Rumpf 222, Arm 232 Einheiten). Füsse fest am Ursprung,
+  // beim Zurücktreten per dx versetzt; Hände per IK fest auf der Matte (handX/handY = Handgelenk), Ellbogen zeigen nach hinten.
+  sunsal: {
+    view: 'side', pin: 'ankle', floor: 46, grip: 'flat', feet: true, label: 'Sonnengruss',
+    seq: [
+      { name: 'Berghaltung', t: 1.4, h: 1, k: { torso: -90, spine: 0, nod: 0, uarm: 92, farm: 90, hand: 90, thigh: 90, calf: 90, foot: 0, fthigh: 90, fcalf: 90, ffoot: 0, dx: 0, dy: 0 } },
+      { name: 'Arme nach oben', t: 1.6, h: 0.6, k: { torso: -93, spine: -12, nod: -14, uarm: -94, farm: -94, hand: -94, thigh: 90, calf: 90, foot: 0, fthigh: 90, fcalf: 90, ffoot: 0, dx: 0, dy: 0 } },
+      { name: 'Vorbeuge', t: 1.8, h: 0.6, k: { torso: 40, spine: 14, nod: 8, handX: 180, handY: 30, thigh: 82, calf: 100, foot: 0, fthigh: 84, fcalf: 98, ffoot: 0, dx: 0, dy: 0 } },
+      // Ausfallschritt: vorderes Bein (fest am Ursprung) gebeugt, hinteres gestreckt mit aufgestellten Zehen
+      LUNGE,
+      { name: 'Plank', t: 1.5, h: 0.6, k: { torso: -24, spine: 0, nod: 4, handX: 180, handY: 30, thigh: 156, calf: 156, foot: 100, fthigh: 156, fcalf: 156, ffoot: 100, dx: -266, dy: -22 } },
+      { name: 'Chaturanga', t: 1.2, h: 0.3, k: { torso: -11, spine: 0, nod: 0, handX: 180, handY: 30, thigh: 169, calf: 169, foot: 100, fthigh: 169, fcalf: 169, ffoot: 100, dx: -266, dy: -22 } },
+      { name: 'Heraufschauender Hund', t: 1.4, h: 0.9, k: { torso: -38, spine: -30, nod: -18, handX: 180, handY: 30, thigh: 172, calf: 174, foot: 180, fthigh: 172, fcalf: 174, ffoot: 180, dx: -266, dy: 8 } },
+      { name: 'Herabschauender Hund', t: 1.6, h: 1.6, k: { torso: 40, spine: 0, nod: 10, handX: 180, handY: 30, thigh: 108, calf: 108, foot: 20, fthigh: 108, fcalf: 108, ffoot: 20, dx: -266, dy: -4 } },
+      LUNGE,
+      { name: 'Vorbeuge', t: 1.5, h: 0.4, k: { torso: 40, spine: 14, nod: 8, handX: 180, handY: 30, thigh: 82, calf: 100, foot: 0, fthigh: 84, fcalf: 98, ffoot: 0, dx: 0, dy: 0 } },
+      { name: 'Arme nach oben', t: 1.8, h: 0.4, k: { torso: -93, spine: -12, nod: -14, uarm: -94, farm: -94, hand: -94, thigh: 90, calf: 90, foot: 0, fthigh: 90, fcalf: 90, ffoot: 0, dx: 0, dy: 0 } },
+    ],
+  },
   // ---- Kettlebell (Oktober 2026): Kugel hängt an der Faust wie beim Goblet Squat ----
   kbswing: {
     view: 'side', pin: 'ankle', dur: 1.6, floor: 46, grip: 'fist', label: 'Kettlebell Swing', props: [KB('grip')],
@@ -1250,9 +1273,25 @@ function slothRigBuild(pose, v2 = false) {
     }
     return { ...s, torso: best };
   };
+  // handX/handY (Seite): Handgelenke liegen fest an diesem Punkt (relativ zum festen Punkt wie die Requisiten), die Arme
+  // folgen per Zweigelenk-IK; die Ellbogen zeigen nach hinten zu den Füssen (wie beim Stütz). Hand flach auf dem Boden.
+  const reach = (s) => {
+    if (s.handX == null || view !== 'side') return s;
+    const { q, pts } = pose1({ uarm: 90, farm: 90, hand: 0, ...s }), pin = sub(pts[pose.pin], [s.dx || 0, s.dy || 0]), T = add([s.handX, s.handY], pin), S = q.uarm.P;
+    const len = (e) => Math.hypot(e.end[0] - e.P[0], e.end[1] - e.P[1]), L1 = len(q.uarm), L2 = len(q.farm);
+    const u = sub(pts.shoulder, pts.hip), ul = Math.hypot(u[0], u[1]), upv = [u[0] / ul, u[1] / ul], front = [-upv[1], upv[0]];
+    const pref = [-0.3 * front[0] - upv[0], -0.3 * front[1] - upv[1]];
+    let d = sub(T, S), dl = Math.hypot(d[0], d[1]);
+    const dmax = L1 + L2 - 0.01; if (dl > dmax) { d = mul(d, dmax / dl); dl = dmax; }
+    const base = Math.atan2(d[1], d[0]), al = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + dl * dl - L2 * L2) / (2 * L1 * dl))));
+    const cand = [base + al, base - al].map((a) => { const J = add(S, [Math.cos(a) * L1, Math.sin(a) * L1]), mid = add(S, mul(d, L1 / dl));
+      return { a, J, score: (J[0] - mid[0]) * pref[0] + (J[1] - mid[1]) * pref[1] }; }).sort((m, n) => n.score - m.score)[0];
+    const W = add(S, d), ua = cand.a * 180 / Math.PI, fa = Math.atan2(W[1] - cand.J[1], W[0] - cand.J[0]) * 180 / Math.PI;
+    return { ...s, uarm: ua, farm: fa, hand: 0, fuarm: ua, ffarm: fa, fhand: 0 };
+  };
   // Liefert je Teil { img, P, r, p, k } (Welt = P + k·R(r)·(x - p)), relativ zum festen Punkt
-  return (s) => {
-    const { q, pts } = pose1(pose.solve ? solve(s) : pose.lean ? lean(s) : s);
+  const fn = (s) => {
+    const { q, pts } = pose1(reach(pose.solve ? solve(s) : pose.lean ? lean(s) : s));
     // dx/dy: ganze Figur verschieben (Hüpfen, Fersen heben)
     const pin = sub(pts[pose.pin], [s.dx || 0, s.dy || 0]);
     for (const k in q) q[k] = q[k].skip ? { skip: true } : q[k].mesh ? { mesh: true, src: q[k].src, far: q[k].far, o: q[k].o, bones: q[k].bones.map((m) => ({ ...m, P: sub(m.P, pin) })) }
@@ -1282,6 +1321,8 @@ function slothRigBuild(pose, v2 = false) {
     });
     return q;
   };
+  fn.reach = reach; // Armwinkel einer Stellung mit festen Händen (Abläufe: weicher Übergang zu freien Armen)
+  return fn;
 }
 
 /* Gesicht: blinzelt immer mal, schreit am härtesten Punkt ('b' = Stellung b, 'a' = Stellung a),
@@ -1475,6 +1516,29 @@ function slothMeshTick() {
 // neue Figuren im DOM finden (Figuren entstehen als HTML-Text)
 if (typeof MutationObserver !== 'undefined' && slothMeshOK) new MutationObserver(() => slothMeshScan()).observe(document.documentElement, { childList: true, subtree: true });
 
+/* Ablauf (pose.seq): [{ k: Stellung, t: Übergang dorthin (s), h: Haltezeit (s), name }], der erste Übergang kommt vom
+   letzten Eintrag (Schleife). Liefert die Stellung zur Zeit time: weich (Kosinus) zwischen zwei Schlüsselposen. */
+function slothSeqAt(seq, dur, time) {
+  let t = ((time % dur) + dur) % dur, i = 0;
+  for (; i < seq.length - 1; i++) { if (t < seq[i].t + seq[i].h) break; t -= seq[i].t + seq[i].h; }
+  const A = seq[(i - 1 + seq.length) % seq.length].k, B = seq[i].k, u = t >= seq[i].t ? 1 : 0.5 - 0.5 * Math.cos(Math.PI * t / seq[i].t), s = {};
+  for (const k of new Set([...Object.keys(A), ...Object.keys(B)])) {
+    let a = A[k] ?? B[k], b = B[k] ?? A[k];
+    // Winkel auf dem kurzen Weg (IK liefert z. B. 200° statt -160°): sonst dreht ein Arm einmal herum
+    if (!/^(dx|dy|handX|handY|spine|nod)$/.test(k)) { while (b - a > 180) b -= 360; while (b - a < -180) b += 360; }
+    // Hände: nur festhalten, wenn beide Stellungen sie festhalten; sonst Arm-Winkel weich (siehe build/reach)
+    s[k] = a + (b - a) * u;
+  }
+  if (A.handX == null || B.handX == null) { delete s.handX; delete s.handY; }
+  // Fussschritt (dx ändert sich): Fuss beim Versetzen leicht anheben
+  if (Math.abs((A.dx || 0) - (B.dx || 0)) > 40) s.dy = (s.dy || 0) - Math.sin(Math.PI * u) * 40;
+  return s;
+}
+// Abläufe vorbereiten: Gesamtdauer, a/b (für Prüfungen, die zwei Stellungen erwarten)
+for (const p of Object.values(SLOTH_POSES)) if (p.seq) {
+  p.dur = p.seq.reduce((n, e) => n + e.t + e.h, 0); p.a = p.seq[0].k; p.b = p.seq[Math.floor(p.seq.length / 2)].k; p.effort = false; p.path = null;
+}
+
 function slothRigPrepare(poseName) {
   const v2 = slothV2On(), name = v2 ? poseName + '-v2' : poseName; // eigener CSS-/Cache-Name je Figur
   if (slothRigCache[name]) return slothRigCache[name];
@@ -1493,10 +1557,13 @@ function slothRigPrepare(poseName) {
     return keys[keys.length - 1][1];
   };
   const meshPose = v2 && slothMeshOK && !!SLOTH_V2.mesh;
-  const N = meshPose ? 48 : 24, frames = [], calmTail = []; // Mesh-Bein: Einzelbilder, daher mehr Stellungen
+  // seq: Ablauf aus mehreren Schlüsselposen (Sonnengruss) – 4 Stellungen je Sekunde, dazwischen weich
+  const N = pose.seq ? Math.round(pose.dur * 4) : meshPose ? 48 : 24, frames = [], calmTail = []; // Mesh-Bein: Einzelbilder, daher mehr Stellungen
+  // Schlüsselposen mit festen Händen bekommen ihre IK-Armwinkel dazu (für Übergänge zu Posen mit freien Armen)
+  const seq = pose.seq && pose.seq.map((e) => (e.k.handX == null ? e : { ...e, k: { ...build.reach(e.k), handX: e.k.handX, handY: e.k.handY } }));
   for (let i = 0; i <= N; i++) {
-    const m = amount(i / N), s = {};
-    for (const k of new Set([...Object.keys(pose.a), ...Object.keys(pose.b)])) {
+    const m = amount(i / N), s = pose.seq ? slothSeqAt(seq, pose.dur, (i / N) * pose.dur) : {};
+    if (!pose.seq) for (const k of new Set([...Object.keys(pose.a), ...Object.keys(pose.b)])) {
       const a = pose.a[k] ?? (/^(len|near)_/.test(k) ? 1 : pose.b[k]); // fehlt in a: Länge 1, sonst wie b
       s[k] = a + ((pose.b[k] ?? a) - a) * m;
     }
