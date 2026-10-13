@@ -1441,7 +1441,7 @@ function slothMeshScan(root) {
   if (slothMeshLive.size && !slothMeshRAF) slothMeshRAF = requestAnimationFrame(slothMeshTick);
 }
 function slothMeshInitGL() {
-  const cv = document.createElement('canvas'), gl = cv.getContext('webgl', { premultipliedAlpha: true, alpha: true, preserveDrawingBuffer: true });
+  const cv = document.createElement('canvas'), gl = cv.getContext('webgl', { premultipliedAlpha: true, alpha: true, preserveDrawingBuffer: false, powerPreference: 'low-power' }); // Bild wird im selben Durchgang kopiert, kein Puffer nötig
   if (!gl) return null;
   const sh = (t, src) => { const o = gl.createShader(t); gl.shaderSource(o, src); gl.compileShader(o); return o; };
   const pr = gl.createProgram();
@@ -1487,13 +1487,15 @@ function slothMeshTick() {
     if (r.bottom < 0 || r.top > vh || r.width < 2) continue;
     // Phase aus der CSS-Animation des Rumpfs derselben Figur (exakt im Takt, auch pausiert/verzögert)
     if (!L.anim || L.anim.playState === 'idle') { const svg = L.fo.closest('svg'), el = svg && svg.querySelector('.sp-torso'); L.anim = el && el.getAnimations ? el.getAnimations()[0] : null; }
-    const pr = L.anim ? L.anim.effect.getComputedTiming().progress : 0;
+    // auf das Bildraster der CSS-Figur runden (SLOTH_FPS): sonst zeichnet das Mesh 60-mal je Sekunde neu
+    const T = L.anim && L.anim.effect.getComputedTiming(), q = T ? Math.max(1, Math.round(T.duration / 1000 * SLOTH_FPS)) : 1;
+    const pr = T && T.progress != null ? Math.floor(T.progress * q) / q : 0;
     if (L.drawn && pr === L.pr && Math.round(r.width) === L.w) continue; // Stellung unverändert (z. B. angehalten): nichts zu tun
     L.pr = pr; L.w = Math.round(r.width);
     const P = L.d.pts, N = P.length - 1, x = (pr == null ? 0 : pr) * N, i = Math.min(N - 1, Math.floor(x)), t = x - i, A = P[i], B = P[i + 1], buf = E.buf;
     for (let k = 0; k < buf.length; k++) buf[k] = A[k] + (B[k] - A[k]) * t;
     if (L.d.op) { const o = (L.d.op[i] + (L.d.op[i + 1] - L.d.op[i]) * t).toFixed(3); if (L.fo.style.opacity !== o) L.fo.style.opacity = o; }
-    const dpr = Math.min(2, window.devicePixelRatio || 1), w = Math.max(2, Math.round(r.width * dpr)), h = Math.max(2, Math.round(r.height * dpr));
+    const dpr = Math.min(1.5, window.devicePixelRatio || 1), w = Math.max(2, Math.round(r.width * dpr)), h = Math.max(2, Math.round(r.height * dpr));
     if (L.cv.width !== w || L.cv.height !== h) { L.cv.width = w; L.cv.height = h; L.ctx = null; }
     if (G.cv.width < w || G.cv.height < h) { G.cv.width = Math.max(G.cv.width, w); G.cv.height = Math.max(G.cv.height, h); }
     gl.viewport(0, G.cv.height - h, w, h); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -1538,6 +1540,8 @@ function slothSeqAt(seq, dur, time) {
 for (const p of Object.values(SLOTH_POSES)) if (p.seq) {
   p.dur = p.seq.reduce((n, e) => n + e.t + e.h, 0); p.a = p.seq[0].k; p.b = p.seq[Math.floor(p.seq.length / 2)].k; p.effort = false; p.path = null;
 }
+
+const SLOTH_FPS = 30; // Bildrate der Faultier-Animation (CSS-Figur und Meshes)
 
 function slothRigPrepare(poseName) {
   const v2 = slothV2On(), name = v2 ? poseName + '-v2' : poseName; // eigener CSS-/Cache-Name je Figur
@@ -1659,12 +1663,15 @@ function slothRigPrepare(poseName) {
   const tfCss = (e) => (e.ba != null
     ? `translate(${n(e.P[0])}px,${n(e.P[1])}px) rotate(${+(e.r + e.ba).toFixed(2)}deg)${sc2(e)} rotate(${+(-e.ba).toFixed(2)}deg) translate(${n(-e.p[0])}px,${n(-e.p[1])}px)`
     : `translate(${n(e.P[0])}px,${n(e.P[1])}px) rotate(${+e.r.toFixed(2)}deg)${sc(e)} translate(${n(-e.p[0])}px,${n(-e.p[1])}px)`);
+  // Akku: höchstens ~30 Bilder je Sekunde statt 60 – jedes Bild zeichnet die ganze SVG-Figur neu; für die ruhige
+  // Bewegung reicht das (Zeichentrick läuft mit 12–24). steps() je Abschnitt zwischen zwei Stellungen.
+  const tf = `steps(${Math.max(1, Math.round(SLOTH_FPS * pose.dur / N))},end)`;
   const css = [];
   for (const key of order) {
     if (!frames[0][key] || frames[0][key].skip || frames[0][key].mesh) continue;
     const op = (e) => (e.o != null ? `;opacity:${+e.o.toFixed(2)}` : '');
     const steps = frames.map((f, i) => `${+(i * 100 / N).toFixed(2)}%{transform:${tfCss(f[key])}${op(f[key])}}`).join('');
-    css.push(`@keyframes srk-${name}-${key}{${steps}}.sr-${name} .sp-${key}{animation:srk-${name}-${key} ${pose.dur}s linear infinite;animation-delay:var(--srd,0s)}`);
+    css.push(`@keyframes srk-${name}-${key}{${steps}}.sr-${name} .sp-${key}{animation:srk-${name}-${key} ${pose.dur}s ${tf} infinite;animation-delay:var(--srd,0s)}`);
   }
   if (frames[0].tail && !frames[0].tail.skip) {
     for (let i = 1; i < calmTail.length; i++) { while (calmTail[i].r - calmTail[i - 1].r > 180) calmTail[i].r -= 360; while (calmTail[i].r - calmTail[i - 1].r < -180) calmTail[i].r += 360; }

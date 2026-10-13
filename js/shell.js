@@ -138,9 +138,12 @@ function fmtSessionClock(startedAt) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 setInterval(() => {
-  const el = document.getElementById('fs-session-clock');
-  const b = el && activeSetBuilder();
-  if (b && b.sessionStartedAt) el.textContent = `⏱ ${fmtSessionClock(b.sessionStartedAt)}`;
+  const el = document.getElementById('fs-session-clock'), tot = document.getElementById('fs-rest-total');
+  if (!el && !tot) return;
+  const b = activeSetBuilder();
+  if (!b || !b.sessionStartedAt) return;
+  if (el) el.textContent = `⏱ ${fmtSessionClock(b.sessionStartedAt)}`;
+  if (tot) tot.textContent = fmtSessionClock(b.sessionStartedAt); // Pausen-Bildschirm (gym.js)
 }, 1000);
 function ensureFsDock() {
   let el = document.getElementById('fs-dock');

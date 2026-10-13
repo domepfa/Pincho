@@ -36,10 +36,8 @@ html, body {
   color: var(--accent); opacity: .16; pointer-events: none;
 }
 .sloth-bg svg { width: 100%; height: auto; display: block; }
-@media (prefers-reduced-motion: no-preference) {
-  .sloth-bg { animation: sloth-sway 7s ease-in-out infinite; transform-origin: 50% 0; }
-}
-@keyframes sloth-sway { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+/* Kein Dauer-Schaukeln: eine endlose Animation hinter den unscharfen Leisten (backdrop-filter) zwingt das Handy,
+   ständig neu zu zeichnen – auch im Leerlauf, und das kostet viel Akku. */
 #app { position: relative; z-index: 1; }
 
 /* Kopfzeile */
