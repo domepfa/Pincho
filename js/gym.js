@@ -535,6 +535,7 @@ function renderFsRestScreen(builder) {
           <span class="fs-rest-state" id="fs-rest-state"></span>
         </div>
       </div>
+      ${builder.sessionStartedAt ? `<div class="fs-rest-total mono">Training gesamt <b id="fs-rest-total">${fmtSessionClock(builder.sessionStartedAt)}</b></div>` : ''}
       <div class="fs-rest-target">
         <button type="button" class="fs-rest-adj" data-rest-adj="-15" aria-label="Pause 15 Sekunden kürzer">−15 s</button>
         <span>Ziel ${fmtMinSec(target)}</span>

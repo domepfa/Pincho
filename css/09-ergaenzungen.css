@@ -93,13 +93,15 @@
 .fs-rest-dial { position: relative; width: min(72vw, 300px); aspect-ratio: 1; }
 .fs-rest-dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .fs-rest-track { fill: none; stroke: var(--surface-2); stroke-width: 12; }
-.fs-rest-ring { fill: none; stroke: #ff6b47; stroke-width: 12; stroke-linecap: round; transition: stroke-dashoffset .9s linear, stroke .3s; }
+.fs-rest-ring { fill: none; stroke: #ff6b47; stroke-width: 12; stroke-linecap: round; transition: stroke .3s; } /* kein Gleiten: springt 1×/s (3°), spart Akku */
 #fs-rest-screen.ready .fs-rest-ring { stroke: var(--success); }
 .fs-rest-center { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 2px; }
 .fs-rest-big { font: 700 clamp(56px, 18vw, 84px)/1 'Barlow Condensed', sans-serif; color: var(--ink); }
 .fs-rest-label { font: 600 12px 'Barlow', system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); }
 .fs-rest-state { font: 600 16px 'Barlow', system-ui, sans-serif; color: #ff6b47; }
 #fs-rest-screen.ready .fs-rest-state { color: var(--success); }
+.fs-rest-total { font: 600 15px 'Barlow', system-ui, sans-serif; color: var(--ink-dim); letter-spacing: .02em; }
+.fs-rest-total b { color: var(--ink); font-weight: 700; }
 .fs-rest-target { display: flex; align-items: center; gap: 14px; color: var(--ink-dim); font: 600 15px 'Barlow', system-ui, sans-serif; }
 .fs-rest-adj { min-width: 64px; min-height: 40px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: 600 14px 'Barlow', system-ui, sans-serif; cursor: pointer; }
 .fs-rest-next { width: 100%; display: grid; gap: 8px; padding: 14px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line-soft); }
