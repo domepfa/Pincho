@@ -458,6 +458,20 @@ function renderFsDiscardButton() {
   };
 }
 
+/* Hochwischen auf der Leiste unten (einmal je Leiste verdrahtet): ruft onUp, wenn der Finger klar nach oben zieht */
+function wireDockSwipeUp(dock, onUp) {
+  if (!dock || dock.dataset.swipe) return;
+  dock.dataset.swipe = '1';
+  let y0 = null;
+  dock.addEventListener('touchstart', (e) => { y0 = e.touches.length === 1 ? e.touches[0].clientY : null; }, { passive: true });
+  dock.addEventListener('touchend', (e) => {
+    if (y0 == null) return;
+    const dy = y0 - e.changedTouches[0].clientY;
+    y0 = null;
+    if (dy > 50) onUp();
+  });
+}
+
 /* ---------- Training beenden (nur Freestyle) ----------
    Immer erreichbar über "Beenden" in der Leiste unten: Zusammenfassung, Notiz, RPE, Speichern und – klein und
    abgesetzt – Verwerfen. Notiz/RPE/Speichern sind die Felder aus dem Formular (log.js, #log-finish-block): sie
@@ -827,7 +841,8 @@ function renderFsPanel() {
     }).join('')}`;
   if (activeGroup && fsPhase !== 'entering') {
     const dock = ensureFsDock();
-    dock.innerHTML = dockHtml(activeGroup);
+    // In der Pause: Griff oben – Leiste hochwischen (oder antippen) holt den Pausen-Bildschirm mit den letzten Trainings zurück
+    dock.innerHTML = (fsPhase === 'resting' ? '<div class="fs-dock-grip" aria-hidden="true"></div>' : '') + dockHtml(activeGroup);
     dock.classList.toggle('resting', fsPhase === 'resting');
     dock.classList.remove('hidden');
     document.body.classList.add('has-fs-dock');
@@ -917,6 +932,9 @@ function renderFsPanel() {
   // Pausenuhr in der Leiste antippen holt den Pausen-Bildschirm zurück
   const restPill = document.getElementById('fs-rest-timer');
   if (restPill) restPill.onclick = () => { fsRestHidden = false; renderFsRestScreen(builder); };
+  const dock = document.getElementById('fs-dock'), grip = dock && dock.querySelector('.fs-dock-grip');
+  if (grip) grip.onclick = () => { fsRestHidden = false; renderFsRestScreen(builder); };
+  wireDockSwipeUp(dock, () => { if (fsPhase === 'resting') { fsRestHidden = false; renderFsRestScreen(activeSetBuilder()); } });
   renderFsRestScreen(builder);
 
   holder.querySelectorAll('[data-activate]').forEach((el) => {
