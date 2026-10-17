@@ -679,7 +679,7 @@ function renderFsPanel() {
       <div class="fs-dock-head mono">
         <span class="fs-dock-name">▸ ${esc(exerciseName(g.exerciseId))}</span>
         ${builder.sessionStartedAt ? `<span class="fs-session-clock" id="fs-session-clock" title="Trainingszeit gesamt">⏱ ${fmtSessionClock(builder.sessionStartedAt)}</span>` : ''}
-        ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-dock-add">+ Übung</button><button type="button" class="btn ghost small" id="fs-dock-finish">Beenden</button>` : ''}
+        ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-dock-add">+ Übung</button><button type="button" class="btn small fs-dock-finish" id="fs-dock-finish">✓ Beenden</button>` : ''}
       </div>`;
     if (fsPhase === 'idle') {
       const sug = fsSetSuggestion(g);
