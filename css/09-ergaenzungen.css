@@ -192,8 +192,12 @@
 .fs-finish-sum span { font-size: 12px; color: var(--ink-dim); }
 #fs-finish-slot #log-save { width: 100%; min-height: 56px; font-size: 20px; }
 .fs-finish-discard { justify-self: center; margin-top: 4px; color: var(--ink-dim); }
-.fs-dock-head #fs-dock-finish { margin-left: 6px; }
 
 /* Griff oben an der Leiste in der Pause: hochwischen/antippen holt den Pausen-Bildschirm zurück */
 .fs-dock-grip { width: 44px; height: 5px; border-radius: 3px; background: var(--line); margin: -4px auto 6px; cursor: pointer; position: relative; }
 .fs-dock-grip::after { content: ''; position: absolute; inset: -12px -40px; }
+
+/* "Beenden" in der Leiste: gut sichtbar (gefüllt, grün), nicht nur ein Textknopf */
+#fs-dock .fs-dock-head .fs-dock-finish { padding: 8px 14px; font-size: 15px; font-weight: 700; background: var(--success, #4ade80); border-color: var(--success, #4ade80); color: #062012; margin-left: 2px; }
+/* Kein "Runterziehen zum Aktualisieren" im Browser (Training geht sonst versehentlich neu los) */
+html, body { overscroll-behavior-y: none; }
