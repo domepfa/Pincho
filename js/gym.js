@@ -472,6 +472,30 @@ function wireDockSwipeUp(dock, onUp) {
   });
 }
 
+/* Knopf, der nur durch Gedrückthalten auslöst (ms): füllt sich dabei sichtbar (--hold 0..1); ein kurzer Tipp
+   zeigt nur den Hinweis. Gegen versehentliches Beenden mitten im Training. */
+function wireHoldButton(btn, ms, onDone) {
+  let t0 = 0, raf = 0, done = false;
+  const set = (v) => btn.style.setProperty('--hold', v.toFixed(3));
+  const step = () => {
+    const v = Math.min(1, (performance.now() - t0) / ms);
+    set(v);
+    if (v >= 1) { done = true; t0 = 0; fbBuzz([40]); setTimeout(() => set(0), 200); onDone(); return; }
+    raf = requestAnimationFrame(step);
+  };
+  const start = (e) => { e.preventDefault(); done = false; t0 = performance.now(); btn.classList.add('holding'); raf = requestAnimationFrame(step); };
+  const stop = () => {
+    if (!t0 && !done) return;
+    cancelAnimationFrame(raf); btn.classList.remove('holding');
+    if (!done && t0) toast('Zum Beenden gedrückt halten.', 'ok');
+    t0 = 0; set(0);
+  };
+  btn.addEventListener('pointerdown', start);
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => btn.addEventListener(ev, stop));
+  btn.addEventListener('contextmenu', (e) => e.preventDefault()); // kein Kontextmenü beim langen Drücken
+  btn.onclick = null;
+}
+
 /* ---------- Training beenden (nur Freestyle) ----------
    Immer erreichbar über "Beenden" in der Leiste unten: Zusammenfassung, Notiz, RPE, Speichern und – klein und
    abgesetzt – Verwerfen. Notiz/RPE/Speichern sind die Felder aus dem Formular (log.js, #log-finish-block): sie
@@ -854,7 +878,7 @@ function renderFsPanel() {
   updateFsRestTimerUI();
 
   const dockFinish = document.getElementById('fs-dock-finish');
-  if (dockFinish) dockFinish.onclick = openFsFinishScreen;
+  if (dockFinish) wireHoldButton(dockFinish, 700, openFsFinishScreen);
   const dockAdd = document.getElementById('fs-dock-add');
   if (dockAdd) {
     dockAdd.onclick = () => {

@@ -213,3 +213,6 @@ body.training-locked .bottomnav a:not(.active), body.training-locked .topbar .wh
 #dim-overlay .dim-sub { font: 600 18px 'Barlow', system-ui, sans-serif; min-height: 22px; }
 #dim-overlay.ready .dim-sub, #dim-overlay.ready .dim-time { color: #2f7a4c; }
 #dim-overlay .dim-hint { position: absolute; bottom: calc(28px + var(--safe-bottom, 0px)); font-size: 12px; color: #343a42; }
+
+/* "Beenden" gedrückt halten: Füllung von links */
+#fs-dock .fs-dock-head .fs-dock-finish { --hold: 0; background-image: linear-gradient(90deg, rgba(0,0,0,.28) calc(var(--hold) * 100%), transparent 0); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
