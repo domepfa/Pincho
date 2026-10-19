@@ -133,6 +133,11 @@ let planExecution = null;
    Plan-Ausführung sehen UI-seitig identisch aus (Übung wählen/aktivieren,
    Satz für Satz erfassen), deshalb teilen sie sich dieselben Render-
    Funktion (renderFsPanel) statt doppelten Code. */
+/* Läuft gerade ein Gym-Training (Freestyle mit Übungen oder Plan-Ausführung)? Dann ist Umschalten gesperrt –
+   Modus-Wahl ausgeblendet, Tabs und Konto führen nicht weg (main.js), bis über "Beenden" gespeichert/verworfen ist. */
+function trainingLocked() {
+  return (logMode === 'execute' && !!planExecution) || (logMode === 'freestyle' && freestyleBuilder.exercises.length > 0);
+}
 function activeSetBuilder() {
   return logMode === 'execute' ? planExecution : freestyleBuilder;
 }
@@ -276,7 +281,7 @@ async function renderLog() {
         </div>
       </div>`}
 
-      ${logMode === 'execute' || showingRecap ? '' : `
+      ${showingRecap ? '' : trainingLocked() ? `<div class="training-lock-note">${logMode === 'execute' ? 'Plan' : 'Freestyle'} läuft – zum Wechseln erst beenden</div>` : `
       <div class="chip-row log-mode-row">
         <button type="button" class="chip ${logMode === 'planned' ? 'active' : ''}" data-log-mode="planned">Plan</button>
         <button type="button" class="chip ${logMode === 'freestyle' ? 'active' : ''}" data-log-mode="freestyle">Freestyle</button>

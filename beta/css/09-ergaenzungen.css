@@ -201,3 +201,7 @@
 #fs-dock .fs-dock-head .fs-dock-finish { padding: 8px 14px; font-size: 15px; font-weight: 700; background: var(--success, #4ade80); border-color: var(--success, #4ade80); color: #062012; margin-left: 2px; }
 /* Kein "Runterziehen zum Aktualisieren" im Browser (Training geht sonst versehentlich neu los) */
 html, body { overscroll-behavior-y: none; }
+
+/* Training läuft: Tabs/Konto sichtbar gesperrt, statt Modus-Wahl ein Hinweis */
+body.training-locked .bottomnav a:not(.active), body.training-locked .topbar .who { opacity: .35; }
+.training-lock-note { margin: 4px 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--surface-2); color: var(--ink-dim); font-size: 14px; text-align: center; }

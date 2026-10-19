@@ -846,6 +846,7 @@ function renderFsPanel() {
     dock.classList.toggle('resting', fsPhase === 'resting');
     dock.classList.remove('hidden');
     document.body.classList.add('has-fs-dock');
+    document.body.classList.toggle('training-locked', trainingLocked());
   } else {
     hideFsDock();
   }

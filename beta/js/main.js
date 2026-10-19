@@ -9,7 +9,14 @@
 
 /* ---------- Start ---------- */
 window.addEventListener('hashchange', () => {
-  state.route = location.hash ? location.hash.replace('#', '') : defaultRoute();
+  const next = location.hash ? location.hash.replace('#', '') : defaultRoute();
+  // Training läuft: nicht wegnavigieren (Tabs, Konto, Zurück-Taste) – zurück auf Gym, kurzer Hinweis
+  if (state.route === 'log' && next !== 'log' && trainingLocked()) {
+    history.replaceState(null, '', '#log');
+    toast('Training läuft – erst beenden (✓ Beenden unten).', 'err');
+    return;
+  }
+  state.route = next;
   render();
 });
 boot();

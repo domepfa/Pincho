@@ -159,7 +159,7 @@ function hideFsDock() {
   hideFsRestScreen();
   const el = document.getElementById('fs-dock');
   if (el) { el.classList.add('hidden'); el.innerHTML = ''; }
-  document.body.classList.remove('has-fs-dock');
+  document.body.classList.remove('has-fs-dock', 'training-locked');
 }
 
 function render() {
