@@ -1156,3 +1156,52 @@ function fsMachineNoteHtml(exerciseId) {
     </div>
   `;
 }
+
+/* ---------- Ruhemodus (Akku) ----------
+   Läuft ein Gym-Training und wurde 15 s nichts berührt, wird in der Pause und während eines Satzes alles schwarz bis
+   auf eine gedämpfte grosse Uhr. Auf OLED-Displays braucht Schwarz praktisch keinen Strom; die Helligkeit selbst darf
+   eine Web-App nicht ändern. Ein Tipp irgendwo weckt die Anzeige (der Tipp löst sonst nichts aus). Ton und Vibration
+   am Pausenende laufen unverändert weiter. */
+const DIM_AFTER_MS = 15000;
+let dimLastTouch = Date.now();
+function dimClockText() {
+  if (fsPhase === 'resting') {
+    const target = fsRestTargetSec(), left = target - fsRestTimer.seconds;
+    return { label: 'Pause', time: fmtMinSec(fsRestTimer.seconds), sub: left > 0 ? `noch ${fmtMinSec(left)}` : 'Bereit', ready: left <= 0 };
+  }
+  if (fsPhase === 'working') return { label: 'Satz läuft', time: fmtMinSec(fsWorkTimer.seconds), sub: '', ready: false };
+  return null;
+}
+function dimTick() {
+  const el = document.getElementById('dim-overlay');
+  const info = document.body.classList.contains('training-locked') && state.route === 'log' ? dimClockText() : null;
+  if (!info) { if (el) el.remove(); return; }
+  if (!el && Date.now() - dimLastTouch < DIM_AFTER_MS) return;
+  let ov = el;
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'dim-overlay';
+    ov.innerHTML = '<div class="dim-label"></div><div class="dim-time mono"></div><div class="dim-sub"></div><div class="dim-hint">Tippen zum Aufwecken</div>';
+    document.body.appendChild(ov);
+  }
+  ov.querySelector('.dim-label').textContent = info.label;
+  ov.querySelector('.dim-time').textContent = info.time;
+  ov.querySelector('.dim-sub').textContent = info.sub;
+  ov.classList.toggle('ready', info.ready);
+}
+// jede Berührung zählt als Aktivität; liegt der Ruhemodus an, weckt sie nur – der zugehörige Klick wird verschluckt,
+// damit er nicht den Knopf unter der schwarzen Fläche auslöst (z. B. "Nächster Satz")
+let dimWokeAt = 0;
+const dimWake = (e) => {
+  dimLastTouch = Date.now();
+  const ov = document.getElementById('dim-overlay');
+  if (!ov) return;
+  dimWokeAt = Date.now();
+  e.preventDefault(); e.stopPropagation();
+  setTimeout(() => ov.remove(), 400);
+};
+['pointerdown', 'keydown', 'touchstart'].forEach((t) => window.addEventListener(t, dimWake, { capture: true, passive: false }));
+['click', 'pointerup', 'touchend'].forEach((t) => window.addEventListener(t, (e) => {
+  if (Date.now() - dimWokeAt < 700) { e.preventDefault(); e.stopPropagation(); }
+}, { capture: true, passive: false }));
+setInterval(dimTick, 1000);

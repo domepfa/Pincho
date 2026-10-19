@@ -205,3 +205,11 @@ html, body { overscroll-behavior-y: none; }
 /* Training läuft: Tabs/Konto sichtbar gesperrt, statt Modus-Wahl ein Hinweis */
 body.training-locked .bottomnav a:not(.active), body.training-locked .topbar .who { opacity: .35; }
 .training-lock-note { margin: 4px 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--surface-2); color: var(--ink-dim); font-size: 14px; text-align: center; }
+
+/* Ruhemodus während des Trainings: fast nur Schwarz (OLED spart), Uhr gedämpft */
+#dim-overlay { position: fixed; inset: 0; z-index: 300; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #5b6470; cursor: pointer; }
+#dim-overlay .dim-label { font: 600 14px 'Barlow', system-ui, sans-serif; letter-spacing: .16em; text-transform: uppercase; }
+#dim-overlay .dim-time { font: 700 96px/1 'Barlow Condensed', sans-serif; color: #6b7480; }
+#dim-overlay .dim-sub { font: 600 18px 'Barlow', system-ui, sans-serif; min-height: 22px; }
+#dim-overlay.ready .dim-sub, #dim-overlay.ready .dim-time { color: #2f7a4c; }
+#dim-overlay .dim-hint { position: absolute; bottom: calc(28px + var(--safe-bottom, 0px)); font-size: 12px; color: #343a42; }
