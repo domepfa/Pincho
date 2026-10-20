@@ -106,6 +106,7 @@ function renderLogBuilderPanel() {
       if (!confirm('Ausführung abbrechen? Noch nicht gespeicherte Sätze gehen verloren.')) return;
       stopAllFsTimers();
       planExecution = null;
+      saveDraft('plan_exec', null);
       logMode = 'planned';
       renderLog();
     };
@@ -647,7 +648,7 @@ function renderFsRestScreen(builder) {
     noteInput.oninput = () => {
       noteSet.note = noteInput.value.trim();
       if (!noteSet.note) delete noteSet.note;
-      if (logMode === 'freestyle') saveDraft('freestyle', builder);
+      saveTrainingDraft();
     };
     noteInput.onkeydown = (e) => { if (e.key === 'Enter') noteInput.blur(); };
   }
@@ -683,7 +684,7 @@ function renderFsPanel() {
   const holder = document.getElementById('fs-panel');
   if (!holder) return;
   const builder = activeSetBuilder();
-  if (logMode === 'freestyle') saveDraft('freestyle', builder);
+  saveTrainingDraft();
   renderFsDiscardButton();
 
   if (!builder.exercises.length) {
@@ -1004,7 +1005,7 @@ function renderFsPanel() {
       const [gi, si, f] = inp.dataset.edit.split(':');
       const set = builder.exercises[Number(gi)].sets[Number(si)];
       set[f] = f === 'weight' ? (inp.value === '' ? '' : Number(inp.value)) : inp.value;
-      if (logMode === 'freestyle') saveDraft('freestyle', builder);
+      saveTrainingDraft();
     };
   });
   holder.querySelectorAll('[data-machine-note]').forEach((ta) => {

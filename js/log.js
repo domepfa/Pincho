@@ -126,8 +126,9 @@ function sharedTemplatesOfKind(kind) {
 /* Laufende Ausführung eines Plans: gleiche Form wie freestyleBuilder
    (exercises: [{exerciseId, sets:[...]}], activeIndex), zusätzlich die
    Ziel-Werte aus dem Plan pro Übung fürs "Ziel: ..."-Label. Wird nur über
-   "Plan starten" gesetzt; null, solange keine Ausführung läuft. */
-let planExecution = null;
+   "Plan starten" gesetzt; null, solange keine Ausführung läuft. Wird wie der
+   Freestyle als Entwurf gespeichert, damit sie ein Wegwischen der App übersteht. */
+let planExecution = loadDraft('plan_exec');
 
 /* Der für den aktuellen logMode "aktive" Satz-Builder — Freestyle und
    Plan-Ausführung sehen UI-seitig identisch aus (Übung wählen/aktivieren,
@@ -140,6 +141,12 @@ function trainingLocked() {
 }
 function activeSetBuilder() {
   return logMode === 'execute' ? planExecution : freestyleBuilder;
+}
+
+/* Laufendes Training (Freestyle oder Plan-Ausführung) auf dem Handy sichern */
+function saveTrainingDraft() {
+  if (logMode === 'freestyle') saveDraft('freestyle', freestyleBuilder);
+  else if (logMode === 'execute') saveDraft('plan_exec', planExecution);
 }
 
 /* Letzter bekannter Wert für eine Übung — über die komplette Session-
@@ -361,6 +368,7 @@ async function renderLog() {
         // Der Plan selbst bleibt erhalten (wie eine Fingerboard-Vorlage) —
         // nur die gerade laufende Ausführung wird zurückgesetzt.
         planExecution = null;
+        saveDraft('plan_exec', null);
         logMode = 'planned';
       } else {
         freestyleBuilder = { exercises: [], activeIndex: -1, pickerExerciseId: EXERCISE_LIBRARY[0].id, sessionStartedAt: null };

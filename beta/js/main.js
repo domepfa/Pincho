@@ -19,4 +19,13 @@ window.addEventListener('hashchange', () => {
   state.route = next;
   render();
 });
+/* App wurde mitten im Training geschlossen (z. B. weggewischt): laufendes
+   Training wiederherstellen und direkt im Gym-Tab öffnen. */
+if (planExecution) logMode = 'execute';
+else if (freestyleBuilder.exercises.length) logMode = 'freestyle';
+if (trainingLocked()) {
+  state.route = 'log';
+  history.replaceState(null, '', '#log');
+  toast('Training wiederhergestellt.');
+}
 boot();
