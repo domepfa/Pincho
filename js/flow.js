@@ -342,22 +342,22 @@ async function beginFlowBlock() {
   renderFlowOverlay();
   // Flow bewusst ruhig: nur ein Gong zum Einstieg in die erste Pose —
   // danach kommt der Gong jeweils am Ende einer Haltephase (Signal zum
-  // Wechseln, vorher 3 kurze Pieps, siehe tickFlow), nicht nochmal beim
+  // Wechseln, vorher 3 leise Countdown-Töne, siehe tickFlow), nicht nochmal beim
   // Beginn der nächsten.
   if (flow.blockIndex === 0) gong();
 }
 
 function tickFlow() {
   flow.secondsLeft--;
-  // Letzte 3 Sekunden einer Haltephase: kurzer Piep pro Sekunde, danach der Gong
-  if (flow.sequence[flow.stepIndex].phase === 'Halten' && flow.secondsLeft > 0 && flow.secondsLeft <= 3) beepTick();
+  // Letzte 3 Sekunden (Halten und Wechsel): leiser Klangschalen-Ton pro Sekunde
+  if (flow.secondsLeft > 0 && flow.secondsLeft <= 3) gong(undefined, true);
   if (flow.secondsLeft <= 0) {
     const endedPhase = flow.sequence[flow.stepIndex].phase;
     flow.stepIndex++;
     const sequenceDone = flow.stepIndex >= flow.sequence.length;
     // Ein Gong, sobald eine Pose fertig gehalten ist (= jetzt in die
-    // nächste wechseln) — kein Ton am Ende der
-    // Wechselzeit. Ausnahme: endet mit dieser Pose der ganze Flow, gibt
+    // nächste wechseln); am Ende der Wechselzeit nur der leise Countdown
+    // davor. Ausnahme: endet mit dieser Pose der ganze Flow, gibt
     // finishFlowSession() den Abschluss-Gong (2×) statt eines einzelnen.
     const isFinalStep = sequenceDone && flow.blockIndex === flowBlocks.length - 1;
     if (endedPhase === 'Halten' && !isFinalStep) gong();
