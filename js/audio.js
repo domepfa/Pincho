@@ -110,16 +110,18 @@ function beepEnd() {
    Gong/Klangschale), kurzer Anschlag und langes, weiches Ausklingen.
    gongStrikes(n) schlägt n-mal hintereinander, damit man die Pausenlänge
    auch ohne hinzuschauen am Gehör abzählen kann. */
-function gong(when) {
+function gong(when, soft) {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!beep.ctx) beep.ctx = new Ctx();
     const ctx = beep.ctx;
     if (ctx.state === 'suspended') ctx.resume();
     const t0 = when ?? ctx.currentTime;
-    const base = 220;
+    // soft: kleine Klangschale (höher, leiser, kurz) für den Countdown im Flow
+    const base = soft ? 440 : 220;
     const partials = [[1, 0.22, 2.6], [2.02, 0.09, 1.8], [2.74, 0.06, 1.3], [4.1, 0.03, 0.8]];
     partials.forEach(([ratio, vol, decay]) => {
+      if (soft) { vol *= 0.6; decay *= 0.35; }
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
