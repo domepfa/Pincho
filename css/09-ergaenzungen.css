@@ -216,3 +216,7 @@ body.training-locked .bottomnav a:not(.active), body.training-locked .topbar .wh
 
 /* "Beenden" gedrückt halten: Füllung von links */
 #fs-dock .fs-dock-head .fs-dock-finish { --hold: 0; background-image: linear-gradient(90deg, rgba(0,0,0,.28) calc(var(--hold) * 100%), transparent 0); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
+/* Ruhemodus: Hauptknopf der Leiste (Satz beenden / Nächster Satz) direkt antippbar, dunkel für OLED */
+#dim-overlay .dim-action { margin-top: 36px; min-width: 220px; padding: 18px 28px; border-radius: 999px; border: 2px solid #2a3038; background: #0b0d10; color: #8a939e; font: 700 22px 'Barlow Condensed', sans-serif; letter-spacing: .04em; cursor: pointer; }
+#dim-overlay .dim-action[hidden] { display: none; }
+#dim-overlay.ready .dim-action { border-color: #2f7a4c; color: #4fa872; }

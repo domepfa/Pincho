@@ -1190,11 +1190,13 @@ function fsMachineNoteHtml(exerciseId) {
 const DIM_AFTER_MS = 15000;
 let dimLastTouch = Date.now();
 function dimClockText() {
+  // action: Knopf der Leiste, den der Ruhemodus direkt anbietet (ein Tipp weniger)
   if (fsPhase === 'resting') {
     const target = fsRestTargetSec(), left = target - fsRestTimer.seconds;
-    return { label: 'Pause', time: fmtMinSec(fsRestTimer.seconds), sub: left > 0 ? `noch ${fmtMinSec(left)}` : 'Bereit', ready: left <= 0 };
+    const action = document.getElementById('fs-next-exercise') || document.getElementById('fs-next-set');
+    return { label: 'Pause', time: fmtMinSec(fsRestTimer.seconds), sub: left > 0 ? `noch ${fmtMinSec(left)}` : 'Bereit', ready: left <= 0, action };
   }
-  if (fsPhase === 'working') return { label: 'Satz läuft', time: fmtMinSec(fsWorkTimer.seconds), sub: '', ready: false };
+  if (fsPhase === 'working') return { label: 'Satz läuft', time: fmtMinSec(fsWorkTimer.seconds), sub: '', ready: false, action: document.getElementById('fs-end-set') };
   return null;
 }
 function dimTick() {
@@ -1206,8 +1208,20 @@ function dimTick() {
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'dim-overlay';
-    ov.innerHTML = '<div class="dim-label"></div><div class="dim-time mono"></div><div class="dim-sub"></div><div class="dim-hint">Tippen zum Aufwecken</div>';
+    ov.innerHTML = '<div class="dim-label"></div><div class="dim-time mono"></div><div class="dim-sub"></div><button type="button" class="dim-action"></button><div class="dim-hint">Sonst irgendwo tippen zum Aufwecken</div>';
     document.body.appendChild(ov);
+    ov.querySelector('.dim-action').onclick = () => {
+      const target = document.getElementById(ov.querySelector('.dim-action').dataset.target);
+      ov.remove();
+      dimLastTouch = Date.now();
+      target?.click(); // noch in derselben Geste, damit "Satz beenden" die Zahlentastatur öffnen darf
+    };
+  }
+  const actBtn = ov.querySelector('.dim-action');
+  actBtn.hidden = !info.action;
+  if (info.action) {
+    actBtn.dataset.target = info.action.id;
+    actBtn.textContent = info.action.textContent.trim();
   }
   ov.querySelector('.dim-label').textContent = info.label;
   ov.querySelector('.dim-time').textContent = info.time;
@@ -1220,7 +1234,7 @@ let dimWokeAt = 0;
 const dimWake = (e) => {
   dimLastTouch = Date.now();
   const ov = document.getElementById('dim-overlay');
-  if (!ov) return;
+  if (!ov || e.target.closest?.('.dim-action')) return; // Knopf im Ruhemodus: normal auslösen
   dimWokeAt = Date.now();
   e.preventDefault(); e.stopPropagation();
   setTimeout(() => ov.remove(), 400);
