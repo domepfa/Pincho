@@ -1845,6 +1845,12 @@ const SLOTH_SWAPS = {
   tgu: { imgs: [['pose_tgu_a', [480, 554]], ['pose_tgu_b', [800, 531]]], dur: 6, sx: -170, label: 'Turkish Get-up' }, // sx: Schatten unter die Körpermitte
   windmill: { imgs: [['pose_windmill_a', [1012, 559]], ['pose_windmill_b', [1322, 562]]], dur: 4.4, label: 'Kettlebell Windmill' },
   halo: { imgs: [['pose_halo_a', [606, 1006]], ['pose_halo_b', [915, 1006]]], dur: 3, label: 'Kettlebell Halo' },
+  // Yoga/Pilates (sheets/poses_yoga.png): Haltungen atmen, Beinkreisen und Säge wechseln zwischen zwei Bildern; top = von oben, ohne Schatten
+  eagle: { imgs: [['pose_eagle', [136, 511]]], dur: 5, label: 'Adler' },
+  twist: { imgs: [['pose_twist', [845, 503]]], dur: 5, top: true, label: 'Liegende Drehung' },
+  baby: { imgs: [['pose_baby', [1180, 485]]], dur: 5, label: 'Glückliches Baby' },
+  legcircle: { imgs: [['pose_legcircle_a', [164, 1047]], ['pose_legcircle_b', [434, 1048]]], dur: 4, top: true, label: 'Beinkreisen' },
+  saw: { imgs: [['pose_saw_a', [743, 1022]], ['pose_saw_b', [1124, 1024]]], dur: 5, label: 'Die Säge' },
 };
 function slothSwapFigure(name, cls) {
   const sw = SLOTH_SWAPS[name];
@@ -1864,7 +1870,7 @@ function slothSwapFigure(name, cls) {
     slothRigCache['swap:' + name] = true;
   }
   const pad = 20, w = x1 - x0 + 2 * pad, h = y1 - y0 + 2 * pad;
-  const shadow = `<ellipse class="sloth-rig-shadow" cx="${sw.sx || 0}" cy="-4" rx="${Math.round((x1 - x0) * 0.4)}" ry="10"/>`;
+  const shadow = sw.top ? '' : `<ellipse class="sloth-rig-shadow" cx="${sw.sx || 0}" cy="-4" rx="${Math.round((x1 - x0) * 0.4)}" ry="10"/>`;
   return `<svg class="sloth-rig sr-${name} ${cls}" data-dur="${sw.dur}" viewBox="${x0 - pad} ${y0 - pad} ${w} ${h}" width="${Math.round(w / 1.5)}" height="${Math.round(h / 1.5)}" role="img" aria-label="${sw.label}">${shadow}${imgs.join('')}</svg>`;
 }
 
