@@ -418,6 +418,14 @@ function setFlowFigure(holder, block, working) {
   holder.innerHTML = flowFigureHtml(block, working);
 }
 
+// Hinweis unter dem Timer: beim Halten die Wechselpause, in der Pause die nächste Pose
+function flowNextText(working) {
+  const block = flowBlocks[flow.blockIndex];
+  const next = flowBlocks[flow.blockIndex + 1];
+  if (working && block.restSec > 0) return `Danach: Wechsel ${block.restSec}s`;
+  return next ? `Danach: ${esc(poseName(next.poseId))}` : 'Letzte Pose — gleich geschafft!';
+}
+
 function renderFlowOverlay() {
   const el = ensureFlowOverlay();
   const block = flowBlocks[flow.blockIndex];
@@ -426,10 +434,6 @@ function renderFlowOverlay() {
   const isPausedNow = flow.running && !flow.intervalId;
   const frac = step.seconds ? 1 - flow.secondsLeft / step.seconds : 0;
   const ringOffset = (FB_RING_CIRCUMFERENCE * (1 - frac)).toFixed(1);
-  const next = flowBlocks[flow.blockIndex + 1];
-  const nextText = working && block.restSec > 0
-    ? `Danach: Wechsel ${block.restSec}s`
-    : next ? `Danach: ${esc(poseName(next.poseId))}` : 'Letzte Pose — gleich geschafft!';
   el.innerHTML = `
     <button type="button" class="fb-overlay-close" id="flow-close" title="Abbrechen">✕</button>
     <div class="fb-overlay-inner">
@@ -445,7 +449,7 @@ function renderFlowOverlay() {
         </div>
       </div>
       <div class="phase mono" id="flow-phase">${isPausedNow ? 'PAUSIERT' : working ? 'Halten' : 'Wechsel'}</div>
-      <div class="fb-stage-next mono">${nextText}</div>
+      <div class="fb-stage-next mono" id="flow-next">${flowNextText(working)}</div>
       <div class="fb-transport">
         <button type="button" class="fb-transport-btn fb-play" id="flow-playpause" title="${isPausedNow ? 'Weiter' : 'Pause'}">${isPausedNow ? TRANSPORT_ICON.play : TRANSPORT_ICON.pause}</button>
       </div>
@@ -473,6 +477,8 @@ function updateFlowUI() {
   }
   const phaseEl = document.getElementById('flow-phase');
   if (phaseEl) phaseEl.textContent = working ? 'Halten' : 'Wechsel';
+  const nextEl = document.getElementById('flow-next');
+  if (nextEl) nextEl.innerHTML = flowNextText(working);
   const figureHolder = document.getElementById('flow-figure');
   if (figureHolder) setFlowFigure(figureHolder, flowBlocks[flow.blockIndex], working);
 }
