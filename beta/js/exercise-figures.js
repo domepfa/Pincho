@@ -2686,7 +2686,7 @@ const SLOTH_EXERCISE_POSES = {
   trx_chest_press: 'trxchestpress', trx_triceps_ext: 'trxtriceps', trx_fallout: 'trxfallout', trx_pistol_squat: 'trxpistol',
   trx_push_up: 'trxpushup', trx_pike: 'trxpike', trx_knee_tuck: 'trxtuck', trx_hamstring_curl: 'trxhamcurl',
   sun_salutation: 'sunsal',
-  eagle_pose: 'eagle', reclining_twist: 'twist', happy_baby: 'baby', leg_circles_pilates: 'legcircle', saw_pilates: 'saw',
+  eagle_pose: 'eagle', pigeon_pose: 'pigeon', reclining_twist: 'twist', happy_baby: 'baby', leg_circles_pilates: 'legcircle', saw_pilates: 'saw',
   // Yoga/Pilates (POSE_LIBRARY, Flow-Modus): Haltungen mit Atmen bzw. Pilates-Bewegungen
   mountain_pose: 'ymountain', downward_dog: 'ydog', childs_pose: 'ychild', cat_cow_flow: 'catcow', cobra_pose: 'ycobra',
   triangle_pose: 'ytriangle', extended_side_angle: 'ysideangle', chair_pose: 'ychair', tree_pose: 'ytree', low_lunge: 'ylowlunge',
