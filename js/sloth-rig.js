@@ -1847,6 +1847,7 @@ const SLOTH_SWAPS = {
   halo: { imgs: [['pose_halo_a', [606, 1006]], ['pose_halo_b', [915, 1006]]], dur: 3, label: 'Kettlebell Halo' },
   // Yoga/Pilates (sheets/poses_yoga.png): Haltungen atmen, Beinkreisen und Säge wechseln zwischen zwei Bildern; top = von oben, ohne Schatten
   eagle: { imgs: [['pose_eagle', [136, 511]]], dur: 5, label: 'Adler' },
+  pigeon: { imgs: [['pose_pigeon', [245, 333]]], dur: 5, label: 'Taube' }, // eigenes Bild, sheets/poses_pigeon.png
   twist: { imgs: [['pose_twist', [845, 503]]], dur: 5, top: true, label: 'Liegende Drehung' },
   baby: { imgs: [['pose_baby', [1180, 485]]], dur: 5, label: 'Glückliches Baby' },
   legcircle: { imgs: [['pose_legcircle_a', [164, 1047]], ['pose_legcircle_b', [434, 1048]]], dur: 4, top: true, label: 'Beinkreisen' },

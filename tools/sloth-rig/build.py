@@ -47,8 +47,10 @@ POSES = ('poses_extra.jpg', {'russian_a': [2], 'russian_b': [1], 'ninety': [5], 
 # Kettlebell-Übungen als ganze Posen (GPT-Blatt, Oktober 2026): Turkish Get-up, Windmill, Halo – je Anfang und Ende
 POSES_KB = ('poses_kb.png', {'tgu_a': [4], 'tgu_b': [3], 'windmill_a': [2], 'windmill_b': [1], 'halo_a': [5], 'halo_b': [6]})
 
-# Yoga/Pilates als ganze Posen (GPT-Blatt, Oktober 2026); die Taube (Teil 2) ist als Spagat gezeichnet, darum nicht übernommen
+# Yoga/Pilates als ganze Posen (GPT-Blatt, Oktober 2026); die Taube (Teil 2) ist dort als Spagat gezeichnet,
+# sie kommt aus einem eigenen Bild (auf 34 % verkleinert, damit der Massstab zum Blatt passt)
 POSES_YOGA = ('poses_yoga.png', {'eagle': [1], 'twist': [3], 'baby': [4], 'legcircle_a': [51], 'legcircle_b': [52], 'saw_a': [53], 'saw_b': [54]})
+POSES_PIGEON = ('poses_pigeon.png', {'pigeon': [1]})
 
 # Geräte (Requisiten), Teil-Nummern je Blatt in sheets/equipment/
 EQUIP = {
@@ -167,10 +169,11 @@ def main():
     g = gray(rgb)
     for name, ids in POSES_KB[1].items():
         parts[f'pose_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'pose_{name}.png'))
-    rgb, lab = label(os.path.join(HERE, 'sheets', POSES_YOGA[0]))
-    g = gray(rgb)
-    for name, ids in POSES_YOGA[1].items():
-        parts[f'pose_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'pose_{name}.png'))
+    for fname, comps in (POSES_YOGA, POSES_PIGEON):
+        rgb, lab = label(os.path.join(HERE, 'sheets', fname))
+        g = gray(rgb)
+        for name, ids in comps.items():
+            parts[f'pose_{name}'] = cut(rgb, lab, ids, g, os.path.join(OUT, f'pose_{name}.png'))
     for fname, comps in EQUIP.items():
         rgb, lab = label(os.path.join(HERE, 'sheets', 'equipment', fname))
         g = gray(rgb)
