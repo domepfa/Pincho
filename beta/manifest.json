@@ -10,5 +10,9 @@
     { "src": "../assets/icon-beta-192-any.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "../assets/icon-beta-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "../assets/icon-beta-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+  ],
+  "share_target": {
+    "action": "./share-watch", "method": "POST", "enctype": "multipart/form-data",
+    "params": { "files": [{ "name": "file", "accept": [".fit", "application/vnd.ant.fit", "application/fit", "application/octet-stream"] }] }
+  }
 }
