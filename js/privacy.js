@@ -33,6 +33,7 @@ async function renderPrivacy() {
         <li><b>Training:</b> Logs (Übungen, Sätze, Gewichte, Dauer, Notizen), Pläne, Fingerboard-Einheiten, Vorlagen und Einstellungen.</li>
         <li><b>Crews:</b> in welchen Crews du bist, deine Challenges, dein "Mitgemacht" und Vorlagen, die du mit der Crew teilst.</li>
         <li><b>Eigene Übungen und Übungswünsche:</b> deine eigenen Übungen sind privat. Einen Übungswunsch (Name, Muskelgruppe, Hinweis, dein Name) sieht nur ${PRIVACY_OPERATOR}.</li>
+        <li><b>Uhr-Daten (freiwillig):</b> nur wenn du selbst eine Uhr-Datei (z. B. von Coros) zu einem Training hinzufügst: Puls (Ø, Max und Verlauf), Kalorien, Dauer und Gerätename. Die Datei selbst wird nicht gespeichert. Entfernen: das Training im Verlauf löschen.</li>
         <li><b>Zyklus (freiwillig):</b> nur die Daten deines Periodenbeginns. Das sind Gesundheitsdaten — sie werden nur mit deiner ausdrücklichen Einwilligung gespeichert, die du jederzeit widerrufen kannst (Tab Fortschritt → Zyklus → Ausschalten &amp; löschen).</li>
       </ul>
       <h3>Wer sieht was</h3>

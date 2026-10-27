@@ -1,9 +1,9 @@
-const CACHE_NAME = 'pincho-beta-v96';
+const CACHE_NAME = 'pincho-beta-v97';
 const SHELL_ASSETS = [
   './', './index.html',
   './css/01-basis.css', './css/02-bereiche.css', './css/03-ablauf.css', './css/04-look-basis.css', './css/05-look-board.css', './css/06-look-seiten.css', './css/07-faultier.css', './css/08-ablauf-ruhig.css', './css/09-ergaenzungen.css', './css/10-duell.css', './css/11-abwechslung.css',
   // Reihenfolge wie in index.html
-  './js/config.js', './js/data.js', './js/firebase.js', './js/sloth-rig-data.js', './js/sloth-rig.js', './js/core.js', './js/exercise-picker.js', './js/login.js', './js/shell.js', './js/plan.js', './js/log.js', './js/ausdauer.js', './js/flow.js', './js/gym.js', './js/fingerboard.js', './js/fb-builder.js', './js/fb-dice.js', './js/exercise-figures.js', './js/fb-blocks.js', './js/audio.js', './js/fb-runner.js', './js/progress.js', './js/cycle.js', './js/challenges.js', './js/privacy.js', './js/help.js', './js/custom-exercises.js', './js/konto.js', './js/main.js',
+  './js/config.js', './js/data.js', './js/firebase.js', './js/sloth-rig-data.js', './js/sloth-rig.js', './js/core.js', './js/exercise-picker.js', './js/login.js', './js/shell.js', './js/plan.js', './js/log.js', './js/ausdauer.js', './js/flow.js', './js/gym.js', './js/fingerboard.js', './js/fb-builder.js', './js/fb-dice.js', './js/exercise-figures.js', './js/fb-blocks.js', './js/audio.js', './js/fb-runner.js', './js/progress.js', './js/cycle.js', './js/challenges.js', './js/privacy.js', './js/help.js', './js/custom-exercises.js', './js/konto.js', './js/watch-import.js', './js/main.js',
   './manifest.json', '../assets/icon-512-any.png', '../assets/icon-192-any.png', '../assets/icon-512-transparent.png', '../assets/icon-512-maskable.png', '../assets/icon-beta-192-any.png', '../assets/icon-beta-512-maskable.png',
   '../assets/board-bm1000.png', '../assets/board-bm2000.png', '../assets/board-campus.jpg',
   '../assets/ki-anleitung-json.md',
@@ -72,6 +72,22 @@ function cacheFirst(request) {
     return cached || fetchPromise;
   });
 }
+
+/* "Teilen" → Pincho (share_target in manifest.json): die geteilte Uhr-Datei (FIT) im Cache ablegen und die
+   App öffnen; watch-import.js holt sie dort nach dem Start ab. */
+const SHARE_CACHE = 'pincho-share';
+self.addEventListener('fetch', (e) => {
+  const url = new URL(e.request.url);
+  if (e.request.method !== 'POST' || !url.pathname.endsWith('/share-watch')) return;
+  e.respondWith((async () => {
+    try {
+      const form = await e.request.formData();
+      const file = form.getAll('file').find((f) => f && typeof f !== 'string');
+      if (file) await (await caches.open(SHARE_CACHE)).put(new URL('shared-watch.fit', self.registration.scope).href, new Response(file));
+    } catch (err) { /* ohne Datei einfach die App öffnen */ }
+    return Response.redirect(new URL('./index.html#log', self.registration.scope).href, 303);
+  })());
+});
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;

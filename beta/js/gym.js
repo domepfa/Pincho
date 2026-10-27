@@ -1063,7 +1063,7 @@ function renderFsPanel() {
       repsEl.blur();
       setTimeout(() => {
         const unit = exerciseUnit(builder.exercises[builder.activeIndex].exerciseId);
-        builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps, elapsedSec: fsCapturedElapsed, unit });
+        builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps, elapsedSec: fsCapturedElapsed, unit, at: Date.now() }); // at: für Puls je Satz (Uhr-Daten)
         fsNoteTarget = { gi: builder.activeIndex, si: builder.exercises[builder.activeIndex].sets.length - 1 };
         // Supersatz: ohne Pause weiter zur nächsten Übung der Runde; Pause erst nach der letzten
         const mem = supersetMembers(builder.exercises, builder.activeIndex);

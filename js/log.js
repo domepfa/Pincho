@@ -394,6 +394,7 @@ async function renderLogHistory() {
   state.logs = entries.map(([, e]) => e);
   const list = document.getElementById('log-list');
   if (!list) return; // Nutzer hat inzwischen weiternavigiert
+  checkSharedWatchFile(); // über "Teilen" geschickte Uhr-Datei (landet auf #log)
   // Trend-Vergleich braucht die NÄCHSTÄLTERE Session mit derselben Übung —
   // also relativ zur eigenen Position in der (neueste-zuerst) Liste, nicht
   // immer die global letzte (sonst würde eine ältere Karte gegen eine noch
@@ -413,9 +414,11 @@ async function renderLogHistory() {
       ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => {
         const priorSets = Array.isArray(ex.sets) ? priorSetsForExercise(ex.exerciseId, idx) : null;
         const trend = priorSets ? exerciseTrend(ex.exerciseId, ex.sets, priorSets) : null;
-        return `<div class="ex-log-row"><span>${ex.superset ? `<span class="ss-badge">${supersetLabel(e.exercises, e.exercises.indexOf(ex))}</span>` : ''}${esc(exerciseName(ex.exerciseId))}${trend ? ` <span class="fs-trend ${trend.cls}">${trend.symbol}</span>` : ''}</span><span class="mono">${esc(fbExerciseSetsText(ex))}</span></div>`;
+        return `<div class="ex-log-row"><span>${ex.superset ? `<span class="ss-badge">${supersetLabel(e.exercises, e.exercises.indexOf(ex))}</span>` : ''}${esc(exerciseName(ex.exerciseId))}${trend ? ` <span class="fs-trend ${trend.cls}">${trend.symbol}</span>` : ''}</span><span class="mono">${esc(fbExerciseSetsText(ex))}${watchExerciseHrText(e.watch, ex)}</span></div>`;
       }).join('')}</div>` : ''}
       ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
+      ${e.watch ? `<div class="watch-block">${watchSummaryHtml(e.watch)}${watchChartHtml(e.watch, e.exercises)}</div>` : ''}
+      <label class="btn ghost small watch-add">${e.watch ? '⌚ Uhr-Datei ersetzen' : '⌚ Uhr-Datei hinzufügen'}<input type="file" accept=".fit,application/vnd.ant.fit,application/octet-stream" data-watch-file="${id}" hidden></label>
       ${(e.exercises && e.exercises.length) ? `<button type="button" class="btn ghost small" data-save-plan="${id}" style="width:100%;margin-top:6px;">Als Plan speichern</button>` : ''}
       ${challengeDurationChipsHtml(`log-share-${id}`, CHALLENGE_WINDOW_H)}
       <div class="field-row" style="margin-top:6px;">
@@ -426,6 +429,9 @@ async function renderLogHistory() {
   `).join('') : '<div class="list-empty">Noch keine Einträge.</div>';
 
   entries.forEach(([id]) => wireChallengeDurationChips(`log-share-${id}`));
+  list.querySelectorAll('[data-watch-file]').forEach((inp) => {
+    inp.onchange = () => { if (inp.files[0]) attachWatchFile(inp.files[0], inp.dataset.watchFile); inp.value = ''; };
+  });
   list.querySelectorAll('[data-save-plan]').forEach((btn) => {
     btn.onclick = async () => {
       const found = entries.find(([id2]) => id2 === btn.dataset.savePlan);
