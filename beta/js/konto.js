@@ -62,6 +62,34 @@ function renderKontoAnim() {
   });
 }
 
+/* Ruhe-/Maximalpuls für Uhr-Daten (Belastung, Pulszonen), gespeichert unter members/{id}/hr */
+function renderKontoHr() {
+  const holder = document.getElementById('konto-hr');
+  if (!holder) return;
+  const h = (state.memberDoc && state.memberDoc.hr) || {};
+  const seen = Math.max(0, ...(state.logs || []).map((e) => (e.watch && e.watch.hrMax) || 0));
+  holder.innerHTML = `
+    <div class="card">
+      <p class="card-title">Puls (für Uhr-Daten)</p>
+      <p class="card-sub" style="margin-bottom:10px;">Damit schätzt Pincho die Belastung und teilt die Pulskurve in Zonen. Leer lassen = Standard (60 / 190).</p>
+      <div class="field-row">
+        <div class="field"><label>Ruhepuls</label><input type="number" inputmode="numeric" id="konto-hr-rest" min="30" max="100" placeholder="60" value="${h.rest || ''}"></div>
+        <div class="field"><label>Maximalpuls</label><input type="number" inputmode="numeric" id="konto-hr-max" min="120" max="230" placeholder="190" value="${h.max || ''}"></div>
+      </div>
+      <p class="card-sub">Ruhepuls: zeigt die Uhr (Coros-App → Ruhepuls), sonst morgens im Bett messen. Maximalpuls: am genauesten aus einem harten Test; Faustregel 208 − 0,7 × Alter.${seen ? ` Höchster Wert in deinen Uhr-Daten: ${seen}.` : ''}</p>
+      <button type="button" class="btn small" id="konto-hr-save" style="margin-top:8px;">Speichern</button>
+    </div>`;
+  document.getElementById('konto-hr-save').onclick = () => {
+    const rest = Number(document.getElementById('konto-hr-rest').value) || null;
+    const max = Number(document.getElementById('konto-hr-max').value) || null;
+    if ((rest && (rest < 30 || rest > 100)) || (max && (max < 120 || max > 230)) || (rest && max && rest >= max)) { toast('Werte prüfen: Ruhepuls 30–100, Maximalpuls 120–230.', 'err'); return; }
+    const hr = rest || max ? { rest, max } : null;
+    state.memberDoc = { ...(state.memberDoc || {}), hr };
+    fbPatch(`members/${state.member.id}`, { hr });
+    toast('Gespeichert.', 'ok');
+  };
+}
+
 function renderKontoNav() {
   const holder = document.getElementById('konto-nav');
   if (!holder) return;
@@ -130,6 +158,7 @@ async function renderKonto() {
     </div>
     <div id="konto-nav"></div>
     <div id="konto-anim"></div>
+    <div id="konto-hr"></div>
     <div id="konto-create"></div>
     <div id="konto-wishes"></div>
     <div id="konto-cycle"></div>
@@ -141,6 +170,7 @@ async function renderKonto() {
   document.getElementById('konto-join').onclick = () => joinCrewWithCode(normalizeInviteCode(document.getElementById('konto-join-code').value));
 
   await loadCrews(); // frisch: neue Mitglieder sollen ohne Neustart erscheinen
+  renderKontoHr();
   const holder = document.getElementById('konto-crews');
   if (!holder) return; // weiternavigiert
   const ids = Object.keys(state.crews);
