@@ -238,3 +238,24 @@ body.training-locked .bottomnav a:not(.active), body.training-locked .topbar .wh
 /* Eingabe nach "Satz beenden": zurück in den Satz oder ohne Speichern verwerfen */
 .fs-entry-undo { display: flex; gap: 8px; margin-top: 8px; }
 .fs-entry-undo .btn { flex: 1; }
+/* Uhr-Daten: Detailansicht und Fortschritt */
+button.watch-block { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.watch-more { display: block; text-align: right; font-size: 12px; color: var(--accent); margin-top: 2px; }
+.watch-detail { max-height: 92vh; overflow-y: auto; }
+.watch-scrub { font-size: 13px; color: var(--ink); min-height: 20px; margin: 6px 0 2px; }
+.watch-big { display: block; width: 100%; height: 240px; touch-action: none; }
+.watch-big polyline { fill: none; stroke: #ff6b4a; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.watch-big .watch-set { fill: rgba(var(--accent-rgb), .16); }
+.watch-set-label { font-size: 10px; fill: var(--ink-dim); font-family: Barlow, sans-serif; }
+.watch-tick { stroke: var(--line); }
+.watch-tick-label { font-size: 10px; fill: var(--ink-faint); text-anchor: middle; font-family: Barlow, sans-serif; }
+.watch-cursor { stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.watch-zones { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 10px; }
+.watch-zone-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; color: var(--ink-faint); margin-top: 6px; }
+.watch-zone-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+.watch-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+.watch-table th { text-align: left; font-weight: 600; color: var(--ink-faint); font-size: 11px; padding: 4px; border-bottom: 1px solid var(--line-soft); }
+.watch-table td { padding: 6px 4px; border-bottom: 1px solid var(--line-soft); }
+.watch-note { font-size: 12px; color: var(--ink-faint); margin-top: 8px; }
+.pg-pulse-load { font-size: 10.5px; fill: var(--ink); font-family: Barlow, sans-serif; font-weight: 600; }
+.pg-sub { font-size: 14px; margin: 14px 0 4px; }

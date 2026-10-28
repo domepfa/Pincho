@@ -8,8 +8,12 @@ const WATCH_SHARE_CACHE = 'pincho-share';
 const WATCH_SHARE_KEY = 'shared-watch.fit';
 const FIT_EPOCH_MS = 631065600000; // FIT zählt Sekunden ab 31.12.1989
 const WATCH_HR_STEP = 10;
-// Belastung nach Banister (TRIMP) mit Ruhepuls 60 / Maximalpuls 190 – trifft die Coros-Belastung gut (27 ↔ 29)
-const WATCH_HR_REST = 60, WATCH_HR_MAX = 190;
+// Ruhe-/Maximalpuls fürs Schätzen der Belastung und für die Zonen: im Konto einstellbar (members/{id}/hr), sonst 60/190
+const WATCH_HR_DEFAULT = { rest: 60, max: 190 };
+function hrSettings() {
+  const h = (state.memberDoc && state.memberDoc.hr) || {};
+  return { rest: Number(h.rest) || WATCH_HR_DEFAULT.rest, max: Number(h.max) || WATCH_HR_DEFAULT.max, custom: !!(h.rest || h.max) };
+}
 
 /* Minimaler FIT-Leser: nur die Nachrichten, die wir brauchen (0 Datei, 18 Session, 20 Messpunkte). */
 function parseFit(arrayBuffer) {
@@ -64,9 +68,11 @@ function parseFit(arrayBuffer) {
   return out;
 }
 
+// Belastung nach Banister (TRIMP); mit echtem Ruhe-/Maximalpuls nahe an der Coros-Belastung
 function watchTrimp(hrSeries, stepSec) {
+  const { rest, max } = hrSettings();
   return Math.round(hrSeries.reduce((s, h) => {
-    const x = Math.max(0, (h - WATCH_HR_REST) / (WATCH_HR_MAX - WATCH_HR_REST));
+    const x = Math.max(0, (h - rest) / (max - rest));
     return s + (stepSec / 60) * x * 0.64 * Math.exp(1.92 * x);
   }, 0));
 }
@@ -161,7 +167,7 @@ function watchLogLabel(e) {
 function watchSummaryHtml(w) {
   const cell = (v, l) => (v != null ? `<div><b>${v}</b><span>${l}</span></div>` : '');
   return `<div class="watch-sum mono">
-    ${cell(w.load, 'Belastung ≈')}${cell(w.hrAvg, 'Ø Puls')}${cell(w.hrMax, 'Max')}${cell(w.kcal, 'kcal')}${cell(fmtMinSec(w.durSec), 'Uhr-Dauer')}
+    ${cell(watchLoad(w), 'Belastung ≈')}${cell(w.hrAvg, 'Ø Puls')}${cell(w.hrMax, 'Max')}${cell(w.kcal, 'kcal')}${cell(fmtMinSec(w.durSec), 'Uhr-Dauer')}
   </div>`;
 }
 
@@ -196,6 +202,198 @@ function watchSetHr(w, set) {
 function watchExerciseHrText(w, ex) {
   const hrs = (ex.sets || []).map((st) => watchSetHr(w, st)).filter((v) => v != null);
   return hrs.length ? ` · ♥ ${Math.max(...hrs)}` : '';
+}
+
+/* ---------- Auswertung ---------- */
+// Belastung immer mit den aktuellen Puls-Einstellungen aus der gespeicherten Kurve (gespeichertes load nur als Ersatz)
+function watchLoad(w) {
+  return w.hr && w.hr.length ? watchTrimp(w.hr, w.hrStep) : w.load;
+}
+const HR_ZONES = [
+  { name: 'Z1', label: 'Erholung', from: 0, color: '#5b7a99' },
+  { name: 'Z2', label: 'Grundlage', from: 0.6, color: '#4fb6ee' },
+  { name: 'Z3', label: 'Aerob', from: 0.7, color: '#4caf6e' },
+  { name: 'Z4', label: 'Schwelle', from: 0.8, color: '#f0a35a' },
+  { name: 'Z5', label: 'Maximal', from: 0.9, color: '#ff5a4a' },
+];
+function hrZoneIndex(h, max) {
+  const r = h / max;
+  for (let z = HR_ZONES.length - 1; z >= 0; z--) if (r >= HR_ZONES[z].from) return z;
+  return 0;
+}
+// Sekunden je Zone
+function watchZoneSeconds(w) {
+  const { max } = hrSettings();
+  const out = HR_ZONES.map(() => 0);
+  (w.hr || []).forEach((h) => { out[hrZoneIndex(h, max)] += w.hrStep; });
+  return out;
+}
+/* Sätze mit Uhrzeit auf der Kurve: Ø/Max-Puls im Satz und Erholung = Spitze am Satzende minus Puls 60 s später
+   (nur wenn in der Minute kein neuer Satz beginnt) */
+function watchSetStats(w, exercises) {
+  if (!w || !w.hr || !w.hr.length) return [];
+  const sets = [];
+  (exercises || []).forEach((ex) => (ex.sets || []).forEach((st, si) => {
+    if (!st.at) return;
+    const t1 = (st.at - w.start) / 1000, t0 = t1 - (st.elapsedSec || 0);
+    if (t1 < 0 || t0 > w.durSec) return;
+    sets.push({ exerciseId: ex.exerciseId, si, t0: Math.max(0, t0), t1 });
+  }));
+  sets.sort((a, b) => a.t0 - b.t0);
+  const at = (t) => w.hr[Math.max(0, Math.min(w.hr.length - 1, Math.round(t / w.hrStep)))];
+  return sets.map((st, i) => {
+    const win = [];
+    for (let t = st.t0; t <= st.t1 + w.hrStep / 2; t += w.hrStep) win.push(at(t));
+    const peak = Math.max(at(st.t1), at(st.t1 + 10), ...win);
+    const next = sets[i + 1];
+    const rec = (!next || next.t0 >= st.t1 + 60) && st.t1 + 60 <= w.durSec ? peak - at(st.t1 + 60) : null;
+    return { ...st, hrAvg: Math.round(win.reduce((a, b) => a + b, 0) / win.length), hrMax: Math.max(...win, at(st.t1 + 10)), rec };
+  });
+}
+// pro Übung zusammengefasst, in Trainings-Reihenfolge
+function watchExerciseStats(w, exercises) {
+  const by = [];
+  watchSetStats(w, exercises).forEach((st) => {
+    let row = by.find((r) => r.exerciseId === st.exerciseId);
+    if (!row) by.push(row = { exerciseId: st.exerciseId, sets: [] });
+    row.sets.push(st);
+  });
+  return by.map((r) => {
+    const recs = r.sets.map((x) => x.rec).filter((v) => v != null);
+    return { exerciseId: r.exerciseId, n: r.sets.length, hrAvg: Math.round(r.sets.reduce((a, x) => a + x.hrAvg, 0) / r.sets.length),
+      hrMax: Math.max(...r.sets.map((x) => x.hrMax)), rec: recs.length ? Math.round(recs.reduce((a, b) => a + b, 0) / recs.length) : null };
+  });
+}
+// Pulsabfall als Zahl mit Vorzeichen (−12 = um 12 gefallen; + = noch gestiegen)
+function fmtRec(v) { return v == null ? '–' : v >= 0 ? '−' + v : '+' + -v; }
+function watchZoneBarHtml(w) {
+  const z = watchZoneSeconds(w), total = z.reduce((a, b) => a + b, 0) || 1;
+  return `<div class="watch-zones">${z.map((sec, i) => sec ? `<span style="flex:${sec};background:${HR_ZONES[i].color}" title="${HR_ZONES[i].name}"></span>` : '').join('')}</div>
+    <div class="watch-zone-legend mono">${z.map((sec, i) => sec ? `<span><i style="background:${HR_ZONES[i].color}"></i>${HR_ZONES[i].name} ${Math.round(sec / 60)}′</span>` : '').join('')}</div>`;
+}
+
+/* ---------- Detailansicht: grosse Kurve mit Zonen, Zeitachse, Fingerfahren, Tabelle je Übung ---------- */
+function openWatchDetail(entry) {
+  const w = entry.watch;
+  if (!w || !w.hr || w.hr.length < 2) return;
+  const { max } = hrSettings();
+  const W = 640, H = 220, lo = Math.max(40, Math.min(...w.hr) - 8), hi = Math.max(...w.hr) + 8;
+  const x = (t) => (t / w.durSec) * W;
+  const y = (h) => H - ((Math.min(hi, Math.max(lo, h)) - lo) / (hi - lo)) * H;
+  const bands = HR_ZONES.map((z, i) => {
+    const top = i < HR_ZONES.length - 1 ? HR_ZONES[i + 1].from * max : hi;
+    const bot = z.from * max;
+    if (top <= lo || bot >= hi) return '';
+    return `<rect x="0" y="${y(top).toFixed(1)}" width="${W}" height="${(y(bot) - y(top)).toFixed(1)}" fill="${z.color}" opacity=".10"/>`;
+  }).join('');
+  const sets = watchSetStats(w, entry.exercises);
+  let lastEx = null;
+  const setRects = sets.map((st) => {
+    const label = st.exerciseId !== lastEx ? `<text x="${(x(st.t0) + 2).toFixed(1)}" y="12" class="watch-set-label">${esc(exerciseName(st.exerciseId).slice(0, 14))}</text>` : '';
+    lastEx = st.exerciseId;
+    return `<rect class="watch-set" x="${x(st.t0).toFixed(1)}" y="0" width="${Math.max(3, x(st.t1) - x(st.t0)).toFixed(1)}" height="${H}"/>${label}`;
+  }).join('');
+  const ticks = [];
+  for (let m = 10; m * 60 < w.durSec; m += 10) ticks.push(`<line x1="${x(m * 60).toFixed(1)}" x2="${x(m * 60).toFixed(1)}" y1="${H}" y2="${H - 6}" class="watch-tick"/><text x="${x(m * 60).toFixed(1)}" y="${H + 14}" class="watch-tick-label">${m}′</text>`);
+  const pts = w.hr.map((h, i) => `${x(i * w.hrStep).toFixed(1)},${y(h).toFixed(1)}`).join(' ');
+  const rows = watchExerciseStats(w, entry.exercises);
+  const d = new Date(w.start);
+  const el = document.createElement('div');
+  el.className = 'info-sheet-backdrop';
+  el.id = 'watch-detail';
+  el.innerHTML = `
+    <div class="info-sheet-card watch-detail">
+      <div class="fs-finish-head"><h3>Puls · ${esc(fmtDayKey(entry.date))}</h3><button type="button" class="info-sheet-close" id="watch-detail-close" aria-label="Schliessen">✕</button></div>
+      <div class="watch-meta mono">${esc(w.device)} · Start ${d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })} · Maximalpuls ${max}${hrSettings().custom ? '' : ' (Standard)'}</div>
+      ${watchSummaryHtml(w)}
+      <div class="watch-scrub mono" id="watch-scrub">Mit dem Finger über die Kurve fahren</div>
+      <svg class="watch-big" id="watch-big" viewBox="0 -2 ${W} ${H + 20}" preserveAspectRatio="none">
+        ${bands}${setRects}<polyline points="${pts}"/>${ticks.join('')}
+        <line id="watch-cursor" x1="0" x2="0" y1="0" y2="${H}" class="watch-cursor" visibility="hidden"/>
+      </svg>
+      ${watchZoneBarHtml(w)}
+      ${rows.length ? `<table class="watch-table"><thead><tr><th>Übung</th><th>Sätze</th><th>Ø</th><th>Max</th><th>Erholung</th></tr></thead><tbody>
+        ${rows.map((r) => `<tr><td>${esc(exerciseName(r.exerciseId))}</td><td class="mono">${r.n}</td><td class="mono">${r.hrAvg}</td><td class="mono">${r.hrMax}</td><td class="mono">${fmtRec(r.rec)}</td></tr>`).join('')}
+      </tbody></table><p class="watch-note">Erholung: wie stark der Puls 60 s nach dem Satz gefallen ist. Mehr = besser erholt.</p>`
+        : '<p class="watch-note">Puls je Übung gibt es für Trainings, bei denen Pincho die Uhrzeit der Sätze kennt (ab Ende Oktober 2026).</p>'}
+    </div>`;
+  document.body.appendChild(el);
+  const close = () => el.remove();
+  el.addEventListener('click', (e) => { if (e.target === el) close(); });
+  document.getElementById('watch-detail-close').onclick = close;
+  const svg = document.getElementById('watch-big'), cur = document.getElementById('watch-cursor'), out = document.getElementById('watch-scrub');
+  const scrub = (e) => {
+    const r = svg.getBoundingClientRect();
+    const t = Math.max(0, Math.min(w.durSec, ((e.clientX - r.left) / r.width) * w.durSec));
+    const h = w.hr[Math.min(w.hr.length - 1, Math.round(t / w.hrStep))];
+    const st = sets.find((s2) => t >= s2.t0 - 5 && t <= s2.t1 + 5);
+    const clock = new Date(w.start + t * 1000).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+    cur.setAttribute('x1', x(t)); cur.setAttribute('x2', x(t)); cur.setAttribute('visibility', 'visible');
+    out.textContent = `${clock} · ${h} bpm · ${HR_ZONES[hrZoneIndex(h, max)].name}${st ? ` · ${exerciseName(st.exerciseId)} Satz ${st.si + 1}` : ''}`;
+  };
+  svg.addEventListener('pointerdown', scrub);
+  svg.addEventListener('pointermove', scrub);
+}
+
+/* ---------- Tab Fortschritt: Belastung und Zonen je Woche, Erholungs-Trend ---------- */
+function pgPulseHtml(weeks) {
+  const withWatch = (state.logs || []).filter((e) => e.watch && e.watch.hr && e.watch.hr.length);
+  if (!withWatch.length) return '';
+  const wk = weeks.map((w) => {
+    const es = withWatch.filter((e) => e.watch.start >= w.from && e.watch.start < w.from + 7 * 86400000);
+    const zones = HR_ZONES.map(() => 0);
+    es.forEach((e) => watchZoneSeconds(e.watch).forEach((sec, i) => { zones[i] += sec / 60; }));
+    return { from: w.from, load: es.reduce((a, e) => a + (watchLoad(e.watch) || 0), 0), zones, n: es.length };
+  });
+  const maxMin = Math.max(1, ...wk.map((w) => w.zones.reduce((a, b) => a + b, 0))) * 1.15;
+  const W = 340, H = 150, padB = 20, slot = W / wk.length, bw = slot - 10;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" class="pg-vol" role="img" aria-label="Pulszonen und Belastung je Woche">`;
+  wk.forEach((w, i) => {
+    const x = i * slot + 5;
+    let base = H - padB;
+    w.zones.forEach((m, z) => {
+      if (!m) return;
+      const h = (m / maxMin) * (H - padB - 18);
+      base -= h;
+      svg += `<rect x="${x}" y="${base.toFixed(1)}" width="${bw}" height="${h.toFixed(1)}" fill="${HR_ZONES[z].color}"/>`;
+    });
+    if (w.load) svg += `<text x="${x + bw / 2}" y="${(base - 4).toFixed(1)}" text-anchor="middle" class="pg-pulse-load">${w.load}</text>`;
+    const d = new Date(w.from);
+    svg += `<text x="${x + bw / 2}" y="${H - 4}" text-anchor="middle" class="pg-vol-axis">${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.</text>`;
+  });
+  svg += `<line x1="0" x2="${W}" y1="${H - padB}" y2="${H - padB}" stroke="var(--line-soft)"/></svg>`;
+  // letzte 7 Tage gegen den Wochenschnitt der 28 Tage davor (gleitend, damit ein Montag nicht "zu wenig" meldet)
+  const now = Date.now(), DAY = 86400000;
+  const sumLoad = (a, b) => withWatch.filter((e) => e.watch.start >= a && e.watch.start < b).reduce((t, e) => t + (watchLoad(e.watch) || 0), 0);
+  const cur = sumLoad(now - 7 * DAY, now), avg4 = Math.round(sumLoad(now - 35 * DAY, now - 7 * DAY) / 4);
+  const ratio = avg4 ? cur / avg4 : null;
+  const loadHint = ratio == null ? '' : ratio > 1.5 ? ' – deutlich mehr als sonst, auf Erholung achten' : ratio < 0.7 ? ' – weniger als sonst' : ' – im üblichen Rahmen';
+  // Erholungs-Trend: Ø Pulsabfall je Training (nur Trainings mit Satz-Uhrzeiten)
+  const recs = withWatch.slice().sort((a, b) => a.watch.start - b.watch.start).map((e) => {
+    const r = watchSetStats(e.watch, e.exercises).map((x) => x.rec).filter((v) => v != null);
+    return r.length ? { date: e.date, rec: r.reduce((a, b) => a + b, 0) / r.length } : null;
+  }).filter(Boolean).slice(-10);
+  let recHtml = '<p class="pg-muted">Erholungs-Trend: kommt, sobald Trainings mit Satz-Uhrzeit Uhr-Daten haben.</p>';
+  if (recs.length) {
+    const hiR = Math.max(...recs.map((r) => r.rec)) + 3, loR = Math.max(0, Math.min(...recs.map((r) => r.rec)) - 3);
+    const RW = 340, RH = 60, rx = (i) => recs.length === 1 ? RW / 2 : 8 + (i / (recs.length - 1)) * (RW - 16), ry = (v) => RH - 6 - ((v - loR) / (hiR - loR || 1)) * (RH - 12);
+    const last3 = recs.slice(-3), before = recs.slice(0, -3);
+    const avg = (a) => Math.round(a.reduce((s, r) => s + r.rec, 0) / a.length);
+    recHtml = `<svg viewBox="0 0 ${RW} ${RH}" class="pg-vol" role="img" aria-label="Erholung je Training">
+        <polyline points="${recs.map((r, i) => `${rx(i).toFixed(1)},${ry(r.rec).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+        ${recs.map((r, i) => `<circle cx="${rx(i).toFixed(1)}" cy="${ry(r.rec).toFixed(1)}" r="3.5" fill="var(--accent)"/>`).join('')}
+      </svg>
+      <p class="pg-readout">Erholung (Pulsabfall 60 s nach dem Satz): zuletzt Ø ${fmtRec(avg(last3))} bpm${before.length ? `, davor Ø ${fmtRec(avg(before))} bpm` : ''}. Mehr = fitter.</p>`;
+  }
+  return `
+    <div class="pg-card">
+      <div class="pg-card-head"><h3>Puls &amp; Belastung</h3></div>
+      ${svg}
+      <div class="watch-zone-legend mono">${HR_ZONES.map((z) => `<span><i style="background:${z.color}"></i>${z.name} ${z.label}</span>`).join('')}</div>
+      <p class="pg-readout">Letzte 7 Tage Belastung ${cur}${avg4 ? ` · Ø je Woche davor ${avg4}${loadHint}` : ''}. Zahl über dem Balken = Belastung, Höhe = Minuten in den Zonen.</p>
+      <h4 class="pg-sub">Erholung</h4>
+      ${recHtml}
+    </div>`;
 }
 
 /* Nach dem Start: über "Teilen" geschickte Datei abholen (einmalig) */

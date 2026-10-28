@@ -410,6 +410,11 @@ function recoveryFactorForRpe(rpe) {
   if (!r) return 1;
   return r <= 5 ? 0.6 : r <= 7 ? 0.85 : r >= 10 ? 1.15 : 1;
 }
+// mit Uhr-Daten: gemessene Belastung statt RPE (locker < 30, mittel < 60, normal < 100, hart darüber)
+function recoveryFactorForLoad(load) {
+  if (!load) return 1;
+  return load < 30 ? 0.6 : load < 60 ? 0.85 : load < 100 ? 1 : 1.15;
+}
 const RECOVERY_FB_FACTOR = { pp_warmup: 0.4, pp_beginner: 0.8 };
 function progressRecoveryHtml() {
   const lastT = {}, factor = {};
@@ -417,7 +422,7 @@ function progressRecoveryHtml() {
   const touch = (id, t, f = 1) => { if (!lastT[id] || t > lastT[id]) { lastT[id] = t; factor[id] = f; } };
   progressFbSessions.forEach((sn) => touch('finger', entryTime(sn), sn.partial ? 0.7 : RECOVERY_FB_FACTOR[sn.templateId] || 1));
   state.logs.forEach((e) => {
-    const f = recoveryFactorForRpe(e.rpe);
+    const f = e.watch ? recoveryFactorForLoad(watchLoad(e.watch)) : recoveryFactorForRpe(e.rpe);
     if (e.type === 'klettern') touch('finger', entryTime(e), f);
     (e.exercises || []).forEach((ex) => {
       const m = exerciseMuscles(ex.exerciseId);
@@ -507,6 +512,7 @@ function drawProgress() {
     ${pgHeatHtml(wkCur)}
     ${pgHintsHtml(wkCur, wkPrev)}
     ${pgVolumeHtml(weeks)}
+    ${pgPulseHtml(weeks)}
     ${pgRecordsHtml()}
 
     <div class="pg-card">
