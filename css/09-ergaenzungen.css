@@ -235,3 +235,6 @@ body.training-locked .bottomnav a:not(.active), body.training-locked .topbar .wh
 .watch-label { display: block; font-size: 12px; margin-top: 12px; color: var(--ink-faint); }
 .watch-sheet select { width: 100%; margin-top: 4px; }
 .watch-warn { margin-top: 8px; font-size: 13px; color: #f0a35a; }
+/* Eingabe nach "Satz beenden": zurück in den Satz oder ohne Speichern verwerfen */
+.fs-entry-undo { display: flex; gap: 8px; margin-top: 8px; }
+.fs-entry-undo .btn { flex: 1; }
