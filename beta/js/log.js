@@ -419,7 +419,7 @@ async function renderLogHistory() {
       }).join('')}</div>` : ''}
       ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
       ${e.watch ? `<button type="button" class="watch-block" data-watch-detail="${id}" aria-label="Puls im Detail">${watchSummaryHtml(e.watch)}${watchChartHtml(e.watch, e.exercises)}<span class="watch-more">Details ›</span></button>` : ''}
-      <label class="btn ghost small watch-add">${e.watch ? '⌚ Uhr-Datei ersetzen' : '⌚ Uhr-Datei hinzufügen'}<input type="file" accept=".fit,application/vnd.ant.fit,application/octet-stream" data-watch-file="${id}" hidden></label>
+      <label class="btn ghost small watch-add">${e.watch ? '⌚ Uhr-Datei ersetzen' : '⌚ Uhr-Datei hinzufügen'}<input type="file" accept=".fit,.zip,application/vnd.ant.fit,application/zip,application/octet-stream" data-watch-file="${id}" hidden></label>
       ${(e.exercises && e.exercises.length) ? `<button type="button" class="btn ghost small" data-save-plan="${id}" style="width:100%;margin-top:6px;">Als Plan speichern</button>` : ''}
       ${challengeDurationChipsHtml(`log-share-${id}`, CHALLENGE_WINDOW_H)}
       <div class="field-row" style="margin-top:6px;">

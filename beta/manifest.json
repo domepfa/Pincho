@@ -13,6 +13,6 @@
   ],
   "share_target": {
     "action": "./share-watch", "method": "POST", "enctype": "multipart/form-data",
-    "params": { "files": [{ "name": "file", "accept": [".fit", "application/vnd.ant.fit", "application/fit", "application/octet-stream"] }] }
+    "params": { "files": [{ "name": "file", "accept": [".fit", ".zip", "application/vnd.ant.fit", "application/fit", "application/zip", "application/x-zip-compressed", "application/octet-stream"] }] }
   }
 }
