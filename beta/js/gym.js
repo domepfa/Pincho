@@ -551,13 +551,17 @@ function closeFsFinishScreen(gone) {
    klein in der Leiste weiter (antippen holt ihn zurück). Der grosse Knopf klickt den echten Knopf in
    der Leiste, damit der Ablauf (nächster Satz, Runde, nächste Übung) nur an einer Stelle steckt. */
 let fsRestHidden = false;
+// Hinweis zum nächsten Satz: derselbe Satz vom letzten Training (Satz 2 ↔ Satz 2); gab es den nicht, der eben gemachte
 function fsSetSuggestion(g) {
-  const last = g.sets.length ? g.sets[g.sets.length - 1] : lastValueForExercise(g.exerciseId);
+  const n = g.sets.length;
+  const prevSet = (historyForExercise(g.exerciseId, 1)[0]?.sets || [])[n];
+  const fromPrev = !!prevSet || !n;
+  const last = prevSet || (n ? g.sets[n - 1] : lastValueForExercise(g.exerciseId));
   if (!last || last.reps === '' || last.reps == null) return '';
   const w = last.weight !== '' && last.weight != null ? `${String(last.weight).replace('.', ',')} kg × ` : '';
   const unit = (last.unit || 'reps') === 'time' ? ' s' : '';
   const note = last.note ? ` · „${last.note}“` : '';
-  return `${g.sets.length ? 'eben' : 'letztes Mal'} ${w}${last.reps}${unit}${note}`;
+  return `${fromPrev ? 'letztes Mal' : 'eben'} ${w}${last.reps}${unit}${note}`;
 }
 /* Die letzten 3 Trainings dieser Übung im Pausen-Bildschirm, je Zeile alle Sätze. */
 function fsRestHistoryHtml(exerciseId) {
