@@ -186,7 +186,8 @@ function fmtShortDate(dateStr) {
 function historyForExercise(exerciseId, limit) {
   const sessions = [];
   for (const entry of state.logs) {
-    if (!entry.exercises || sessions.length >= limit) break;
+    if (sessions.length >= limit) break;
+    if (!entry.exercises) continue; // z. B. Ausdauer ohne Übungen – weitersuchen
     const ex = entry.exercises.find((e) => e.exerciseId === exerciseId && Array.isArray(e.sets) && e.sets.length);
     if (ex) sessions.push({ date: entry.date, sets: ex.sets });
   }
