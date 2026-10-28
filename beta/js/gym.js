@@ -288,6 +288,13 @@ function startFsWorkTimer() {
     updateFsWorkTimerUI();
   }, 1000);
 }
+// Versehentlich "Satz beenden": Stoppuhr läuft ab der schon gezählten Zeit weiter
+function resumeFsWorkTimer(elapsedSec) {
+  startFsWorkTimer();
+  fsWorkTimer.startedAt = Date.now() - elapsedSec * 1000;
+  fsWorkTimer.seconds = elapsedSec;
+  updateFsWorkTimerUI();
+}
 function stopFsWorkTimer() {
   clearInterval(fsWorkTimer.intervalId);
   fsWorkTimer.intervalId = null;
@@ -780,6 +787,10 @@ function renderFsPanel() {
         <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" data-entry-key="${builder.activeIndex}:${g.sets.length}:${unit}" value="${isHold ? fsCapturedElapsed : esc(prevReps)}"></div>
       </div>
       <button type="button" class="btn small" id="fs-add-set" style="width:100%;">Satz speichern</button>
+      <div class="fs-entry-undo">
+        <button type="button" class="btn ghost small" id="fs-resume-set">↩ Weiter im Satz</button>
+        <button type="button" class="btn ghost small" id="fs-discard-set">Verwerfen</button>
+      </div>
     `;
   };
 
@@ -928,6 +939,21 @@ function renderFsPanel() {
         box.style.scrollMarginTop = `${topbarH + 8}px`;
         box.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 300);
+    };
+  }
+  const resumeSetBtn = document.getElementById('fs-resume-set');
+  if (resumeSetBtn) {
+    resumeSetBtn.onclick = () => {
+      fsPhase = 'working';
+      resumeFsWorkTimer(fsCapturedElapsed);
+      renderFsPanel();
+    };
+  }
+  const discardSetBtn = document.getElementById('fs-discard-set');
+  if (discardSetBtn) {
+    discardSetBtn.onclick = () => {
+      fsPhase = 'idle';
+      renderFsPanel();
     };
   }
   const nextSetBtn = document.getElementById('fs-next-set');
