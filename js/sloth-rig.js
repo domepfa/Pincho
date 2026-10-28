@@ -912,6 +912,12 @@ const SLOTH_POSES = {
     a: { torso: -36, uarm: 92, farm: 90, thigh: 70, calf: 102, fuarm: 70, ffarm: 70 },
     b: { torso: -36, uarm: 170, farm: 70, thigh: 70, calf: 102, fuarm: 70, ffarm: 70 },
   },
+  // Kugel auf Hüfthöhe um den Körper reichen: vorne vor dem Bauch, dann hinter dem Rücken
+  kbaround: {
+    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Kettlebell Around the World', props: [KB('grip')],
+    a: { torso: -94, uarm: 72, farm: 40, hand: 40, thigh: 86, calf: 92, fuarm: 76, ffarm: 44 },
+    b: { torso: -94, uarm: 118, farm: 132, hand: 132, thigh: 86, calf: 92, fuarm: 114, ffarm: 128 },
+  },
   kbcarry: {
     view: 'side', pin: 'hip', dur: 1.2, floor: 330, grip: 'fist', label: 'Farmer Carry', props: [KB('fgrip', 'mid'), KB('grip')],
     a: { torso: -94, uarm: 92, farm: 90, fuarm: 92, ffarm: 90, thigh: 72, calf: 96, fthigh: 108, fcalf: 116 },

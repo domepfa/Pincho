@@ -2681,7 +2681,7 @@ const SLOTH_EXERCISE_POSES = {
   tibialis_raise: 'tibialis', wrist_curl: 'wristcurl', wrist_ext: 'wristcurl', wrist_mobility: 'wristmob',
   doorway_pec_stretch: 'doorway',
   kb_swing: 'kbswing', kb_swing_single: 'kbswing', kb_clean: 'kbclean', kb_press: 'kbpress', kb_snatch: 'kbsnatch',
-  kb_turkish_getup: 'tgu', kb_windmill: 'windmill', kb_halo: 'halo', kb_single_leg_rdl: 'kbslrdl', kb_row: 'kbrow', kb_farmer_carry: 'kbcarry', kb_front_rack_lunge: 'kbracklunge',
+  kb_turkish_getup: 'tgu', kb_around_world: 'kbaround', kb_windmill: 'windmill', kb_halo: 'halo', kb_single_leg_rdl: 'kbslrdl', kb_row: 'kbrow', kb_farmer_carry: 'kbcarry', kb_front_rack_lunge: 'kbracklunge',
   trx_row: 'trxrow', trx_y_raise: 'trxyraise', trx_face_pull: 'trxfacepull', trx_biceps_curl: 'trxcurl',
   trx_chest_press: 'trxchestpress', trx_triceps_ext: 'trxtriceps', trx_fallout: 'trxfallout', trx_pistol_squat: 'trxpistol',
   trx_push_up: 'trxpushup', trx_pike: 'trxpike', trx_knee_tuck: 'trxtuck', trx_hamstring_curl: 'trxhamcurl',
