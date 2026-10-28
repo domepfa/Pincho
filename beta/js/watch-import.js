@@ -1,5 +1,5 @@
 /* js/watch-import.js — Uhr-Daten (FIT-Datei, z. B. aus der Coros-App) an ein gespeichertes Training hängen.
-   Weg 1: im Verlauf "⌚ Uhr-Datei" → Datei wählen. Weg 2: in der Coros-App "Teilen" → Pincho; der Service-Worker
+   Weg 1: im Verlauf "⌚ Uhr-Datei" → Datei wählen (.fit oder .zip, z. B. Garmin-Export). Weg 2: in der Coros-App "Teilen" → Pincho; der Service-Worker
    legt die Datei unter WATCH_SHARE_KEY im Cache ab (siehe sw.js, share_target in manifest.json), checkSharedWatchFile()
    holt sie nach dem Start ab. Gespeichert wird nur eine Zusammenfassung unter logs/{member}/{id}/watch:
    { device, start, durSec, kcal, hrAvg, hrMax, hrMin, load, hrStep, hr: [Puls je hrStep Sekunden] } */
@@ -13,6 +13,33 @@ const WATCH_HR_DEFAULT = { rest: 60, max: 190 };
 function hrSettings() {
   const h = (state.memberDoc && state.memberDoc.hr) || {};
   return { rest: Number(h.rest) || WATCH_HR_DEFAULT.rest, max: Number(h.max) || WATCH_HR_DEFAULT.max, custom: !!(h.rest || h.max) };
+}
+
+/* ZIP (z. B. Garmin "Original exportieren") direkt öffnen: erste .fit-Datei darin entpacken.
+   Liest das Inhaltsverzeichnis am Dateiende (dort stehen die Grössen verlässlich), entpackt mit DecompressionStream. */
+async function fitBufferFromFile(file) {
+  const ab = await file.arrayBuffer();
+  const dv = new DataView(ab);
+  if (ab.byteLength < 4 || dv.getUint32(0, true) !== 0x04034b50) return ab; // kein ZIP
+  let eocd = -1;
+  for (let i = ab.byteLength - 22; i >= Math.max(0, ab.byteLength - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error('Kaputte ZIP-Datei');
+  let p = dv.getUint32(eocd + 16, true);
+  const n = dv.getUint16(eocd + 10, true);
+  for (let k = 0; k < n && dv.getUint32(p, true) === 0x02014b50; k++) {
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true), extraLen = dv.getUint16(p + 30, true), commentLen = dv.getUint16(p + 32, true);
+    const local = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(new Uint8Array(ab, p + 46, nameLen));
+    p += 46 + nameLen + extraLen + commentLen;
+    if (!/\.fit$/i.test(name)) continue;
+    const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+    const data = new Uint8Array(ab, start, csize);
+    if (method === 0) return data.slice().buffer;
+    if (method !== 8 || typeof DecompressionStream === 'undefined') throw new Error('ZIP lässt sich hier nicht entpacken – bitte die .fit-Datei direkt wählen');
+    return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+  }
+  throw new Error('Keine .fit-Datei in der ZIP');
 }
 
 /* Minimaler FIT-Leser: nur die Nachrichten, die wir brauchen (0 Datei, 18 Session, 20 Messpunkte). */
@@ -118,7 +145,7 @@ function watchMatchScore(w, e) {
 /* Auswahl, an welches Training die Uhr-Daten kommen. preselectId: aus dem Verlauf heraus schon bekannt. */
 async function attachWatchFile(file, preselectId) {
   let w;
-  try { w = summarizeFit(parseFit(await file.arrayBuffer())); } catch (err) { toast('Datei nicht lesbar: ' + err.message, 'err'); return; }
+  try { w = summarizeFit(parseFit(await fitBufferFromFile(file))); } catch (err) { toast('Datei nicht lesbar: ' + err.message, 'err'); return; }
   const raw = await fbGet(`logs/${state.member.id}`);
   const entries = Object.entries(raw || {}).sort((x, y) => (y[1].createdAt || 0) - (x[1].createdAt || 0));
   if (!entries.length) { toast('Noch kein gespeichertes Training.', 'err'); return; }
