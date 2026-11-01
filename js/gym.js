@@ -59,7 +59,6 @@ function renderLogBuilderPanel() {
       <div id="fs-discard-holder"></div>
     `;
     const addPseudoExercise = (exerciseId) => {
-      if (!freestyleBuilder.exercises.length) freestyleBuilder.sessionStartedAt = Date.now();
       freestyleBuilder.exercises.push({ exerciseId, sets: [] });
       freestyleBuilder.activeIndex = freestyleBuilder.exercises.length - 1;
       fsPhase = 'idle';
@@ -81,7 +80,6 @@ function renderLogBuilderPanel() {
         freestyleBuilder.exercises = freestyleBuilder.exercises.filter(keep);
         freestyleBuilder.activeIndex = freestyleBuilder.exercises.findIndex((g) => g.exerciseId === activeId);
       }
-      if (!freestyleBuilder.exercises.length) freestyleBuilder.sessionStartedAt = Date.now();
       let idx = freestyleBuilder.exercises.findIndex((g) => g.exerciseId === id);
       if (idx === -1) {
         freestyleBuilder.exercises.push({ exerciseId: id, sets: [] });
@@ -278,6 +276,9 @@ function updateFsWorkTimerUI() {
   if (el) el.textContent = fmtMinSec(fsWorkTimer.seconds);
 }
 function startFsWorkTimer() {
+  // Trainingszeit läuft ab dem ersten "Satz starten", nicht schon ab dem Auswählen einer Übung
+  const b = activeSetBuilder();
+  if (b && !b.sessionStartedAt) b.sessionStartedAt = Date.now();
   requestWakeLock(); // Bildschirm soll während einer laufenden Session nicht ausgehen (dieselbe Sperre wie im Fingerboard-Ablauf)
   clearInterval(fsWorkTimer.intervalId);
   fsWorkTimer.seconds = 0;
