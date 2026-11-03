@@ -44,13 +44,8 @@ function renderLogBuilderPanel() {
     // Pseudo-Übung innerhalb von Freestyle (siehe exerciseIsHold in data.js)
     // — landet dadurch automatisch in derselben Session/demselben
     // Verlaufseintrag wie die Übungen danach, statt in einem eigenen.
-    const hasWarmup = freestyleBuilder.exercises.some((g) => g.exerciseId === 'warmup_general');
-    const hasCooldown = freestyleBuilder.exercises.some((g) => g.exerciseId === 'cooldown_general');
     holder.innerHTML = `
-      <div class="field-row" style="margin-bottom:12px;">
-        ${hasWarmup ? '' : `<button type="button" class="btn ghost small" id="fs-add-warmup" style="flex:1;">🔥 Warm-up hinzufügen</button>`}
-        ${hasCooldown ? '' : `<button type="button" class="btn ghost small" id="fs-add-cooldown" style="flex:1;">🧘 Cooldown hinzufügen</button>`}
-      </div>
+      <div class="field-row" id="fs-pseudo-row" style="margin-bottom:12px;"></div>
       <div class="field">
         <label>Übung</label>
         <div id="fs-exercise-grid"></div>
@@ -66,10 +61,21 @@ function renderLogBuilderPanel() {
       stopFsWorkTimer();
       renderLogBuilderPanel();
     };
-    const addWarmupBtn = document.getElementById('fs-add-warmup');
-    if (addWarmupBtn) addWarmupBtn.onclick = () => addPseudoExercise('warmup_general');
-    const addCooldownBtn = document.getElementById('fs-add-cooldown');
-    if (addCooldownBtn) addCooldownBtn.onclick = () => addPseudoExercise('cooldown_general');
+    // Warm-up/Cooldown-Knöpfe nur, solange die Pseudo-Übung nicht in der Liste steht – nach jedem Entfernen neu zeichnen
+    const renderPseudoRow = () => {
+      const row = document.getElementById('fs-pseudo-row');
+      if (!row) return;
+      const has = (id) => freestyleBuilder.exercises.some((g) => g.exerciseId === id);
+      row.innerHTML = `
+        ${has('warmup_general') ? '' : '<button type="button" class="btn ghost small" id="fs-add-warmup" style="flex:1;">Warm-up hinzufügen</button>'}
+        ${has('cooldown_general') ? '' : '<button type="button" class="btn ghost small" id="fs-add-cooldown" style="flex:1;">Cooldown hinzufügen</button>'}`;
+      row.hidden = !row.children.length;
+      const addWarmupBtn = document.getElementById('fs-add-warmup');
+      if (addWarmupBtn) addWarmupBtn.onclick = () => addPseudoExercise('warmup_general');
+      const addCooldownBtn = document.getElementById('fs-add-cooldown');
+      if (addCooldownBtn) addCooldownBtn.onclick = () => addPseudoExercise('cooldown_general');
+    };
+    renderPseudoRow();
     wireExercisePickerGrid('fs-exercise-grid', EXERCISE_LIBRARY, freestyleBuilder.pickerExerciseId, (id) => {
       freestyleBuilder.pickerExerciseId = id;
       // Nur angetippt, aber noch kein Satz gemacht: beim Wechsel zu einer anderen Übung wieder entfernen,
@@ -79,6 +85,7 @@ function renderLogBuilderPanel() {
         const activeId = freestyleBuilder.exercises[freestyleBuilder.activeIndex]?.exerciseId;
         freestyleBuilder.exercises = freestyleBuilder.exercises.filter(keep);
         freestyleBuilder.activeIndex = freestyleBuilder.exercises.findIndex((g) => g.exerciseId === activeId);
+        renderPseudoRow(); // z. B. nur angetippter Cooldown wieder weg → Knopf wieder anbieten
       }
       let idx = freestyleBuilder.exercises.findIndex((g) => g.exerciseId === id);
       if (idx === -1) {
@@ -1019,10 +1026,12 @@ function renderFsPanel() {
   holder.querySelectorAll('[data-remove-group]').forEach((btn) => {
     btn.onclick = () => {
       const gi = Number(btn.dataset.removeGroup);
-      builder.exercises.splice(gi, 1);
+      const [removed] = builder.exercises.splice(gi, 1);
       supersetCleanup(builder.exercises);
       if (builder.activeIndex >= builder.exercises.length) builder.activeIndex = builder.exercises.length - 1;
-      renderFsPanel();
+      // Warm-up/Cooldown entfernt: Knopfreihe oben neu, damit man ihn wieder hinzufügen kann
+      if (removed && (removed.exerciseId === 'warmup_general' || removed.exerciseId === 'cooldown_general')) renderLogBuilderPanel();
+      else renderFsPanel();
     };
   });
   holder.querySelectorAll('[data-remove-set]').forEach((btn) => {
