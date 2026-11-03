@@ -572,15 +572,16 @@ function fsSetSuggestion(g) {
   return `${fromPrev ? 'letztes Mal' : 'eben'} ${w}${last.reps}${unit}${note}`;
 }
 /* Die letzten 3 Trainings dieser Übung im Pausen-Bildschirm, je Zeile alle Sätze. */
-function fsRestHistoryHtml(exerciseId) {
+// markIdx: dieser Satz im jüngsten Training wird fett (der als Nächstes zu schlagende)
+function fsRestHistoryHtml(exerciseId, markIdx) {
   const sessions = historyForExercise(exerciseId, 3);
   if (!sessions.length) return '';
   const setTxt = (s) => {
     const w = s.weight !== '' && s.weight != null ? `${String(s.weight).replace('.', ',')} kg × ` : '';
     return `${w}${s.reps}${setUnitSuffix(exerciseId, s) ? ' s' : ''}`;
   };
-  return `<ul class="fs-rest-hist">${sessions.map((sess) =>
-    `<li><span class="mono">${esc(fmtShortDate(sess.date))}</span>${esc(sess.sets.map(setTxt).join(' · '))}</li>`).join('')}</ul>`;
+  return `<ul class="fs-rest-hist">${sessions.map((sess, si) =>
+    `<li><span class="mono">${esc(fmtShortDate(sess.date))}</span>${sess.sets.map((st, i) => (si === 0 && i === markIdx ? `<b>${esc(setTxt(st))}</b>` : esc(setTxt(st)))).join(' · ')}</li>`).join('')}</ul>`;
 }
 function hideFsRestScreen() {
   const el = document.getElementById('fs-rest-screen');
@@ -603,11 +604,11 @@ function renderFsRestScreen(builder) {
   const group = supersetMembers(builder.exercises, nextIdx);
   const lines = group.map((j) => {
     const g = builder.exercises[j];
-    const hist = fsRestHistoryHtml(g.exerciseId);
+    const hist = fsRestHistoryHtml(g.exerciseId, g.sets.length);
     // "letztes Mal" steht schon in der Verlaufsliste darunter
     const sug = g.sets.length || !hist ? fsSetSuggestion(g) : '';
     const letter = group.length > 1 ? `<span class="ss-badge">${String.fromCharCode(65 + group.indexOf(j))}</span>` : '';
-    return `<div class="fs-rest-next-row">${letter}<b>${esc(exerciseName(g.exerciseId))}</b><span class="fs-rest-next-sub">Satz ${g.sets.length + 1}${sug ? ' · ' + esc(sug) : ''}</span>${hist}</div>`;
+    return `<div class="fs-rest-next-row">${letter}<b>${esc(exerciseName(g.exerciseId))}</b><span class="fs-rest-next-sub"><b>Satz ${g.sets.length + 1}${sug ? ' · ' + esc(sug) : ''}</b></span>${hist}</div>`;
   }).join('');
   // Nach dem letzten Satz einer Übung (Plan): klar machen, dass die Werte zur NÄCHSTEN Übung gehören
   const isNextExercise = primary.id === 'fs-next-exercise';

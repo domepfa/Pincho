@@ -259,3 +259,6 @@ button.watch-block { display: block; width: 100%; text-align: left; background: 
 .watch-note { font-size: 12px; color: var(--ink-faint); margin-top: 8px; }
 .pg-pulse-load { font-size: 10.5px; fill: var(--ink); font-family: Barlow, sans-serif; font-weight: 600; }
 .pg-sub { font-size: 14px; margin: 14px 0 4px; }
+/* Pause: Hinweis zum nächsten Satz und derselbe Satz im letzten Training hervorheben */
+.fs-rest-next-row .fs-rest-next-sub b { color: var(--ink); font-weight: 700; }
+.fs-rest-hist b { color: var(--ink); font-weight: 700; }
