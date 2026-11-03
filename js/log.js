@@ -153,6 +153,7 @@ function saveTrainingDraft() {
    Historie (state.logs, neueste zuerst), egal ob geplant oder freestyle
    geloggt. Zeigt "wo man beim letzten Mal stand", damit man beim
    Freestyle-Training nicht raten muss. */
+// Wert vom letzten Training dieser Übung – dessen ERSTER Satz (Startpunkt fürs nächste Training, Satz 1 ↔ Satz 1)
 function lastValueForExercise(exerciseId) {
   for (const entry of state.logs) {
     if (!entry.exercises) continue;
@@ -160,8 +161,8 @@ function lastValueForExercise(exerciseId) {
       if (ex.exerciseId !== exerciseId) continue;
       if (Array.isArray(ex.sets)) {
         if (ex.sets.length) {
-          const last = ex.sets[ex.sets.length - 1];
-          return { weight: last.weight, reps: last.reps, note: last.note || '' };
+          const first = ex.sets[0];
+          return { weight: first.weight, reps: first.reps, note: first.note || '' };
         }
       } else if (ex.reps !== '' && ex.reps != null) {
         return { weight: ex.weight, reps: ex.reps };
