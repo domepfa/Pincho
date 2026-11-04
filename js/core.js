@@ -26,6 +26,15 @@ function typeTagline(el) {
 }
 
 /* ---------- Helfer ---------- */
+/* Schlichte Linien-Icons statt Emojis (Uhr, Herz, Armbanduhr), in Textgrösse und Textfarbe */
+const UI_ICONS = {
+  clock: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/>',
+  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  watch: '<rect x="6" y="6" width="12" height="12" rx="3"/><path d="M9 6l1-3h4l1 3M9 18l1 3h4l1-3M12 9.5V12l1.5 1.5"/>',
+};
+function uiIcon(name) {
+  return `<svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${UI_ICONS[name]}</svg>`;
+}
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',

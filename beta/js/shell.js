@@ -142,7 +142,8 @@ setInterval(() => {
   if (!el && !tot) return;
   const b = activeSetBuilder();
   if (!b || !b.sessionStartedAt) return;
-  if (el) el.textContent = `⏱ ${fmtSessionClock(b.sessionStartedAt)}`;
+  const t = document.getElementById('fs-session-clock-t');
+  if (t) t.textContent = fmtSessionClock(b.sessionStartedAt);
   if (tot) tot.textContent = fmtSessionClock(b.sessionStartedAt); // Pausen-Bildschirm (gym.js)
 }, 1000);
 function ensureFsDock() {

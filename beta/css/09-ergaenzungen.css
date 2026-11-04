@@ -262,3 +262,27 @@ button.watch-block { display: block; width: 100%; text-align: left; background: 
 /* Pause: Hinweis zum nächsten Satz und derselbe Satz im letzten Training hervorheben */
 .fs-rest-next-row .fs-rest-next-sub b { color: var(--ink); font-weight: 700; }
 .fs-rest-hist b { color: var(--ink); font-weight: 700; }
+/* Pause: Ziel für den nächsten Satz gross */
+.fs-rest-next-row .fs-rest-goal { grid-column: 2; display: flex; flex-direction: column; font: 700 30px/1.1 'Barlow Condensed', sans-serif; color: var(--accent); margin-top: 2px; }
+.fs-rest-next-row .fs-rest-goal small { font: 600 12px 'Barlow', system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+/* Satz-Eingabe: −/+ links und rechts vom Feld */
+.fs-stepper { display: flex; align-items: stretch; gap: 3px; }
+.fs-stepper input { flex: 1; min-width: 0; text-align: center; padding-left: 2px; padding-right: 2px; font-size: 18px; -moz-appearance: textfield; }
+.fs-stepper input::-webkit-outer-spin-button, .fs-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.fs-step { flex: 0 0 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: 700 22px/1 'Barlow', sans-serif; cursor: pointer; touch-action: manipulation; }
+.fs-step:active { background: rgba(var(--accent-rgb), .2); }
+/* Während eines Trainings: Übungsliste eingeklappt, Verlauf ausgeblendet */
+#fs-picker-toggle { display: none; }
+body.training-locked #fs-picker-toggle:not(.open) { display: block; width: 100%; margin-bottom: 12px; }
+body.training-locked .fs-picker-field:not(.open) { display: none; }
+body.training-locked .log-history-sec { display: none; }
+/* Beenden-Fenster: Fortschritt */
+.fs-finish-prog { margin: 4px 0 12px; display: grid; gap: 4px; }
+.fs-finish-vol { font-size: 14px; color: var(--ink-dim); margin-bottom: 4px; }
+.fs-finish-vol b { color: var(--ink); font-size: 16px; }
+.fs-finish-row { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; padding: 4px 0; border-bottom: 1px solid var(--line-soft); }
+.fs-finish-pr { color: #f0c24a; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.fs-finish-new { color: var(--ink-faint); font-size: 12px; }
+/* Linien-Icons (uiIcon) statt Emojis */
+.ui-ico { width: 1em; height: 1em; vertical-align: -0.14em; flex-shrink: 0; }
+.fs-session-clock { display: inline-flex; align-items: center; gap: 4px; }

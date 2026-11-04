@@ -1,5 +1,5 @@
 /* js/watch-import.js — Uhr-Daten (FIT-Datei, z. B. aus der Coros-App) an ein gespeichertes Training hängen.
-   Weg 1: im Verlauf "⌚ Uhr-Datei" → Datei wählen (.fit oder .zip, z. B. Garmin-Export). Weg 2: in der Coros-App "Teilen" → Pincho; der Service-Worker
+   Weg 1: im Verlauf "Uhr-Datei hinzufügen" → Datei wählen (.fit oder .zip, z. B. Garmin-Export). Weg 2: in der Coros-App "Teilen" → Pincho; der Service-Worker
    legt die Datei unter WATCH_SHARE_KEY im Cache ab (siehe sw.js, share_target in manifest.json), checkSharedWatchFile()
    holt sie nach dem Start ab. Gespeichert wird nur eine Zusammenfassung unter logs/{member}/{id}/watch:
    { device, start, durSec, kcal, hrAvg, hrMax, hrMin, load, hrStep, hr: [Puls je hrStep Sekunden] } */
@@ -162,7 +162,7 @@ async function attachWatchFile(file, preselectId) {
   el.id = 'watch-sheet';
   el.innerHTML = `
     <div class="info-sheet-card watch-sheet">
-      <div class="fs-finish-head"><h3>⌚ Uhr-Daten</h3><button type="button" class="info-sheet-close" id="watch-close" aria-label="Schliessen">✕</button></div>
+      <div class="fs-finish-head"><h3>${uiIcon('watch')} Uhr-Daten</h3><button type="button" class="info-sheet-close" id="watch-close" aria-label="Schliessen">✕</button></div>
       <div class="watch-meta mono">${esc(w.device)} · ${d.toLocaleDateString('de-CH')} ${d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}</div>
       ${watchSummaryHtml(w)}
       ${watchChartHtml(w, null)}
@@ -228,7 +228,7 @@ function watchSetHr(w, set) {
 
 function watchExerciseHrText(w, ex) {
   const hrs = (ex.sets || []).map((st) => watchSetHr(w, st)).filter((v) => v != null);
-  return hrs.length ? ` · ♥ ${Math.max(...hrs)}` : '';
+  return hrs.length ? ` · ${uiIcon('heart')} ${Math.max(...hrs)}` : '';
 }
 
 /* ---------- Auswertung ---------- */
