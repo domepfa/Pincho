@@ -44,11 +44,16 @@ function renderLogBuilderPanel() {
     // Pseudo-Übung innerhalb von Freestyle (siehe exerciseIsHold in data.js)
     // — landet dadurch automatisch in derselben Session/demselben
     // Verlaufseintrag wie die Übungen danach, statt in einem eigenen.
+    // Während eines Trainings ist die lange Übungsliste eingeklappt (CSS: body.training-locked), damit die
+    // aktive Übung oben steht; "+ Übung" (Leiste oder Knopf hier) klappt sie auf, nach der Wahl wieder zu
     holder.innerHTML = `
-      <div class="field-row" id="fs-pseudo-row" style="margin-bottom:12px;"></div>
-      <div class="field">
-        <label>Übung</label>
-        <div id="fs-exercise-grid"></div>
+      <button type="button" class="btn ghost small fs-picker-toggle" id="fs-picker-toggle">+ Übung hinzufügen</button>
+      <div class="fs-picker-field" id="fs-picker-field">
+        <div class="field-row" id="fs-pseudo-row" style="margin-bottom:12px;"></div>
+        <div class="field">
+          <label>Übung</label>
+          <div id="fs-exercise-grid"></div>
+        </div>
       </div>
       <div id="fs-panel"></div>
       <div id="fs-discard-holder"></div>
@@ -76,6 +81,7 @@ function renderLogBuilderPanel() {
       if (addCooldownBtn) addCooldownBtn.onclick = () => addPseudoExercise('cooldown_general');
     };
     renderPseudoRow();
+    document.getElementById('fs-picker-toggle').onclick = openFsPicker;
     wireExercisePickerGrid('fs-exercise-grid', EXERCISE_LIBRARY, freestyleBuilder.pickerExerciseId, (id) => {
       freestyleBuilder.pickerExerciseId = id;
       // Nur angetippt, aber noch kein Satz gemacht: beim Wechsel zu einer anderen Übung wieder entfernen,
@@ -92,6 +98,7 @@ function renderLogBuilderPanel() {
         freestyleBuilder.exercises.push({ exerciseId: id, sets: [] });
         idx = freestyleBuilder.exercises.length - 1;
       }
+      closeFsPicker();
       if (idx === freestyleBuilder.activeIndex) { renderFsPanel(); }
       else activateFsGroup(freestyleBuilder, idx);
       // Zur aktiven Übung scrollen statt zu einer festen Stelle — das
@@ -441,6 +448,21 @@ function findNextUnfinishedExerciseIndex(builder, fromIndex) {
    Übungswechsel hinweg WEITERLAUFEN (die Erholung pausiert ja nicht, nur
    weil man sich eine andere Übung anschaut) — erst ein bewusstes "Start"
    für die neue Übung beendet sie dann wirklich. */
+// Übungsliste aufklappen und hinscrollen — Topbar-Höhe abziehen, sonst läge der obere Teil darunter
+function openFsPicker() {
+  const field = document.getElementById('fs-picker-field');
+  const toggle = document.getElementById('fs-picker-toggle');
+  if (!field) return;
+  field.classList.add('open');
+  if (toggle) toggle.classList.add('open');
+  const topbarH = document.querySelector('.topbar')?.getBoundingClientRect().height || 0;
+  const targetTop = field.getBoundingClientRect().top + window.scrollY - topbarH - 8;
+  window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+}
+function closeFsPicker() {
+  document.getElementById('fs-picker-field')?.classList.remove('open');
+  document.getElementById('fs-picker-toggle')?.classList.remove('open');
+}
 function activateFsGroup(builder, idx) {
   builder.activeIndex = idx;
   fsRoundDone = false; // selbst gewechselt: nicht automatisch zurückspringen
@@ -533,6 +555,7 @@ function openFsFinishScreen() {
         <div><b>${done.length}</b><span>${done.length === 1 ? 'Übung' : 'Übungen'}</span></div>
         <div><b>${sets}</b><span>${sets === 1 ? 'Satz' : 'Sätze'}</span></div>
       </div>
+      ${fsFinishProgressHtml(done)}
       <div id="fs-finish-slot"></div>
       <button type="button" class="btn ghost small fs-finish-discard" id="fs-finish-discard">Training verwerfen</button>
     </div>`;
@@ -551,6 +574,34 @@ function openFsFinishScreen() {
     renderLog();
   };
 }
+/* Fortschritt fürs Beenden-Fenster: Volumen gegen dieselben Übungen beim letzten Mal, je Übung Trend und Rekord */
+function fsFinishProgressHtml(done) {
+  const real = done.filter((g) => g.exerciseId !== 'warmup_general' && g.exerciseId !== 'cooldown_general');
+  if (!real.length) return '';
+  let vol = 0, prevVol = 0, compared = 0;
+  const rows = real.map((g) => {
+    const prevSets = historyForExercise(g.exerciseId, 1)[0]?.sets;
+    const v = g.sets.reduce((a, st) => a + (st.weight !== '' && st.weight != null ? setVolume(st) || 0 : 0), 0);
+    vol += v;
+    if (prevSets) { prevVol += prevSets.reduce((a, st) => a + (st.weight !== '' && st.weight != null ? setVolume(st) || 0 : 0), 0); compared++; }
+    const trend = prevSets ? exerciseTrend(g.exerciseId, g.sets, prevSets) : null;
+    // Rekord: bester Satz heute schlägt den besten Satz aller früheren Trainings dieser Übung
+    const best = bestSetOf(g.exerciseId, g.sets);
+    let prevBest = null;
+    state.logs.forEach((e) => (e.exercises || []).forEach((ex) => {
+      if (ex.exerciseId !== g.exerciseId || !Array.isArray(ex.sets) || !ex.sets.length) return;
+      const b = bestSetOf(g.exerciseId, ex.sets);
+      if (b && (!prevBest || b.score > prevBest.score)) prevBest = b;
+    }));
+    const record = best && prevBest && best.score > prevBest.score;
+    return `<div class="fs-finish-row"><span>${esc(exerciseName(g.exerciseId))}</span><span>${record ? '<b class="fs-finish-pr">Rekord</b> ' : ''}${trend ? `<span class="fs-trend ${trend.cls}">${trend.symbol}</span>` : '<span class="fs-finish-new">neu</span>'}</span></div>`;
+  }).join('');
+  const pct = compared && prevVol ? Math.round(((vol - prevVol) / prevVol) * 100) : null;
+  return `<div class="fs-finish-prog">
+    ${vol ? `<div class="fs-finish-vol"><b>${Math.round(vol).toLocaleString('de-CH')} kg</b> bewegt${pct != null ? ` · <span class="fs-trend ${pct >= 0 ? 'fs-trend-up' : 'fs-trend-down'}">${pct > 0 ? '+' : ''}${pct} %</span> gegenüber letztem Mal` : ''}</div>` : ''}
+    ${rows}
+  </div>`;
+}
 // gone: Formular wird ohnehin neu aufgebaut (nach Speichern/Verwerfen) – Felder nicht zurücklegen
 function closeFsFinishScreen(gone) {
   const el = document.getElementById('fs-finish-screen');
@@ -566,18 +617,51 @@ function closeFsFinishScreen(gone) {
    klein in der Leiste weiter (antippen holt ihn zurück). Der grosse Knopf klickt den echten Knopf in
    der Leiste, damit der Ablauf (nächster Satz, Runde, nächste Übung) nur an einer Stelle steckt. */
 let fsRestHidden = false;
-// Hinweis zum nächsten Satz: derselbe Satz vom letzten Training (Satz 2 ↔ Satz 2); gab es den nicht, der eben gemachte
-function fsSetSuggestion(g) {
-  const n = g.sets.length;
-  const prevSet = (historyForExercise(g.exerciseId, 1)[0]?.sets || [])[n];
-  const fromPrev = !!prevSet || !n;
-  const last = prevSet || (n ? g.sets[n - 1] : lastValueForExercise(g.exerciseId));
-  if (!last || last.reps === '' || last.reps == null) return '';
-  const w = last.weight !== '' && last.weight != null ? `${String(last.weight).replace('.', ',')} kg × ` : '';
-  const unit = (last.unit || 'reps') === 'time' ? ' s' : '';
-  const note = last.note ? ` · „${last.note}“` : '';
-  return `${fromPrev ? 'letztes Mal' : 'eben'} ${w}${last.reps}${unit}${note}`;
+/* Ziel für den nächsten Satz (progressive Überlastung), Basis ist derselbe Satz vom letzten Training:
+   - Plan mit Zielwerten: das Plan-Ziel
+   - letztes Mal ohne Einbruch (kein Satz mit weniger Wdh. als Satz 1): mehr Gewicht, gleiche Wdh.
+   - sonst gleiches Gewicht, +1 Wdh. (Halte-Übungen +5 s; ohne Gewicht immer mehr Wdh.)
+   - mehr Sätze als letztes Mal: wie der eben gemachte; noch nie gemacht: null */
+function fsWeightStep(exerciseId, w) {
+  if (exerciseId.startsWith('kb_')) return 4;
+  return w < 10 ? 1 : 2.5;
 }
+function fsSetGoal(g) {
+  const n = g.sets.length;
+  const isTime = exerciseUnit(g.exerciseId) === 'time';
+  if (g.targetReps != null && g.targetReps !== '') {
+    return { weight: g.targetWeight !== '' && g.targetWeight != null ? Number(g.targetWeight) : '', reps: g.targetReps, isTime, kind: 'plan' };
+  }
+  const prev = historyForExercise(g.exerciseId, 1)[0]?.sets || [];
+  const base = prev[n];
+  if (!base) {
+    if (!n) return null;
+    const last = g.sets[n - 1];
+    return { weight: last.weight, reps: last.reps, isTime: (last.unit || 'reps') === 'time', kind: 'same' };
+  }
+  const baseTime = (base.unit || (isTime ? 'time' : 'reps')) === 'time';
+  const w = base.weight !== '' && base.weight != null ? Number(base.weight) : '';
+  const reps = Number(base.reps) || 0;
+  const firstReps = Number(prev[0].reps) || 0;
+  const noDrop = prev.every((st) => (Number(st.reps) || 0) >= firstReps);
+  if (w !== '' && w > 0 && noDrop && !baseTime) {
+    return { weight: Math.round((w + fsWeightStep(g.exerciseId, w)) * 10) / 10, reps, isTime: false, kind: 'weight', base };
+  }
+  return { weight: w, reps: reps + (baseTime ? 5 : 1), isTime: baseTime, kind: 'reps', base };
+}
+function fsFmtSet(st, isTime) {
+  const w = st.weight !== '' && st.weight != null ? `${String(st.weight).replace('.', ',')} kg × ` : '';
+  return `${w}${st.reps}${isTime ? ' s' : ''}`;
+}
+// Ergebnis eines Satzes gegen denselben Satz vom letzten Training: 1 besser, 0 gleich, -1 weniger, null ohne Vergleich
+function fsCompareToLast(exerciseId, idx, set) {
+  const base = (historyForExercise(exerciseId, 1)[0]?.sets || [])[idx];
+  if (!base) return null;
+  const vol = (st) => (Number(st.weight) || 1) * (Number(st.reps) || 0);
+  const a = vol(set), b = vol(base);
+  return a > b ? 1 : a === b ? 0 : -1;
+}
+
 /* Die letzten 3 Trainings dieser Übung im Pausen-Bildschirm, je Zeile alle Sätze. */
 // markIdx: dieser Satz im jüngsten Training wird fett (der als Nächstes zu schlagende)
 function fsRestHistoryHtml(exerciseId, markIdx) {
@@ -612,10 +696,12 @@ function renderFsRestScreen(builder) {
   const lines = group.map((j) => {
     const g = builder.exercises[j];
     const hist = fsRestHistoryHtml(g.exerciseId, g.sets.length);
-    // "letztes Mal" steht schon in der Verlaufsliste darunter
-    const sug = g.sets.length || !hist ? fsSetSuggestion(g) : '';
+    // Ziel gross, "letztes Mal" steht (fett markiert) in der Verlaufsliste darunter
+    const goal = fsSetGoal(g);
+    const goalHtml = goal ? `<span class="fs-rest-goal"><small>Satz ${g.sets.length + 1} · ${goal.kind === 'same' ? 'wie eben' : 'Ziel'}</small>${esc(fsFmtSet(goal, goal.isTime))}</span>`
+      : `<span class="fs-rest-next-sub"><b>Satz ${g.sets.length + 1}</b></span>`;
     const letter = group.length > 1 ? `<span class="ss-badge">${String.fromCharCode(65 + group.indexOf(j))}</span>` : '';
-    return `<div class="fs-rest-next-row">${letter}<b>${esc(exerciseName(g.exerciseId))}</b><span class="fs-rest-next-sub"><b>Satz ${g.sets.length + 1}${sug ? ' · ' + esc(sug) : ''}</b></span>${hist}</div>`;
+    return `<div class="fs-rest-next-row">${letter}<b>${esc(exerciseName(g.exerciseId))}</b>${goalHtml}${hist}</div>`;
   }).join('');
   // Nach dem letzten Satz einer Übung (Plan): klar machen, dass die Werte zur NÄCHSTEN Übung gehören
   const isNextExercise = primary.id === 'fs-next-exercise';
@@ -723,11 +809,12 @@ function renderFsPanel() {
     const head = `
       <div class="fs-dock-head mono">
         <span class="fs-dock-name">▸ ${esc(exerciseName(g.exerciseId))}</span>
-        ${builder.sessionStartedAt ? `<span class="fs-session-clock" id="fs-session-clock" title="Trainingszeit gesamt">⏱ ${fmtSessionClock(builder.sessionStartedAt)}</span>` : ''}
+        ${builder.sessionStartedAt ? `<span class="fs-session-clock" id="fs-session-clock" title="Trainingszeit gesamt">${uiIcon('clock')}<span id="fs-session-clock-t">${fmtSessionClock(builder.sessionStartedAt)}</span></span>` : ''}
         ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-dock-add">+ Übung</button><button type="button" class="btn small fs-dock-finish" id="fs-dock-finish">✓ Beenden</button>` : ''}
       </div>`;
     if (fsPhase === 'idle') {
-      const sug = fsSetSuggestion(g);
+      const goal = fsSetGoal(g);
+      const sug = goal ? `${goal.kind === 'same' ? 'wie eben' : 'Ziel'} ${fsFmtSet(goal, goal.isTime)}${goal.base ? ` · letztes Mal ${fsFmtSet(goal.base, goal.isTime)}` : ''}` : (g.sets.length ? '' : 'Erstes Mal – Gewicht wählen, 8–12 Wdh.');
       return `${head}
         <div class="fs-dock-hint">Satz ${g.sets.length + 1}${sug ? ' · ' + esc(sug) : ''}</div>
         <button type="button" class="btn fs-dock-btn" id="fs-start-set">▶ Satz starten</button>`;
@@ -778,9 +865,10 @@ function renderFsPanel() {
     // vom Vorsatz DIESER Session (gleiche Einheit) — beim ersten Satz
     // bleibt sie leer. Vorausgefüllt wird sie beim Fokussieren markiert,
     // eine neue Zahl ersetzt sie also direkt.
-    const last = g.sets.length ? g.sets[g.sets.length - 1] : lastValueForExercise(g.exerciseId);
-    const prevSessionSet = g.sets.length ? g.sets[g.sets.length - 1] : null;
-    const prevReps = prevSessionSet && (prevSessionSet.unit || 'reps') === 'reps' ? String(prevSessionSet.reps ?? '') : '';
+    // Vorbelegung mit dem Ziel (fsSetGoal); ohne Ziel wie bisher der letzte Satz dieser Session
+    const goal = fsSetGoal(g);
+    const last = goal || (g.sets.length ? g.sets[g.sets.length - 1] : lastValueForExercise(g.exerciseId));
+    const prevReps = goal && !goal.isTime ? String(goal.reps ?? '') : '';
     // Bei Isohold-Übungen IST die gestoppte Dauer die Angabe — die wird
     // direkt übernommen statt sie erst manuell als "Wiederholung" abtippen
     // oder per Extra-Knopf umdeuten zu müssen. Sekunden sind eine Zeit,
@@ -792,8 +880,8 @@ function renderFsPanel() {
         <button type="button" class="chip ${isHold ? 'active' : ''}" data-unit="time">Zeit</button>
       </div>
       <div class="field-row">
-        <div class="field"><label>Gewicht (kg)</label><input type="number" inputmode="decimal" enterkeyhint="next" id="fs-weight" data-entry-key="${builder.activeIndex}:${g.sets.length}" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"></div>
-        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" data-entry-key="${builder.activeIndex}:${g.sets.length}:${unit}" value="${isHold ? fsCapturedElapsed : esc(prevReps)}"></div>
+        <div class="field"><label>Gewicht (kg)</label><div class="fs-stepper"><button type="button" class="fs-step" data-step="fs-weight" data-dir="-1" aria-label="Gewicht weniger">−</button><input type="number" inputmode="decimal" enterkeyhint="next" id="fs-weight" data-entry-key="${builder.activeIndex}:${g.sets.length}" value="${last && last.weight != null ? esc(String(last.weight)) : ''}" step="0.5"><button type="button" class="fs-step" data-step="fs-weight" data-dir="1" aria-label="Gewicht mehr">+</button></div></div>
+        <div class="field"><label>${isHold ? 'Dauer (s)' : 'Wdh.'}</label><div class="fs-stepper"><button type="button" class="fs-step" data-step="fs-reps" data-dir="-1" aria-label="weniger">−</button><input type="text" inputmode="numeric" enterkeyhint="done" id="fs-reps" data-entry-key="${builder.activeIndex}:${g.sets.length}:${unit}" value="${isHold ? fsCapturedElapsed : esc(prevReps)}"><button type="button" class="fs-step" data-step="fs-reps" data-dir="1" aria-label="mehr">+</button></div></div>
       </div>
       <button type="button" class="btn small" id="fs-add-set" style="width:100%;">Satz speichern</button>
       <div class="fs-entry-undo">
@@ -906,15 +994,7 @@ function renderFsPanel() {
   if (dockFinish) wireHoldButton(dockFinish, 700, openFsFinishScreen);
   const dockAdd = document.getElementById('fs-dock-add');
   if (dockAdd) {
-    dockAdd.onclick = () => {
-      // Hoch zur Übungsauswahl — Topbar-Höhe abziehen, sonst läge der obere
-      // Teil (Körperbild + Regionen-Chips) unter der fixen Topbar.
-      const grid = document.getElementById('fs-exercise-grid');
-      if (!grid) return;
-      const topbarH = document.querySelector('.topbar')?.getBoundingClientRect().height || 0;
-      const targetTop = grid.getBoundingClientRect().top + window.scrollY - topbarH - 8;
-      window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
-    };
+    dockAdd.onclick = openFsPicker;
   }
   const startSetBtn = document.getElementById('fs-start-set');
   if (startSetBtn) {
@@ -950,6 +1030,18 @@ function renderFsPanel() {
       }, 300);
     };
   }
+  // −/+ neben Gewicht und Wdh.: kleine Korrekturen ohne Tastatur (Eintippen geht weiterhin)
+  holder.querySelectorAll('[data-step]').forEach((btn) => {
+    btn.onclick = () => {
+      const input = document.getElementById(btn.dataset.step);
+      const g = builder.exercises[builder.activeIndex];
+      if (!input || !g) return;
+      const cur = parseFloat(String(input.value).replace(',', '.')) || 0;
+      const step = btn.dataset.step === 'fs-weight' ? fsWeightStep(g.exerciseId, cur) : (exerciseUnit(g.exerciseId) === 'time' ? 5 : 1);
+      const next = Math.max(0, Math.round((cur + Number(btn.dataset.dir) * step) * 10) / 10);
+      input.value = btn.dataset.step === 'fs-weight' && next === 0 ? '' : String(next);
+    };
+  });
   const resumeSetBtn = document.getElementById('fs-resume-set');
   if (resumeSetBtn) {
     resumeSetBtn.onclick = () => {
@@ -1105,6 +1197,9 @@ function renderFsPanel() {
       setTimeout(() => {
         const unit = exerciseUnit(builder.exercises[builder.activeIndex].exerciseId);
         builder.exercises[builder.activeIndex].sets.push({ weight: weightRaw === '' ? '' : Number(weightRaw), reps, elapsedSec: fsCapturedElapsed, unit, at: Date.now() }); // at: für Puls je Satz (Uhr-Daten)
+        const gNow = builder.exercises[builder.activeIndex];
+        const cmp = fsCompareToLast(gNow.exerciseId, gNow.sets.length - 1, gNow.sets[gNow.sets.length - 1]);
+        if (cmp === 1) toast('Stärker als letztes Mal ↑', 'ok');
         fsNoteTarget = { gi: builder.activeIndex, si: builder.exercises[builder.activeIndex].sets.length - 1 };
         // Supersatz: ohne Pause weiter zur nächsten Übung der Runde; Pause erst nach der letzten
         const mem = supersetMembers(builder.exercises, builder.activeIndex);

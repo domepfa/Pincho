@@ -308,8 +308,8 @@ async function renderLog() {
       </div>`}
     </div>
 
-    <div class="sec-head"><h2 class="sec-title">Verlauf</h2><div class="sec-rule"></div></div>
-    <div class="list" id="log-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
+    <div class="sec-head log-history-sec"><h2 class="sec-title">Verlauf</h2><div class="sec-rule"></div></div>
+    <div class="list log-history-sec" id="log-list"><span class="mono" style="color:var(--ink-faint);font-size:12px;">lädt…</span></div>
   `);
 
   renderLogBuilderPanel();
@@ -412,7 +412,7 @@ async function renderLogHistory() {
     <div class="log-item">
       <div class="top"><span>${esc(fmtDayKey(e.date))}</span><span class="type">${esc((e.type || '').toUpperCase())}</span></div>
       ${e.durationMin ? `<div class="ex-log-list"><div class="ex-log-row"><span>${sessionTypeIconLabel(e.type)}</span><span class="mono">${e.durationMin} Min.</span></div></div>` : ''}
-      ${e.totalSessionSec ? `<div class="ex-log-list"><div class="ex-log-row"><span>⏱ Zeit</span><span class="mono">${fmtMinSec(e.totalSessionSec)} gesamt · ${fmtMinSec(e.totalWorkSec || 0)} Arbeit</span></div></div>` : ''}
+      ${e.totalSessionSec ? `<div class="ex-log-list"><div class="ex-log-row"><span>${uiIcon('clock')} Zeit</span><span class="mono">${fmtMinSec(e.totalSessionSec)} gesamt · ${fmtMinSec(e.totalWorkSec || 0)} Arbeit</span></div></div>` : ''}
       ${(e.exercises && e.exercises.length) ? `<div class="ex-log-list">${e.exercises.map((ex) => {
         const priorSets = Array.isArray(ex.sets) ? priorSetsForExercise(ex.exerciseId, idx) : null;
         const trend = priorSets ? exerciseTrend(ex.exerciseId, ex.sets, priorSets) : null;
@@ -420,7 +420,7 @@ async function renderLogHistory() {
       }).join('')}</div>` : ''}
       ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
       ${e.watch ? `<button type="button" class="watch-block" data-watch-detail="${id}" aria-label="Puls im Detail">${watchSummaryHtml(e.watch)}${watchChartHtml(e.watch, e.exercises)}<span class="watch-more">Details ›</span></button>` : ''}
-      <label class="btn ghost small watch-add">${e.watch ? '⌚ Uhr-Datei ersetzen' : '⌚ Uhr-Datei hinzufügen'}<input type="file" accept=".fit,.zip,application/vnd.ant.fit,application/zip,application/octet-stream" data-watch-file="${id}" hidden></label>
+      <label class="btn ghost small watch-add">${uiIcon('watch')} ${e.watch ? 'Uhr-Datei ersetzen' : 'Uhr-Datei hinzufügen'}<input type="file" accept=".fit,.zip,application/vnd.ant.fit,application/zip,application/octet-stream" data-watch-file="${id}" hidden></label>
       ${(e.exercises && e.exercises.length) ? `<button type="button" class="btn ghost small" data-save-plan="${id}" style="width:100%;margin-top:6px;">Als Plan speichern</button>` : ''}
       ${challengeDurationChipsHtml(`log-share-${id}`, CHALLENGE_WINDOW_H)}
       <div class="field-row" style="margin-top:6px;">
