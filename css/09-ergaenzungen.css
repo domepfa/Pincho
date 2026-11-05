@@ -286,3 +286,8 @@ body.training-locked .log-history-sec { display: none; }
 /* Linien-Icons (uiIcon) statt Emojis */
 .ui-ico { width: 1em; height: 1em; vertical-align: -0.14em; flex-shrink: 0; }
 .fs-session-clock { display: inline-flex; align-items: center; gap: 4px; }
+/* Leiste: Ziel für den nächsten Satz deutlich hervorgehoben */
+.fs-dock-goal { display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 10px; margin: 0 0 10px; padding: 8px 12px; border-radius: 12px; background: rgba(var(--accent-rgb), .12); border: 1px solid rgba(var(--accent-rgb), .35); }
+.fs-dock-goal-label { grid-column: 1 / -1; font: 600 11px 'Barlow', system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
+.fs-dock-goal-val { font: 700 30px/1.05 'Barlow Condensed', sans-serif; color: var(--accent); }
+.fs-dock-goal-last { font-size: 13px; color: var(--ink-dim); justify-self: end; }
