@@ -814,9 +814,12 @@ function renderFsPanel() {
       </div>`;
     if (fsPhase === 'idle') {
       const goal = fsSetGoal(g);
-      const sug = goal ? `${goal.kind === 'same' ? 'wie eben' : 'Ziel'} ${fsFmtSet(goal, goal.isTime)}${goal.base ? ` · letztes Mal ${fsFmtSet(goal.base, goal.isTime)}` : ''}` : (g.sets.length ? '' : 'Erstes Mal – Gewicht wählen, 8–12 Wdh.');
+      // Ziel gross und farbig, "letztes Mal" klein daneben
+      const hint = goal
+        ? `<div class="fs-dock-goal"><span class="fs-dock-goal-label">Satz ${g.sets.length + 1} · ${goal.kind === 'same' ? 'wie eben' : 'Ziel'}</span><span class="fs-dock-goal-val">${esc(fsFmtSet(goal, goal.isTime))}</span>${goal.base ? `<span class="fs-dock-goal-last">letztes Mal ${esc(fsFmtSet(goal.base, goal.isTime))}</span>` : ''}</div>`
+        : `<div class="fs-dock-hint">Satz ${g.sets.length + 1}${g.sets.length ? '' : ' · Erstes Mal – Gewicht wählen, 8–12 Wdh.'}</div>`;
       return `${head}
-        <div class="fs-dock-hint">Satz ${g.sets.length + 1}${sug ? ' · ' + esc(sug) : ''}</div>
+        ${hint}
         <button type="button" class="btn fs-dock-btn" id="fs-start-set">▶ Satz starten</button>`;
     }
     if (fsPhase === 'working') {
