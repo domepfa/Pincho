@@ -300,3 +300,8 @@ body.training-locked .log-history-sec { display: none; }
 .fs-dock-goal-last { font-size: 13px; color: var(--ink-dim); justify-self: end; }
 /* Ruhemodus: "Übung wechseln" klein unter dem Hauptknopf */
 #dim-overlay .dim-action.dim-switch, #dim-overlay.ready .dim-action.dim-switch { margin-top: 14px; min-width: 0; padding: 10px 20px; font-size: 16px; border-width: 1px; border-color: #2a3038; color: #6b7480; }
+/* Ruhemodus: welcher Satz, was letztes Mal war */
+#dim-overlay .dim-ref { margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; padding: 0 20px; }
+#dim-overlay .dim-ref span { font: 600 15px 'Barlow', system-ui, sans-serif; color: #6b7480; }
+#dim-overlay .dim-ref b { font: 700 28px 'Barlow Condensed', sans-serif; color: #8a939e; }
+#dim-overlay .dim-sub:empty { display: none; }
