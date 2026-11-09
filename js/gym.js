@@ -1324,10 +1324,22 @@ function dimClockText() {
   if (fsPhase === 'resting') {
     const target = fsRestTargetSec(), left = target - fsRestTimer.seconds;
     const action = document.getElementById('fs-next-exercise') || document.getElementById('fs-next-set');
-    return { label: 'Pause', time: fmtMinSec(fsRestTimer.seconds), sub: left > 0 ? `noch ${fmtMinSec(left)}` : 'Bereit', ready: left <= 0, action };
+    const b = activeSetBuilder();
+    const nextIdx = action && action.id === 'fs-next-exercise' ? Number(action.dataset.nextIdx) : (fsRoundStart(b) ?? b.activeIndex);
+    return { label: 'Pause', time: fmtMinSec(fsRestTimer.seconds), sub: left > 0 ? `noch ${fmtMinSec(left)}` : 'Bereit', ready: left <= 0, action, ref: dimRefText(b.exercises[nextIdx]) };
   }
-  if (fsPhase === 'working') return { label: 'Satz läuft', time: fmtMinSec(fsWorkTimer.seconds), sub: '', ready: false, action: document.getElementById('fs-end-set') };
+  if (fsPhase === 'working') {
+    const b = activeSetBuilder();
+    return { label: 'Satz läuft', time: fmtMinSec(fsWorkTimer.seconds), sub: '', ready: false, action: document.getElementById('fs-end-set'), ref: dimRefText(b.exercises[b.activeIndex]) };
+  }
   return null;
+}
+// Ruhemodus: "Übung · Satz N" und darunter "letztes Mal …" (HTML)
+function dimRefText(g) {
+  if (!g) return '';
+  const ref = fsSetGoal(g);
+  const n = g.sets.length + 1;
+  return `<span>${esc(exerciseName(g.exerciseId))} · Satz ${n}</span>${ref ? `<b>${FS_REF_LABEL[ref.kind]} ${esc(fsFmtSet(ref, ref.isTime))}</b>` : ''}`;
 }
 function dimTick() {
   const el = document.getElementById('dim-overlay');
@@ -1338,7 +1350,7 @@ function dimTick() {
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'dim-overlay';
-    ov.innerHTML = '<div class="dim-label"></div><div class="dim-time mono"></div><div class="dim-sub"></div><button type="button" class="dim-action dim-main"></button><button type="button" class="dim-action dim-switch">Übung wechseln</button><div class="dim-hint">Sonst irgendwo tippen zum Aufwecken</div>';
+    ov.innerHTML = '<div class="dim-label"></div><div class="dim-time mono"></div><div class="dim-sub"></div><div class="dim-ref"></div><button type="button" class="dim-action dim-main"></button><button type="button" class="dim-action dim-switch">Übung wechseln</button><div class="dim-hint">Sonst irgendwo tippen zum Aufwecken</div>';
     document.body.appendChild(ov);
     // In der Pause direkt zur Übungswahl (wie "Übung wechseln" im Pausen-Bildschirm)
     ov.querySelector('.dim-switch').onclick = () => {
@@ -1366,6 +1378,7 @@ function dimTick() {
   ov.querySelector('.dim-label').textContent = info.label;
   ov.querySelector('.dim-time').textContent = info.time;
   ov.querySelector('.dim-sub').textContent = info.sub;
+  ov.querySelector('.dim-ref').innerHTML = info.ref || '';
   ov.classList.toggle('ready', info.ready);
 }
 // jede Berührung zählt als Aktivität; liegt der Ruhemodus an, weckt sie nur – der zugehörige Klick wird verschluckt,
