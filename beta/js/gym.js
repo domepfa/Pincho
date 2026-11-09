@@ -664,8 +664,8 @@ function fsCompareToLast(exerciseId, idx, set) {
 
 /* Die letzten 3 Trainings dieser Übung im Pausen-Bildschirm, je Zeile alle Sätze. */
 // markIdx: dieser Satz im jüngsten Training wird fett (der als Nächstes zu schlagende)
-function fsRestHistoryHtml(exerciseId, markIdx) {
-  const sessions = historyForExercise(exerciseId, 3);
+function fsRestHistoryHtml(exerciseId, markIdx, limit = 3) {
+  const sessions = historyForExercise(exerciseId, limit);
   if (!sessions.length) return '';
   const setTxt = (s) => {
     const w = s.weight !== '' && s.weight != null ? `${String(s.weight).replace('.', ',')} kg × ` : '';
@@ -695,7 +695,8 @@ function renderFsRestScreen(builder) {
   const group = supersetMembers(builder.exercises, nextIdx);
   const lines = group.map((j) => {
     const g = builder.exercises[j];
-    const hist = fsRestHistoryHtml(g.exerciseId, g.sets.length);
+    // Supersatz: nur das letzte Training je Übung, damit alles auf einen Bildschirm passt
+    const hist = fsRestHistoryHtml(g.exerciseId, g.sets.length, group.length > 1 ? 1 : 2);
     // Ziel gross, "letztes Mal" steht (fett markiert) in der Verlaufsliste darunter
     const goal = fsSetGoal(g);
     const goalHtml = goal ? `<span class="fs-rest-goal"><small>Satz ${g.sets.length + 1} · ${goal.kind === 'same' ? 'wie eben' : 'Ziel'}</small>${esc(fsFmtSet(goal, goal.isTime))}</span>`
@@ -719,7 +720,7 @@ function renderFsRestScreen(builder) {
     history.pushState({ fsRest: true }, '');
   }
   el.innerHTML = `
-    <div class="info-sheet-card fs-rest-card">
+    <div class="info-sheet-card fs-rest-card${group.length > 1 ? ' compact' : ''}">
       <div class="fs-rest-grip" aria-hidden="true"></div>
       <div class="fs-rest-dial">
         <svg viewBox="0 0 200 200" aria-hidden="true"><circle class="fs-rest-track" cx="100" cy="100" r="88"/><circle id="fs-rest-ring" class="fs-rest-ring" cx="100" cy="100" r="88" stroke-dasharray="${FS_RING_LEN.toFixed(1)}" stroke-dashoffset="${FS_RING_LEN.toFixed(1)}"/></svg>
