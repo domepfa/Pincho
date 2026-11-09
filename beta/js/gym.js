@@ -618,7 +618,7 @@ function closeFsFinishScreen(gone) {
    der Leiste, damit der Ablauf (nächster Satz, Runde, nächste Übung) nur an einer Stelle steckt. */
 let fsRestHidden = false;
 /* Referenz für den nächsten Satz: derselbe Satz vom letzten Training ("letztes Mal", Satz 2 ↔ Satz 2).
-   Im Plan das Plan-Ziel; mehr Sätze als letztes Mal: der eben gemachte; noch nie gemacht: null.
+   Im Plan das Plan-Ziel; mehr Sätze als letztes Mal: dessen letzter Satz; noch nie gemacht: null.
    Bewusst kein Vorschlag für mehr Gewicht oder Wdh. – das entscheidet man selbst. */
 function fsWeightStep(exerciseId, w) {
   if (exerciseId.startsWith('kb_')) return 4;
@@ -631,16 +631,13 @@ function fsSetGoal(g) {
     return { weight: g.targetWeight !== '' && g.targetWeight != null ? Number(g.targetWeight) : '', reps: g.targetReps, isTime, kind: 'plan' };
   }
   const prev = historyForExercise(g.exerciseId, 1)[0]?.sets || [];
-  const base = prev[n];
-  if (!base) {
-    if (!n) return null;
-    const last = g.sets[n - 1];
-    return { weight: last.weight, reps: last.reps, isTime: (last.unit || 'reps') === 'time', kind: 'same' };
-  }
+  // mehr Sätze als letztes Mal: dessen letzter Satz
+  const base = prev[n] || prev[prev.length - 1];
+  if (!base) return null;
   const baseTime = (base.unit || (isTime ? 'time' : 'reps')) === 'time';
   return { weight: base.weight !== '' && base.weight != null ? Number(base.weight) : '', reps: base.reps, isTime: baseTime, kind: 'last' };
 }
-const FS_REF_LABEL = { plan: 'Ziel', same: 'wie eben', last: 'letztes Mal' };
+const FS_REF_LABEL = { plan: 'Ziel', last: 'letztes Mal' };
 function fsFmtSet(st, isTime) {
   const w = st.weight !== '' && st.weight != null ? `${String(st.weight).replace('.', ',')} kg × ` : '';
   return `${w}${st.reps}${isTime ? ' s' : ''}`;
