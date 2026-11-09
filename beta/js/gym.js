@@ -621,6 +621,7 @@ let fsRestHidden = false;
    - Plan mit Zielwerten: das Plan-Ziel
    - letztes Mal ohne Einbruch (kein Satz mit weniger Wdh. als Satz 1): mehr Gewicht, gleiche Wdh.
    - sonst gleiches Gewicht, +1 Wdh. (Halte-Übungen +5 s; ohne Gewicht immer mehr Wdh.)
+   - ab Satz 2: das heute gewählte Gewicht bleibt, nur die Wdh. kommen vom letzten Mal
    - mehr Sätze als letztes Mal: wie der eben gemachte; noch nie gemacht: null */
 function fsWeightStep(exerciseId, w) {
   if (exerciseId.startsWith('kb_')) return 4;
@@ -642,6 +643,13 @@ function fsSetGoal(g) {
   const baseTime = (base.unit || (isTime ? 'time' : 'reps')) === 'time';
   const w = base.weight !== '' && base.weight != null ? Number(base.weight) : '';
   const reps = Number(base.reps) || 0;
+  // Ab Satz 2: das heute gewählte Gewicht bleibt; Wdh. wie letztes Mal, bei gleichem oder weniger Gewicht +1
+  if (n) {
+    const cur = g.sets[n - 1];
+    const cw = cur.weight !== '' && cur.weight != null ? Number(cur.weight) : '';
+    const heavier = cw !== '' && w !== '' && cw > w;
+    return { weight: cw, reps: reps + (heavier ? 0 : baseTime ? 5 : 1), isTime: baseTime, kind: 'carry', base };
+  }
   const firstReps = Number(prev[0].reps) || 0;
   const noDrop = prev.every((st) => (Number(st.reps) || 0) >= firstReps);
   if (w !== '' && w > 0 && noDrop && !baseTime) {
