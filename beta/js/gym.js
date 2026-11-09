@@ -617,12 +617,9 @@ function closeFsFinishScreen(gone) {
    klein in der Leiste weiter (antippen holt ihn zurück). Der grosse Knopf klickt den echten Knopf in
    der Leiste, damit der Ablauf (nächster Satz, Runde, nächste Übung) nur an einer Stelle steckt. */
 let fsRestHidden = false;
-/* Ziel für den nächsten Satz (progressive Überlastung), Basis ist derselbe Satz vom letzten Training:
-   - Plan mit Zielwerten: das Plan-Ziel
-   - letztes Mal ohne Einbruch (kein Satz mit weniger Wdh. als Satz 1): mehr Gewicht, gleiche Wdh.
-   - sonst gleiches Gewicht, +1 Wdh. (Halte-Übungen +5 s; ohne Gewicht immer mehr Wdh.)
-   - ab Satz 2: das heute gewählte Gewicht bleibt, nur die Wdh. kommen vom letzten Mal
-   - mehr Sätze als letztes Mal: wie der eben gemachte; noch nie gemacht: null */
+/* Referenz für den nächsten Satz: derselbe Satz vom letzten Training ("letztes Mal", Satz 2 ↔ Satz 2).
+   Im Plan das Plan-Ziel; mehr Sätze als letztes Mal: der eben gemachte; noch nie gemacht: null.
+   Bewusst kein Vorschlag für mehr Gewicht oder Wdh. – das entscheidet man selbst. */
 function fsWeightStep(exerciseId, w) {
   if (exerciseId.startsWith('kb_')) return 4;
   return w < 10 ? 1 : 2.5;
@@ -641,28 +638,9 @@ function fsSetGoal(g) {
     return { weight: last.weight, reps: last.reps, isTime: (last.unit || 'reps') === 'time', kind: 'same' };
   }
   const baseTime = (base.unit || (isTime ? 'time' : 'reps')) === 'time';
-  const w = base.weight !== '' && base.weight != null ? Number(base.weight) : '';
-  const reps = Number(base.reps) || 0;
-  // Ab Satz 2: das heute gewählte Gewicht bleibt; Wdh. wie letztes Mal, bei gleichem oder weniger Gewicht +1
-  if (n) {
-    const cur = g.sets[n - 1];
-    const cw = cur.weight !== '' && cur.weight != null ? Number(cur.weight) : '';
-    const heavier = cw !== '' && w !== '' && cw > w;
-    return fsCapReps({ weight: cw, reps: reps + (heavier ? 0 : baseTime ? 5 : 1), isTime: baseTime, kind: 'carry', base }, g.exerciseId);
-  }
-  const firstReps = Number(prev[0].reps) || 0;
-  const noDrop = prev.every((st) => (Number(st.reps) || 0) >= firstReps);
-  if (w !== '' && w > 0 && noDrop && !baseTime) {
-    return { weight: Math.round((w + fsWeightStep(g.exerciseId, w)) * 10) / 10, reps, isTime: false, kind: 'weight', base };
-  }
-  return fsCapReps({ weight: w, reps: reps + (baseTime ? 5 : 1), isTime: baseTime, kind: 'reps', base }, g.exerciseId);
+  return { weight: base.weight !== '' && base.weight != null ? Number(base.weight) : '', reps: base.reps, isTime: baseTime, kind: 'last' };
 }
-// Mit Gewicht nicht über 12 Wdh.: dann lieber eine Stufe mehr Gewicht bei 12 Wdh.
-const FS_MAX_REPS = 12;
-function fsCapReps(goal, exerciseId) {
-  if (goal.isTime || goal.weight === '' || !(goal.weight > 0) || goal.reps <= FS_MAX_REPS) return goal;
-  return { ...goal, weight: Math.round((goal.weight + fsWeightStep(exerciseId, goal.weight)) * 10) / 10, reps: FS_MAX_REPS, kind: 'weight' };
-}
+const FS_REF_LABEL = { plan: 'Ziel', same: 'wie eben', last: 'letztes Mal' };
 function fsFmtSet(st, isTime) {
   const w = st.weight !== '' && st.weight != null ? `${String(st.weight).replace('.', ',')} kg × ` : '';
   return `${w}${st.reps}${isTime ? ' s' : ''}`;
@@ -713,7 +691,7 @@ function renderFsRestScreen(builder) {
     const hist = fsRestHistoryHtml(g.exerciseId, g.sets.length, group.length > 1 ? 1 : 2);
     // Ziel gross, "letztes Mal" steht (fett markiert) in der Verlaufsliste darunter
     const goal = fsSetGoal(g);
-    const goalHtml = goal ? `<span class="fs-rest-goal"><small>Satz ${g.sets.length + 1} · ${goal.kind === 'same' ? 'wie eben' : 'Ziel'}</small>${esc(fsFmtSet(goal, goal.isTime))}</span>`
+    const goalHtml = goal ? `<span class="fs-rest-goal"><small>Satz ${g.sets.length + 1} · ${FS_REF_LABEL[goal.kind]}</small>${esc(fsFmtSet(goal, goal.isTime))}</span>`
       : `<span class="fs-rest-next-sub"><b>Satz ${g.sets.length + 1}</b></span>`;
     const letter = group.length > 1 ? `<span class="ss-badge">${String.fromCharCode(65 + group.indexOf(j))}</span>` : '';
     return `<div class="fs-rest-next-row">${letter}<b>${esc(exerciseName(g.exerciseId))}</b>${goalHtml}${hist}</div>`;
@@ -831,7 +809,7 @@ function renderFsPanel() {
       const goal = fsSetGoal(g);
       // Ziel gross und farbig, "letztes Mal" klein daneben
       const hint = goal
-        ? `<div class="fs-dock-goal"><span class="fs-dock-goal-label">Satz ${g.sets.length + 1} · ${goal.kind === 'same' ? 'wie eben' : 'Ziel'}</span><span class="fs-dock-goal-val">${esc(fsFmtSet(goal, goal.isTime))}</span>${goal.base ? `<span class="fs-dock-goal-last">letztes Mal ${esc(fsFmtSet(goal.base, goal.isTime))}</span>` : ''}</div>`
+        ? `<div class="fs-dock-goal"><span class="fs-dock-goal-label">Satz ${g.sets.length + 1} · ${FS_REF_LABEL[goal.kind]}</span><span class="fs-dock-goal-val">${esc(fsFmtSet(goal, goal.isTime))}</span></div>`
         : `<div class="fs-dock-hint">Satz ${g.sets.length + 1}${g.sets.length ? '' : ' · Erstes Mal – Gewicht wählen, 8–12 Wdh.'}</div>`;
       return `${head}
         ${hint}
@@ -883,9 +861,10 @@ function renderFsPanel() {
     // vom Vorsatz DIESER Session (gleiche Einheit) — beim ersten Satz
     // bleibt sie leer. Vorausgefüllt wird sie beim Fokussieren markiert,
     // eine neue Zahl ersetzt sie also direkt.
-    // Vorbelegung mit dem Ziel (fsSetGoal); ohne Ziel wie bisher der letzte Satz dieser Session
+    // Vorbelegung: Gewicht wie heute schon gewählt (ab Satz 2) bzw. wie letztes Mal; Wdh. wie derselbe Satz letztes Mal
     const goal = fsSetGoal(g);
-    const last = goal || (g.sets.length ? g.sets[g.sets.length - 1] : lastValueForExercise(g.exerciseId));
+    const todayLast = g.sets.length ? g.sets[g.sets.length - 1] : null;
+    const last = todayLast || goal || lastValueForExercise(g.exerciseId);
     const prevReps = goal && !goal.isTime ? String(goal.reps ?? '') : '';
     // Bei Isohold-Übungen IST die gestoppte Dauer die Angabe — die wird
     // direkt übernommen statt sie erst manuell als "Wiederholung" abtippen
