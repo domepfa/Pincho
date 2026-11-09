@@ -648,14 +648,20 @@ function fsSetGoal(g) {
     const cur = g.sets[n - 1];
     const cw = cur.weight !== '' && cur.weight != null ? Number(cur.weight) : '';
     const heavier = cw !== '' && w !== '' && cw > w;
-    return { weight: cw, reps: reps + (heavier ? 0 : baseTime ? 5 : 1), isTime: baseTime, kind: 'carry', base };
+    return fsCapReps({ weight: cw, reps: reps + (heavier ? 0 : baseTime ? 5 : 1), isTime: baseTime, kind: 'carry', base }, g.exerciseId);
   }
   const firstReps = Number(prev[0].reps) || 0;
   const noDrop = prev.every((st) => (Number(st.reps) || 0) >= firstReps);
   if (w !== '' && w > 0 && noDrop && !baseTime) {
     return { weight: Math.round((w + fsWeightStep(g.exerciseId, w)) * 10) / 10, reps, isTime: false, kind: 'weight', base };
   }
-  return { weight: w, reps: reps + (baseTime ? 5 : 1), isTime: baseTime, kind: 'reps', base };
+  return fsCapReps({ weight: w, reps: reps + (baseTime ? 5 : 1), isTime: baseTime, kind: 'reps', base }, g.exerciseId);
+}
+// Mit Gewicht nicht über 12 Wdh.: dann lieber eine Stufe mehr Gewicht bei 12 Wdh.
+const FS_MAX_REPS = 12;
+function fsCapReps(goal, exerciseId) {
+  if (goal.isTime || goal.weight === '' || !(goal.weight > 0) || goal.reps <= FS_MAX_REPS) return goal;
+  return { ...goal, weight: Math.round((goal.weight + fsWeightStep(exerciseId, goal.weight)) * 10) / 10, reps: FS_MAX_REPS, kind: 'weight' };
 }
 function fsFmtSet(st, isTime) {
   const w = st.weight !== '' && st.weight != null ? `${String(st.weight).replace('.', ',')} kg × ` : '';
