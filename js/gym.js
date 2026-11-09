@@ -617,11 +617,11 @@ function closeFsFinishScreen(gone) {
    klein in der Leiste weiter (antippen holt ihn zurück). Der grosse Knopf klickt den echten Knopf in
    der Leiste, damit der Ablauf (nächster Satz, Runde, nächste Übung) nur an einer Stelle steckt. */
 let fsRestHidden = false;
-/* Ziel für den nächsten Satz (progressive Überlastung), Basis ist derselbe Satz vom letzten Training:
+/* Ziel für den nächsten Satz, Basis ist derselbe Satz vom letzten Training. Pincho schlägt kein anderes
+   Gewicht vor, nur mehr Wdh.:
    - Plan mit Zielwerten: das Plan-Ziel
-   - letztes Mal ohne Einbruch (kein Satz mit weniger Wdh. als Satz 1): mehr Gewicht, gleiche Wdh.
-   - sonst gleiches Gewicht, +1 Wdh. (Halte-Übungen +5 s; ohne Gewicht immer mehr Wdh.)
-   - ab Satz 2: das heute gewählte Gewicht bleibt, nur die Wdh. kommen vom letzten Mal
+   - Satz 1: Gewicht wie letztes Mal, +1 Wdh. (Halte-Übungen +5 s)
+   - ab Satz 2: das heute gewählte Gewicht bleibt; Wdh. wie letztes Mal +1 (gleich viele, wenn heute schwerer)
    - mehr Sätze als letztes Mal: wie der eben gemachte; noch nie gemacht: null */
 function fsWeightStep(exerciseId, w) {
   if (exerciseId.startsWith('kb_')) return 4;
@@ -648,20 +648,9 @@ function fsSetGoal(g) {
     const cur = g.sets[n - 1];
     const cw = cur.weight !== '' && cur.weight != null ? Number(cur.weight) : '';
     const heavier = cw !== '' && w !== '' && cw > w;
-    return fsCapReps({ weight: cw, reps: reps + (heavier ? 0 : baseTime ? 5 : 1), isTime: baseTime, kind: 'carry', base }, g.exerciseId);
+    return { weight: cw, reps: reps + (heavier ? 0 : baseTime ? 5 : 1), isTime: baseTime, kind: 'carry', base };
   }
-  const firstReps = Number(prev[0].reps) || 0;
-  const noDrop = prev.every((st) => (Number(st.reps) || 0) >= firstReps);
-  if (w !== '' && w > 0 && noDrop && !baseTime) {
-    return { weight: Math.round((w + fsWeightStep(g.exerciseId, w)) * 10) / 10, reps, isTime: false, kind: 'weight', base };
-  }
-  return fsCapReps({ weight: w, reps: reps + (baseTime ? 5 : 1), isTime: baseTime, kind: 'reps', base }, g.exerciseId);
-}
-// Mit Gewicht nicht über 12 Wdh.: dann lieber eine Stufe mehr Gewicht bei 12 Wdh.
-const FS_MAX_REPS = 12;
-function fsCapReps(goal, exerciseId) {
-  if (goal.isTime || goal.weight === '' || !(goal.weight > 0) || goal.reps <= FS_MAX_REPS) return goal;
-  return { ...goal, weight: Math.round((goal.weight + fsWeightStep(exerciseId, goal.weight)) * 10) / 10, reps: FS_MAX_REPS, kind: 'weight' };
+  return { weight: w, reps: reps + (baseTime ? 5 : 1), isTime: baseTime, kind: 'reps', base };
 }
 function fsFmtSet(st, isTime) {
   const w = st.weight !== '' && st.weight != null ? `${String(st.weight).replace('.', ',')} kg × ` : '';
