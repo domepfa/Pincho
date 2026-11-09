@@ -298,3 +298,5 @@ body.training-locked .log-history-sec { display: none; }
 .fs-dock-goal-label { grid-column: 1 / -1; font: 600 11px 'Barlow', system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
 .fs-dock-goal-val { font: 700 30px/1.05 'Barlow Condensed', sans-serif; color: var(--accent); }
 .fs-dock-goal-last { font-size: 13px; color: var(--ink-dim); justify-self: end; }
+/* Ruhemodus: "Übung wechseln" klein unter dem Hauptknopf */
+#dim-overlay .dim-action.dim-switch, #dim-overlay.ready .dim-action.dim-switch { margin-top: 14px; min-width: 0; padding: 10px 20px; font-size: 16px; border-width: 1px; border-color: #2a3038; color: #6b7480; }

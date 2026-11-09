@@ -1341,17 +1341,27 @@ function dimTick() {
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'dim-overlay';
-    ov.innerHTML = '<div class="dim-label"></div><div class="dim-time mono"></div><div class="dim-sub"></div><button type="button" class="dim-action"></button><div class="dim-hint">Sonst irgendwo tippen zum Aufwecken</div>';
+    ov.innerHTML = '<div class="dim-label"></div><div class="dim-time mono"></div><div class="dim-sub"></div><button type="button" class="dim-action dim-main"></button><button type="button" class="dim-action dim-switch">Übung wechseln</button><div class="dim-hint">Sonst irgendwo tippen zum Aufwecken</div>';
     document.body.appendChild(ov);
-    ov.querySelector('.dim-action').onclick = () => {
-      const target = document.getElementById(ov.querySelector('.dim-action').dataset.target);
+    // In der Pause direkt zur Übungswahl (wie "Übung wechseln" im Pausen-Bildschirm)
+    ov.querySelector('.dim-switch').onclick = () => {
+      ov.remove();
+      dimLastTouch = Date.now();
+      const sw = document.getElementById('fs-rest-switch');
+      if (sw) sw.click();
+      else if (logMode === 'execute') document.getElementById('fs-panel')?.scrollIntoView({ behavior: 'smooth' });
+      else openFsPicker();
+    };
+    ov.querySelector('.dim-main').onclick = () => {
+      const target = document.getElementById(ov.querySelector('.dim-main').dataset.target);
       ov.remove();
       dimLastTouch = Date.now();
       target?.click(); // noch in derselben Geste, damit "Satz beenden" die Zahlentastatur öffnen darf
     };
   }
-  const actBtn = ov.querySelector('.dim-action');
+  const actBtn = ov.querySelector('.dim-main');
   actBtn.hidden = !info.action;
+  ov.querySelector('.dim-switch').hidden = fsPhase !== 'resting';
   if (info.action) {
     actBtn.dataset.target = info.action.id;
     actBtn.textContent = info.action.textContent.trim();
