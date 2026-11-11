@@ -802,14 +802,17 @@ function renderFsPanel() {
         ${builder.sessionStartedAt ? `<span class="fs-session-clock" id="fs-session-clock" title="Trainingszeit gesamt">${uiIcon('clock')}<span id="fs-session-clock-t">${fmtSessionClock(builder.sessionStartedAt)}</span></span>` : ''}
         ${logMode === 'freestyle' ? `<button type="button" class="btn ghost small" id="fs-dock-add">+ Übung</button><button type="button" class="btn small fs-dock-finish" id="fs-dock-finish">✓ Beenden</button>` : ''}
       </div>`;
+    // "letztes Mal" für den nächsten Satz gross und farbig (auch in der Pause, ggf. für die nächste Übung)
+    const refBox = (gx) => {
+      const goal = fsSetGoal(gx);
+      const who = gx !== g ? `${esc(exerciseName(gx.exerciseId))} · ` : '';
+      return goal
+        ? `<div class="fs-dock-goal"><span class="fs-dock-goal-label">${who}Satz ${gx.sets.length + 1} · ${FS_REF_LABEL[goal.kind]}</span><span class="fs-dock-goal-val">${esc(fsFmtSet(goal, goal.isTime))}</span></div>`
+        : `<div class="fs-dock-hint">${who}Satz ${gx.sets.length + 1}${gx.sets.length ? '' : ' · Erstes Mal – Gewicht wählen, 8–12 Wdh.'}</div>`;
+    };
     if (fsPhase === 'idle') {
-      const goal = fsSetGoal(g);
-      // Ziel gross und farbig, "letztes Mal" klein daneben
-      const hint = goal
-        ? `<div class="fs-dock-goal"><span class="fs-dock-goal-label">Satz ${g.sets.length + 1} · ${FS_REF_LABEL[goal.kind]}</span><span class="fs-dock-goal-val">${esc(fsFmtSet(goal, goal.isTime))}</span></div>`
-        : `<div class="fs-dock-hint">Satz ${g.sets.length + 1}${g.sets.length ? '' : ' · Erstes Mal – Gewicht wählen, 8–12 Wdh.'}</div>`;
       return `${head}
-        ${hint}
+        ${refBox(g)}
         <button type="button" class="btn fs-dock-btn" id="fs-start-set">▶ Satz starten</button>`;
     }
     if (fsPhase === 'working') {
@@ -830,21 +833,21 @@ function renderFsPanel() {
     const restHtml = `<div class="fs-rest-timer mono" id="fs-rest-timer">PAUSE ${fmtMinSec(fsRestTimer.seconds)}</div>`;
     const roundStart = fsRoundStart(builder);
     if (roundStart != null) {
-      return `${head}${restHtml}
+      return `${head}${restHtml}${refBox(builder.exercises[roundStart])}
       <button type="button" class="btn fs-dock-btn" id="fs-next-set" aria-label="Nächste Supersatz-Runde, beginnt mit ${esc(exerciseName(builder.exercises[roundStart].exerciseId))}">▶ Runde ${builder.exercises[roundStart].sets.length + 1}</button>`;
     }
     if (reachedTarget && nextUnfinishedIdx != null) {
       // Plan-Ziel für diese Übung erreicht — automatisch die nächste offene
       // Übung vorschlagen. Ein Extra-Satz bleibt trotzdem manuell möglich;
       // das ändert nur DIESE Ausführung, nicht den gespeicherten Plan.
-      return `${head}${restHtml}
+      return `${head}${restHtml}${refBox(builder.exercises[nextUnfinishedIdx])}
         <div class="fs-dock-row">
           <button type="button" class="btn ghost fs-dock-btn fs-dock-secondary" id="fs-next-set">+ Extra</button>
           <button type="button" class="btn fs-dock-btn" id="fs-next-exercise" data-next-idx="${nextUnfinishedIdx}">▶ ${esc(exerciseName(builder.exercises[nextUnfinishedIdx].exerciseId))}</button>
         </div>`;
     }
     const label = g.sets.length ? (reachedTarget ? '+ Extra-Satz' : '▶ Nächster Satz') : '▶ Satz starten';
-    return `${head}${restHtml}
+    return `${head}${restHtml}${refBox(g)}
       <button type="button" class="btn fs-dock-btn" id="fs-next-set">${label}</button>`;
   };
 
