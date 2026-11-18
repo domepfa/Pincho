@@ -1353,7 +1353,7 @@ function dimTick() {
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'dim-overlay';
-    ov.innerHTML = '<div class="dim-label"></div><div class="dim-time mono"></div><div class="dim-sub"></div><div class="dim-ref"></div><button type="button" class="dim-action dim-main"></button><button type="button" class="dim-action dim-switch">Übung wechseln</button><div class="dim-hint">Sonst irgendwo tippen zum Aufwecken</div>';
+    ov.innerHTML = '<div class="dim-total mono"></div><div class="dim-label"></div><div class="dim-time mono"></div><div class="dim-sub"></div><div class="dim-ref"></div><button type="button" class="dim-action dim-main"></button><button type="button" class="dim-action dim-switch">Übung wechseln</button><div class="dim-hint">Sonst irgendwo tippen zum Aufwecken</div>';
     document.body.appendChild(ov);
     // In der Pause direkt zur Übungswahl (wie "Übung wechseln" im Pausen-Bildschirm)
     ov.querySelector('.dim-switch').onclick = () => {
@@ -1382,6 +1382,8 @@ function dimTick() {
   ov.querySelector('.dim-time').textContent = info.time;
   ov.querySelector('.dim-sub').textContent = info.sub;
   ov.querySelector('.dim-ref').innerHTML = info.ref || '';
+  const b = activeSetBuilder();
+  ov.querySelector('.dim-total').textContent = b && b.sessionStartedAt ? `Training gesamt ${fmtSessionClock(b.sessionStartedAt)}` : '';
   ov.classList.toggle('ready', info.ready);
 }
 // jede Berührung zählt als Aktivität; liegt der Ruhemodus an, weckt sie nur – der zugehörige Klick wird verschluckt,

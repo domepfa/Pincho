@@ -305,3 +305,5 @@ body.training-locked .log-history-sec { display: none; }
 #dim-overlay .dim-ref span { font: 600 15px 'Barlow', system-ui, sans-serif; color: #6b7480; }
 #dim-overlay .dim-ref b { font: 700 28px 'Barlow Condensed', sans-serif; color: #8a939e; }
 #dim-overlay .dim-sub:empty { display: none; }
+/* Ruhemodus: Gesamtzeit des Trainings oben */
+#dim-overlay .dim-total { position: absolute; top: calc(28px + var(--safe-top, 0px)); font-size: 18px; color: #6b7480; letter-spacing: .04em; }
