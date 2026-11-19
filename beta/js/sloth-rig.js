@@ -104,8 +104,21 @@ const KB = (at, layer) => ({ img: 'kettlebell', at, a: [916, 64], k: 1.3, ...(la
 const TRX = (from, to = 'grip') => [{ line: from, to: 'f' + to, thick: 8, layer: 'mid', box: true }, { line: from, to, thick: 8, anchor: true, box: true }];
 // Landmine: dicke Stange vom Gelenk am Boden (from, relativ zum festen Punkt) bis knapp über die Hand,
 // Gelenk als dunkler Kreis (anchor)
-// Die Hand hält das Hülsenende, die Scheibe sitzt knapp davor Richtung Gelenk
-const LANDMINE = (from, to = 'grip') => [{ line: from, to, thick: 14, over: 24, end: true, anchor: true, layer: 'mid' }, { img: 'plate', at: 'lever:0:-95', k: 1, layer: 'mid' }];
+// Gezeichnet (sheets/equipment/landmine.png): Halterung am Boden, die Stange (span) von der Öffnung der Halterung bis zur
+// Hand am Hülsenende; liegt das Gelenk vor der Figur (x > 0), zeigt die Halterung nach links (gespiegelt)
+const LM_BASE_K = 0.5, LM_MOUTH = [470, 632], LM_BASE_FOOT = [360, 825];
+const LANDMINE = (from, to = 'grip', toOff) => {
+  const mouth = [from[0] + (from[0] > 0 ? -1 : 1) * (LM_MOUTH[0] - LM_BASE_FOOT[0]) * LM_BASE_K, from[1] - (LM_BASE_FOOT[1] - LM_MOUTH[1]) * LM_BASE_K];
+  return [
+    { img: 'lmbase', at: from, a: LM_BASE_FOOT, k: LM_BASE_K, flip: from[0] > 0, layer: 'back' },
+    { span: true, img: 'lmbar', from: mouth, to, toOff, a: [24, 317], b: [1490, 317], k: 0.75, layer: 'mid' },
+  ];
+};
+// Vorderansicht: die Stange zeigt zum Betrachter, darum Stab mit runder Scheibe statt der Seitenansicht der Stange
+const LANDMINE_FRONT = (from, to) => [
+  { img: 'lmbase', at: from, a: LM_BASE_FOOT, k: LM_BASE_K, layer: 'back' },
+  { line: [from[0], from[1] - 90], to, thick: 14, over: 24, end: true, layer: 'mid' }, { img: 'plate', at: 'lever:1:-95', k: 1, layer: 'mid' },
+];
 // Ausfallschritt im Sonnengruss (Hüfte ~138 über dem vorderen Knöchel, hinteres Bein 30° unter der Waagrechten)
 // Hüfte hoch genug, dass das kurze Faultier-Bein unter dem Bauch sichtbar bleibt
 const LUNGE = { name: 'Ausfallschritt', t: 1.4, h: 0.5, k: { torso: 4, spine: 10, nod: -8, handX: 180, handY: 30, thigh: 40, calf: 103, foot: 0, fthigh: 134, fcalf: 134, ffoot: 100, dx: 0, dy: 0 } };
@@ -444,45 +457,52 @@ const SLOTH_POSES = {
     b: { torso: -36, uarm: 170, farm: 70, thigh: 70, calf: 102 },
   },  // ---- Landmine: Stange vom Gelenk am Boden bis über die Hände, Scheibe am Stangenende (LANDMINE) ----
   lmpress: {
-    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'Landmine Press', props: LANDMINE([480, 40]),
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'Landmine Press', props: LANDMINE([480, 46]),
     a: { torso: -98, uarm: 72, farm: -78, hand: -60, thigh: 86, calf: 92, fuarm: 96, ffarm: 92 },
     b: { torso: -102, uarm: -28, farm: -28, hand: -28, thigh: 86, calf: 92, fuarm: 96, ffarm: 92 },
   },
   lmpresskneel: {
-    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'Landmine Press kniend', props: LANDMINE([460, 40]),
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'Landmine Press kniend', props: LANDMINE([460, 46]),
     a: { torso: -96, uarm: 72, farm: -78, hand: -60, thigh: 0, calf: 90, fthigh: 96, fcalf: 178, fuarm: 96, ffarm: 92 },
     b: { torso: -100, uarm: -26, farm: -26, hand: -26, thigh: 0, calf: 90, fthigh: 96, fcalf: 178, fuarm: 96, ffarm: 92 },
   },
   lmchest: {
-    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'Landmine Brustpresse', props: LANDMINE([500, 40]),
+    view: 'side', pin: 'ankle', dur: 2.6, floor: 46, grip: 'fist', label: 'Landmine Brustpresse', props: LANDMINE([500, 46]),
     a: { torso: -104, uarm: 78, farm: -72, hand: -50, fuarm: 82, ffarm: -68, thigh: 86, calf: 92 },
     b: { torso: -106, uarm: -18, farm: -18, hand: -18, fuarm: -14, ffarm: -14, thigh: 86, calf: 92 },
   },
   lmrow: {
     // einarmig: freie Hand auf dem Knie, Stange vom Gelenk hinter der Figur
-    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Landmine Rudern', props: LANDMINE([-330, 40]),
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Landmine Rudern', props: LANDMINE([-330, 46]),
     a: { torso: -36, uarm: 92, farm: 90, thigh: 70, calf: 102, fuarm: 60, ffarm: 40 },
     b: { torso: -36, uarm: 170, farm: 70, thigh: 70, calf: 102, fuarm: 60, ffarm: 40 },
   },
+  lmtbar: {
+    // T-Bar mit V-Griff: Stangenende im Haken des Griffs, die Hände an den Griffen darunter
+    view: 'side', pin: 'ankle', dur: 2.4, floor: 46, grip: 'fist', label: 'Landmine T-Bar Rudern',
+    props: [...LANDMINE([-360, 46], 'grip', [0, -58]), { img: 'vgrip', at: 'grip', a: [1127, 800], k: 0.4 }],
+    a: { torso: -36, uarm: 92, farm: 90, thigh: 70, calf: 102 },
+    b: { torso: -36, uarm: 170, farm: 70, thigh: 70, calf: 102 },
+  },
   lmsquat: {
-    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'Landmine Squat', props: LANDMINE([500, 40]),
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'Landmine Squat', props: LANDMINE([500, 46]),
     a: { torso: -100, uarm: 104, farm: -58, hand: -40, thigh: 80, calf: 92 },
     b: { torso: -70, uarm: 72, farm: -80, hand: -60, thigh: 8, calf: 110 },
   },
   lmlunge: {
-    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'Landmine Ausfallschritt', props: LANDMINE([500, 40]),
+    view: 'side', pin: 'ankle', dur: 2.8, floor: 46, grip: 'fist', label: 'Landmine Ausfallschritt', props: LANDMINE([500, 46]),
     a: { torso: -98, uarm: 104, farm: -58, hand: -40, thigh: 72, calf: 100, fthigh: 112, fcalf: 140 },
     b: { torso: -94, uarm: 104, farm: -58, hand: -40, thigh: 8, calf: 96, fthigh: 98, fcalf: 172 },
   },
   lmrdl: {
-    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Landmine Kreuzheben', props: LANDMINE([500, 40]),
+    view: 'side', pin: 'ankle', dur: 3, floor: 46, grip: 'fist', label: 'Landmine Kreuzheben', props: LANDMINE([500, 46]),
     a: { torso: -96, uarm: 84, farm: 82, thigh: 86, calf: 92, fuarm: 84, ffarm: 82 },
     b: { torso: -28, uarm: 86, farm: 84, thigh: 96, calf: 96, fuarm: 86, ffarm: 84 },
   },
   // Vorderansicht: Gelenk vor den Füssen (zum Betrachter), die Stange zeigt schräg zu den Händen
   lmrainbow: {
     view: 'front', pin: 'feet', dur: 3, floor: 26, armsFront: true, join: { arm: 'l', to: 'hand_r', bend: 1 }, label: 'Landmine Rotation',
-    props: LANDMINE([0, 60], 'hand_r'),
+    props: LANDMINE_FRONT([0, 60], 'hand_r'),
     // Hände zeigen immer leicht nach links unten (sonst greift die linke Hand per join nicht an die Stange); die
     // Bewegung von Seite zu Seite kommt aus dem Rumpf
     a: { torso: -74, head: -82, uarm_l: 40, farm_l: 40, uarm_r: 92, farm_r: 98, ...STAND_LEGS, tail: 0 },
@@ -490,7 +510,7 @@ const SLOTH_POSES = {
   },
   lmantirot: {
     // Seitenansicht: Arme gestreckt vor der Brust, die Stange wird gehalten (kleines Nachgeben und wieder fixieren)
-    view: 'side', pin: 'ankle', dur: 3.4, floor: 46, grip: 'fist', label: 'Landmine Anti-Rotation', props: LANDMINE([500, 40]),
+    view: 'side', pin: 'ankle', dur: 3.4, floor: 46, grip: 'fist', label: 'Landmine Anti-Rotation', props: LANDMINE([500, 46]),
     a: { torso: -100, uarm: -6, farm: -6, hand: -6, fuarm: -2, ffarm: -2, thigh: 84, calf: 92 },
     b: { torso: -96, uarm: 4, farm: 4, hand: 4, fuarm: 8, ffarm: 8, thigh: 84, calf: 92 },
   },
@@ -1468,6 +1488,12 @@ function slothRigBuild(pose, v2 = false) {
         const end = q['leverEnd' + lv[1]];
         return lv[2] ? add(end, mul(q['leverDir' + lv[1]], Number(lv[2]))) : end;
       };
+      if (pr.span) { // Bild (z. B. Landmine-Stange) von from bis to: Punkt a des Bildes auf from, b auf to, nur in der Länge gestreckt
+        const A0 = pt(pr.from), B = add(pt(pr.to), pr.toOff || [0, 0]), d = sub(B, A0), [ax, ay] = pr.a, [bx, by] = pr.b;
+        const ang = Math.atan2(d[1], d[0]) - Math.atan2(by - ay, bx - ax);
+        q['prop' + i] = { img: 'eq_' + pr.img, P: A0, r: ang * 180 / Math.PI, p: pr.a, k: [Math.hypot(d[0], d[1]) / Math.hypot(bx - ax, by - ay), pr.k || 1] };
+        return;
+      }
       if (pr.bar) { // Hantelstange von der Scheibe in der Hand schräg nach hinten zur zweiten Scheibe
         const A0 = add(pt(pr.at), [pr.dx, pr.dy]);
         q['prop' + i] = { line: true, bar: true, P: A0, r: Math.atan2(pr.d[1], pr.d[0]) * 180 / Math.PI, p: [0, 0], k: [Math.hypot(pr.d[0], pr.d[1]), pr.w / 6] };
