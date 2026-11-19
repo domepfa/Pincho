@@ -77,6 +77,8 @@ SIDE_NECK_CUT = (560, 246, 0.5, 8)  # x ab dem waagrecht, y, Steigung nach hinte
 EQUIP2 = {
     'geraete2.jpg': {'stack': [231], 'calfframe': [229], 'calfpad': [232], 'dipbars': [285], 'nordic': [284], 'abductseat': [248]},
     'geraete3.jpg': {'edge': [156]},
+    # Landmine (GPT-Blatt, November 2026): Stange mit Scheibe, Bodenhalterung, V-Griff
+    'landmine.png': {'lmbar': [1], 'lmbase': [32], 'vgrip': [33]},
 }
 
 # Geräte etwas dunkler, damit sie neben dem Faultier zurücktreten

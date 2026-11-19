@@ -2675,7 +2675,7 @@ const SLOTH_EXERCISE_POSES = {
   leg_press: 'legpress', leg_extension: 'legext', leg_curl_lying: 'legcurl', butterfly: 'pecdeck',
   reverse_butterfly: 'reversefly', hip_abduction_machine: 'abduction', hip_adduction_machine: 'abduction',
   hip_abduction_cable: 'abductioncable', calf_raise_seated: 'calfseated', calf_raise_machine: 'calfmachine',
-  back_extension: 'backext', pullover_machine: 'pullovermachine', dip_machine: 'dipmachine', t_bar_row: 'tbarrow', landmine_press: 'lmpress', landmine_press_kneeling: 'lmpresskneel', landmine_chest_press: 'lmchest', landmine_row: 'lmrow', meadows_row: 'lmrow', landmine_tbar_row: 'tbarrow', landmine_squat: 'lmsquat', landmine_reverse_lunge: 'lmlunge', landmine_rdl: 'lmrdl', landmine_rainbow: 'lmrainbow', landmine_antirotation: 'lmantirot', ab_wheel_rollout: 'abwheel',
+  back_extension: 'backext', pullover_machine: 'pullovermachine', dip_machine: 'dipmachine', t_bar_row: 'tbarrow', landmine_press: 'lmpress', landmine_press_kneeling: 'lmpresskneel', landmine_chest_press: 'lmchest', landmine_row: 'lmrow', meadows_row: 'lmrow', landmine_tbar_row: 'lmtbar', landmine_squat: 'lmsquat', landmine_reverse_lunge: 'lmlunge', landmine_rdl: 'lmrdl', landmine_rainbow: 'lmrainbow', landmine_antirotation: 'lmantirot', ab_wheel_rollout: 'abwheel',
   jump_rope: 'jumprope', agility_ladder_run: 'ladder', zercher_squat_rotation: 'goblet', carioca: 'shuffle',
   russian_twist: 'russian', hip_9090: 'ninety', frog_stretch: 'frog', ext_rotation: 'extrot',
   tibialis_raise: 'tibialis', wrist_curl: 'wristcurl', wrist_ext: 'wristcurl', wrist_mobility: 'wristmob',
