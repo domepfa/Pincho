@@ -818,6 +818,7 @@ function renderFsPanel() {
     if (fsPhase === 'working') {
       return `${head}
         <div class="fs-work-timer mono" id="fs-work-timer">${fmtMinSec(fsWorkTimer.seconds)}</div>
+        ${refBox(g)}
         <button type="button" class="btn fs-dock-btn" id="fs-end-set">■ Satz beenden</button>`;
     }
     // 'resting' — während der Pause zur Übung gewechselt (siehe
